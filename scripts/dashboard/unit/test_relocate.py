@@ -1,5 +1,5 @@
-"""Copying or moving a container to another node, its data with it (the
-operator, 10 Oct): the jobs each half runs, the data passed only to the jobs
+"""Copying or moving a container to another node, its data with it:
+the jobs each half runs, the data passed only to the jobs
 that send and fetch it, a copy beside the original, a move that takes the
 old node's containers down only once it is up, and the way back when one
 fails."""
@@ -69,7 +69,7 @@ class Relocate(unittest.TestCase):
         devactions.act = lambda p, i, a, req, **kw: (self.acted.append((p, i, a, req)) or ({"ok": True}, 200))
         self.addCleanup(setattr, devactions, "act", real)
         # Running, unless a test says otherwise: what the old node does
-        # around the data depends on it (B725).
+        # around the data depends on it.
         self.running = True
         was_running = devactions._running
         devactions._running = lambda p, i=devapp.MAIN: self.running
@@ -84,8 +84,8 @@ class Relocate(unittest.TestCase):
         return devactions.compose_done(j, state)
 
     def test_a_written_container_that_builds_an_image_ships_too(self):
-        # A container written on the Docker tab for alpha, building an image
-        # (B716): moved to n2, which is not alpha's, its image is built on
+        # A container written on the Docker tab for alpha, building an image:
+        # moved to n2, which is not alpha's, its image is built on
         # alpha's node and shipped, never built on n2, which holds no code.
         d = devapp._load()
         d["web"] = {"main": {"source": "file", "for": "alpha", "node": "n1"}}
@@ -141,7 +141,7 @@ class Relocate(unittest.TestCase):
         self.assertEqual(p.read_bytes(), body)
 
     def test_the_data_may_come_in_pieces(self):
-        """Through a tunnel's edge a request may carry at most 100 MB (R170): the
+        """Through a tunnel's edge a request may carry at most 100 MB: the
         agent sends offset and total, a piece that landed already is not
         taken twice, and the file is whole only when the last piece is."""
         r = relocate.start("alpha", "main", "copy", "n2", "alpha-web")
@@ -155,7 +155,7 @@ class Relocate(unittest.TestCase):
 
     def test_data_bigger_than_the_room_here_is_refused_before_a_byte(self):
         """The old node says how big its data is; a box that was taken over
-        would otherwise fill the controller's disk (R92)."""
+        would otherwise fill the controller's disk."""
         r = relocate.start("alpha", "main", "copy", "n2", "alpha-web")
         self.q.jobs[r["job"]]["state"] = "running"
         was = relocate.DATA_KEEP_FREE
@@ -192,8 +192,8 @@ class Relocate(unittest.TestCase):
                                  "spec": {"project": "alpha", "instance": "main", "action": "rebuild"}}, "failed")
         rec = devapp._read_rec("alpha", "main")
         self.assertEqual(rec.get("node"), "n1", "back where it was")
-        # Said in the bell, where it can be put away, not on the row for ever
-        # (the operator, 11 Oct); gone once the container starts again.
+        # Said in the bell, where it can be put away, not on the row for ever;
+        # gone once the container starts again.
         self.assertIsNone(relocate.view("alpha", "main"), "the row says nothing of it")
         rows = relocate.attention(lambda nid: nid)
         self.assertEqual([(r["kind"], r["id"], r["why"]) for r in rows],
@@ -208,7 +208,7 @@ class Relocate(unittest.TestCase):
 
     def test_an_arriving_container_builds_and_stays_down(self):
         # The real plan (devactions._plan), with the record at the move's
-        # last stage: build, down, and no up (R208, the operator, 13 Oct).
+        # last stage: build, down, and no up.
         import importlib
         real = importlib.import_module("devactions")
         plain = [st["name"] for st in real._plan("alpha", "main", "rebuild")]
@@ -219,7 +219,7 @@ class Relocate(unittest.TestCase):
         relocate._set("alpha", "main", relocating=None)
 
     def test_the_data_is_unpacked_on_arrival_unless_the_archive_is_to_stay(self):
-        # The dialog's choice (the operator, 14 Oct): unpack at once, or
+        # The dialog's choice: unpack at once, or
         # carry the archive and unpack from the row later.
         r = relocate.start("alpha", "main", "copy", "n3", "two")
         self.q.jobs[r["job"]]["state"] = "running"
@@ -289,7 +289,7 @@ class Relocate(unittest.TestCase):
         self.assertFalse(devapp.env_path("alpha", "alpha-web").exists())
 
     def test_a_remove_on_a_quiet_node_queues_the_down_and_keeps_the_row(self):
-        # B597: a node reads quiet for a minute every few (B550), and a remove
+        # A node reads quiet for a minute every few, and a remove
         # landing then forgot the row and left the container running.
         devapp._avail_hosts.clear()
         devapp._avail.update(val=None, when=0)
@@ -314,7 +314,7 @@ class Relocate(unittest.TestCase):
         self.assertTrue(relocate.start("alpha", "main", "move", "n3", data="")["ok"], "nothing said is unpack")
 
     def test_one_that_is_down_is_neither_stopped_nor_started_around_the_data(self):
-        # B725: start on no containers exited 1, failing a copy after its
+        # Start on no containers exited 1, failing a copy after its
         # data was sent, and leaving a failed move down at home.
         self.running = False
         r = relocate.start("alpha", "main", "copy", "n3", "two")
@@ -334,7 +334,7 @@ class Relocate(unittest.TestCase):
                          "it was down, so it stays down")
 
     def test_no_data_sends_the_container_alone(self):
-        # The third choice (the operator, 14 Oct): a copy is the record and
+        # The third choice: a copy is the record and
         # a build on the new node, nothing on the old; a running move stops
         # here first, a down one does not even that.
         r = relocate.start("alpha", "main", "copy", "n3", "two", data="none")
@@ -369,7 +369,7 @@ class Relocate(unittest.TestCase):
 
 class OneAtATime(unittest.TestCase):
     def test_a_second_press_while_the_first_starts_is_refused(self):
-        # B555: the check and the mark were apart, so two presses both started.
+        # The check and the mark were apart, so two presses both started.
         import threading
         from unittest import mock
         go, inside = threading.Event(), threading.Event()
@@ -394,7 +394,7 @@ if __name__ == "__main__":
 class UnpackTrustsNoManifest(unittest.TestCase):
     """The unpack script runs on the new node over an archive the old node
     packed, and a hosting-only box that was taken over writes that archive:
-    it writes the moved instance's own volumes and no other (R92)."""
+    it writes the moved instance's own volumes and no other."""
 
     def run_unpack(self, manifest, have=(), labels=None):
         import json

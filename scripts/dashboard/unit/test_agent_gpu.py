@@ -1,4 +1,4 @@
-"""The node agent's GPU name in its census (B391): only an nvidia-smi that
+"""The node agent's GPU name in its census: only an nvidia-smi that
 answered is a name. Drives _gpu_name against a stand-in nvidia-smi on PATH."""
 import os
 import shutil
@@ -31,7 +31,7 @@ class StandIn(unittest.TestCase):
 
 
 class AmdCard(unittest.TestCase):
-    """An AMD card is known by its PCI vendor id (B767): the words 'VGA
+    """An AMD card is known by its PCI vendor id: the words 'VGA
     compatible' hold 'ati', so every display adapter read as AMD's."""
 
     def lspci(self, text):
@@ -96,7 +96,7 @@ class GpuSample(StandIn):
 
 
 class GpuDriver(unittest.TestCase):
-    """Where the driver stands, read from sysfs and modinfo (R102): the row
+    """Where the driver stands, read from sysfs and modinfo: the row
     has to tell not installed, installed and waiting for a reboot, running,
     and removed but still loaded apart, before nvidia-smi can answer."""
 
@@ -145,7 +145,7 @@ class GpuDriver(unittest.TestCase):
         self.assertEqual(self.read(), {})
 
     def test_a_driver_left_for_a_card_that_has_gone_is_said(self):
-        # B168: the row it keeps is the only way to remove it.
+        # The row it keeps is the only way to remove it.
         self.card(vendor="0x1234")
         got = agent._gpu_driver(sys_root=self.root, modinfo=self.modinfo("610.57.04"))
         self.assertEqual((got["installed"], got["nocard"], got["bound"]), ("610.57.04", True, ""))
@@ -192,7 +192,7 @@ class GpuDriver(unittest.TestCase):
 
 
 class GpuDriverApt(unittest.TestCase):
-    """What apt says about the driver (R102): the branches on offer for the
+    """What apt says about the driver: the branches on offer for the
     row's pulldown, the package installed, what it would update to, and the
     one recommended for the card. Stand-ins for apt-cache, dpkg-query and
     ubuntu-drivers on PATH."""

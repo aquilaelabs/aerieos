@@ -1,5 +1,5 @@
 """bb-session binds what it staged from a descriptor opened a part at a time
-through no link (R247 step 5): the account owns much of a view's sources,
+through no link: the account owns much of a view's sources,
 and a link it left along one (u/<account> pointed at another account's
 folder) led the bind to that account's token and session."""
 import importlib.machinery

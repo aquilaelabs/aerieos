@@ -1,4 +1,4 @@
-"""A toolchain install asks its source's host first (R82): a machine with
+"""A toolchain install asks its source's host first: a machine with
 no internet is told in one sentence, naming the host, before anything is
 touched."""
 import json
@@ -52,7 +52,7 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")
 
 # sdk_install itself, under bb's set -e, with the session guard (not what is
 # asked here) answered yes: reach answers 1 exactly when it has the sentence,
-# and the assignment that took it ended the install there in silence (B144).
+# and the assignment that took it ended the install there in silence.
 RUN = r"""set -euo pipefail
 REPO="$1" STORE="$2"
 die() { echo "DIE: $*"; exit 3; }

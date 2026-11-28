@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Install AerieOS's controller on a machine of its own, without the
-# container (R90), and make that machine a node of itself.
+# container, and make that machine a node of itself.
 #
 # The container install is the image: compose or the Unraid template, tini
 # and the entrypoint. This is the same controller laid out the way the image
@@ -59,7 +59,7 @@ SUDOERS="$P/etc/sudoers.d/aerieos-controller"
 BB_BIN="$P/usr/local/bin/aerie"
 SERVICE=aerieos-controller
 REPO=aquilaelabs/aerieos
-# Who may sign a release (R199): the copy in the tree this script is in,
+# Who may sign a release: the copy in the tree this script is in,
 # the release that runs here, so a key is trusted because this install
 # already held it and never because a download names it. Another file only
 # under the unit tests' prefix.
@@ -233,7 +233,7 @@ lay_out() {
     install -m 0644 "$t/Dockerfile" "$dir.partial/Dockerfile"
     chmod -R a+rX "$dir.partial"
     chmod -R +x "$dir.partial/scripts"
-    # The scripts' bytecode, as the image makes it (R228 step 8): nothing at
+    # The scripts' bytecode, as the image makes it: nothing at
     # run time writes any, so without it each start and each relayed verb
     # compiles again. Made here by this machine's python3, never carried
     # from the tree laid out, whose may be another python's or stale; a
@@ -243,7 +243,7 @@ lay_out() {
         python3 -m compileall -q "$dir.partial/scripts" >/dev/null 2>&1 \
             || warn "the scripts did not all compile ahead of time: they run, and compile as they load"
     fi
-    # noVNC: a VM's screen in the dock (R99), the release the tree's
+    # noVNC: a VM's screen in the dock, the release the tree's
     # config/image-tools.json pins, held to the pinned sha256 (pin-fetch)
     # as the image takes it.
     if [ "${NO_FETCH:-0}" != 1 ]; then
@@ -491,7 +491,7 @@ folders() {
     else
         # The parent made if missing and never changed if it is there: install
         # -d sets a folder's mode and owner even when it exists, and the
-        # parent of --workspace /projects is / (B498).
+        # parent of --workspace /projects is /.
         mkdir -p "$(dirname "$P$WORKSPACE_DIR")"
         install -d -m 0750 -o "$ACCOUNT" -g "$g" "$P$WORKSPACE_DIR"
     fi
@@ -538,7 +538,7 @@ env_get() {
 
 # state_dir: the controller's state as the service finds it, with the same
 # default host-env.sh gives when the env file names none; an empty answer
-# had the update's gate and the rollback read the current directory (B499).
+# had the update's gate and the rollback read the current directory.
 state_dir() {
     local v; v="$(env_get DASHBOARD_STATE)"
     v="${v:-$VAR/config}"
@@ -693,7 +693,7 @@ Its state is $(state_dir), its projects $(env_get WORKSPACE).
 EOF
 }
 
-# ---- the appliance image (R160 step 1) ----------------------------------------
+# ---- the appliance image ----------------------------------------
 # cmd_stage: inside the image's root while mkosi builds it: root, the
 # packages in, no service manager running, the checkout at $TREE. What
 # --install does up to the service, enabled for the first boot and not
@@ -753,7 +753,7 @@ cmd_firstboot() {
 
 # ---- updates: the release fetched and put in place as an image pull is -----
 # release_signed TAG FILE NAME DIR: FILE, which the release TAG carries as
-# NAME, is the file the release's signed list names (R199): SHA256SUMS and
+# NAME, is the file the release's signed list names: SHA256SUMS and
 # its signature are fetched into DIR, the signature is verified against
 # this install's signers, and FILE's own sha256 is the one the list gives
 # NAME. The tag says who may have signed: the namespace a signer is named
@@ -810,7 +810,7 @@ release_signed() {
     printf '   %s is the file %s'"'"'s list names, signed by %s\n' "$name" "$tag" "$who" >&2
 }
 
-# fetch_tree [TAG]: the release's controller bundle (R90 step 5), which the
+# fetch_tree [TAG]: the release's controller bundle, which the
 # release workflow publishes as aerieos-controller-X.Y.Z.tar.gz with its
 # sha256 beside it and a build attestation from GitHub: the archive checked
 # against the sha256, against the attestation where gh is here to ask, and
@@ -868,7 +868,7 @@ fetch_tree() {
             printf '   build attestation: gh is not here to check it; the sha256 is what held\n' >&2
         fi
         # ...and the file the release's signed list names, by a key this
-        # install already holds (R199): who changes the repository can
+        # install already holds: who changes the repository can
         # build and attest a bundle and put a sha256 beside it, not sign
         # the list.
         release_signed "$tag" "$d/release.tar.gz" "aerieos-controller-${ver}.tar.gz" "$d"
@@ -920,7 +920,7 @@ cmd_update() {
     read -r ver rev <<<"$(tree_stamp "$t")"
     cur="$(sed -n 's/^BB_VERSION=//p' "$OPT/build.env" 2>/dev/null || true)"
     say "update: ${cur:-?} to ${ver}"
-    # Never back to an older release (B1170; the operator, 28 Oct: no roll
+    # Never back to an older release (no roll
     # back): a signed older one still carries the holes later ones closed.
     # The way back after a failed update is back_to_previous, never this.
     if [ -n "$cur" ] && [[ "$(ver_key "$ver")" < "$(ver_key "$cur")" ]]; then
@@ -955,7 +955,7 @@ cmd_update() {
     if wait_up; then
         printf '   %s is up\n' "$ver"
     else
-        # Not answering: back by itself (R90 step 5), the state the newer
+        # Not answering: back by itself, the state the newer
         # build may have moved on put back from the copy it took, so the
         # machine is never left on a build that does not come up.
         warn "${ver} did not answer on port ${PORT}: journalctl -u ${SERVICE} says why; going back to ${cur:-the one before} now"
@@ -984,8 +984,8 @@ ver_key() {
 }
 
 # back_to_previous: the release before, put back by an update whose new
-# release did not answer (R90 step 5). Boot safety, not a downgrade: it is
-# never a verb of its own (the operator, 28 Oct: no roll back).
+# release did not answer. Boot safety, not a downgrade: it is
+# never a verb of its own (no roll back).
 back_to_previous() {
     local prev newver oldver state
     [ -L "$RELEASES/.previous" ] || die "there is no release before this one to go back to"
@@ -1056,7 +1056,7 @@ cmd_remove() {
     rm -f "$OPT"
     if [ "$PURGE" = 1 ]; then
         # Whether this installer made the account, read before the folder
-        # that records it goes, which made the answer always no (B500).
+        # that records it goes, which made the answer always no.
         local made=""
         grep -qx "$ACCOUNT" "$MADE" 2>/dev/null && made=1
         rm -rf "$VAR" "$ETC"
@@ -1087,7 +1087,7 @@ cmd_remove() {
 # A machine that is a node already is left as it is: of this controller,
 # provisioned again for a newer agent and bb-session; of another, said.
 OWN_MARK="$ETC/own-node"
-# The features the installer on the ISO was asked for (R160 step 2), turned
+# The features the installer on the ISO was asked for, turned
 # on with the node at the first boot: one id per line, on the data partition.
 OS_FEATURES_FILE="$P/var/lib/aerieos-os/features"
 declare -a OS_FEATURES=()
@@ -1131,7 +1131,7 @@ own_node() {
 # names the controller's folders, which bb-session covers in every view and
 # holds to their owners and modes before it starts a session. The
 # controller keeps no port on the loopback that answers without a sign-in
-# (its terminals are the dashboard's own, R133), so the wall names none, and
+# (its terminals are the dashboard's own), so the wall names none, and
 # the port table an earlier install wrote is taken away.
 # The name of that table (bb-session's WALL_TABLE).
 WALL_TABLE=builderbot_wall

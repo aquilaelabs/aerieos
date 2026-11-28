@@ -1,5 +1,5 @@
 """An agent update is AerieOS's own release where the node pinned the
-release key (R227 step 1): taken with a signature under that key over its
+release key: taken with a signature under that key over its
 digest, refused without one, taken unsigned only where the node's console
 said so, and taken as before by a node that pinned nothing. The console's
 choices outlive the running agent's own writes of node.json."""
@@ -52,7 +52,7 @@ class Verify(unittest.TestCase):
         self.assertIn("console allows unsigned", said)
 
     def test_an_update_signed_by_the_spare_is_taken_as_one_signed_by_the_key(self):
-        # R232: the key the builds sign with is lost or replaced, the spare
+        # The key the builds sign with is lost or replaced, the spare
         # signs in its place, and no node is cut off.
         k, pub = pair()
         s, spare = pair()
@@ -151,7 +151,7 @@ class Enrolling(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", pub])
         self.assertEqual(json.load(open(stores.NODE_JSON)).get("release_key"), pub)
-        # The Enroll script carries the spare after a comma (R232): both are
+        # The Enroll script carries the spare after a comma: both are
         # pinned, and a script that names the key alone drops the spare.
         _, spare = pair()
         with contextlib.redirect_stdout(io.StringIO()) as out:
@@ -233,8 +233,8 @@ class Signer(unittest.TestCase):
         r = subprocess.run([sys.executable, tool], env={k2: v for k2, v in env.items() if k2 != "AERIEOS_RELEASE_KEY"},
                            capture_output=True, text=True, timeout=60, check=False)
         self.assertIn("ships unsigned", r.stdout)
-        # Named on the file's second line, that other key is the spare
-        # (R232): a build may sign with it, and the check passes under it.
+        # Named on the file's second line, that other key is the spare:
+        # a build may sign with it, and the check passes under it.
         open(mine, "a").write(f"aerieos-release-ed25519 {other.public_key().public_bytes_raw().hex()}\n")
         r = subprocess.run([sys.executable, tool], env=dict(env, AERIEOS_RELEASE_KEY=other.private_bytes_raw().hex()),
                            capture_output=True, text=True, timeout=60, check=False)
@@ -265,7 +265,7 @@ class Signer(unittest.TestCase):
         key = enrollscript.release_key()
         self.assertEqual(release.clean_key(key), key)
         self.assertTrue(key, "the repository names AerieOS's release key")
-        # ...and its spare beside it (R232), a key of its own a node can pin too.
+        # ...and its spare beside it, a key of its own a node can pin too.
         keys = enrollscript.release_keys()
         self.assertEqual(len(keys), 2, "the repository names a spare for the release key")
         self.assertEqual(release.clean_keys(",".join(keys)), keys)
@@ -276,7 +276,7 @@ class FromTheBuildToTheNode(unittest.TestCase):
     a pinned node then keeps: the three work the list out apart (the tool
     from the tree, the controller and the node from the bundle), and root's
     tools are kept from a bundle that list passed, under the one signature
-    over it (R267 step 28)."""
+    over it."""
 
     def test_the_tree_signed_is_the_bundle_kept(self):
         import tarfile

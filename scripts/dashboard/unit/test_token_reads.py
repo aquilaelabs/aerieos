@@ -1,4 +1,4 @@
-"""Who reads an account's coding-agent token on a node (R125 step 6): the
+"""Who reads an account's coding-agent token on a node: the
 agent keeps the files at 600 and says a reader that is neither the account
 nor itself; the controller audits each new one once and puts the newest on
 the bell, where a dismissal holds until another."""

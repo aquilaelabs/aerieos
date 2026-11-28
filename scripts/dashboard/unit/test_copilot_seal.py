@@ -1,7 +1,7 @@
-"""Copilot CLI's sign-in sealed with the others (R126 step 3): its config,
+"""Copilot CLI's sign-in sealed with the others: its config,
 which holds the token beside its settings, is sealed whole, the seal's
 header names the GitHub login, and the Installed page reads the login from
-the header while the copy is shut, in either seal format (B407)."""
+the header while the copy is shut, in either seal format."""
 import importlib.util
 import json
 import os

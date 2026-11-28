@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AerieOS USB Maker (R198): the stick maker (aerieos-stick.py) in a
+"""AerieOS USB Maker: the stick maker (aerieos-stick.py) in a
 window, for Windows above all, where it is built into one .exe that asks for
 Administrator once at start. Nothing here writes a disk itself: every step
 is aerieos-stick.py's own (the disks it lists, the release it fetches and
@@ -297,7 +297,7 @@ class Maker(tk.Tk):
                 try:
                     image = stick.release_image(self.choice["tag"].get().strip() if src == "tag" else "latest", "dev" if src == "dev" else "normal")
                 except SystemExit as e:
-                    # No stable release out yet (B959): the newest dev build
+                    # No stable release out yet: the newest dev build
                     # is written, said, rather than a stop with Back dead.
                     if src != "latest" or "dev channel" not in str(e):
                         raise
@@ -307,7 +307,7 @@ class Maker(tk.Tk):
             again = stick.pick(d["id"])
             if (again["size"], again["model"]) != (d["size"], d["model"]):
                 raise Stopped("the stick is not the one picked any more (it was unplugged or changed): nothing written")
-            # Big enough for the image, said before anything is erased (B958).
+            # Big enough for the image, said before anything is erased.
             why = stick.fits_why(image, again["size"])
             if why:
                 raise Stopped(f"{why}: nothing written")

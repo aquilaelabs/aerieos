@@ -1,5 +1,5 @@
 """A bare-metal controller's update never moves back to an older release
-(B1170; the operator, 28 Oct: no roll back): the installer's own version
+(no roll back): the installer's own version
 order, X.Y.Z then a dev build before the release it leads to."""
 import os
 import subprocess

@@ -1,4 +1,4 @@
-"""bb-agent-hook (R95 steps 6, 21): Codex's, Copilot's and Grok's hooks hold Claude's
+"""bb-agent-hook: Codex's, Copilot's and Grok's hooks hold Claude's
 guards. Their payloads said again in Claude Code's shape, the same hooks run
 in the same order, and a refusal answered in each agent's own way; against
 stand-in hooks, never the real controller."""
@@ -122,7 +122,7 @@ class Runs(unittest.TestCase):
         self.assertEqual(self.ran(), [["alpha", "u_0123abcd"]], "the guards after it are not asked")
 
     def test_before_a_tool_the_guards_run_in_this_process(self):
-        # R228 step 17: each guard was a python of its own before every tool
+        # Each guard was a python of its own before every tool
         # call. A refusal is passed on as before, and nothing was started.
         real = self.h.subprocess.run
         started = []
@@ -180,7 +180,7 @@ class Runs(unittest.TestCase):
                                                     "tool_input": "*** Add File: /tmp/scratch.txt\n"}, env)[0], 0)
 
     def test_a_projects_other_repositories_are_its_trees_too(self):
-        # R136: a session of a project of several repositories writes in
+        # A session of a project of several repositories writes in
         # each, as Claude's walls let it, each one's VERSION held.
         env = {"BB_PROJECT": "alpha", "BB_AGENT_WHO": "u_0123abcd", "WORKSPACE": "/workspace",
                "BB_TREE": "/workspace/.worktrees/alpha/codex-u_0123abcd", "BB_CLAUDE_SHARE": "/workspace/.claude",

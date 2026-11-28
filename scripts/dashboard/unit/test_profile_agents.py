@@ -1,4 +1,4 @@
-"""Your coding agents on Profile (R294 step 6): each agent with a sign-in of
+"""Your coding agents on Profile: each agent with a sign-in of
 its own on each node the person may sign in on, where it is installed or they
 are signed in to it, with the server's own reason a press could not run now;
 a hosting-only node, a retired one and one out of the person's scope are

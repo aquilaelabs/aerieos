@@ -1,5 +1,5 @@
 """A container written here that builds from a git URL builds the files
-committed at that ref (B595): which contexts are such a URL, so the
+committed at that ref: which contexts are such a URL, so the
 rebuild's log can say an ignored file of a working tree is not in it."""
 import os
 import sys

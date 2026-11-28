@@ -45,7 +45,7 @@ plugins {
 
 // The debug APK into dist/, under the name it is asked for (-PbbOut), from
 // wherever this build wrote it: the build directory is off the share on a
-// node (the root build file, B351), so a command copying from
+// node (the root build file), so a command copying from
 // app/build/outputs would find nothing there.
 tasks.register<Copy>("bbApk") {
     dependsOn("assembleDebug")
@@ -67,8 +67,8 @@ android {
         versionName = bbVersion
         buildConfigField("int", "TARGET_API", "9")
     }
-    // A release has no signing config here, so Gradle writes it unsigned
-    // (R106): AerieOS signs it with the project's own sideload key, on the
+    // A release has no signing config here, so Gradle writes it unsigned:
+    // AerieOS signs it with the project's own sideload key, on the
     // controller for a release (releasesign.py) and with aerie sign otherwise.
     // No key, alias or password is in the tree or in CI.
     buildTypes {
@@ -104,11 +104,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.security:security-crypto:1.1.0")
-    // The app's lock (R133): the phone's own fingerprint, face or PIN.
+    // The app's lock: the phone's own fingerprint, face or PIN.
     implementation("androidx.biometric:biometric:1.1.0")
     // ...whose FragmentActivity must be a current one: the fragment library
     // biometric 1.1.0 carries rejects the request codes activity 1.13's
-    // result registry hands out ("Can only use lower 16 bits", B493).
+    // result registry hands out ("Can only use lower 16 bits").
     implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     // The unit tier (src/test): the plain-Kotlin parts, such as how a

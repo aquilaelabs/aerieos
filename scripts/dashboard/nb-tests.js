@@ -1,6 +1,6 @@
 // The notebook's Tests view: the test registry, what each test protects and
 // what a run cost. One classic script beside index.html (docs/nodes.md §13):
-// one file per notebook view (R60). A factory makeNotebook calls per notebook.
+// one file per notebook view. A factory makeNotebook calls per notebook.
 
 "use strict";
 
@@ -85,7 +85,7 @@ function nbTestsView({$, nb, project}){
     }
     const all = j.tests || [];
     // A redraw comes from the poll as well as from this panel. It patches the
-    // list (R244), and a row's body is its own code's, filled again only when
+    // list, and a row's body is its own code's, filled again only when
     // what it shows moved, so typing stays where it is; when it is filled
     // again (another window described the test) the text somebody is part-way
     // through typing has to come back with the row. Carried only where it DIFFERS
@@ -101,21 +101,21 @@ function nbTestsView({$, nb, project}){
       const p = body.querySelector(".tstP"), n = body.querySelector(".tstN");
       // The mark and its reason are typing too: a tick the redraw took back
       // between ticking it and Save posted the description and no mark, and
-      // said nothing about the difference (B79).
+      // said nothing about the difference.
       const a = body.querySelector(".tstAccept"), w = body.querySelector(".tstWhy");
       const accept = a ? a.checked : !!t?.accepted, why = w ? w.value : (t?.accepted || "");
       if (t && p && n && (p.value !== t.protects || n.value !== t.notes
                           || accept !== !!t.accepted || why !== (t.accepted || "")))
         drafts.set(t.key, {protects: p.value, notes: n.value, accept, why});
     });
-    // A run going right now is said first, before the last run's numbers
-    // (R99): aerie test tells the server at its start and end, and the app
+    // A run going right now is said first, before the last run's numbers:
+    // aerie test tells the server at its start and end, and the app
     // already reads the same fact to time its note.
     const going = j.running
       ? `<b>tests running</b>, started ${esc(ago(j.running.since))}${j.running.by ? " by " + esc(j.running.by) : ""}${
           j.running.cmd ? `: <code>${esc(j.running.cmd)}</code>` : ""}`
       : "";
-    // What has nothing to act on is hidden (R225): the output button
+    // What has nothing to act on is hidden: the output button
     // appears with the first run.
     $("tstOut").hidden = !all.length;
     if (!all.length){
@@ -129,7 +129,7 @@ function nbTestsView({$, nb, project}){
       $("tstFolds").innerHTML = "";
       return;
     }
-    // The glance (R109): what passed of every test and what failed in the
+    // The glance: what passed of every test and what failed in the
     // last run of each, then the time in tests: the sum of every test's last
     // measured duration, what the suite spends *in* its tests, with the last
     // run's own wall time under it, the difference being the harness; then
@@ -213,8 +213,8 @@ function nbTestsView({$, nb, project}){
       for (const ch of JSON.stringify([t.protects, t.notes, t.accepted, t.sits_on, t.was, t.history, tstEditing.has(t.key)]))
         h = (h * 31 + ch.charCodeAt(0)) | 0;
       return String(h); };
-    // Only the rows on show are built, a page at a time (pageLimit, R228
-    // step 13): every row was built and all but 25 hidden.
+    // Only the rows on show are built, a page at a time (pageLimit):
+    // every row was built and all but 25 hidden.
     const lim = pageLimit($("tstList"), "tstList", shown.length);
     patch($("tstList"), shown.length ? shown.slice(0, lim).map(t => `
       <details class="tst${t.suspect ? " flagged" : ""}" data-key="${esc(t.key)}"${
@@ -246,7 +246,7 @@ function nbTestsView({$, nb, project}){
       if (body.dataset.done === sig) return;
       body.dataset.done = sig;
       const draft = drafts.get(box.dataset.key);
-      // A role that reads the project and does not write it (B101): no
+      // A role that reads the project and does not write it: no
       // Edit, and the fields never out.
       const ro = projWriteWhy(project);
       if (ro) tstEditing.delete(t.key);
@@ -272,7 +272,7 @@ function nbTestsView({$, nb, project}){
         };
         return;
       }
-      // One form (R301): the two sentences, and where it sits on a wait, the
+      // One form: the two sentences, and where it sits on a wait, the
       // tick with its reason under it; Cancel and Save at its foot.
       const fid = `tstf${++tstFormSeq}`, accepted = draft ? draft.accept : t.accepted;
       drawHTML(body, `${sub}${formBox({fields: [

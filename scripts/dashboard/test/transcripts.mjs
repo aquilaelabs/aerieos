@@ -43,7 +43,7 @@ const browser = await launch();
 const page = await newPage(browser);
 await page.goto(URL); await ready(page);
 // Your conversations are the project's notebook's, in its Sessions view
-// beside Overview (the operator, 22 Oct), no longer a section of Profile.
+// beside Overview, no longer a section of Profile.
 await page.evaluate(() => openProfileTab());
 await page.waitForSelector('.profiletab .snav [data-spick]', { timeout: 15000 });
 ok(!(await page.$('.profiletab .snav [data-spick="logs"]')) && !(await page.$('.profiletab .cvlogs')),
@@ -82,7 +82,7 @@ ok(!/SECRET REASONING/.test(got.text), "Claude's private reasoning is not in it"
 ok(!/SIDECHAIN WORDS/.test(got.text), 'a subagent side chain is not in it');
 ok(!/not a turn/.test(got.text), 'a summary line is not in it');
 
-// Read here (R83): the same conversation as turns in a dialog, Claude's
+// Read here: the same conversation as turns in a dialog, Claude's
 // commands folded under its turn with what each answered.
 await page.click(`${SESS} .cvlogs .artrow [data-cvread="conv-one-2026"]`);
 await page.waitForSelector('#cvModal:not([hidden]) .cvturn', { timeout: 15000 });
@@ -109,9 +109,9 @@ const empty = await page.evaluate(() => { const was = $('cvBody').innerHTML;
   $('cvBody').innerHTML = was; return h; });
 ok(empty < 260 && tall > empty * 2, `...and a conversation with nothing said in it is a dialog its own size (${empty}px, a read one ${tall}px)`);
 await page.click('#cvClose');
-// Any one of them resumed (the operator, 22 Oct: the Claude button resumes
+// Any one of them resumed (the Claude button resumes
 // only the last): Resume opens the chooser with that conversation picked
-// under its Resume, whose press starts it (R284 step 4), and nothing starts
+// under its Resume, whose press starts it, and nothing starts
 // until then.
 await page.click(`${SESS} .cvlogs .artrow [data-cvresume="conv-two-2025"]`);
 await page.waitForSelector('.resumemenu', { state: 'attached', timeout: 10000 }).catch(() => {});
@@ -126,7 +126,7 @@ ok(!rm.started && !rm.step && (rm.anchor ? rm.open === 'alpha' && rm.pick === 'c
    `Resume opens the chooser with the conversation picked under Resume, or says why it cannot, starting nothing yet (${JSON.stringify(rm)})`);
 await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(state.projects); });
 
-// A label, a note and Kept (R236, the operator, 12 Nov): Edit swaps a row's
+// A label, a note and Kept: Edit swaps a row's
 // fields in, Save says each to the controller, and the row is then read by
 // its label, its first words still under it.
 await section("A label, a note and Kept", async () => {
@@ -189,7 +189,7 @@ const none = await page.evaluate(async () => (await fetch('/api/transcript?proje
 ok(none === 400, `a space that is not one is refused as not a space (${none})`);
 
 // ---- a session reads its account's own conversations, on its project and on a read ----
-// The operator's ask (29 Sep): a session on alpha, with beta among alpha's
+// The operator's ask: a session on alpha, with beta among alpha's
 // reads, reads the account's conversations on beta, through aerie transcripts;
 // a project alpha does not read is not a project to it, and nothing of
 // another account's is ever found.
@@ -204,8 +204,8 @@ const sfetch = (path, opts = {}) => fetch(URL.replace(/\/$/, '') + path, { ...op
 await page.evaluate(async () => { await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', reads: ['beta'] }) }); });
 const own = await (await sfetch('/api/transcripts?project=alpha')).json();
 ok(own.rows?.some(r => r.id === 'conv-one-2026'), `a session lists the account's conversations on its own space (${(own.rows || []).length})`);
-// Make visible and Delete are the person's, from the Sessions view's ⋯
-// (the operator, 22 Oct): a session reads conversations, it does not share
+// Make visible and Delete are the person's, from the Sessions view's ⋯:
+// a session reads conversations, it does not share
 // or delete them.
 const bySession = await (await sfetch('/api/transcripts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ project: 'alpha', id: 'conv-two-2025', action: 'share' }) })).json();
@@ -224,10 +224,10 @@ await section("A person's own session says the same of their conversations", asy
   const del = await sfetch('/api/transcripts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', id: 'conv-one-2026', action: 'delete' }) }).then(r => r.status, () => 0);
   ok(del === 403, `...while deleting one stays its person's, never a session's (${del})`);
 });
-// A row's ⋯ opened until its item shows (B384): a redraw landing between
+// A row's ⋯ opened until its item shows: a redraw landing between
 // the press and the menu replaced the row, and the menu opened on the one
 // taken away.
-// The press itself is inside the loop too (3 Nov): the menu shut by a
+// The press itself is inside the loop too: the menu shut by a
 // redraw between its item showing and the press left the press waiting
 // a minute on an item no longer visible.
 const pressInMenu = async (id, item) => {
@@ -242,7 +242,7 @@ await pressInMenu('conv-two-2025', '[data-cvshare]');
 // The row's text, not a pill: its agent already wears one.
 await page.waitForFunction(sel => /visible to every session/.test(document.querySelector(sel)?.textContent || ''),
                            rowOf('conv-two-2025'), { timeout: 10000 }).catch(() => {});
-// Drawn on the press (the operator, 22 Nov: under a menu that shuts on it);
+// Drawn on the press (under a menu that shuts on it);
 // the controller follows.
 const convRows = () => page.evaluate(async () => (await (await fetch('/api/transcripts?project=alpha')).json()).rows || []);
 const shared = await until(async () => (await convRows()).find(r => r.id === 'conv-two-2025')?.shared, 10000);
@@ -272,7 +272,7 @@ ok(/^Conversation on beta, session beta-chat-1/.test(shown) && /You \(2026-09-28
    'aerie transcripts show ID prints one, stamped in the zone asked for');
 ok(/^your conversations on alpha, every agent's/.test(cli('transcripts', 'list')), 'and with no -p it is the session\'s own space');
 // A memory saved by a session is the account's on that repository, the one
-// the Memory view reads and every agent's briefing carries (R152).
+// the Memory view reads and every agent's briefing carries.
 const added = cli('memory', 'add', 'alpha-deploys', '--type', 'project', '--about', 'alpha deploys from its main branch', 'Deploys come from main; a tag starts one.');
 const mem = await page.evaluate(async () => ((await (await fetch('/api/memory?project=alpha')).json()).memories || [])
   .map(m => ({ name: m.name, hook: m.hook, type: m.type })));

@@ -1,6 +1,6 @@
 """An uninstall from the Nodes page retires the node when its job ends done,
 which the agent reports from its own stop handler, since the uninstall
-removes the agent's unit inside the seconds the agent watches it (B703).
+removes the agent's unit inside the seconds the agent watches it.
 A cancel does not retire: the machine may still be whole."""
 import os
 import sys

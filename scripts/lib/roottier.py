@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""aerie tests root: the root tier (R240 step 5, R3 step 8).
+"""aerie tests root: the root tier.
 
 What the root agent and the root helpers do in a folder an account controls
 is only seen for real by root: a suite's node is an ordinary account, where

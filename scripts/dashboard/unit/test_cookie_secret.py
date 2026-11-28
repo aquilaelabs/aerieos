@@ -1,4 +1,4 @@
-"""The key sign-in cookies are signed with (R135): with an install key it is
+"""The key sign-in cookies are signed with: with an install key it is
 made from the key and kept nowhere, so a copy of /config forges no sign-in,
 and the file an install kept before is removed; without one it is a random
 secret kept in /config as before, the same across restarts."""

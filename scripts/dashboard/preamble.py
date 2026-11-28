@@ -43,18 +43,18 @@ WORKSPACE = os.environ.get("WORKSPACE", "/workspace")
 # What the rules may take of a session's prompt, in bytes (share.py): over
 # it the named rules say less before one is left out. Sixteen kilobytes is
 # about four thousand tokens. The roadmap and the bugs had shares once and
-# are counts now (R202): a session read two hundred titles cut short on
+# are counts now: a session read two hundred titles cut short on
 # every conversation and used few, and the items a prompt names arrive on
 # that prompt instead (mentioned).
 SHARES = {"rules": 16 * 1024, "memory": 8 * 1024}
 
 # Where the briefing's core ends (config/templates/briefing.md): the lines
 # that hold every time come first, then the house rules, then the rest of
-# the briefing as reference (R200 step 5). What is read first and short is
+# the briefing as reference. What is read first and short is
 # what is followed; a rule after five thousand words of how-to was read at
 # the same weight as the how-to.
 _CORE_END = "<!-- BUILDERBOT:CORE-END -->"
-# The rest of the template is topics (R202): each `## Heading` after the
+# The rest of the template is topics: each `## Heading` after the
 # core carries a TOPIC marker with its slug and a gist, the block carries
 # the index of them where the TOPICS marker stands, and `aerie help TOPIC`
 # prints one when the work reaches it. A session read the whole manual
@@ -64,7 +64,7 @@ _TOPIC = re.compile(r"^<!-- BUILDERBOT:TOPIC ([a-z][a-z0-9-]*): (.*?) -->$")
 
 
 live_fn = None
-# A project of several repositories (R136), the server's: repository ->
+# A project of several repositories, the server's: repository ->
 # (the project's name, its id, [(repository, its shown name)]), or None.
 repos_fn = None
 
@@ -74,7 +74,7 @@ def configure(*, rules_mod, roadmap_mod, bugs_mod, live=None, prefs_mod=None):
 
     Same shape as every other module here: server.py owns configuring them,
     and `aerie` hands in the same three after configuring them itself. `live`
-    is the server's: what build is running, for the briefing (R75 step 5);
+    is the server's: what build is running, for the briefing;
     bb, which has no server, hands in nothing and the part is left out.
     """
     global live_fn
@@ -84,25 +84,25 @@ def configure(*, rules_mod, roadmap_mod, bugs_mod, live=None, prefs_mod=None):
 
 
 prefs_mod = None
-# Whether the project has no repository (R208), from the server
+# Whether the project has no repository, from the server
 # (repos.is_work): a session there works in the project's own folder, with
 # no git and no notebook, and builds containers and VMs.
 work_of = None
 
 
 def is_work(project):
-    """Whether `project` is one with no repository (R208)."""
+    """Whether `project` is one with no repository."""
     try:
         return bool(work_of and work_of(project))
     except Exception:                                            # noqa: BLE001
         return False
 
 
-# Whether a project's node reports an NVIDIA card, from the server (R102):
+# Whether a project's node reports an NVIDIA card, from the server:
 # a fact about the machine, not the tree, so the briefing's GPU section is
 # decided by it and costs a session on a node without one nothing.
 node_gpu = None
-# What the project's token may do on its git host (R188), from the server
+# What the project's token may do on its git host, from the server
 # (forgeaccess.briefing); bb, which has no server, hands in nothing.
 forge_line = None
 
@@ -181,13 +181,13 @@ def sees_line(project):
             f"this node.")
 
 
-# registry.label, set by the server (R154): the name a project is shown
+# registry.label, set by the server: the name a project is shown
 # under, which is not its directory once a name has been used before.
 label_of = None
 # The project's id as it is written (registry.pid): P3.
 id_of = None
 # (repository) -> (the project's shown name, its id), or None for a
-# repository in no project (R138): the project a session is briefed as.
+# repository in no project: the project a session is briefed as.
 project_fn = None
 
 
@@ -202,7 +202,7 @@ def identity_line(project):
     """The project's id, and its shown name where that is not the directory:
     the person says the name, every path takes the directory, and the id
     names it for good, renamed or not. A repository in a project is briefed
-    as that project (R138), with every repository in it named as its own."""
+    as that project, with every repository in it named as its own."""
     got = project_fn(project) if project_fn else None
     several = repos_fn(project) if (got and repos_fn) else None
     if is_work(project):
@@ -241,7 +241,7 @@ def identity_line(project):
             + (f" Its id is {pid}, which never changes." if pid else ""))
 
 
-# The project's Agents may dials as they stand (the operator, 27 Oct: a
+# The project's Agents may dials as they stand (a
 # session told only the defaults said a release would wait on the owner's
 # answer where the dial was auto), in the words aerie settings and the
 # Permissions view use; the same record and defaults as settings-verbs.py.
@@ -254,7 +254,7 @@ DIALS = (("Add to roadmap", "gate.roadmap", "auto"), ("File bugs", "gate.bugs", 
          ("Report AerieOS bugs", "report", "auto"), ("Sign a build", "sign", "ask"),
          ("Manage signing keys", "keys", "ask"), ("Tag and publish a release", "release", "ask"),
          ("Use a lent PC", "pc", "deny"))
-# The dials a project with no repository keeps (R208): what a session may
+# The dials a project with no repository keeps: what a session may
 # run and ask for, none of what it would enter into a notebook or ship.
 WORK_DIALS = ("devbuild", "makevms", "installpacks", "report", "pc")
 # (project) -> what a session may move the version by (version.policy), set
@@ -274,7 +274,7 @@ def dials_line(project):
         return ""
     gate = rec.get("gate") if isinstance(rec.get("gate"), dict) else {}
     said = []
-    # A project with no repository (R208) has only the dials that need no
+    # A project with no repository has only the dials that need no
     # code: the notebook's, the signing, release and version ones are
     # nothing's there.
     work = is_work(project)
@@ -302,7 +302,7 @@ def reads_line(project):
             reads = []
     # Its own project's other repositories are read as well (reads_trees),
     # and they are its own to change: the identity line names them, and
-    # here they would be called read-only (the operator, 27 Oct).
+    # here they would be called read-only.
     several = repos_fn(project) if repos_fn else None
     own = {d for d, _lab in (several[2] if several else [])}
     reads = [r for r in reads if r not in own]
@@ -323,7 +323,7 @@ def reads_line(project):
 
 # What the notebook's Design view holds, said in the briefing when there is
 # one, so a project designed before its first line of code is built to the
-# design from the start (the operator, 28 Sep): the themes, the pages by
+# design from the start: the themes, the pages by
 # name, the rules, and where aerie design show reads each.
 _DESIGN = "<!-- BUILDERBOT:DESIGN -->"
 
@@ -339,7 +339,7 @@ def design_line(project):
             "ask": "a save of yours waits for the operator's approval on the notebook",
             "deny": "the space refuses a session's save, so say in your reply what you would put there"}[dial]
     if not rec:
-        # Nothing designed beforehand (the operator, 29 Sep): build as you
+        # Nothing designed beforehand: build as you
         # would, then put what you arrived at into the notebook so the next
         # session finds it there.
         return ("The notebook's Design view is empty: no theme, no page, no design rule. Build as you "
@@ -423,7 +423,7 @@ _END = "<!-- BUILDERBOT:END -->"
 
 
 def briefing(project, gates=True):
-    """How this machine works, as every session on it is told (R63), whole:
+    """How this machine works, as every session on it is told, whole:
     the core, the project's own lines and every topic. `gates` off keeps
     the sections the tree would leave out, for `aerie help TOPIC` on a
     project that is not an Android one.
@@ -462,7 +462,7 @@ def briefing(project, gates=True):
         if m:
             bits = m.group(1).split()
             # `node:gpu` is evidence the node gives rather than the tree;
-            # `repo:any` is the project having a repository at all (R208).
+            # `repo:any` is the project having a repository at all.
             skip = gates and not any((bool(node_gpu and node_gpu(project)) if g == "node:gpu"
                                       else (not is_work(project)) if g == "repo:any"
                                       else _has(tree, g))
@@ -520,7 +520,7 @@ def topics(project):
     return [(slug, gist, len(body.encode("utf-8"))) for slug, _, gist, body in split(briefing(project))[1]]
 
 
-# The tool packs added here (R77), name to {label, guidance}: set by the
+# The tool packs added here, name to {label, guidance}: set by the
 # server (toolpacks.packs) and by aerie preamble, which reads the same file.
 packs_of = None
 
@@ -539,7 +539,7 @@ def _packs_on(project):
 
 def packs_line(project):
     """The tool packs a session here may use, said where it learns its
-    project, and the way to ask for a tool on its node (R169 step 5), a
+    project, and the way to ask for a tool on its node, a
     toolchain AerieOS ships or a pack of the vetted catalog, as the
     project's Install a tool pack dial says."""
     on = _packs_on(project)
@@ -565,7 +565,7 @@ def topic(project, slug):
     none by that name. Every topic answers, the tree's gates aside: a
     question about the emulator on a project with no Android is still a
     question. tool-NAME is a tool pack's own guidance, for a project that
-    uses the pack (R77)."""
+    uses the pack."""
     if slug.startswith("tool-"):
         rec = _packs_on(project).get(slug[5:])
         if rec is not None:
@@ -585,7 +585,7 @@ def _has(tree, pattern):
 
 
 def memory_part(project, uid="", agent=""):
-    """The account's memories on each repository of the project (R152): the
+    """The account's memories on each repository of the project: the
     index of each, as Claude Code loads its own at a session's start, so a
     session of any coding agent starts knowing them, and the way to save
     one on the repository it is about, which keeps it with that repository
@@ -636,7 +636,7 @@ def parts(project, reply="", asks="", uid="", agent=""):
 
     The briefing's core first, then the house rules, then the person's own
     settings: what a session is held to, short, before anything it reads
-    for reference (R200). Then the rest of the briefing, what is running,
+    for reference. Then the rest of the briefing, what is running,
     and what there is to work on.
 
     Each store answers "" when it has nothing, and an empty piece contributes
@@ -645,7 +645,7 @@ def parts(project, reply="", asks="", uid="", agent=""):
     """
     out = []
     whole = {}
-    # A project with no repository (R208) has no notebook and no
+    # A project with no repository has no notebook and no
     # repositories to brief on: those parts are left out, not said empty.
     work = is_work(project)
 
@@ -661,8 +661,8 @@ def parts(project, reply="", asks="", uid="", agent=""):
                      ("rules", lambda: rules_mod.fitted(project, SHARES["rules"])),
                      ("replies", lambda: (person_part(reply, asks), "")),
                      ("briefing", lambda: brief("rest")),
-                     # What is running, as a fact rather than a guess (R75
-                     # step 5): a session argued from a build it assumed once.
+                     # What is running, as a fact rather than a guess:
+                     # a session argued from a build it assumed once.
                      ("live", lambda: (live_fn() if live_fn else "", "")),
                      ("roadmap", lambda: (roadmap_mod.brief(project), "")),
                      ("bugs", lambda: (bugs_mod.brief(project), "")),
@@ -686,7 +686,7 @@ def parts(project, reply="", asks="", uid="", agent=""):
 
 
 def repos_part(project):
-    """For a session on a project of several repositories (R136): what the
+    """For a session on a project of several repositories: what the
     project is, each repository's tree, and each other repository's rules,
     roadmap and bugs under its name, as this one's are above. Its rules
     share the rules' room between them."""
@@ -717,7 +717,7 @@ def repos_part(project):
     return "\n".join(lines)
 
 
-# ---- what a prompt names on the record (R202) ---------------------------------
+# ---- what a prompt names on the record ---------------------------------
 # The block carries counts; the items and bugs a prompt is about arrive on
 # that prompt, through the hook every prompt already runs, the way a named
 # rule does: the titles whose words the person typed, or whose number they
@@ -746,7 +746,7 @@ def _words(text):
 
 def mentioned(project, text, told=()):
     """(what to say, the names to remember) for the open roadmap items and
-    bugs that `text`, what a person typed, names: by number (R4, B7) or by
+    bugs that `text`, what a person typed, names: by number or by
     two or more words shared with the title. `told` is what this
     conversation was handed already, left out."""
     words = _words(text)
@@ -797,7 +797,7 @@ def mentioned(project, text, told=()):
 
 
 def for_agent(agent_id, text):
-    """The block as a session of this coding agent reads it (R95 step 5):
+    """The block as a session of this coding agent reads it:
     Claude's as it is; another agent's with one line ahead of it saying
     what it is, and that this briefing, the house rules and bb hold for it
     as for any agent's session here."""

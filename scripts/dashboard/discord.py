@@ -1,4 +1,4 @@
-"""A space's Discord server (R293): built out and changed from a layout kept
+"""A space's Discord server: built out and changed from a layout kept
 as code, through the controller, which holds the bot's token.
 
 Connected once in the space's settings: a Discord application's bot token,
@@ -352,7 +352,7 @@ def normalize(layout):
 
 
 def _onboarding(ob):
-    """The onboarding a layout asks for (the operator, 26 Nov: its questions,
+    """The onboarding a layout asks for (its questions,
     Discord's documented onboarding; rules screening stays the server's own),
     or None where it names none, which leaves the server's as it is."""
     if ob is None:

@@ -1,13 +1,13 @@
 "use strict";
-// This controller (R90 step 8, split the operator, 9 Nov): on a bare-metal
+// This controller (split the operator): on a bare-metal
 // install, what is the controller's and not the node's, in the Controller
 // rail group: the head (the release this install runs, how long it has been
-// up, a held start's Start), the Updates section (Controller settings' own,
-// R90 step 5) and the older versions kept to boot. The machine as a node is
+// up, a held start's Start), the Updates section (Controller settings' own)
+// and the older versions kept to boot. The machine as a node is
 // the Nodes page's row like any node's, with the sections only it carries
 // (machineNodeSections). The container edition has no own machine and says
 // so if the page is opened.
-// Chrome from docSurface(); the hard rules are uniform.mjs's.
+// Chrome from docSurface; the hard rules are uniform.mjs's.
 
 function openMachineTab(what){
   if (what) sectOpen["nodes:" + what] = true;
@@ -29,10 +29,10 @@ function machineHead(n){
   const r = n.reported || {};
   const img = state?.image || {};
     const wall = r.session?.up ? "in force" : r.session?.why ? `down: ${r.session.why}` : n.live ? "not reported yet" : "";
-  // A held start (R56 step 9): Start lifts it. Holding the next one is the
-  // checkbox beside Reboot and Shut down (R161 step 11).
+  // A held start: Start lifts it. Holding the next one is the
+  // checkbox beside Reboot and Shut down.
   const h = state?.held || {};
-  // Beside it, Check parity once the array is up (R163 step 15): the
+  // Beside it, Check parity once the array is up: the
   // check runs after the start, never holding it; an old system's array
   // adopted as it is waits until it is taken over, its parity not ours.
   const ar = r.array || {}, oldParity = (state?.firstboot?.adopt?.want?.parity || []).length;
@@ -43,7 +43,7 @@ function machineHead(n){
   return pageHead({about: true, title: n.name, pills: `<span class="tag ndown">this machine</span> ${nodeStatePill(n)}${h.held ? ` <span class="pill bad">held</span>` : ""}`, actions, facts: [
     ["System", [r.os, r.hostname && r.hostname !== n.name ? r.hostname : ""].filter(Boolean).join(" · ")],
     ["Release", `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`],
-    // AerieOS (R160 step 4): the image, the slot this boot came from
+    // AerieOS: the image, the slot this boot came from
     // and the one that boots next when an update has been written.
     ...(r.os_image?.version ? [["Image", `AerieOS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}`]] : []),
     ["Up", shortUptime(state?.uptime || 0)],
@@ -71,8 +71,8 @@ function renderMachineInto(i){
     drawHTML(d.list, `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`);
     return;
   }
-  // Everything about updating this machine, drawn here and nowhere else
-  // (R294 step 13): the release and its channel, the update window (from
+  // Everything about updating this machine, drawn here and nowhere else:
+  // the release and its channel, the update window (from
   // Controller settings' table, as the Network page draws its groups) and
   // the older versions kept.
   const groups = settingsSections().filter(g => MACHINE_GROUPS.includes(g.key));
@@ -96,7 +96,7 @@ function renderMachineInto(i){
 
 // The settings groups about updating this machine, drawn on This controller
 // where a bare-metal install has its own machine, and in Controller settings
-// otherwise, never both (R294 step 13).
+// otherwise, never both.
 const MACHINE_GROUPS = ["updwin"];
 const updatesOnMachine = () => !!(state?.bare_metal && state?.own_node);
 
@@ -109,7 +109,7 @@ function machineNodeSections(n){
 
 // A press's words once its system job on this machine is in: with another
 // at work here it is queued behind that one, never refused
-// (nodes.system_job_for), and the words say so (the operator, 22 Nov).
+// (nodes.system_job_for), and the words say so.
 // Read when the press is made; a string, or a function of the answer.
 function machineSaid(said){
   const ahead = ndAhead(ownMachine());
@@ -117,7 +117,7 @@ function machineSaid(said){
   return j => queuedSaid(typeof said === "function" ? said(j) : said, ahead);
 }
 
-// Hold the next start (R56 step 9, R161 step 11): a checkbox beside Restart
+// Hold the next start: a checkbox beside Restart
 // and Shut down, ticked for the one restart that follows and shown ticked
 // while it is armed; a bare-metal install's alone.
 function holdNextBox(){
@@ -140,7 +140,7 @@ function wireHoldNext(root){
   });
 }
 
-// Older versions (R201, the operator, 1 Nov): what updates pushed out of
+// Older versions: what updates pushed out of
 // their slots, each one on the boot menu. Boot this next is one visit: the
 // boot after is the version it came from again.
 function olderVersionsSection(n){
@@ -161,7 +161,7 @@ function olderVersionsSection(n){
 function wireOlderVersions(root){
   root.querySelectorAll("[data-oskeptdo]").forEach(b => b.onclick = () => pressing(b, async () => {
     const verb = b.dataset.oskeptdo, version = b.closest("[data-oskept]")?.dataset.oskept || "";
-    // Boot it next asks nothing (R265: a press asks only where its yes costs something): it is once, at the next
+    // Boot it next asks nothing (a press asks only where its yes costs something): it is once, at the next
     // restart, and nothing restarts until the person does. Remove deletes
     // the version's files, and asks.
     if (verb !== "next" && !await askYes(`Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
@@ -171,7 +171,7 @@ function wireOlderVersions(root){
   }));
 }
 
-// The stick (R161 step 10, the operator, 29 Oct: read once and written
+// The stick (read once and written
 // rarely): the system runs from RAM, the stick keeps the configuration, and
 // what writes all day (docker, the VMs, the toolchains, the projects) is on
 // the system pool picked here, or waits for one. What still lives on the
@@ -179,7 +179,7 @@ function wireOlderVersions(root){
 const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces", secrets: "the secrets and the install key"};
 // The system pool's picker: The stick's own, and the first-run walk's.
 function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here.", row = false){
-  // An adopted pool counts whatever its filesystem (B663): the census's
+  // An adopted pool counts whatever its filesystem: the census's
   // pools are zpools alone. A data disk does not: it carries the old parity.
   const seen = new Set((n.reported?.pools || []).map(p => p.mount));
   const adopted = (n.reported?.adopted?.mounts || []).filter(m => m.mounted && !m.ro && !/\/disk\d+$/.test(m.where) && !seen.has(m.where));
@@ -200,7 +200,7 @@ function stickPoolPick(n, s, none = "No pool or array here yet: make one on the 
   if (row) return `<div class="setpick"><label class="pickw" for="stickPool">System pool</label><div class="setpickline">${sel}${go}</div>${under}</div>`;
   return formBox({fields: [formField("stickPool", "System pool", `${sel}${under}`)], foot: [go]});
 }
-// A pool holding another install's folder (the operator, 8 Nov): never taken,
+// A pool holding another install's folder: never taken,
 // set aside beside it when picked, for a person to delete once sure.
 const STICK_OTHER = "This pool holds another AerieOS install's folder, aerieos-system. Using it renames that folder to aerieos-system.old (or .old-2 and on) and leaves it as it is, to delete once nothing in it is wanted.";
 const stickPoolOther = (s, path) => !!path && (s?.others || []).includes(path);
@@ -217,7 +217,7 @@ function stickSection(n){
     ["The spaces", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "held until a pool or a folder on the disks is named: none is made on the stick",
      {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
-    // The stick's own partition, which the controller stops with when it is full (the operator, 8 Nov).
+    // The stick's own partition, which the controller stops with when it is full.
     ...(typeof s.var_total_mb === "number" ? [["Room on the stick", `${gb(s.var_free_mb * 1024)} free of ${gb(s.var_total_mb * 1024)}`,
         {cls: s.var_free_mb < 1024 || s.var_free_mb * 10 < s.var_total_mb ? (s.var_free_mb < 512 ? "bad" : "warn") : ""}]] : []),
   ];
@@ -229,7 +229,7 @@ function stickSection(n){
     {cls: s.ready ? "" : "warn"});
 }
 
-// A projects folder of the machine's own (R163, the operator, 1 Nov): a
+// A projects folder of the machine's own: a
 // controller moved here without its repositories takes the folder its
 // projects already sit in on the adopted disks, nothing copied. Offered
 // where those disks are: the plan's shares, then the merged views.
@@ -281,7 +281,7 @@ function wireStick(root){
   });
 }
 
-// A way in at the screen (R194): AerieOS's console takes a password
+// A way in at the screen: AerieOS's console takes a password
 // set here, logging in as admin with sudo for root; the boot menu's Rescue
 // entry is the way in when nothing else answers. Only on AerieOS.
 function machineConsoleSection(n){
@@ -309,8 +309,8 @@ function wireMachineConsole(root){
   }));
 }
 
-// What a stick's prepared configuration did at the first boot (R161 step 8,
-// firstboot.py): each piece applied, waiting for disks to be adopted, or not
+// What a stick's prepared configuration did at the first boot
+// (firstboot.py): each piece applied, waiting for disks to be adopted, or not
 // applied with why, in the facts voice. Nothing on an install that had none.
 function firstbootSection(){
   const f = state?.firstboot;
@@ -322,8 +322,8 @@ function firstbootSection(){
     `<div class="field">${factGrid(rows, "fbfacts")}<div class="hint">What the stick's prepared settings did ${esc(ago(f.at))}. What waits comes once its disks are adopted.</div></div>`);
 }
 
-// The disks and pools the stick's plan names, adopted as they are (R163
-// steps 8 and 9): each found here by its serial or not, the parity disk
+// The disks and pools the stick's plan names, adopted as they are:
+// each found here by its serial or not, the parity disk
 // left alone, read only or writable said in what each costs, Check for the
 // dry run and Adopt; once adopted, what is mounted where and Release.
 let adoptWritable = false;
@@ -336,7 +336,7 @@ function adoptSection(n){
   const p = adoptParts(n);
   return p ? docSection("nodes", p.id, p.title, p.status, p.body, p.opts) : "";
 }
-// The way back to the old system (R163 step 5), for the state the disks
+// The way back to the old system, for the state the disks
 // are in: read-only, nothing to do; written to, its parity checked or
 // rebuilt there; taken over, its parity rebuilt there. What is never done
 // here, which keeps that way open, is said once.
@@ -359,7 +359,7 @@ function adoptBackSection(n){
 
 // What the section says, apart from its fold: the first-run walk draws the
 // same body in its own card.
-// The old array degraded (B940): a disk its old system marked disabled or
+// The old array degraded: a disk its old system marked disabled or
 // missing, whose files may live only in the parity, so nothing writes to
 // the array until that system has rebuilt it.
 const adoptDegraded = () => (state?.firstboot?.adopt?.degraded || []).length > 0;
@@ -373,10 +373,10 @@ function adoptParts(n, {take = true} = {}){
     const rows = [...had.mounts.map(m => [m.where, `${m.fs}, ${m.ro ? "read-only" : "writable"}${m.mounted ? "" : ", not mounted yet"}`, {cls: m.mounted ? "" : "warn"}]),
       ...Object.entries(had.merged || {}).map(([w, up]) => [w, up ? "merged" : "merged, not mounted yet", {cls: up ? "" : "warn"}]),
       ...(had.parity || []).map(p => ["parity", `${p}, left alone`])];
-    // Taking the array over (R163 step 3): SnapRAID's parity on the old
+    // Taking the array over: SnapRAID's parity on the old
     // parity disk, the data disks writable where they are; offered by an
     // agent that has it, where the old parity disk is here.
-    // The first-run walk leaves it out (the operator, 8 Nov): the parity
+    // The first-run walk leaves it out: the parity
     // is built after the walk, from here, and the bell says so until it is.
     const canTake = take && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length && !adoptDegraded();
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
@@ -420,20 +420,20 @@ function adoptParts(n, {take = true} = {}){
       <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, opts: {open: true}};
 }
 
-// The containers and VMs the old system ran (R163 steps 10 and 11): read
+// The containers and VMs the old system ran: read
 // from its Docker and libvirt image files once the disks are adopted. The
 // containers come back as compose files in a zip, each imported from New
-// container (the operator, 10 Nov: rather than made here on a press); the
+// container (rather than made here on a press); the
 // VMs are defined in this machine's libvirt, each started with the machine
 // where it was. The containers' rows and their networks are the
 // controller's (adopt-apps plan), fetched once a read lands.
 let adoptPlan = null, adoptNets = {}, adoptPlanFor = "";
-// The VMs the person unticked, kept across redraws: "v:NAME" (the operator,
-// 1 Nov: pick which to bring back, not all of them).
+// The VMs the person unticked, kept across redraws: "v:NAME"
+// (pick which to bring back, not all of them).
 const adoptSkip = new Set();
 // Where the old system's Docker and VMs kept what ran: the stick's plan's
 // words when it was made with one, else their usual places on the adopted
-// disks (the operator, 10 Nov: a stick made with no plan had no way to bring
+// disks (a stick made with no plan had no way to bring
 // its containers back at all). A guess the read says plainly when it misses.
 function oldAppsFrom(n){
   const from = state?.firstboot?.apps_from;
@@ -443,9 +443,9 @@ function oldAppsFrom(n){
   if (!root) return null;
   return {docker: {image: `${root}/system/docker/docker.img`, autostart_file: ""}, vms: {image: `${root}/system/libvirt/libvirt.img`, vfio: []}, networks: {}, guessed: true};
 }
-// The old system's containers and VMs (R163 steps 10, 11), drawn on the
+// The old system's containers and VMs, drawn on the
 // Containers page of the controller's own machine, where they are looked
-// for (the operator, 10 Nov: it was on the Nodes page and never found).
+// for (it was on the Nodes page and never found).
 function adoptAppsSection(n){
   const had = n.reported?.adopted, from = oldAppsFrom(n);
   if (!had || !(had.mounts || []).length || !from) return "";
@@ -467,7 +467,7 @@ function adoptAppsSection(n){
       <b>${esc(label)}</b> <span class="sub">${esc(said)}</span></label>`;
   const other = Object.fromEntries((n.reported?.vms_other || []).map(v => [v.name, v]));
   // The VMs not defined here yet, each a tick, Define acting on them right
-  // under them (B750: it sat under the last defined VM's buttons, as if it
+  // under them (it sat under the last defined VM's buttons, as if it
   // were that VM's).
   const toDefine = (apps.vms || []).filter(v => !other[v.name]);
   const ticks = toDefine.map(v => pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`))).join("");
@@ -481,7 +481,7 @@ function adoptAppsSection(n){
   const vmRows = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name], off = ["stopped", "shut off", "crashed"].includes(s.state);
     return `<div class="vmrow"><div class="actbar"><span class="grow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${s.state}${off ? "" : " · shut it down to clone it"}`)}</span></span><span class="vmacts">${s.state === "running"
       ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
-      // Made AerieOS's own (R163 step 12): its disks copied, the original kept.
+      // Made AerieOS's own: its disks copied, the original kept.
       btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${off ? "" : " disabled"}`, "Clone into a space…")}</span></div>
       <label class="ndcap"><input type="checkbox" data-adoptvmauto="${esc(v.name)}"${s.autostart ? " checked" : ""}> Starts with the machine</label></div>`; }).join("");
   return docSection("docker", "oldapps", "Containers and VMs from the old system",
@@ -580,8 +580,8 @@ function adoptSharesLine(){
     (s.notes || []).map(x => ` ${esc(x.name)}: ${esc(x.said)}.`).join("")}</div>`;
 }
 
-// The folders at the top of /mnt/user the plan has no share settings for
-// (R163 step 13): made on a disk directly, so the old system served them
+// The folders at the top of /mnt/user the plan has no share settings for:
+// made on a disk directly, so the old system served them
 // with its defaults (exported, public). Each is offered to tick, unticked.
 function adoptFolders(n){
   const had = n?.reported?.adopted || {}, plan = new Set((state?.firstboot?.shares?.rows || []).map(r => r.name));
@@ -596,7 +596,7 @@ function adoptFoldersField(n){
     <div class="actbar"><button type="button" data-adoptfolders>Serve the ticked</button></div></div>`;
 }
 
-// Each share's places once the array is taken over (R163): where its new
+// Each share's places once the array is taken over: where its new
 // files land and the mover's from and to, started from the old system's
 // own settings and set before the takeover, with when the mover runs. What
 // the person changed is kept across redraws.
@@ -613,7 +613,7 @@ function adoptTakeField(){
   if (adoptMoverCron === null) adoptMoverCron = old || MOVER_TIMES[0][0];
   // Each share a group at the field's margin, then when the mover runs,
   // then the takeover's own two presses under what they act on.
-  // One form (R301): a group a share, then when the mover runs.
+  // One form: a group a share, then when the mover runs.
   const moves = list.length ? [
     ...list.map((m, i) => ({head: m.share, attrs: `data-admove="${esc(m.share)}"`, fields: [moveFields(`adMove${i}`, pools, m)]})),
     {fields: [formField("adoptMoverWhen", "The mover runs", `<select id="adoptMoverWhen">${optionList(times, adoptMoverCron)}</select>`)]}] : [];
@@ -677,7 +677,7 @@ function wireAdopt(root){
     if (act === "adopt" && adoptWritable && !await askYes("Adopt the data disks writable?\n\nA file written to one is a write the old system's parity did not see: going back to it then takes a parity sync, which leaves its array unprotected until it ends.",
         {title: "Writable?", verb: "Adopt writable"})) return;
     // A planned data disk not on this machine (replaced, or dead) no longer
-    // holds the rest back (B947): read only, the others adopt and its files
+    // holds the rest back: read only, the others adopt and its files
     // are missing from the merged tree until it is found; writable waits
     // for every disk, since the parity covers them all.
     const plan = state?.firstboot?.adopt?.want || {};

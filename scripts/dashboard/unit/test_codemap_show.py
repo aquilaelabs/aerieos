@@ -1,4 +1,4 @@
-"""aerie map show prints a definition whole (R251): each one called NAME,
+"""aerie map show prints a definition whole: each one called NAME,
 or the one holding FILE:LINE, headed by where it is and its comment."""
 import os
 import shutil

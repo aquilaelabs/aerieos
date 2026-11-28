@@ -1,5 +1,5 @@
 """names.py and ids.py: the tmux name a project's session really has, and
-the item numbers a person types (R86 named these as untested)."""
+the item numbers a person types."""
 import os
 import sys
 import unittest
@@ -21,7 +21,7 @@ class TmuxName(unittest.TestCase):
 
 class EveryAgent(unittest.TestCase):
     """A check that must see any agent's session on a project, and the one
-    session a message goes to (R95 step 16)."""
+    session a message goes to."""
 
     def test_every_live_agent_has_a_session_name_claude_first(self):
         got = names.agent_sessions("ep.silon")

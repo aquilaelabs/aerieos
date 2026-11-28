@@ -1,5 +1,5 @@
 """Behind `aerie discord` (cmd_discord in aerie): a space's Discord server
-from a session (R293), relayed through the controller's /api/discord,
+from a session, relayed through the controller's /api/discord,
 which holds the bot's token; a session never holds it.
 
   aerie discord [status]          the server connected and the last plans

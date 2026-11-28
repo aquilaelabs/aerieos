@@ -1,12 +1,12 @@
-"""SMB and NFS shares on the controller's own machine (R162 step 1): each
+"""SMB and NFS shares on the controller's own machine: each
 share as AerieOS's own two files say it (/etc/samba/smb.conf.d/
 builderbot.conf, included by smb.conf; /etc/exports.d/builderbot.exports),
 read whole for the census and written whole by the storage-share job, which
 checks the name, the path (a folder under /mnt or /srv that is there) and
 the users and clients named before Samba and NFS are told to read again.
 Who may reach a share is a Unix user the machine has (an account's own,
-R125, or one named) or everybody as a guest. The SMB passwords the accounts
-set on Profile (R164 step 1) come with the hello as Samba keeps them (the
+or one named) or everybody as a guest. The SMB passwords the accounts
+set on Profile come with the hello as Samba keeps them (the
 NT hash per Unix user) and are imported into Samba's own database here,
 the users made where they are missing and the ones gone removed; a share
 may be a Mac's Time Machine target.
@@ -26,7 +26,7 @@ from .names import ETC
 
 SMB_FILE = "/etc/samba/smb.conf.d/builderbot.conf"
 # The shares nothing serves: a folder that is a share, kept here since neither
-# Samba's file nor NFS's says it (the operator, 4 Nov).
+# Samba's file nor NFS's says it.
 INTERNAL_FILE = ETC + "/shares-internal.json"
 SMB_MAIN = "/etc/samba/smb.conf"
 SMB_MAP = "/etc/samba/aerieos-users.map"
@@ -39,7 +39,7 @@ SMB_USERS_FILE = "/run/builderbot/smbusers"
 # one, nor a character Samba's or NFS's file would read as its own.
 NAME_RE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
 # Samba's own sections, which a share of that name would reopen: [global]'s
-# path, guest ok and force user would be every share's after it (R247 step 5).
+# path, guest ok and force user would be every share's after it.
 SAMBA_OWN = {"global", "homes", "printers"}
 
 
@@ -171,7 +171,7 @@ def _make_folder(path):
 
 def _samba_hooks(main=None):
     """smb.conf told about the shares file and the names' map, once, in its
-    [global] section, where the image's own says nothing of them (B672). The
+    [global] section, where the image's own says nothing of them. The
     file's kept in /etc, so a boot keeps it; False when it could not be written."""
     main = main or env_or("BB_SMB_MAIN", SMB_MAIN)
     want = [f"   username map = {env_or('BB_SMB_MAP', SMB_MAP)}", f"   include = {env_or('BB_SMB_FILE', SMB_FILE)}"]
@@ -220,14 +220,14 @@ def render(shares):
                     smb.append(f"    read list = {' '.join(readers)}\n")
                 # A folder made for the share is nobody's and each person named
                 # on it writes as that, so two people see each other's files,
-                # as a NAS's share is (B672). A folder that was somebody's
+                # as a NAS's share is. A folder that was somebody's
                 # before keeps its owners.
                 if _nobodys(s["path"]):
                     # Group-write too: without it a file written over the
                     # network cannot be saved over again (found by a real
                     # client: new files worked, overwriting them was denied).
                     smb.append("    force user = nobody\n    force group = nogroup\n    create mask = 0664\n    directory mask = 0775\n")
-            # A Mac's Time Machine target (R164 step 1): fruit says so to the
+            # A Mac's Time Machine target: fruit says so to the
             # Finder, catia keeps the names it writes; the Mac finds it by
             # mDNS, which Samba registers itself.
             smb.append("    vfs objects = catia fruit streams_xattr\n    fruit:metadata = stream\n"
@@ -243,7 +243,7 @@ class SharesMixin:
     """Agent's share jobs: one of the parts class Agent (agent.py) is made of."""
 
     def smb_users_want(self, rows):
-        """The accounts' SMB passwords as the hello hands them (R164 step 1):
+        """The accounts' SMB passwords as the hello hands them:
         [{user, nt}], applied once per change (its digest kept in node.json):
         each user made where it is missing (a system user, no login shell,
         the bbu group), the set imported into Samba's database whole, and
@@ -286,7 +286,7 @@ class SharesMixin:
                 continue
             # X: the password does not expire, and a real time it last changed;
             # LCT-00000000 tells Samba it must change first, which no share
-            # client can do (B672).
+            # client can do.
             lines.append(f"{r['user']}:{uid}:{'X' * 32}:{r['nt']}:[UX         ]:LCT-{int(time.time()):08X}:\n")
         path = env_or("BB_SMB_USERS_FILE", SMB_USERS_FILE)
         try:
@@ -305,7 +305,7 @@ class SharesMixin:
             except OSError:
                 pass
         # The name a person signs in with, onto the Unix user Samba knows them
-        # as (B672).
+        # as.
         try:
             write_atomic(env_or("BB_SMB_MAP", SMB_MAP),
                          "".join(f'{r["user"]} = "{r["name"]}"\n' for r in want if re.fullmatch(r"[A-Za-z0-9._@+-]{1,64}", r["name"])),
@@ -341,7 +341,7 @@ class SharesMixin:
         if os.geteuid() != 0:
             say("refused: shares are written as root, and this agent is not root\n")
             return "failed", 77
-        # Many at once (R163 step 9, an adopted system's shares): each the
+        # Many at once (an adopted system's shares): each the
         # same set as one alone, in turn, each said; one refused leaves the
         # others served.
         if cfg.get("share") == "set-many":
@@ -409,7 +409,7 @@ class SharesMixin:
                         # when the share names it, as it would be at the
                         # account's first sign-in: a share adopted from
                         # another system names people who have never signed
-                        # in (B633, the VM walk of 2 Nov: 'backups' for two
+                        # in (the VM walk of 2 Nov: 'backups' for two
                         # people refused). A name that is not an account's
                         # is still refused.
                         if not re.fullmatch(r"bbu-[0-9a-f]{8}", u):

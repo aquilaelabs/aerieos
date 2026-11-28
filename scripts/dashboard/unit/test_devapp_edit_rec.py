@@ -2,7 +2,7 @@
 is handed the record under the store's lock and the store is written when it
 ends cleanly. Without create an instance the store does not have is handed
 over as None and nothing is written, so a result that lands after Remove
-does not bring the row back (B633); with create it is made. set_field sets
+does not bring the row back; with create it is made. set_field sets
 one field through it, or takes it off when the value is empty."""
 import json
 import os

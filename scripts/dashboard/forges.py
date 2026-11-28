@@ -76,7 +76,7 @@ def configure(*, run, state=None, write_json=None):      # noqa: A002 - injected
 # asked for the real one: git's credential store is a URL, so a token has to
 # go in beside SOME name, and each of these publishes the one it wants.
 # `registry` is where the host keeps a repository's container images, which a
-# deploy pushes to with the person's own token for the host (R281 step 4):
+# deploy pushes to with the person's own token for the host:
 # "{host}" for one that serves them on its own address; absent where it is
 # not known from the address (a GitLab's is its own setting).
 
@@ -457,7 +457,7 @@ def whoami(entry, host, token, scheme="https"):
 
 def token_access(entry, host, token, path, scheme="https"):
     """What the host says this token may do on this repository, for the
-    settings dialog's Test (the operator, 7 Oct). git proves a read and a
+    settings dialog's Test. git proves a read and a
     push; this says what git cannot: a GitHub classic token's scopes (one
     without `workflow` pushes everything except a change under
     .github/workflows), and the role the host gives the token's account.

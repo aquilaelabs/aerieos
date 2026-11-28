@@ -1,4 +1,4 @@
-"""statemigrations 0032 (R294 step 14): a space's color, kept in its settings
+"""statemigrations 0032: a space's color, kept in its settings
 before colors were each person's, becomes the own colors of every account that
 had picked none, so nobody's cards change, and leaves the settings; an account
 with colors of its own keeps exactly them; run twice, nothing more moves."""

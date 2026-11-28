@@ -1,5 +1,5 @@
 """A controller moved onto a machine that already has its own node and a
-stick's plan (move.carry_here, the operator 1 Nov): the machine's own node
+stick's plan (move.carry_here): the machine's own node
 and its tokens come across into the state put in place, the old home's own
 node is retired there, the stick's plan is kept, and nothing the moved state
 had of its own is replaced."""
@@ -55,9 +55,9 @@ class Carry(unittest.TestCase):
         self.assertEqual(len(said), 2, said)
 
     def test_a_token_keeps_its_state_across_a_move(self):
-        # R227 step 14: a token's state has a column of its own since the
+        # A token's state has a column of its own since the
         # database's migration 0008, which every supported store has run
-        # (R295: the conversion for a store from before it is gone).
+        # (the conversion for a store from before it is gone).
         for old_aside, old_state in ((False, False),):
             d = tempfile.mkdtemp()
             aside, state = os.path.join(d, "aside"), os.path.join(d, "state")

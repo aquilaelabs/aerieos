@@ -1,4 +1,4 @@
-// First run (R199, R267): after the owner is made, the page is the setup
+// First run: after the owner is made, the page is the setup
 // page until Finish: four step cards at the reading width with nothing
 // beside them (no rail, no panes, so no dock, no search), each with its
 // state and its own action; the node's buttons open the Nodes page's own
@@ -110,7 +110,7 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
       await page.waitForFunction(() => !document.querySelector('.doc.on .hstart'), null, { timeout: 10000 });
       ok(true, '...and Put away takes the card off Home');
       // A node that has dialed in before is still the first node while its
-      // agent is quiet (B651): the card drawn with every node's agent not
+      // agent is quiet: the card drawn with every node's agent not
       // heard from lately keeps the node step done.
       const quiet = await page.evaluate(() => {
         const keep = nodesList, hid = homeStartHidden;
@@ -129,11 +129,11 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
 // Left as the fixture had it.
 await firstRun(false);
 
-// ---- a bare-metal install's first run (R90) -----------------------------------
+// ---- a bare-metal install's first run -----------------------------------
 // The container's first run needs a node the person enrolls; a controller
 // installed bare metal has one already, its own machine, enrolled by the
-// installer, and Finish waits for that one and for no other (the operator,
-// 22 Oct). Told by the install's marker in its env file, BB_INSTALL. Each
+// installer, and Finish waits for that one and for no other.
+// Told by the install's marker in its env file, BB_INSTALL. Each
 // on a controller of its own, from a fresh state, beside the harness's.
 await section("a bare-metal install's first run", async () => {
   const DASH = fileURLToPath(new globalThis.URL('..', import.meta.url));
@@ -146,7 +146,7 @@ await section("a bare-metal install's first run", async () => {
               'Content-Type': 'application/json' };
   // Every controller started here ends with the suite, whatever stopped the
   // section it was for: one a failed check left running outlived the run
-  // under the first process (B928).
+  // under the first process.
   const ctrls = [];
   process.on('exit', () => ctrls.forEach(p => { try { p.kill('SIGKILL'); } catch (e) { /* gone */ } }));
   const controller = async (kind, { noOwner = false } = {}) => {
@@ -154,13 +154,13 @@ await section("a bare-metal install's first run", async () => {
     rmSync(w, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     for (const d of ['config', 'workspace', 'home']) mkdirSync(`${w}/${d}`, { recursive: true });
     const env = { ...process.env, DASHBOARD_STATE: `${w}/config`, WORKSPACE: `${w}/workspace` };
-    // Nobody's yet when asked (a move's destination, R90 step 12).
+    // Nobody's yet when asked (a move's destination).
     if (!noOwner) execFileSync('python3', [`${LIB}/users-verbs.py`, 'claim', `${DASH}/users.py`, OWNER.username],
                                { env: { ...env, BB_USERS_PW: OWNER.password } });
     // The port is free when asked for and taken by the server only once it
     // starts, and under a whole run's load an outgoing connection can take
-    // it in that gap: the server then ends on Address already in use (B931's
-    // gap, B1142). Started again on another port when that is what ended it,
+    // it in that gap: the server then ends on Address already in use.
+    // Started again on another port when that is what ended it,
     // three times at most; any other end is the answer, its log saying why.
     let proc, base;
     for (let tries = 1; ; tries++){
@@ -207,7 +207,7 @@ await section("a bare-metal install's first run", async () => {
     return { base, proc, enroll, finish, land: () => post('/api/move-land', {}), stop: () => proc.kill('SIGTERM') };
   };
 
-  // The own machine's disks (R161 step 3): the stick it runs from, three
+  // The own machine's disks: the stick it runs from, three
   // hard disks of one size, a larger one holding something, and an SSD.
   const TB = 1048576 * 4;
   var OWN_DISKS = [
@@ -225,7 +225,7 @@ await section("a bare-metal install's first run", async () => {
   await (await ctr.enroll('box1', false)).go();
   const fin = await ctr.finish();
   ok(!fin.error, `...and finishes once one answers (${fin.error || 'ok'})`);
-  // Moving a controller in is the first setup's alone (the operator, 6 Nov):
+  // Moving a controller in is the first setup's alone:
   // once finished, a landing is refused, never merged.
   const late = await ctr.land();
   ok(/only while a controller is first being set up/.test(late.error || ''), `a move is refused once the setup is finished (${late.error || 'landed'})`);
@@ -259,7 +259,7 @@ await section("a bare-metal install's first run", async () => {
      `its setup page shows this machine as the node being set up, with where it is, and Finish waits (${JSON.stringify(before)})`);
   ok(before.more === 'Enroll another machine' && !before.primary, '...and offers Enroll for more machines, as an option');
 
-  // ---- its disks (R161 step 3) ------------------------------------------------
+  // ---- its disks ------------------------------------------------
   // What they are for and how many may fail, the layout picked from them
   // and said with why, nothing written until Make it names every disk.
   const plans = await page.evaluate(disks => {
@@ -306,7 +306,7 @@ await section("a bare-metal install's first run", async () => {
   });
   ok(card.second === 'Your disks' && card.rows === 5 && card.held && /A ZFS raidz1 of 3 disks/.test(card.plan) && /one disk may fail/.test(card.plan) && card.fast,
      `the first run's second step is the disks: each but the stick a row, one holding data kept unless ticked, the plan in words and the SSD a fast pool (${JSON.stringify(card)})`);
-  // A disk SMART calls failing says so on its row (B771: the page read a
+  // A disk SMART calls failing says so on its row (the page read a
   // field nothing sends, so no disk could ever be marked).
   const failing = await page.evaluate(() => {
     const disks = setupDisks.own?.disks?.disks || setupDisks.own?.disks || [];
@@ -327,7 +327,7 @@ await section("a bare-metal install's first run", async () => {
   });
   ok(!failing.none && failing.well.length === 0 && failing.ill.length === 1 && failing.ill[0] === failing.disk,
      `a disk SMART calls failing wears it on its row, and a healthy one does not (${JSON.stringify(failing)})`);
-  // The disks a stick's plan adopts are the old system's (B637): each a
+  // The disks a stick's plan adopts are the old system's: each a
   // row with whose it is and no box, left out of the plan and of Make it;
   // when every disk is theirs the step points at This machine and makes
   // nothing.
@@ -361,7 +361,7 @@ await section("a bare-metal install's first run", async () => {
     ok(some.all.pill === 'in the walk' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
        && !some.all.make && some.all.boxes === 0 && some.all.walk === 'Walk me through it' && some.anyLink === 0,
        `...and with every disk theirs the step leads into the walk, offers nothing to make, and no link on the page leads where nothing can show (B662) (${JSON.stringify(some.all).slice(0, 300)})`);
-    // B945: a pool met by its disk, a disk the plan sets apart, and a disk
+    // A pool met by its disk, a disk the plan sets apart, and a disk
     // with a partition that holds no filesystem (an old parity) are never
     // offered to erase.
     const apart = await page.evaluate(() => {
@@ -383,7 +383,7 @@ await section("a bare-metal install's first run", async () => {
        && !apart.ticked.includes('sdc') && /holds a partition: kept unless you tick it/.test(apart.sdc),
        `the old system's pool disk and a disk it set apart are its own, and a disk with a bare partition is kept unless ticked (${JSON.stringify(apart).slice(0, 400)})`);
   }
-  // A new start on a stick (B666, B671; the operator, 4 Nov): the place for the
+  // A new start on a stick: the place for the
   // projects is a step, named by itself once a pool is made; a project waits for
   // it; a share is a folder, internal until it is exported.
   {
@@ -450,7 +450,7 @@ await section("a bare-metal install's first run", async () => {
        `...and left unticked, the shares are made on the main pool, one at a time, and not served (${JSON.stringify(shares).slice(0, 200)})`);
     ok(/internal: only on this machine/.test(fresh.madeCard), `...and it says so once made (${fresh.madeCard?.slice(0, 120)})`);
   }
-  // Moving here (R214): a stick whose plan names disks opens on the walk, its
+  // Moving here: a stick whose plan names disks opens on the walk, its
   // steps in the order they have to happen, each done in place with This
   // machine's and Controller settings' own controls, read from the machine.
   {
@@ -477,7 +477,7 @@ await section("a bare-metal install's first run", async () => {
         toDo: pill("The old system's disks"), landHeld: step('Land the controller')?.querySelector('[data-moveland]')?.disabled,
         heldWhy: /It waits for the step before/.test(words('Land the controller')) && !/the spaces need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
         back: words('If you go back'), rail: getComputedStyle(document.getElementById('rail') || document.body).display };
-      // In order (the operator, 8 Nov): the pool step waits on the disks,
+      // In order: the pool step waits on the disks,
       // saying so; and a system job in flight holds every step that would
       // start another, the page saying what runs.
       out.orderHeld = !!step('Where the spaces and containers go')?.classList.contains('held')
@@ -487,14 +487,14 @@ await section("a bare-metal install's first run", async () => {
         out.jobBand = panel().querySelector('.setjobband')?.textContent.replace(/\s+/g, ' ') || '';
         out.jobHeld = step("The old system's disks")?.querySelector('[data-adopt="adopt"]')?.disabled === true;
         n.jobs = jobsWere; redraw({}); out.jobGone = !panel().querySelector('.setjobband'); }
-      // Adopted writable, not taken over: the walk offers no Take (the
-      // operator, 8 Nov: the parity comes after, from This machine), and
+      // Adopted writable, not taken over: the walk offers no Take
+      // (the parity comes after, from This machine), and
       // says where it comes from.
       redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
       out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
-      // The two presses at the top (the operator, 9 Nov), in place of a step:
+      // The two presses at the top, in place of a step:
       // live while nothing runs, and live for a job too, since the server
-      // queues either behind it and the press says so (the operator, 22 Nov);
+      // queues either behind it and the press says so;
       // the login's says so once the machine has one. Generating shows the
       // password once and sends it.
       { const top = () => panel().querySelector('.setuptitle');
@@ -517,12 +517,12 @@ await section("a bare-metal install's first run", async () => {
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
       out.stuck = words('Where the spaces and containers go'); out.doneDisks = pill("The old system's disks");
       out.pick0 = [...(step('Where the spaces and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
-      // A btrfs cache adopted writable is a pool to pick (B663); a data disk is not.
+      // A btrfs cache adopted writable is a pool to pick; a data disk is not.
       redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.pick = [...(step('Where the spaces and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
       out.backRw = words('If you go back');
       // A projects folder named: the way back says to give it back first, and how
-      // from the old system (B665); the step says what it costs before it is pressed.
+      // from the old system; the step says what it costs before it is pressed.
       out.costs = words('Where the spaces and containers go');
       stick.projects = '/mnt/user/development/projects'; stick.projects_bound = true; setupSig = ''; drawSetup();
       out.backFolder = words('If you go back');
@@ -532,12 +532,12 @@ await section("a bare-metal install's first run", async () => {
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
       // The old controller ran on this machine, so its address cannot answer:
       // the bundle alone; and the token given on the first page is not asked
-      // again (the operator, 10 Nov).
+      // again.
       out.oldNoFrom = !step('Land the controller')?.querySelector('#landFrom');
       setupLand = { fresh: true, owner: true, stick: true, held: '', token_kept: true }; setupSig = ''; drawSetup();
       out.keptNoTok = !step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile')
         && /the one you gave on the first page/.test(words('Land the controller'));
-      // A bundle picked stays picked when the page draws again (B776: the
+      // A bundle picked stays picked when the page draws again (the
       // redraw set the file field's value, which a file field refuses, so
       // the file was gone and Land said to pick it first).
       { const f = step('Land the controller')?.querySelector('#landFile'), dt = new DataTransfer();
@@ -557,7 +557,7 @@ await section("a bare-metal install's first run", async () => {
       setupLand = { fresh: false, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       out.notFresh = words('Land the controller');
       // A plain stick, with no plan: the same walk with the steps it has, its own
-      // disks made, and not a word of an old system (the operator, 4 Nov).
+      // disks made, and not a word of an old system.
       { const fb = state.firstboot; state.firstboot = null; setupWalk = 'move'; n.reported = { ...was, os_stick: { ...stick, pool: '', ready: false } };
         setupSig = ''; drawSetup();
         out.plain = { titles: titles(), text: panel().textContent.replace(/\s+/g, ' ') };
@@ -627,7 +627,7 @@ await section("a bare-metal install's first run", async () => {
     ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
        `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
     ok(walk.oldNoFrom && walk.keptNoTok, `...the land form asks for the bundle alone where the old controller ran here, and not the token given on the first page (${JSON.stringify([walk.oldNoFrom, walk.keptNoTok])})`);
-    // The page is patched (R244): the field is the same one, its file still in it.
+    // The page is patched: the field is the same one, its file still in it.
     ok(walk.fileKept && !walk.fileKept.threw && walk.fileKept.kept && walk.fileKept.name === 'moved.aeriemove',
        `...and a bundle picked there is still picked after the page draws again (${JSON.stringify(walk.fileKept)})`);
     ok(walk.pickLine, '...the system pool is a label over its field, and the field and its button share a line');
@@ -671,7 +671,7 @@ await section("a bare-metal install's first run", async () => {
      `...and makes it with the Storage page's own calls: the raidz1 and the fast pool (${JSON.stringify(sent)})`);
   const fin2 = await bm.finish();
   ok(!fin2.error, `a bare-metal first run finishes with only its own node (${fin2.error || 'ok'})`);
-  // This controller (R90 step 8; split the operator, 9 Nov): the rail's
+  // This controller (split the operator): the rail's
   // Controller group opens on it, with what is the controller's; the machine
   // as a node is on the Nodes page, in its picker and every other node page's
   // but the containers', and a project's node picker names it This machine.
@@ -689,7 +689,7 @@ await section("a bare-metal install's first run", async () => {
     own: ownMachine()?.id }));
   ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.updates && !mp.row && mp.link === `#/machines/nodes/${mp.own}`,
      `This controller draws the head and the Updates section, no node row, and links to the machine's row on the Nodes page (${mp.link})`);
-  // Everything about updating the machine drawn once (R294 step 13): the
+  // Everything about updating the machine drawn once: the
   // update window here beside Updates, and neither in Controller settings.
   const win = await page.waitForSelector('.machinetab details[data-sect="nodes:updwin"] #set_update_window, .machinetab details[data-sect="nodes:updwin"] select', { timeout: 15000 }).then(() => true, () => false);
   await page.evaluate(() => openSettingsTab());
@@ -707,7 +707,7 @@ await section("a bare-metal install's first run", async () => {
   ok(np.tag && np.sects.includes('nodes:health') && np.sects.includes('nodes:advanced'), `the machine is a row on the Nodes page, with a node's sections (${np.sects.join(',')})`);
   ok(np.live.library && np.live.installed && np.live.files && np.live.emulator && np.live.docker && !np.live.nginx,
      `its node is in the Library's and every node page's picker, the Containers page's too, and not the nginx page's (${JSON.stringify(np.live)})`);
-  // A held start (R56 step 9): not held on this first boot, armed for the
+  // A held start: not held on this first boot, armed for the
   // next by its press, and Start says there was nothing to lift.
   const h0 = await page.evaluate(() => state?.held || null);
   ok(h0 && h0.held === false && h0.armed === false, `a bare-metal install's first start is not held (${JSON.stringify(h0)})`);
@@ -719,8 +719,8 @@ await section("a bare-metal install's first run", async () => {
   await bmApi('/api/v1/nodes', { action: 'hold-next', on: false });
   const started = await bmApi('/api/v1/nodes', { action: 'start-held' });
   ok(started.ok && /not held/.test(started.note || ''), `Start with nothing held says so (${JSON.stringify(started)})`);
-  // ...and holding the next start is a checkbox beside Reboot and Shut down
-  // (R161 step 11), ticked while armed, the head's button gone.
+  // ...and holding the next start is a checkbox beside Reboot and Shut down,
+  // ticked while armed, the head's button gone.
   {
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: true });
     await page.evaluate(async () => { await refresh(); readMoved('nodes'); drawPanes(); });
@@ -730,7 +730,7 @@ await section("a bare-metal install's first run", async () => {
     ok(box.row && !box.head, `hold the next start is a checkbox in the Reboot or shut down row, ticked while armed (${JSON.stringify(box)})`);
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: false });
   }
-  // A stick boot (R161 step 10): The stick section says where docker and the
+  // A stick boot: The stick section says where docker and the
   // VMs write and what the stick has written, with the system pool picker.
   {
     const st = await page.evaluate(() => {
@@ -745,7 +745,7 @@ await section("a bare-metal install's first run", async () => {
        && st.pick.includes('/mnt/pools/fast'),
        `a stick boot's The stick says docker and the VMs wait for a system pool, what is still on the stick and what it has written, with the pools to pick (${st.text.slice(0, 160)})`);
   }
-  // The disks the stick's plan names (R163 step 9): each found here by its
+  // The disks the stick's plan names: each found here by its
   // serial or not, the parity disk left alone, read only or writable, Check
   // and Adopt; once adopted, what is mounted and Release.
   {
@@ -796,7 +796,7 @@ await section("a bare-metal install's first run", async () => {
       // since the step above: the plan is set again with its shares.
       state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
                                  notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
-      // Kept for the steps after this one to plant again (B969).
+      // Kept for the steps after this one to plant again.
       window.__adopted = n.reported.adopted;
       window.__fbShares = state.firstboot;
       readMoved('nodes'); drawPanes();
@@ -813,10 +813,10 @@ await section("a bare-metal install's first run", async () => {
     ok(done.there && done.gone && /\/mnt\/disk1xfs, read-only/.test(done.text) && /not mounted yet/.test(done.text) && /sdc, left alone/.test(done.text) && done.release,
        `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
     // The folders at /mnt/user's top with no share settings, offered to
-    // tick (R163 step 13), and the same section on the Storage page (step 9).
+    // tick, and the same section on the Storage page (step 9).
     // Planted again whole: the share call just above moves the nodes
     // revision, and the reread it starts can replace what the step before
-    // planted before this one draws (B969: offered nothing, the section
+    // planted before this one draws (offered nothing, the section
     // gone with its plan).
     const folders = await page.evaluate(() => {
       const n = ownMachine();
@@ -829,7 +829,7 @@ await section("a bare-metal install's first run", async () => {
     });
     ok(JSON.stringify(folders.offered) === '["TV Shows"]' && folders.ticked === 0 && folders.btn,
        `a folder with no share settings is offered unticked, and the plan's and the served ones are not (${JSON.stringify(folders)})`);
-    // Taking the array over (R163 step 3) and the way back (step 5).
+    // Taking the array over and the way back (step 5).
     const take = await page.evaluate(() => {
       const n = ownMachine(), was = n.reported.adopted;
       const read = () => { readMoved('nodes'); drawPanes();
@@ -840,7 +840,7 @@ await section("a bare-metal install's first run", async () => {
       const old = read();
       n.reported.adopted = { ...was, taken: false };
       // Each share's places, from the old system's settings, set before
-      // the takeover and kept across a redraw (R163).
+      // the takeover and kept across a redraw.
       const fbWas = state.firstboot;
       state.firstboot = { ...fbWas, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *' };
       const offered = read();
@@ -929,8 +929,8 @@ await section("a bare-metal install's first run", async () => {
     });
     ok(onStorage.there && onStorage.release && onStorage.folder,
        `the Storage page of the machine draws the same Adopted disks, Release and the folders to serve (${JSON.stringify(onStorage)})`);
-    // The Nodes page points to the Containers page, where they are (the
-    // operator, 10 Nov: looked for there and never found on the Nodes page).
+    // The Nodes page points to the Containers page, where they are
+    // (looked for there and never found on the Nodes page).
     const pointer = await page.evaluate(() => {
       openNodesTab(ownMachine().id); state.firstboot = state.firstboot || window.__fbKeep;
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
@@ -940,9 +940,9 @@ await section("a bare-metal install's first run", async () => {
       return { there: !!p, button: !!p?.querySelector('[data-oldapps]'), read: !!p?.querySelector('[data-adoptapp]') };
     });
     ok(pointer.there && pointer.button && !pointer.read, `the Nodes page says the old system's containers and VMs are on the Containers page (${JSON.stringify(pointer)})`);
-    // ...and what the old system ran (R163 steps 10, 11): read first, then
-    // its containers as compose files to download (the operator, 10 Nov:
-    // imported from New container, never made here on a press) and its VMs
+    // ...and what the old system ran: read first, then
+    // its containers as compose files to download
+    // (imported from New container, never made here on a press) and its VMs
     // to define and run.
     const apps = await page.evaluate(() => {
       const n = ownMachine();
@@ -975,7 +975,7 @@ await section("a bare-metal install's first run", async () => {
        && ['read', 'br0', 'zip', 'start', 'define'].every(x => apps.acts.includes(x)) && !apps.acts.includes('make') && apps.tick,
        `once read: each container's row, the network it joins and Download compose files, each VM defined or not with Start and its Starts with the machine tick, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.tick}; ${apps.text.slice(0, 200)})`);
     // Each VM still to define is a tick, ticked; one taken off is not
-    // defined, and the button says how many are (the operator, 1 Nov).
+    // defined, and the button says how many are.
     // The VM's tick drawn: read a moment after the list was, it was not there yet.
     await page.waitForSelector('.dmtab [data-adpick="v:Ubuntu"]', { state: 'attached', timeout: 15000 }).catch(() => {});
     const picked = await page.evaluate(() => {
@@ -1006,7 +1006,7 @@ await section("a bare-metal install's first run", async () => {
        `storage-adopt refuses a filesystem it does not take and a Release with nothing adopted, before any job (${badFs.error}; ${noneHeld.error})`);
     await freePoll(page);
   }
-  // Name and time (R161 step 3): the own machine's section, Apply asleep
+  // Name and time: the own machine's section, Apply asleep
   // until a field moves, and the press a system job on its node.
   const nt = await page.evaluate(() => {
     const sect = document.querySelector('.nodestab details[data-sect="nodes:machine"]');
@@ -1029,7 +1029,7 @@ await section("a bare-metal install's first run", async () => {
   await page.close();
   bm.stop();
 
-  // Moving a controller (R90 step 12, and its second pass R175): a source
+  // Moving a controller: a source
   // with a node arms a move (the token shown once, the node told from its
   // next hello, the bundle packed fresh per download), a destination nobody
   // owns pulls the bundle from the source with the token on its first page
@@ -1039,7 +1039,7 @@ await section("a bare-metal install's first run", async () => {
   // with its challenge in the moved answer; the destination's Nodes page
   // lists the node not yet here with its follow line until it says hello.
   {
-    // The first page asks (the operator, 4 Nov): moving a controller here, or a
+    // The first page asks: moving a controller here, or a
     // new start; yes opens the next page on the walk, on any install.
     {
       const lan = await controller('landing', { noOwner: true });
@@ -1095,7 +1095,7 @@ await section("a bare-metal install's first run", async () => {
     const pieces = (await sApi('/api/move?pieces=1')).pieces || [];
     ok(pieces.some(p => p.key === 'state' && p.fixed && p.size > 0) && pieces.some(p => p.key === 'repos' && !p.on) && pieces.some(p => p.key === 'install_key'),
        `what a bundle may carry is listed with sizes, the state fixed and the repositories off (${pieces.map(p => p.key).join(',')})`);
-    // A backup to keep (the operator, 6 Nov): its own token, nothing armed.
+    // A backup to keep: its own token, nothing armed.
     const bkp = await sApi('/api/move', { action: 'backup', repos: false, stores: [] });
     const bst = await sApi('/api/move');
     const bfile = await fetch(`${src.base}/api/move-backup?name=${encodeURIComponent(bkp.bundle || '')}`, { headers: sH });

@@ -1,4 +1,4 @@
-"""A new install set up from a shell on the controller (R84): the owner
+"""A new install set up from a shell on the controller: the owner
 claimed, a node's enrollment token minted, a folder put in place after the
 first run made a project, and its node set, each as the dashboard does it."""
 import json

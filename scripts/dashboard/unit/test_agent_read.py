@@ -1,6 +1,6 @@
 """A docker read on an agent node (devapp._agent_read): asked every time,
 busy or not, and answered from what was kept, marked stale, only when the
-node does not answer (the operator, 11 Oct: the Containers page read "down, as
+node does not answer (the Containers page read "down, as
 last seen" whenever anything ran on the node, including the change just
 made from it)."""
 import os
@@ -56,7 +56,7 @@ class AgentRead(unittest.TestCase):
 class ExecOut(unittest.TestCase):
     """A waited-on command's output is the command's: the agent's opening
     line of every job's log ("exec") was the first line of every container
-    log read on an agent node (B65)."""
+    log read on an agent node."""
 
     def test_the_jobs_opening_line_is_not_the_commands(self):
         import nodes
@@ -68,7 +68,7 @@ class ExecOut(unittest.TestCase):
 
 class NoTree(unittest.TestCase):
     """A record under a written container's name that lost its source mark
-    asks git nothing: there is no tree (B634)."""
+    asks git nothing: there is no tree."""
 
     def test_no_tree_no_git(self):
         import tempfile

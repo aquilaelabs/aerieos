@@ -1,4 +1,4 @@
-# The appliance disk's partitions (R160 step 1), one place for every number
+# The appliance disk's partitions, one place for every number
 # the image's parts share: build.sh lays the disk out by them, the initramfs
 # script mounts by them, fstab names the ESP by one, grub.cfg boots a slot by
 # one, and test_image.py holds the three copies to this file. A partition's

@@ -1,6 +1,6 @@
 """A session asking aerie nodes through the relay reads its space's own
-nodes, and every node only from an owner's or an administrator's seat (B727:
-it read the whole install's inventory); a person at the controller reads all."""
+nodes, and every node only from an owner's or an administrator's seat
+(it read the whole install's inventory); a person at the controller reads all."""
 import json
 import os
 import shutil

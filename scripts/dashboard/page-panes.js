@@ -17,15 +17,15 @@
 // iframe and drop a live terminal for no reason.
 function paintBar(pane, t, i){
   const bar = pane.querySelector(":scope > .bar");
-  // The dock's pane wears the dock's line (R218 step 4), with or without a
+  // The dock's pane wears the dock's line, with or without a
   // terminal in it.
   if (i === 1){
     setClass(bar, "bar dockbar");
     bar.style.removeProperty("--pc");
     // Patched only where it changed: a poll that moves nothing leaves the
     // line's buttons where they are, a pointer over one keeps its hover,
-    // and one that moves something keeps the line and each tab by its id
-    // (R244). A line written whole keeps where it was scrolled to (B322),
+    // and one that moves something keeps the line and each tab by its id.
+    // A line written whole keeps where it was scrolled to,
     // and one with a tab held in it is not drawn at all: a poll bringing a
     // session dot replaced the tab under the finger and dropped it; the
     // drag's end draws it.
@@ -34,24 +34,24 @@ function paintBar(pane, t, i){
     if (!ddrag && patch(bar, dockBar())){
       const line = bar.querySelector(".dockline");
       // ...with the ends' arrows it had before the scroll is put back: an
-      // arrow moves the tabs by the line's gap (B318), so one added after
+      // arrow moves the tabs by the line's gap, so one added after
       // moved a line scrolled along by that much at every redraw.
       if (line && line !== old){ line.classList.add(...ends); line.scrollLeft = kept; }
       wireDockBar(bar); dockReveal(bar);
     }
     return;
   }
-  // A page (R218 step 2) wears its group's sub-nav, or its name, and no
+  // A page wears its group's sub-nav, or its name, and no
   // close: the rail is how you leave it. A project (step 3) wears its
   // header: the name, the facts, the session's state and its actions.
   const proj = t.kind === "notebook";
   // Which project the front pane is on, so a band put away there comes back
   // once it is left (pnoteOnShow).
   if (i === 0) pnoteOnShow(proj ? t.arg : "");
-  // Patched, and wired, only when it changed (R218 step 10): assigned on
+  // Patched, and wired, only when it changed: assigned on
   // every draw, the page's sub-nav and a project's header were rebuilt by
   // each poll under the pointer that was about to press them; patched, the
-  // header's repository pulldown and its menus are kept as they are (R244).
+  // header's repository pulldown and its menus are kept as they are.
   const fresh = patch(bar, isToolKind(t.kind) ? shellBar(t, i)
     : proj ? projectHeader(t)
     : `<span title="${esc(tabTitle(t))}">${esc(tabLabel(t))}</span>`, true);
@@ -214,10 +214,10 @@ function drawPanes(){
     // "same" and left the old terminal showing under the new name.
     const same = pane.dataset.tab === (t?.id || "") && pane.dataset.kind === (t?.kind || "")
               && pane.dataset.arg === (t?.arg || "")
-              // ...and whether it is popped out (R8): the same tab with its
+              // ...and whether it is popped out: the same tab with its
               // frame gone, or back, is a rebuild.
               && pane.dataset.popped === (t?.popped ? "1" : "")
-              // ...and what draws it (R133): the page's terminal, or a frame.
+              // ...and what draws it: the page's terminal, or a frame.
               && pane.dataset.own === (termOwn(t) ? "1" : "");
     if (same && t){
       paintBar(pane, t, i);
@@ -240,7 +240,7 @@ function drawPanes(){
     if (!t){ showInStack(st, "", () =>
       `<div class="empty-pane">no tab here: “+” opens a terminal, Sessions reopens a running one</div>`);
       continue; }
-    // ...and whether AerieOS's own terminal draws it (R133): switching
+    // ...and whether AerieOS's own terminal draws it: switching
     // between the two is a different slot.
     const key = `${t.id}|${t.kind}|${t.arg}${t.gen ? "|" + t.gen : ""}${t.popped ? "|popped" : ""}${termOwn(t) ? "|own" : ""}`;
     // A terminal that was on screen a moment ago is kept alive behind the one
@@ -255,7 +255,7 @@ function drawPanes(){
                             && c.dataset.key?.startsWith(t.id + "|"))
                     .forEach(c => c.remove());
     const { el, fresh } = showInStack(st, key, () => t.kind === "term" && t.popped
-      // Popped out into its own window (R8): the tab stays, blank, with the
+      // Popped out into its own window: the tab stays, blank, with the
       // one control that makes sense. Not a hidden frame: that would be a
       // second client on the session, the size fight one client per terminal avoids.
       ? `<div class="slot popped"><div class="empty-pane">this terminal is open in its own window<br>
@@ -311,9 +311,9 @@ function drawPanes(){
     openedNow.add(t.id);
     TABKINDS[t.kind]?.open?.();
   }
-  // A terminal of ours whose slot left the page is closed (R133).
+  // A terminal of ours whose slot left the page is closed.
   termSweep();
-  // The page in front, toured the first time this account opens it (R94).
+  // The page in front, toured the first time this account opens it.
   tourSoon(tabOf(panes[0])?.kind);
 }
 
@@ -348,7 +348,7 @@ function nbReadOnly(root, project){
     note.className = "rolock";
     root.prepend(note);
   }
-  // Says why and who lifts it (R119): the lock is somebody's.
+  // Says why and who lifts it: the lock is somebody's.
   note.textContent = lockedWhy(p) + ". Everything here reads as before.";
 }
 
@@ -357,7 +357,7 @@ function nbReadOnly(root, project){
 // Every terminal tab on the strip stays attached, behind the one on screen,
 // for as long as it is on the strip; Minimize (into the Sessions menu) or
 // closing it is what detaches it, since a frame whose tab is gone is removed
-// at the top of drawPanes (the operator, 6 Oct). It used to keep the three
+// at the top of drawPanes. It used to keep the three
 // last seen, and picking a fourth reloaded it from nothing: its page, its
 // socket, its attach. The strip's own cap (MAX_TABS, twelve terminal tabs an
 // account) is the ceiling on browser memory now.
@@ -405,8 +405,8 @@ function showInStack(st, key, html){
 
 // The page fading out stays where it was while it goes: a project's header
 // is taller than a page's bar, so the stack under it moves when one replaces
-// the other, and the page going out jumped by that much (the operator,
-// 16 Oct). Called once the pane's bar is painted.
+// the other, and the page going out jumped by that much.
+// Called once the pane's bar is painted.
 function holdLeaving(st){
   const l = st.querySelector(":scope > .leaving");
   if (!l || !l.dataset.y0) return;
@@ -438,7 +438,7 @@ function dropElsewhere(keep, key){
 // device has been the one using it.
 let nudgeTimer = null, nudgedAt = 0;
 function nudgeTerminals(){
-  // AerieOS's own terminals size themselves to their box (R133).
+  // AerieOS's own terminals size themselves to their box.
   termRevive();
   // The visible ones only. A pane keeps three more frames alive behind the one
   // on screen, and they are all the same size already: thrashing their layout
@@ -469,6 +469,6 @@ function reattachTerminals(){
   document.querySelectorAll(".pane .slot:not(.on) iframe")
           .forEach(f => f.dataset.stale = "1");
   document.querySelectorAll(".pane .slot.on iframe").forEach(f => { f.src = f.src; });
-  // ...and AerieOS's own: a socket that dropped is opened again (R133).
+  // ...and AerieOS's own: a socket that dropped is opened again.
   termRevive();
 }

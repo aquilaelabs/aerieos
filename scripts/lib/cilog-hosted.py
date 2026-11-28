@@ -1,5 +1,5 @@
 """Behind `aerie ci-log` for a project whose workflows run on GitHub's own
-runners (R115): the runs and a run's failed jobs, read by the controller
+runners: the runs and a run's failed jobs, read by the controller
 with its credential (cilogs.py on the dashboard's side), since the session
 holds none and GitHub hands out a log only to a token.
 

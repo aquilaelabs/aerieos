@@ -178,7 +178,7 @@ def memory_dir(project, home=None):
         return None
     # The same slug Claude Code uses for transcripts: the working directory's
     # path with every character that is not a letter or a digit a dash
-    # (B349: its slashes alone named a folder Claude never writes for a
+    # (its slashes alone named a folder Claude never writes for a
     # project like ep.silon). One named the old way, and not yet the new,
     # is read where it is.
     root = Path(home) / ".claude" / "projects" if home else CLAUDE_PROJECTS
@@ -392,7 +392,7 @@ def payload(project, live=(), home=None):
     # A line for a file that is gone has one fix, taking it out, and the
     # view offers it as a press (fix: "tidy"). It used to say "saving takes
     # the line out" beside a Save with nothing staged, which could not be
-    # pressed (B455).
+    # pressed.
     issues = [{"level": "warning", "fix": "tidy",
                "text": f"the index points at {h}, which is not here"}
               for h in sorted(listed - present)]
@@ -455,7 +455,7 @@ def _target(d, file):
 def _write(p, text):
     """Replace a memory atomically, through statefile.write_text: a
     half-written memory is still loaded at the next session start, and a
-    torn frontmatter block is worse than the text it replaced (B196)."""
+    torn frontmatter block is worse than the text it replaced."""
     statefile.write_text(p, text)
 
 
@@ -469,7 +469,7 @@ def _serialized(fn):
     write it back, and nothing held the read and the write together: two
     notebook tabs adding a memory at once both appended to the index they had
     read, one rename won, and the other memory was left on disk with no index
-    line, which is exactly what create() promises cannot happen (B196).
+    line, which is exactly what create promises cannot happen.
 
     The lock file lives under the dashboard's state, keyed by the directory,
     not beside MEMORY.md: that directory is Claude Code's, and a stray file of
@@ -713,9 +713,8 @@ def delete(project, file, home=None):
 # flag the list does (roadmap.mark_unsaved).
 mark_unsaved = None
 
-# The actions of verb() that write. The server counts a person's edit for
-# the sessions' catch-up by these, and a history read is not one of them
-# (B296).
+# The actions of verb that write. The server counts a person's edit for
+# the sessions' catch-up by these, and a history read is not one of them.
 WRITES = ("save", "index", "create", "delete")
 
 
@@ -723,7 +722,7 @@ def verb(proj, act, req, home):
     """Edit, delete or create one of this project's memories, rewrite the
     index, or read the history, once server.py has let this account at the
     project. `home` is whose memories: the reader's own home, never the
-    owner's (B67). The project and file names go through untouched because
+    owner's. The project and file names go through untouched because
     this module is the thing that checks them against what is on disk.
     (payload, status)."""
     file = field(req, "file")

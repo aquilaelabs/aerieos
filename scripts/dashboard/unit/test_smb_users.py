@@ -1,4 +1,4 @@
-"""SMB passwords for the accounts (R164 step 1): the NT hash Samba keeps,
+"""SMB passwords for the accounts: the NT hash Samba keeps,
 set and cleared on Profile, handed to the own machine's hello, a share's
 names resolved to Unix users, and the shares a person reaches."""
 import json
@@ -78,7 +78,7 @@ class SmbPasswords(unittest.TestCase):
 
 
 class FollowsTheSignIn(unittest.TestCase):
-    """One name and one password (the operator, 4 Nov): a share lists people,
+    """One name and one password: a share lists people,
     and on a machine that serves shares a person's sign-in opens them."""
 
     def setUp(self):
@@ -140,7 +140,7 @@ class FollowsTheSignIn(unittest.TestCase):
 
     def test_an_account_no_share_names_has_no_share_password(self):
         # The NT hash is far weaker than the password's own hash, and was
-        # kept for every account at every sign-in (the operator, 13 Nov).
+        # kept for every account at every sign-in.
         u = self.users
         self.d["users"]["mia"] = {"uid": "u_11112222", "password": "x"}
         with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):

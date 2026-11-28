@@ -1,4 +1,4 @@
-"""AerieOS on this machine (R160 step 4): what the image says of
+"""AerieOS on this machine: what the image says of
 itself for the census, and the update that writes the next image into the
 slot not in use. The disk is image/partitions.sh's: two root slots found by
 fixed partition UUIDs, each slot's kernel and initrd under /aerieos/SLOT
@@ -42,7 +42,7 @@ REPO = "aquilaelabs/aerieos"
 # beside the ISO and verifies it against the trusted root this image was
 # built with, with no network.
 ATTEST_URL = "https://api.github.com/repos/{repo}/attestations/sha256:{digest}"
-# Who may have built an image an update takes (B729): the release workflow,
+# Who may have built an image an update takes: the release workflow,
 # build-image.yml, run on a version's tag, as a published release's
 # attestation names it (read off v0.9.0-dev.5341's ISO, 16 Nov: its
 # certificate's identity is .../build-image.yml@refs/tags/v0.9.0-dev.5341).
@@ -54,7 +54,7 @@ def signer_identity(repo):
 
 
 TRUSTED_ROOT = "/usr/lib/aerieos-os/trusted-root.jsonl"
-# Who may sign a release (R199): the running controller's own copy of
+# Who may sign a release: the running controller's own copy of
 # config/release-signers, so a key is trusted because this install already
 # held it, never because the release names it.
 SIGNERS = "/opt/aerieos/config/release-signers"
@@ -226,7 +226,7 @@ def os_release():
             out[key] = got if got in ("a", "b") else ""
         except (OSError, subprocess.SubprocessError):
             out[key] = ""
-    # On trial (R161 step 2): the slot an update wrote, booted and not yet
+    # On trial: the slot an update wrote, booted and not yet
     # marked good; and a fallback the health check recorded, said until the
     # next update.
     try:
@@ -244,8 +244,8 @@ def os_release():
 
 
 def keep_state_before(say, running):
-    """The controller's configuration as it is before an update (R160 step
-    4, R161 step 2): a copy beside the old slot, so going back to that slot
+    """The controller's configuration as it is before an update:
+    a copy beside the old slot, so going back to that slot
     boots the configuration it had, and the two newest copies kept."""
     src = env_or("BB_OS_STATE", "/var/lib/aerieos-controller/config")
     if not os.path.isdir(src):
@@ -271,7 +271,7 @@ def keep_state_before(say, running):
     return True
 
 
-# ---- older versions kept (R201, the operator, 1 Nov) ---------------------------
+# ---- older versions kept ---------------------------
 # A version an update pushes out of its slot is kept as files on the data
 # partition, its root, kernel, initrd and release, with the configuration's
 # copy from when it was left, and is a boot menu entry of its own. Only an
@@ -349,7 +349,7 @@ def _unname_kept(ver, say):
     """A version no longer kept, taken off the next boot where Boot this next
     named it (slot kept-next, aerie_kept_next in grubenv): GRUB with a default
     its menu no longer has boots its first entry, slot A, whichever slot is in
-    use (B620). Read from the environment block itself, cleared by the tool."""
+    use. Read from the environment block itself, cleared by the tool."""
     envf = os.path.join(env_or("BB_OS_ESP", ESP), "grub", "grubenv")
     try:
         with open(envf, encoding="utf-8", errors="replace") as f:
@@ -481,8 +481,8 @@ def _sha256(path):
 
 
 # What an update holds at once on the data partition, against the ISO's
-# size: the ISO, the root taken out of it, its kernel and initrd (R191
-# step 4: a fetch that filled /var took the controller's database with it).
+# size: the ISO, the root taken out of it, its kernel and initrd
+# (a fetch that filled /var took the controller's database with it).
 ROOM = 2.2
 
 
@@ -533,7 +533,7 @@ def _copy_from(r, f, dest, total, say):
 
 
 def stick_status():
-    """A stick boot's state (R161 step 10, the system-pool tool's status):
+    """A stick boot's state (the system-pool tool's status):
     {stick, pool, ready, on_stick, written_kb, boot_written_kb}, or {} where
     the tool is not here (no AerieOS)."""
     tool = env_or("BB_OS_POOL", POOL_TOOL)
@@ -547,7 +547,7 @@ def stick_status():
     if not isinstance(d, dict) or not d.get("stick"):
         return {"stick": False}
     # The stick's own partition (/var): how much room it has, since what
-    # fills it takes the controller down (the operator, 8 Nov).
+    # fills it takes the controller down.
     try:
         du = shutil.disk_usage(env_or("BB_SP_VAR", "/var"))
         room = {"var_total_mb": du.total >> 20, "var_free_mb": du.free >> 20}
@@ -562,7 +562,7 @@ def stick_status():
             # The pools holding another install's folder, which a pick there sets aside.
             "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16],
             # The id its system pool is marked with, for the controller's
-            # state to carry into a backup (B939).
+            # state to carry into a backup.
             "install_id": str(d.get("install_id") or "") if re.fullmatch(r"[0-9a-f]{32,64}", str(d.get("install_id") or "")) else "",
             # ...and the id each other install's pool is marked with.
             "other_marks": {str(k)[:200]: str(v) for k, v in list((d.get("other_marks") or {}).items())[:16]
@@ -596,7 +596,7 @@ class OsImageMixin:
     is made of."""
 
     def _apply_os_kept(self, job, cfg):
-        """An older version kept (R201): `next` boots it once, `remove` takes
+        """An older version kept: `next` boots it once, `remove` takes
         it away; then a hello."""
         tool = env_or("BB_OS_SLOT", SLOT_TOOL)
         verb, ver = str(cfg.get("verb") or ""), str(cfg.get("version") or "")
@@ -696,7 +696,7 @@ class OsImageMixin:
                 dest = os.path.join(work, piece)
                 at = os.path.join(mnt, inside)
                 # A piece is a plain file on the ISO itself, never a link
-                # out of it (B470: one to /dev/zero filled the disk).
+                # out of it (one to /dev/zero filled the disk).
                 if os.path.islink(at) or not os.path.isfile(at):
                     job.say(f"the image has no {inside} as a plain file: nothing written\n")
                     return {}
@@ -712,7 +712,7 @@ class OsImageMixin:
         return files
 
     def _apply_system_pool(self, job, cfg):
-        """A stick's system pool named (R161 step 10): the tool stops docker,
+        """A stick's system pool named: the tool stops docker,
         containerd and libvirt, moves what the stick holds of theirs, of the
         toolchains and of the projects to the pool, keeps the name and binds
         them there at every boot; then a hello says where things are."""
@@ -724,9 +724,9 @@ class OsImageMixin:
         if not on_disks(path):
             job.say("refused: a pool is named by its mount point\n")
             return "failed", 64
-        # Another install's folder there is set aside only when asked (the
-        # operator, 8 Nov); the tool refuses it otherwise, but for the one
-        # this controller's restored configuration names as its own (B939).
+        # Another install's folder there is set aside only when asked;
+        # the tool refuses it otherwise, but for the one
+        # this controller's restored configuration names as its own.
         adopt = str(cfg.get("adopt_id") or "")
         pre = ["env", f"BB_SP_ADOPT_ID={adopt}"] if re.fullmatch(r"[0-9a-f]{32,64}", adopt) else []
         rc = self._sh(job, [*pre, "bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
@@ -735,7 +735,7 @@ class OsImageMixin:
 
     def _apply_projects_folder(self, job, cfg):
         """A folder already on the machine's disks taken as the projects
-        folder (R163, the operator, 1 Nov: a moved controller adopts the
+        folder (a moved controller adopts the
         projects where they are), or let go (`release`): the tool checks it,
         says which of `names` it holds, hands it to the controller's account,
         binds it and restarts the controller on it; then a hello."""
@@ -761,7 +761,7 @@ class OsImageMixin:
         release's files (an offline machine, the files brought on a stick or
         over a share); the sha256 files beside them are read either way.
         What it fetched and took out of the ISO is gone again however it
-        ends: a failed update left gigabytes on the data partition (B470)."""
+        ends: a failed update left gigabytes on the data partition."""
         work = os.path.join(os_work(), "update")
         try:
             return self._os_update(job, cfg, work)
@@ -782,8 +782,7 @@ class OsImageMixin:
             say("refused: this boot named no slot, so the one to write cannot be told from the one running\n")
             return "failed", 78
         # The slot running now on trial is not proven: the other slot is the
-        # only good one, and writing it would leave nothing to go back to
-        # (B470).
+        # only good one, and writing it would leave nothing to go back to.
         if rel.get("trial") and rel.get("next") == cur:
             say(f"refused: slot {cur} runs on trial and is not marked good yet, and slot {other} is the one to fall "
                 "back to: wait for the health check (a few minutes after the dashboard is up), then update\n")
@@ -818,7 +817,7 @@ class OsImageMixin:
         fn = f"{name}.iso"
         iso = os.path.join(work, fn)
         # The release's list of its files, signed by a key this install
-        # already holds (R199), before the image is fetched: who changes the
+        # already holds, before the image is fetched: who changes the
         # repository or a release can build and attest an image and put a
         # sha256 beside it, not sign the list. The tag says who may have
         # signed (tag_namespaces); a list that is unsigned, or signed by
@@ -874,12 +873,11 @@ class OsImageMixin:
             say(f"{fn}: its sha256 does not match the one the release carries ({have[:12]} against {want[:12] or 'none'}): nothing written\n")
             return "failed", 67
         say(f"{fn} matches its sha256\n")
-        # The build attestation (R160 step 4): keyless, from the workflow
+        # The build attestation: keyless, from the workflow
         # that built the image, checked where gh is here to ask GitHub.
         # The build attestation, from a release or from a folder alike: a
         # sha256 from the same place as the image proves nothing about who
-        # built it, and a folder may be on a share others write (B470, R191
-        # step 1).
+        # built it, and a folder may be on a share others write.
         if not self._attested(job, iso, have, name, src, work):
             return "failed", 68
         # ...and the image's own bytes are the ones the signed list names,
@@ -895,8 +893,8 @@ class OsImageMixin:
             return "failed", 66
         os.unlink(iso)
         # The version is the image's own release file's, never only its
-        # file's name, and an older one than this machine runs is not taken
-        # (B847): going back is the boot menu's, which keeps the version
+        # file's name, and an older one than this machine runs is not taken:
+        # going back is the boot menu's, which keeps the version
         # before.
         said = release_version(files["release"])
         if said != ver:
@@ -916,7 +914,7 @@ class OsImageMixin:
             say(f"slot {other}'s partition is not here ({dev}): nothing written\n")
             return "failed", 70
         # Every AerieOS disk shares its partitions' UUIDs, so with a second
-        # one in the machine (a stick) the name could be either (B470).
+        # one in the machine (a stick) the name could be either.
         if not env_or(f"BB_OS_DEV_{other.upper()}", ""):
             uuid = os.path.basename(SLOT_DEV[other])
             r = subprocess.run(["blkid", "-t", f"PARTUUID={uuid}", "-o", "device"], capture_output=True, text=True,
@@ -927,7 +925,7 @@ class OsImageMixin:
                 return "failed", 70
         # GRUB pointed back at this slot, trial off, before the other is
         # touched: a slot left half written by a lost power or a failed
-        # write is never the next boot (B470).
+        # write is never the next boot.
         if self._sh(job, ["bash", tool, "hold"], timeout=30) != 0:
             say("GRUB's environment could not be set back to this slot: nothing written\n")
             return "failed", 73
@@ -978,10 +976,10 @@ class OsImageMixin:
         except OSError as e:
             say(f"the ESP did not take slot {other}'s kernel: {e}\n")
             return "failed", 72
-        # Named for the next boot and put on trial (R161 step 2) in one
+        # Named for the next boot and put on trial in one
         # write: two boots without the health check's word go back to the
         # slot running now. Not set, it is said, and the next boot stays here
-        # (B470: a next without its trial booted the new slot with no way
+        # (a next without its trial booted the new slot with no way
         # back, and was reported a success).
         pin_hostid()
         if self._sh(job, ["bash", tool, "switch", other, cur, ver], timeout=30) != 0:

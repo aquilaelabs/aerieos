@@ -1,11 +1,11 @@
-"""What each added pack is configured with on this node (R172): the hello
+"""What each added pack is configured with on this node: the hello
 hands the rows (pack, the store root, values, env), and the agent writes
 each pack's env into STORE/.bb/config/PACK.env, owned by the session
 account and readable by it alone, which aerie tool reads into a verb's
 environment before it runs; a pack no row names any more loses its file.
 Written only when something changed, by the rows' digest kept in memory.
 
-Each account's own answers (R172 step 5, the fields a pack scopes to a
+Each account's own answers (the fields a pack scopes to a
 person) go into that account's home: ~/.bb/config/PACK.env, owned by the
 account's user and readable by it alone, which aerie tool reads after the
 store's, so a person's own value is the one their session's verb sees.

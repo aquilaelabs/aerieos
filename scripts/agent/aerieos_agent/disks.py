@@ -1,4 +1,4 @@
-"""The machine's disks (R162 step 1): each whole disk by name, model, serial,
+"""The machine's disks: each whole disk by name, model, serial,
 size, kind (rotational or solid state) and transport, what each of its
 partitions holds (a mounted filesystem, a ZFS pool's member, swap, nothing),
 and its SMART health, temperature and hours where smartctl is here. Read
@@ -71,7 +71,7 @@ def _smart(name):
 def by_id_link(name):
     """The /dev/disk/by-id link's name for a disk (the model-and-serial one
     before the wwn one), "" where the machine has none (a VM's virtio disk);
-    what the Storage page names a disk by when it mounts it (R162 step 4)."""
+    what the Storage page names a disk by when it mounts it."""
     root = "/dev/disk/by-id"
     best = ""
     try:
@@ -101,7 +101,7 @@ def _mounts(dev):
 def moved(name, now, ids):
     """Why the disk under `name` is not the one the person picked, or "":
     the job carries each disk's by-id link and serial as the census showed
-    them (B527), and a kernel name that moved to another disk since (a stick
+    them, and a kernel name that moved to another disk since (a stick
     plugged in, a reboot) is refused rather than written."""
     want = (ids or {}).get(name) if isinstance(ids, dict) else None
     if not isinstance(want, dict):

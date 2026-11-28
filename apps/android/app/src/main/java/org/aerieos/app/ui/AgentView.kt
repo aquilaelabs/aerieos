@@ -1,4 +1,4 @@
-// A project's coding agents, from the phone (R128): the dashboard's Manage
+// A project's coding agents, from the phone: the dashboard's Manage
 // agent chooser in the shape a phone takes. For the node the project runs
 // on (a picker where it runs on several), one row per agent installed there:
 // Claude, ChatGPT (Codex CLI) and Copilot. A running session of yours says
@@ -250,7 +250,7 @@ private fun AgentRow(a: Agent, run: JSONObject?, signed: JSONObject?, nodeName: 
                  }, color = if (run != null) (if (sessionWord(run) == "working") Warn else Ok) else if (signed == null) Warn else Dim,
                  style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        // Each agent's sign-in, as the Agents page says it (R95 step 3).
+        // Each agent's sign-in, as the Agents page says it.
         if (signed != null && signed.length() > 0) Text(signedWords(signed), color = Dim, style = MaterialTheme.typography.bodySmall,
                                                          maxLines = 1, overflow = TextOverflow.Ellipsis)
         val task = run?.obj("claude")?.str("task") ?: ""
@@ -435,7 +435,7 @@ fun TerminalPane(api: Api, arg: String, label: String, onClose: () -> Unit) {
                     // The terminal is the dashboard's own page, and xterm is script.
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-                    // A dashboard's own certificate (R290): taken where its key
+                    // A dashboard's own certificate: taken where its key
                     // is the one the phone kept at sign-in (Pins), which the
                     // platform lets a page read from Android 10 on; any other
                     // is refused, as the default client refuses every one.

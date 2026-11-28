@@ -1,5 +1,5 @@
-"""The controller's own machine's name and time zone (R161 step 3, R56 step
-8): the agent's machine job sets each through systemd's tool after holding
+"""The controller's own machine's name and time zone:
+the agent's machine job sets each through systemd's tool after holding
 it to its shape, the census carries the time zone, and the controller
 queues the job for the own machine alone."""
 import os

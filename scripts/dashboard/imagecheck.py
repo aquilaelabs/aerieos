@@ -1,4 +1,4 @@
-"""Registry images kept up to date (R195, the operator, 11 Oct).
+"""Registry images kept up to date.
 
 A container's services that run an image from a registry (`image:` and no
 `build:`) have no other way to move: Rebuild builds what the project's code
@@ -16,7 +16,7 @@ newer build of it is no update: such an image moves when its entry names
 another digest (containers.entry_moved: the app a container was made from,
 a service of AerieOS's), and the row's Update writes that one first.
 
-AerieOS's own image is held to more than its registry (R199): a registry's
+AerieOS's own image is held to more than its registry: a registry's
 tag is whatever was last pushed under it, and each AerieOS release names the
 image its tag pushed by digest, in the release's signed list of its files.
 So for a container that follows `:dev` or `:latest` of AerieOS's image, the
@@ -243,7 +243,7 @@ def attention(node_name, allowed=None, entries=()):
     keyed by bellseen on the digests it would move to. `allowed(project)`
     keeps the containers of the projects this account may act on: a row of
     another project's updates is news about containers it cannot touch, and
-    names what it may not see (the operator, 16 Oct). `entries` are the
+    names what it may not see. `entries` are the
     containers held by a digest whose entry names another now
     (containers.entries_behind): no registry is asked about those, and
     they are on the same row, since Update on the same page moves both."""
@@ -270,7 +270,7 @@ def attention(node_name, allowed=None, entries=()):
     return out
 
 
-import checks  # noqa: E402 (the cadence, R176)
+import checks  # noqa: E402 (the cadence)
 
 
 def check_loop():

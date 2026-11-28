@@ -1,4 +1,4 @@
-"""A session's bb on a node whose projects are a synced copy (R162, R163):
+"""A session's bb on a node whose projects are a synced copy:
 wait for the copy to be in step with the controller's before a relayed verb
 reads or changes the controller's copy, and for the controller's changes to
 be back here before the verb's answer is used.
@@ -15,8 +15,8 @@ import time
 
 UP_S = 60
 DOWN_S = 60
-# How long up() goes on waiting while the copy is moving: each fall in what
-# is left to send buys another UP_S, up to this (B1182: a node with
+# How long up goes on waiting while the copy is moving: each fall in what
+# is left to send buys another UP_S, up to this (a node with
 # thousands of changes on their way failed a push after a minute while they
 # were still going, and the session tried again blindly four times).
 MOVING_S = 600

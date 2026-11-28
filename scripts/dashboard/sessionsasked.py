@@ -1,5 +1,5 @@
 """Which account's terminals this controller opened on each node, for which
-space (R288 step 7): {node id: {"uid/space": when}}, in /config.
+space: {node id: {"uid/space": when}}, in /config.
 
 A terminal opened on a node is stamped with a session token for its
 account and space (server._scoped_arg), and a session idle past that

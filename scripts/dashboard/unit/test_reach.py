@@ -1,4 +1,4 @@
-"""The bell's rows sent elsewhere (R149, reach.py): destinations kept per
+"""The bell's rows sent elsewhere (reach.py): destinations kept per
 person with their secrets sealed, each channel's message shape, the tick
 sending what is new to each destination and holding a repeat while the
 row's key is unchanged, the quiet window, and a test send."""

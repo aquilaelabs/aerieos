@@ -1,7 +1,7 @@
 // The notebook's Roadmap view: the list and its steps, the send box, the
 // refusal when two writers meet, and the staged changes Save replays. One
 // classic script beside index.html (docs/nodes.md §13): one file per notebook
-// view (R60). nbRoadmapView is the factory makeNotebook calls per notebook;
+// view. nbRoadmapView is the factory makeNotebook calls per notebook;
 // everything it draws and does is a function of its own below it.
 
 "use strict";
@@ -32,7 +32,7 @@ function nbRoadmapView({$, nb}){
   // the arrow being pressed, not to the box being drawn.
   nb.sendShownFor = "";
   nb.roadmapOrdering = false;  // the rows are showing move controls instead
-  nb.roadmapOpen = new Set();  // the rows open to their workings and actions (R223), as id:step
+  nb.roadmapOpen = new Set();  // the rows open to their workings and actions, as id:step
   // Reordering is the one edit held back. Everything else here is a decision:
   // ticked, crossed, dropped, and is written the moment it is made; arranging
   // is a draft you are in the middle of, and closing the panel on a half-done
@@ -197,13 +197,13 @@ function nbRmCanSend(nb, r, idx, live){
   return !!st && (idx === nextStep(r) || stepGone(st));
 }
 
-// What a row knows (R254 step 3): an item's when-added and by whom, how
+// What a row knows: an item's when-added and by whom, how
 // far its plan has got and when it was last sent; a step's when-done and
 // when-sent. Drawn in the row's fold, with its details and its actions.
 function nbRmRowFacts(nb, r, idx){
   const st = idx < 0 ? r : (r.steps || [])[idx] || {};
   // A step from another item says which, by the number it answers to
-  // there (R168): the one a session knows it by.
+  // there: the one a session knows it by.
   const from = idx >= 0 && Array.isArray(st.sid) && st.sid.length === 2 && String(st.sid[0]) !== String(r.id)
     ? (st.sid[1] ? `R${st.sid[0]} step ${st.sid[1]}` : `R${st.sid[0]}, folded in`) : "";
   if (idx >= 0) return factGrid([["Done", st.done ? rmDay(st.done) : ""], ["Sent", st.sent ? rmDay(st.sent) : ""], ["Was", from]]);
@@ -253,7 +253,7 @@ function nbRmStepRow(nb, r, idx, live){
             : idx < 0 ? "pick this to send"
             : idx === nxt ? "pick this to send"
             : `step ${nxt + 1} comes first`;
-  // The row open (R223, rows-you-open): the number, the words and Send
+  // The row open (rows-you-open): the number, the words and Send
   // closed; the workings and what can be done to the line (shelve, reword,
   // drop) on the open row. Which rows are open survives a redraw.
   const isOpen = nb.roadmapOpen.has(`${r.id}:${idx}`);
@@ -264,11 +264,10 @@ function nbRmStepRow(nb, r, idx, live){
   // The tags sit above the line rather than beside it: they are labels on the
   // whole item, and on a phone a pill sharing the first line pushed the words
   // into a column two thirds as wide as the ones under it.
-  // ...and the release it is meant for, where one is set (the operator,
-  // 21 Oct).
-  // A step meant for a release of its own says so (R108); one with none
+  // ...and the release it is meant for, where one is set.
+  // A step meant for a release of its own says so; one with none
   // goes with its item and carries no tag. An item an agent put here
-  // names that agent (R95).
+  // names that agent.
   const tags = idx >= 0 ? (st.target ? `<span class="tag ver" title="this step is meant to ship in ${esc(st.target)}">for ${esc(st.target)}</span>` : "")
     : (r.target ? `<span class="tag ver" title="meant to ship in ${esc(r.target)}">for ${esc(r.target)}</span>` : "")
     + (r.by === "claude" ? `<span class="tag who" title="${esc(agentAsker(r))} put this here">${esc(agentAsker(r).toLowerCase())}</span>` : "");
@@ -289,15 +288,15 @@ function nbRmStepRow(nb, r, idx, live){
       title="${fixed ? "a step that has gone stays where it is" : "move it down"}"
       >${NB_RM_DOWN}</button>`;
   // The send is the Claude mark, first of the row's own buttons on the
-  // right (the operator, 29 Sep); the fold's caret takes the arrow's old
+  // right; the fold's caret takes the arrow's old
   // place on a group's row, level with the first line of its words.
-  // A role that reads the project and does not write it (B86): the row
+  // A role that reads the project and does not write it: the row
   // carries nothing that changes the list or sends from it.
   const ro = projWriteWhy(nb.memProj);
   const send = nb.roadmapOrdering || ro ? "" : `<button class="eye go${on ? " sel" : ""}" type="button"${can ? "" : ` aria-disabled="true"`}
       title="${esc(why)}" aria-label="send to ${esc(sendAgent(nb.memProj).name)}"
       aria-pressed="${on ? "true" : "false"}">${SPARK}</button>`;
-  // In reorder mode a step can be dragged onto another item's row (R168):
+  // In reorder mode a step can be dragged onto another item's row:
   // the same move as Move to, by hand.
   return `<div class="roadmap${st.sent ? " sent" : ""}${st.done ? " done" : ""}${
        idx >= 0 ? " step" : ""}${r.shelved ? " shelved" : ""}"
@@ -380,7 +379,7 @@ function nbRmDraw($, nb, j, force){
   // page's own session list, which is what lights the Claude button on
   // the project row. The two are the same fact read from the same place
   // on the server, and reading it here from one source only is what let
-  // the row say running while every arrow here said no session (B214):
+  // the row say running while every arrow here said no session:
   // an answer drawn before the list caught up stood until something else
   // redrew, and nothing said which of the two to believe.
   const sess = j.session || (nb.memProj
@@ -402,7 +401,7 @@ function nbRmDraw($, nb, j, force){
   const left = rows.reduce((n, r) =>
     n + (r.shelved || nextStep(r) === null ? 0 : 1), 0);
   const parked = rows.filter(r => r.shelved).length;
-  // What the list is for is its empty state (R119 step 4).
+  // What the list is for is its empty state.
   $("roadmapEmpty").hidden = !!rows.length;
   // The finished count rides a read; a redraw from the page's own state
   // (the search, a chip) keeps the last one.
@@ -410,7 +409,7 @@ function nbRmDraw($, nb, j, force){
   if (j.releases !== undefined) nb.roadmapReleases = j.releases;
   if (j.changelog !== undefined) nb.roadmapChangelog = j.changelog;
   const finishedN = nb.roadmapFinishedN || 0;
-  // The glance (R109, the Containers page's top): what is left to send,
+  // The glance (the Containers page's top): what is left to send,
   // shelved and finished as tiles, none while the list is empty, whose
   // empty state is the hint where it would be...
   viewGlance($("roadmapHint"), !rows.length && !finishedN ? [] : [
@@ -420,7 +419,7 @@ function nbRmDraw($, nb, j, force){
   // ...and its status line: whether a step can be sent, after what is
   // staged (the bar's own words, syncSave's). No session holds the arrows,
   // a running one lights them.
-  // The session by its agent, not its tmux name (B299).
+  // The session by its agent, not its tmux name.
   setText($("roadmapSess"), live ? `${agentOfSession(tmuxBase(j.session))?.agent.name || "A session"} running` : "no session running");
   $("roadmapField").hidden = !rows.length && !finishedN;
   // The band that narrows it: All, Open and Shelved, and the search on
@@ -432,13 +431,13 @@ function nbRmDraw($, nb, j, force){
   chipBand($("roadmapChips"), chips, "data-rmchip", view, "#roadmapList > details.grp",
            k => { nb.roadmapChip = k; nbRmRedraw($, nb, false); });
   setHidden($("roadmapFind"), rows.length + finishedN < 2 && !nb.roadmapFind);
-  // ...and by the release an item is meant for (the operator, 21 Oct): a
+  // ...and by the release an item is meant for: a
   // chip per target, oldest first, and No target; the Finished section
   // narrows by it too, so what went into a release can be read back.
   const vers = versionChips(rows, rmVers, "No target");
   if (nb.roadmapVer && !vers.some(v => v.key === nb.roadmapVer)) nb.roadmapVer = "";
   const verChips = chipButtons(vers, nb.roadmapVer, "data-rmver", undefined, "Any version");
-  // One band for every group (R109), drawn while any group has two.
+  // One band for every group, drawn while any group has two.
   setHidden($("roadmapFilter"), !chips && !verChips);
   chipBand($("roadmapVers"), verChips, "data-rmver", view, "#roadmapList > details.grp, #roadmapDoneList > details.grp",
            k => { nb.roadmapVer = k; nbRmRedraw($, nb, false); if (nb.roadmapDone) nb.drawFinished(); });
@@ -452,14 +451,14 @@ function nbRmDraw($, nb, j, force){
   if ($("roadmapDoneSect").open && !nb.roadmapDoneAsking
       && (nb.roadmapDone === null || nb.roadmapDone.length !== finishedN)) nbRmLoadFinished($, nb);
   if (nb.roadmapLogOn) nb.drawHistory();
-  // A role that reads the project and does not write it (B86).
+  // A role that reads the project and does not write it.
   const ro = projWriteWhy(nb.memProj);
-  // Only the items the band shows are built, a page at a time (pageLimit,
-  // R228 step 13): every item was built, those the band left out hidden,
+  // Only the items the band shows are built, a page at a time (pageLimit):
+  // every item was built, those the band left out hidden,
   // and all but 25 of the rest.
   const vis = rows.filter(shown);
   {
-  // A group is a fold, like a bug's row (the operator, 29 Sep): its own
+  // A group is a fold, like a bug's row: its own
   // row is the summary, its steps open under it on a tap. Which were
   // open before this redraw stay open, so acting on one does not fold
   // it, and a group whose step is armed is open to show it.
@@ -498,7 +497,7 @@ function nbRmDraw($, nb, j, force){
     // A group's title arrow stands for its next step, so both resolve to the
     // same choice and light up together.
     if (go) go.onclick = () => {
-      // A dead arrow says why when pressed (B213). It is aria-disabled
+      // A dead arrow says why when pressed. It is aria-disabled
       // rather than disabled because a disabled button swallows the press
       // and the reason was only in its hover title, which a finger never
       // sees, and in the line under the whole list.
@@ -516,7 +515,7 @@ function nbRmDraw($, nb, j, force){
     // it is the reversible answer for anyone who only meant "not this one".
     const rm = row.querySelector(".rm");
     if (rm) rm.onclick = () => nbRmOpenDrop($, nb, row, id, step);
-    // Ticking off acts on the press (R254 step 2): Reopen under Finished
+    // Ticking off acts on the press: Reopen under Finished
     // undoes it, so it does not ask. The row goes to Finished at once and
     // comes back saying why if the server refuses (nbRmDrawDone).
     const dn = row.querySelector(".dn");
@@ -552,10 +551,10 @@ function nbRmDraw($, nb, j, force){
     // unguarded one took the whole redraw down with it.
     const ed = row.querySelector(".ed");
     if (ed) ed.onclick = reword;
-    // A step's words reword it; a group's words open its fold (the
-    // operator, 29 Sep), and the pencil is what rewords those.
+    // A step's words reword it; a group's words open its fold,
+    // and the pencil is what rewords those.
     if (step >= 0 && !ro) row.querySelector(".txt").onclick = reword;
-    // Between items (R168): a step moved to another, an item split into
+    // Between items: a step moved to another, an item split into
     // new ones, or folded into another. Each lands at once, not staged:
     // what moves is on two items, and the page's staging is per row. Each
     // is drawn on the press, and put back if the server refuses it.
@@ -592,8 +591,8 @@ function nbRmDraw($, nb, j, force){
   nb.drawBatchNote();
   nb.syncSave();
   $("roadmapOrder").hidden = !rows.length || !!ro;
-  // No Add to roadmap for a role that only reads (B86; the operator, 21
-  // Oct: what a role does not give is not drawn), and its box shut.
+  // No Add to roadmap for a role that only reads
+  // (what a role does not give is not drawn), and its box shut.
   if (ro && !$("roadmapForm").hidden) nbRmForm($, false);
   $("roadmapShow").hidden = !!ro;
   $("roadmapOrder").classList.toggle("on", nb.roadmapOrdering);
@@ -789,7 +788,7 @@ function nbRmPost($, nb, body, quiet, now){
 
 // ---- drawn on the press ----------------------------------------------------
 // What a write between items will do, done to the page's own copy and drawn
-// before the server answers (the operator, 22 Nov: a press must never look
+// before the server answers (a press must never look
 // as if nothing happened). Each answers how to put it back, which nbPoster
 // calls when the write is refused; one that landed is drawn again from the
 // answer, so the guess stands only for the round trip.
@@ -963,7 +962,7 @@ function nbRmOpenDrop($, nb, row, id, step){
                 go: why => nbRmStageRemove($, nb, id, step, why)});
 }
 
-// Which other item (R168): a pick list of every open item but this one,
+// Which other item: a pick list of every open item but this one,
 // under the row, as the other inline asks are; `go` gets its number.
 function nbRmPickItem(nb, row, label, ok, id, go){
   const others = (nb.roadmapItems || []).filter(x => String(x.id) !== String(id) && x.id > 0);
@@ -979,7 +978,7 @@ function nbRmPickItem(nb, row, label, ok, id, go){
   });
 }
 
-// Splitting an item (R168): tick the steps that go, name the new item,
+// Splitting an item: tick the steps that go, name the new item,
 // and Split moves them whole; the new item points back here.
 function nbRmOpenSplit($, nb, row, id){
   if (row.nextElementSibling?.classList.contains("splitbox")) return;
@@ -987,7 +986,7 @@ function nbRmOpenSplit($, nb, row, id){
   const r = nbRmFindRow(nb, id), steps = r?.steps || [];
   const box = document.createElement("div");
   box.className = "dropbox editbox splitbox ctlown";
-  // A form (R301, the operator 27 Nov: a drop box that asks more than one
+  // A form (a drop box that asks more than one
   // thing is a form): the steps to move, the new item's title, Cancel and
   // Split at its foot.
   drawHTML(box, formBox({fields: [
@@ -1028,7 +1027,7 @@ function nbRmOpenReword($, nb, row, id, step){
   const wasInfo = (step < 0 ? r0?.info : r0?.steps?.[step]?.info) || "";
   const box = document.createElement("div");
   box.className = "dropbox editbox ctlown";
-  // A form (R301, the operator 27 Nov: a drop box that asks more than one
+  // A form (a drop box that asks more than one
   // thing is a form): its words, its details and its target, Cancel and
   // Save at its foot.
   const k = `rmRw${id}${step < 0 ? "" : `s${step}`}`;
@@ -1130,12 +1129,12 @@ async function nbRmAdd($, nb){
 }
 
 // Add to roadmap, the control row's primary, unrolls the box under that
-// row (R109), and Cancel (or Escape in an empty box) rolls it back; a line
+// row, and Cancel (or Escape in an empty box) rolls it back; a line
 // half typed keeps the box open. The button stays where it is, a press
 // while the box is open taking the caret back to it.
 function nbRmForm($, on){
   // Rolled back with the caret in it, the caret goes back to the press that
-  // opened it (R286: a keyboard's place was lost with the box).
+  // opened it (a keyboard's place was lost with the box).
   const back = !on && $("roadmapAddBar").contains(document.activeElement);
   // Unrolled and rolled back over its height, as it says (the motion rule).
   slideShow($("roadmapForm"), !!on);
@@ -1156,7 +1155,7 @@ function nbRmRevertPending(nb){
 // A press on the list draws it whatever is open, since it is that press's
 // own change; what moves under a person (the poll, the paging as they
 // scroll, a chip pressed elsewhere on the band) passes force false and
-// leaves an open Reword, Drop or Add step as it is (B1004), the list drawn
+// leaves an open Reword, Drop or Add step as it is, the list drawn
 // once it closes.
 const nbRmRedraw = ($, nb, force = true) =>
   nbRmDraw($, nb, {items: nb.roadmapItems, session: nb.roadmapSession, unsaved: nb.roadmapUnsaved}, force !== false);
@@ -1253,7 +1252,7 @@ function nbRmStageInfo($, nb, id, step, text){
 
 // The release an item is meant for: a state like a shelf, so it carries
 // no was; "" clears it.
-// A step's own (R108) rides the same action with its step.
+// A step's own rides the same action with its step.
 function nbRmStageTarget($, nb, id, target, step = null){
   return nbRmStage($, nb, {action: "target", id, target, ...(step === null ? {} : {step})}, () => {
     const r = nbRmFindRow(nb, id);
@@ -1336,7 +1335,7 @@ async function nbRmFlushPending($, nb){
   return map;
 }
 
-// ---- the finished ones (R78) --------------------------------------------
+// ---- the finished ones --------------------------------------------
 // Ticked-off items leave the list (a list is read to find out what is
 // left) and live in the history with their plans. The toggle at the top
 // fetches them and draws them below the shelved ones, struck through,
@@ -1367,12 +1366,12 @@ function nbRmDrawFinished($, nb){
   if (rows === null){ drawHTML(host, `${skel("rows")}`); return; }
   if (!rows.length){ drawHTML(host, `<div class="empty">nothing finished yet</div>`); return; }
   const when = t => t ? fmtTime(t * 1000, {day: "2-digit", month: "short"}) : "";
-  // Each the same fold as an open item (R254 step 2): its row, then its
+  // Each the same fold as an open item: its row, then its
   // details and its steps with when each was done, and Reopen where a
   // release has not shipped it yet.
   const held = new Set([...host.querySelectorAll("details.grp[open]")].map(d => d.dataset.done));
-  // Only the matching rows, a page at a time (pageLimit, the operator,
-  // 17 Oct): built whole and hidden, a long finished list was slow to draw.
+  // Only the matching rows, a page at a time (pageLimit):
+  // built whole and hidden, a long finished list was slow to draw.
   const vis = rows.filter(r => rmVer(r, nb.roadmapVer) && rmMatch(r, q));
   if (!vis.length && nb.roadmapVer){
     drawHTML(host, `<div class="empty">nothing finished ${nb.roadmapVer === "none" ? "without a target" : `for ${esc(nb.roadmapVer)}`}</div>`);
@@ -1426,7 +1425,7 @@ const stepGone = s => !!(s.sent || s.done);
 // A day as the rows' facts say it ("15 Oct"), from epoch seconds.
 function rmDay(t){ return t ? fmtTime(t * 1000, {day: "2-digit", month: "short"}) : ""; }
 
-// The release a thing done at `at` shipped in (R254 step 4), from the
+// The release a thing done at `at` shipped in, from the
 // CHANGELOG's dated headings, newest first as [version, end of its day]: the
 // oldest release whose day ends after it. null for one done after the newest
 // release (planned for the next), "" where the project has no releases.
@@ -1436,11 +1435,11 @@ function shippedIn(at, rel){
   return null;
 }
 
-// What the changelog says about an item or a bug (R254 step 4), as a fact's
+// What the changelog says about an item or a bug, as a fact's
 // value: each entry with the release it went out in, or Unreleased.
 function clRefs(refs, untie = false){
   if (!refs || !refs.length) return "";
-  // A bug's tied line (R255) carries its bin where the bug may be written:
+  // A bug's tied line carries its bin where the bug may be written:
   // the line stays, it only stops answering this bug. One found by the
   // bug's fix commit says so, and has nothing to untie.
   return `<ul class="clrefs">${refs.map(e => `<li><span class="clin">${esc(e.in)}</span><span class="cltx">${esc(e.text)}${
@@ -1449,10 +1448,10 @@ function clRefs(refs, untie = false){
                              {title: "untie: the line stays, and no longer answers this bug"}) : ""}</li>`).join("")}</ul>`;
 }
 
-// Whether an item answers a search (R254 step 1): its number (R12 or 12), its
+// Whether an item answers a search: its number (R12 or 12), its
 // words, its steps' and their details, case aside. An empty search is all.
 // Whether an item is under the target chip in force ("" is All).
-// An item is under a release by its own target or by a step's (R108): a
+// An item is under a release by its own target or by a step's: a
 // step with none goes with its item.
 const rmVers = r => [r.target || "", ...(r.steps || []).filter(st => st.target).map(st => st.target)];
 const rmVer = (r, v) => rmVers(r).some(t => inRelease(t, v));

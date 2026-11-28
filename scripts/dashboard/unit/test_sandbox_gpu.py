@@ -1,7 +1,7 @@
 """bb-sandbox's gpu-driver and gpu-container verbs, run as the bash they are against stand-in
-tools (R102). The agent and server suites stub bb-sandbox whole, so nothing
+tools. The agent and server suites stub bb-sandbox whole, so nothing
 ran this script's own lines, and its `set -euo pipefail` ended a real
-install without a word on the dev node (30 Sep): the lookup of the installed
+install without a word on the dev node: the lookup of the installed
 branch asked dpkg for packages that were not there. This runs the helper
 extracted from the provisioner, with apt, dpkg, modinfo, ubuntu-drivers and
 id stood in for, and reads what it ran and what it said."""
@@ -156,7 +156,7 @@ echo "docker-ce ii "; exit 0''')
     def test_nothing_of_the_source_is_fetched_while_installing(self):
         with open(self.helper, encoding="utf-8") as f:
             text = f.read()
-        body = text[text.index("cmd_gpu_container() {"):text.index("# --- features (R91)")]
+        body = text[text.index("cmd_gpu_container() {"):text.index("# --- features ---")]
         self.assertNotRegex(body, r"\b(?:curl|wget)\b")
 
     def test_the_toolkit_adds_nvidias_source_installs_and_reloads_docker(self):

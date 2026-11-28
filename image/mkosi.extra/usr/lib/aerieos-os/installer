@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The AerieOS installer (R160 step 2), on the console of a machine
+# The AerieOS installer, on the console of a machine
 # booted from the ISO (bbinstaller=1 on the kernel's command line): the disk
 # to install onto, what will be lost on it, the features to turn on at the
 # first boot, then the disk laid out by the same script that made the image
@@ -41,7 +41,7 @@ VER="$(sed -n 's/^BUILDERBOT_OS_VERSION=//p' "$LIVE/live/release" 2>/dev/null | 
 
 # Every disk this medium sits on, left out of the offer: through a dm
 # mapping (Ventoy) by lsblk's inverse tree, and through a loop device (an
-# ISO file on a stick) by its backing file's own filesystem (B473).
+# ISO file on a stick) by its backing file's own filesystem.
 medium_dev="$(findmnt -no SOURCE "$LIVE" 2>/dev/null | sed 's/\[.*//')"
 case "$medium_dev" in /dev/loop*)
     back="$(losetup -nO BACK-FILE "$medium_dev" 2>/dev/null | head -1)"
@@ -52,7 +52,7 @@ medium_disks="$(basename "${medium_dev:-none}")"
 
 # The disks to offer, one "NAME<tab>what it is" a line: read from lsblk's
 # JSON, since a model with spaces or none at all shifted read's columns and
-# left a machine's own disks out (B473). A disk with anything mounted is in
+# left a machine's own disks out. A disk with anything mounted is in
 # use and never offered.
 disk_rows() {
     lsblk -J -b -p -o NAME,SIZE,MODEL,TRAN,TYPE,MOUNTPOINTS 2>/dev/null | python3 -c '
@@ -73,7 +73,7 @@ for d in json.load(sys.stdin).get("blockdevices") or []:
 ' "$medium_disks"
 }
 
-# AerieOS's logo over the welcome (R185), the one the console shows at
+# AerieOS's logo over the welcome, the one the console shows at
 # every boot.
 LOGO="$(cat "$LIB/logo" 2>/dev/null || true)"
 [ -n "$AUTO" ] || whiptail --title "AerieOS" --msgbox "$LOGO
@@ -109,7 +109,7 @@ Every partition on it is replaced. There is no undo." 20 76 --defaultno || pick=
 done
 
 # Only what the first boot can turn on here is offered, and ticked only where
-# it will work (B768): the VM host needs this CPU's virtualization (no
+# it will work: the VM host needs this CPU's virtualization (no
 # /dev/kvm in a VM without it, and the first boot refused it in the journal
 # alone), and the hosting firewall is a hosting-only node's, refused on a
 # machine that runs sessions, which every machine installed from here does,
@@ -132,7 +132,7 @@ if ! bash "$LIB/lay-disk" "$pick" "$SQ" "$LIVE/live/vmlinuz" "$LIVE/live/initrd"
 fi
 # The features chosen, onto the data partition of the disk just laid out:
 # its fifth, as lay-disk numbers it, never found by its UUID, which every
-# AerieOS disk shares (B473).
+# AerieOS disk shares.
 case "$pick" in *[0-9]) data="${pick}p5" ;; *) data="${pick}5" ;; esac
 mnt="$(mktemp -d)"
 wrote=""

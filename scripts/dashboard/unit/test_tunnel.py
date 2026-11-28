@@ -1,4 +1,4 @@
-"""The home tunnel the controller runs itself (tunnel.py, R176): a token
+"""The home tunnel the controller runs itself (tunnel.py): a token
 read for its ids and never printed, the process started from the settings
 and stopped when they go, and the hostname's record and the tunnel's rules
 written through Cloudflare's API."""
@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
 
 class RouteCheck(unittest.TestCase):
-    """Registered is not routed (the operator, 11 Oct): the name is asked,
+    """Registered is not routed: the name is asked,
     and only this controller's own answer reads as reaching it."""
     def answer(self, code, ctype, body):
         import email.message

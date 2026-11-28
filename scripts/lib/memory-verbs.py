@@ -3,7 +3,7 @@ account's own, through the controller's API as the caller (memory.py on the
 dashboard's side, the notebook's Memory view). Every coding agent keeps
 them here, in the folder Claude Code reads for that repository, so a
 repository moved to another project keeps what was learned about it and a
-session of any agent sees them (R152). `list` prints the index; `show NAME`
+session of any agent sees them. `list` prints the index; `show NAME`
 one memory whole; `add NAME --type T --about "..." BODY` writes one and its
 index line; `forget NAME` removes it. `bb -p REPO memory ...` answers for
 another repository of the project. BB_PROJECT is the repository. The auth

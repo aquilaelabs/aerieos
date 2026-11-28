@@ -14,7 +14,7 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
 
 // The create dialog, as first run and Getting started open it: a project
-// made around the repository it makes (R138). The Projects page's own New
+// made around the repository it makes. The Projects page's own New
 // project asks for a name alone, and a card's Add repository opens this
 // dialog into that project; both are checked under "projects first".
 const newProject = async () => {
@@ -41,7 +41,7 @@ const postJson = (body, api = '/api/create') => page.evaluate(async ([b, u]) => 
   return { status: r.status, body: await r.json().catch(() => ({})) };
 }, [body, api]);
 
-// ---- what is offered (roadmap R54, step 6) --------------------------------
+// ---- what is offered --------------------------------
 // Off, the dialog's host list is the vetted hosts and the catch-all, and a
 // clone naming another is refused with the sentence that names the switch;
 // on, every host is listed and the unvetted ones carry `dev`.
@@ -70,7 +70,7 @@ await page.waitForSelector('#bNewProjTab', { timeout: 15000 });
 ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
    'New space sits in the Spaces page\'s bar');
 
-// ---- projects first (R138) -------------------------------------------
+// ---- projects first -------------------------------------------
 // New project asks for a name alone, spaces and punctuation kept, and makes
 // a project with nothing in it; its card's Add repository opens the dialog
 // into it, without the node and the dials, which are the project's.
@@ -101,8 +101,8 @@ await section("projects first", async () => {
      `New space asks for a name alone (${JSON.stringify(asked)})`);
   const key = await page.evaluate(() => Object.entries(state.repos).find(([, r]) => r.name === 'Web shop, v2')[0]);
   // ...then its first repository at once, named for it, where the card's
-  // Add repository was a second trip with the name typed again (R284 step
-  // 4); Cancel there leaves a space with no repository.
+  // Add repository was a second trip with the name typed again;
+  // Cancel there leaves a space with no repository.
   await page.waitForSelector('#pmodal:not([hidden])', { timeout: 10000 });
   const first = await page.evaluate(() => ({ name: $('pName').value, mode: pMode, into: pInto }));
   ok(first.name === 'Web shop, v2' && first.mode === 'init' && first.into === key,
@@ -111,8 +111,7 @@ await section("projects first", async () => {
   await page.waitForFunction(() => $('pmodal').hidden, null, { timeout: 5000 });
   const card = `.pgrid .pcard[data-pkey="${key}"]`;
   await page.waitForSelector(card, { timeout: 15000 });
-  // The page goes to it, and it wears a ring in the accent that fades
-  // (the operator, 26 Oct).
+  // The page goes to it, and it wears a ring in the accent that fades.
   await page.waitForFunction(k => window.__ringed.includes(k), key, { timeout: 5000 }).catch(() => {});
   // The scroll to it is smooth: read once the card is inside the page's box.
   await page.waitForFunction(c => { const el = document.querySelector(c), r = el.getBoundingClientRect(), d = el.closest('.doc').getBoundingClientRect();
@@ -123,7 +122,7 @@ await section("projects first", async () => {
   await page.waitForFunction(c => !document.querySelector(c).classList.contains('pjnew'), card, { timeout: 5000 }).catch(() => {});
   ok(!await page.$eval(card, c => c.classList.contains('pjnew')), '...which goes after a moment');
   // A project with no repository is a place to run an agent that builds
-  // containers and VMs (R208): its card says so and its Start agent is live.
+  // containers and VMs: its card says so and its Start agent is live.
   // Start agent is drawn as on any card: in this fixture, with no node to
   // run on, it is dead for that reason and no other (never "Add a
   // repository first").
@@ -144,7 +143,7 @@ await section("projects first", async () => {
   ok(await page.evaluate(() => tabs.length) === tabsWas, 'opening its notebook opens its settings dialog instead, no tab');
   await page.click('#rnCancel');
   await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
-  // The card's Settings is the project's own dialog (R208): on a project
+  // The card's Settings is the project's own dialog: on a project
   // with no repository the sections and dials that need code are not drawn.
   await page.click(`${card} .pcfront [data-pedit]`);
   await page.waitForSelector(`${card}.flipped .pcback [data-rn]`, { timeout: 5000 });
@@ -204,7 +203,7 @@ await section("projects first", async () => {
   await page.waitForFunction(k => JSON.stringify(state?.repos?.[k]?.members) === '["webshop"]', key, { timeout: 15000 });
   ok(await page.$eval(card, c => [...c.querySelectorAll('.pcfront .pcrepo > .namelink')].map(b => b.textContent.trim()).join() === 'webshop'),
      '...and the repository made is on the space\'s card');
-  // A new repository's dials start on "as the project" (R208 step 6): its
+  // A new repository's dials start on "as the project": its
   // notebook's Permissions view inherits the project's defaults until it
   // sets one apart, and the project's door draws no such choice.
   await page.evaluate(() => openNotebook('webshop', 'permissions'));
@@ -241,15 +240,15 @@ await section("projects first", async () => {
 
 await newProject();
 ok(await page.$eval('#pmodal', el => !el.hidden), 'the dialog opens');
-// The four gates are on the dialog (R78): what a session may enter into
+// The four gates are on the dialog: what a session may enter into
 // the notebook, auto on every open, so it is a choice made rather than a
 // default found later in the settings dialog.
-// All nine, as the project settings have them (1 Oct), each at what a new
+// All nine, as the project settings have them, each at what a new
 // project starts on: auto where it lands in the notebook or the settings,
 // ask where it reaches past them (its container, a signed build, a key,
-// a published release: R138).
+// a published release).
 await section("The four gates are on the dialog", async () => {
-  // The dials are not asked in the dialog any more (R245): they ride the
+  // The dials are not asked in the dialog any more: they ride the
   // submit at their defaults, said in one line, and live on the space's
   // Settings view.
   const g = await page.evaluate(() => ({ start: P_GATE_START, dials: document.querySelectorAll('#pGateField select').length,
@@ -295,8 +294,8 @@ ok(await page.$eval('#pName', el => el.value) === 'radarr-4k',
 await page.fill('#pUrl', '');
 await page.click('#pLocal');
 ok(await page.$eval('#pNameField', el => !el.hidden), 'back to local keeps the name field');
-// The name typed is the one shown (R154), by GitHub's rule for a
-// repository's name (the operator, 9 Oct): the preview says when that
+// The name typed is the one shown, by GitHub's rule for a
+// repository's name: the preview says when that
 // changes it, and is quiet when it does not.
 await page.fill('#pName', 'My New App');
 ok(await page.$eval('#pNamePreview', el => !el.hidden && /Shown as My-New-App/.test(el.textContent)),
@@ -309,9 +308,9 @@ ok(await page.$eval('#pNamePreview', el => !el.hidden && /shown as beta-2\b/.tes
 await page.fill('#pName', 'plain');
 ok(await page.$eval('#pNamePreview', el => el.hidden),
    '...and stays quiet when there is nothing to say');
-// A folder a deleted project had is never handed out again, purged or not
-// (R154): the shown name is free, the folder is numbered, and the preview
-// says so before Create rather than leaving the -2 to be found (B63). The
+// A folder a deleted project had is never handed out again, purged or not:
+// the shown name is free, the folder is numbered, and the preview
+// says so before Create rather than leaving the -2 to be found. The
 // list is the dialog's own fetch's; a deleted one is planted in it, since
 // purging a fixture here would take a project other blocks use.
 await section("A folder a deleted project had is never handed out again, purged or not", async () => {
@@ -324,7 +323,7 @@ await section("A folder a deleted project had is never handed out again, purged 
        && /Shown as relic, in the folder relic-2: a deleted space had relic/.test(el.textContent)),
      '...and a name whose folder a deleted space had says it is shown as itself in the folder Name-2');
   // ...while a folder a live project is in says which, not that a deleted
-  // project had it (B93).
+  // project had it.
   // The poll held: one landing between the plant and the typing put the
   // server's projects back, and the preview found no live one.
   await holdPoll(page);
@@ -374,7 +373,7 @@ await page.waitForFunction(() => [...document.querySelectorAll('.pgrid .pcard .n
   .some(n => n.textContent === 'zeta'), { timeout: 15000 });
 ok(true, 'the new space appears in the card');
 ok(existsSync(`${DIR}/ws/zeta/.git`), 'zeta is a git repository');
-// Born with a starting version (the operator, 25 Sep): the tree as made is
+// Born with a starting version: the tree as made is
 // the first commit and VERSION at 0.1.0 the second, so the Artifacts tab has
 // a version to move from the moment the project exists.
 await section("Born with a starting version", async () => {
@@ -401,7 +400,7 @@ await section("The brief is a task for the first session, not standing instructi
 });
 
 // A project made after anything has been pinned is not pinned for anyone:
-// what Home shows is each person's to choose (the operator, 23 Oct). It is
+// what Home shows is each person's to choose. It is
 // on the Projects page all the same, which shows every project. Unpinning
 // first is what brings the pins file into existence; while there is none,
 // everything is pinned anyway and this would prove nothing.
@@ -587,14 +586,14 @@ with zipfile.ZipFile('${fx}/slip.zip', 'w') as z:
 });
 
 // ---- renaming ----------------------------------------------------------
-// A rename is the name shown (R154): the directory, and everything keyed by
+// A rename is the name shown: the directory, and everything keyed by
 // it, stays where it is, so nothing has to follow it and nothing is lost.
 const rn = await postJson({ name: 'pinme', to: 'Pinned Again' }, '/api/rename');
 ok(rn.status === 200 && rn.body.name === 'pinme' && rn.body.label === 'Pinned-Again',
    `renaming answers with the directory and the name it is shown under now, spelled as GitHub would (${JSON.stringify(rn.body).slice(0, 120)})`);
 ok(existsSync(`${DIR}/ws/pinme/.git`) && !existsSync(`${DIR}/ws/Pinned Again`),
    '...the directory did not move');
-// Its pin is its project's (R138), kept by the project's key.
+// Its pin is its project's, kept by the project's key.
 const pinmeKey = await page.evaluate(() => state.projects.find(p => p.name === 'pinme')?.project);
 ok(Object.values(JSON.parse(readFileSync(`${DIR}/state/pinned-projects.json`, 'utf8'))).flat().includes(pinmeKey),
    `...so what is keyed by it is still its own (${pinmeKey})`);
@@ -627,7 +626,7 @@ for (const url of ['ext::sh -c id', 'file:///etc', 'https://github.com/owner-onl
                    'https://gitea.example/onlyone'])
   ok(await post({ mode: 'clone', url }) === 400, `clone refused: ${url}`);
 ok(!existsSync(`${DIR}/ws/repo`), 'a refused clone leaves no directory behind');
-// A name in use is no refusal since R154: the new project gets a directory
+// A name in use is no refusal: the new project gets a directory
 // nothing has had (the sanitized name, numbered) and is shown as Name-2.
 // Every one of these sanitizes to `alpha`, which exists.
 for (const name of ['alpha', '../alpha', 'alpha!', '.alpha', '_alpha'])
@@ -657,11 +656,11 @@ await section("and a gate picked on the dialog is written with the project, the 
   ok(g.roadmap === 'ask' && g.bugs === 'deny' && g.rules === 'auto' && g.settings === 'auto',
      `...and the space carries them, the unnamed ones auto (${JSON.stringify(g)})`);
   // ...and Run its container, so a session can create the first one by request.
-  // Read where the create wrote it, which it does before it answers (B606):
+  // Read where the create wrote it, which it does before it answers:
   // the page's copy is a status poll away, and on a loaded box, with every
   // project's git to walk, the polls ran past the wait.
   const docked = await postJson({ name: 'Docked App', mode: 'init', devbuild: 'ask' });
-  // A dial is the project's (R138): read on the key of the project it was made in.
+  // A dial is the project's: read on the key of the project it was made in.
   const dockedKey = Object.entries(JSON.parse(readFileSync(`${DIR}/state/project-repos.json`, 'utf8')).projects || {})
     .find(([, r]) => (r.members || []).includes('Docked-App'))?.[0];
   const dockedPrefs = JSON.parse(readFileSync(`${DIR}/state/claude-prefs.json`, 'utf8')).projects?.[dockedKey] || {};
@@ -672,7 +671,7 @@ await section("and a gate picked on the dialog is written with the project, the 
   const signed = await postJson({ name: 'Signed App', mode: 'init', sign: 'auto', keys: 'deny', release: 'auto', report: 'deny' });
   // Read where the create wrote them, as Run its container is above: the
   // page's copy is a status poll away, and under a whole run's load the
-  // polls ran past a 15 s wait (B916).
+  // polls ran past a 15 s wait.
   const signedKey = Object.entries(JSON.parse(readFileSync(`${DIR}/state/project-repos.json`, 'utf8')).projects || {})
     .find(([, r]) => (r.members || []).includes('Signed-App'))?.[0];
   const sp = JSON.parse(readFileSync(`${DIR}/state/claude-prefs.json`, 'utf8')).projects?.[signedKey] || {};
@@ -837,7 +836,7 @@ await page.waitForSelector('#pmodal:not([hidden])');
 await page.click('#pClone');
 await page.waitForFunction(() => document.querySelectorAll('#pForge option').length > 1);
 // The Host row sits under the address and is always there, so nothing pops
-// up as the address is typed (the operator, 13 Oct): it reads the address
+// up as the address is typed: it reads the address
 // back, locked with the reason on the row, and is a question only for a
 // server nobody has answered for.
 const forgeRow = () => page.$eval('#pForgeField', el => el.hidden ? null : {
@@ -860,7 +859,7 @@ await page.keyboard.press('Escape');
 // And the answer is kept against the host: cloning from it declares it, so
 // the next address on the same server is not a question again. Refused for
 // asking push with nothing to push with, which is after the address has
-// been accepted (a name in use is no refusal since R154).
+// been accepted (a name in use is no refusal).
 const selfHosted = await postJson({ mode: 'clone', url: 'https://git.home.lan:3000/owner/alpha.git',
                                     forge: 'gitea', push: true });
 ok(selfHosted.status === 400 && /pushing needs/.test(selfHosted.body.error || ''),
@@ -1174,12 +1173,12 @@ await page.click('.pgrid .pcard[data-row="beta"] [data-l]');
 // one fetch per open), so every assertion below about the host picker is
 // reading a payload that may still be in flight. Waited on the list being in
 // hand rather than on a tick going by, which is what made this file red about
-// one run in three on a busy box (B99).
+// one run in three on a busy box.
 await page.waitForFunction(() => !document.getElementById('pmodal').hidden
   && document.getElementById('pForge')?.options.length > 1, null, { timeout: 20000 });
 ok(await page.$eval('#pTitle', el => el.textContent === 'Link beta to a git host'),
    'the dialog names the space it is linking');
-// Linking looks like the bottom of the clone form (the operator, 13 Oct):
+// Linking looks like the bottom of the clone form:
 // the address first and the Host row under it, read from the address. A
 // hostname does not say what runs on it, so a server nobody has answered
 // for is the one case that is a question; git.home.lan was answered above.
@@ -1201,8 +1200,8 @@ ok(await post({ name: 'beta', url: 'https://github.com/owner/beta', forge: 'gite
 // Waited on this open's own answer, not the list: the host picker above
 // can be drawn from the last open's catalog while this one's is still out.
 // An answer with no keys in it can be the agent's listing (ssh-add, with a
-// time limit) given up on a loaded box, and the list then never fills
-// (B521): the dialog is opened again for a fresh answer, as a person would.
+// time limit) given up on a loaded box, and the list then never fills:
+// the dialog is opened again for a fresh answer, as a person would.
 for (let i = 0; i < 3; i++){
   const keys = await page.evaluate(async () => ((await pFetch)?.keys || []).length);
   if (keys || i === 2) break;
@@ -1293,7 +1292,7 @@ await section("unlinking", async () => {
   const before = history();
   ok(cfg().includes('[remote "origin"]'), 'alpha starts out linked');
   // The stored token is USABLE through the relay and never READABLE, which is
-  // the whole bargain (roadmap R15). Claude runs on a node, and a node has no
+  // the whole bargain. Claude runs on a node, and a node has no
   // /config, so what has to hold is that nothing the API hands out carries
   // the value: the row says whether there is one, not what it is. Asked of
   // the payloads a project row is drawn from, and of the tree a session owns.
@@ -1350,7 +1349,7 @@ await section("unlinking", async () => {
 
 // ---- linking to another host: what can be checked without one ----------
 // The Gitea, GitLab and Bitbucket paths cannot be exercised against a live
-// server here (roadmap R43 is that proof), so what is checked is the part
+// server here, so what is checked is the part
 // of them that is this code's rather than the host's: the credential line
 // git will read, which owner a repository is created under, and a host
 // remembered with its port.
@@ -1442,10 +1441,10 @@ writeFileSync(`${DIR}/ws/.trash/oldproj/keep.txt`, 'still here\n');
 // icon rule missed this button (an `.ic`) and its SVG got the browser
 // default (fill:black, stroke:none), which draws nothing at all, because
 // every path in it is an open stroke.
-// (laid out first: measured mid-draw it read no stroke, no fill and 0px, B602)
-// On the Projects page's bar now (R218 step 3).
+// (laid out first: measured mid-draw it read no stroke, no fill and 0px)
+// On the Projects page's bar now.
 await page.evaluate(() => openProjectsTab());
-// Found, laid out and read in the one call (B723): the page's bar is drawn
+// Found, laid out and read in the one call: the page's bar is drawn
 // again by the poll and by a page switch's fade, and an icon found by one
 // call and read by the next was read off a copy already taken out of the
 // page, where every computed style is an empty string. The fade's still
@@ -1465,7 +1464,7 @@ await page.waitForFunction(() => document.querySelector('#tList .trow'),
                            { timeout: 10000 });
 // The delete-for-good button draws its bin: an svg in a button without the
 // icon class got the browser's fill:black/stroke:none and was an empty red
-// square (B699).
+// square.
 ok(await page.$eval('#tList .trow [data-tpurge] svg', s => {
      const c = getComputedStyle(s); return c.stroke !== 'none' && c.fill === 'none' && c.width === '16px'; }),
    'the delete-for-good button beside Put back draws its bin icon');
@@ -1478,7 +1477,7 @@ await page.waitForFunction(() => !document.querySelector('#tList .trow[data-t="o
                            { timeout: 10000 });
 ok(existsSync(`${DIR}/ws/oldproj/keep.txt`) && !existsSync(`${DIR}/ws/.trash/oldproj`),
    '...and Put back is a move, so the files arrive with the name');
-// From before projects came first it was in none (R138): back in a project
+// From before projects came first it was in none: back in a project
 // of its own, as every repository was made one then, with nothing asked.
 await refreshUntil(page, () => Object.values(state?.repos || {}).some(r => r.members.includes('oldproj')), { timeout: 15000 });
 ok(true, '...into a space of its own, as one deleted before spaces came first');
@@ -1501,8 +1500,8 @@ ok(await page.$eval('#tList .dropbox .danger', b => b.disabled),
 await page.fill('#tList .dropbox input', 'oldproj');
 ok(!await page.$eval('#tList .dropbox .danger', b => b.disabled),
    '...and wakes on the name itself');
-// Its row goes on the press, before the server has answered (the operator,
-// 22 Nov: a press must never look as if nothing happened).
+// Its row goes on the press, before the server has answered
+// (a press must never look as if nothing happened).
 const purged = page.waitForResponse(r => r.url().includes('/api/trash-purge'), { timeout: 15000 });
 await page.click('#tList .dropbox .danger');
 ok(await page.evaluate(() => !document.querySelector('#tList .trow[data-t="oldproj"]')),
@@ -1515,7 +1514,7 @@ await page.click('#tClose');
 await page.waitForFunction(() => document.getElementById('tmodal').hidden);
 
 // ---- an administrator's new project is theirs to work on ------------------
-// Taken on by whoever made it (the operator, 24 Sep). An administrator sees
+// Taken on by whoever made it. An administrator sees
 // every project and may change only those on their own list, and a new one
 // was not on it: read-only to the person who had just made it, and the node
 // the dialog picked was dropped for the same reason.
@@ -1529,7 +1528,7 @@ await section("an administrator's new project is theirs to work on", async () =>
   const madeBy = await call('/api/create', { name: 'maker-made', mode: 'init' }, MAKER);
   const listed = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.maker'].projects || [];
   const worked = await call('/api/prefs', { project: 'maker-made', build: 'make' }, MAKER);
-  // Kept by its project (R138): the key of the project made around it, given
+  // Kept by its project: the key of the project made around it, given
   // as the project list places the new repository.
   await fetch(URL.replace(/\/$/, '') + '/api/status', { headers: MAKER }).catch(() => {});
   const makerKey = projectKey('maker-made');
@@ -1539,7 +1538,7 @@ await section("an administrator's new project is theirs to work on", async () =>
 });
 
 // A notebook on a project that is no longer there (a layout saved before
-// the project was deleted) is put away once the project list says so (B40).
+// the project was deleted) is put away once the project list says so.
 await section("A notebook on a project that is no longer there", async () => {
   await page.evaluate(() => { tabs.push({ id: 't9001', kind: 'notebook', arg: 'gone-project', label: 'gone-project' }); drawPanes(); });
   await refreshUntil(page, () => !tabs.some(t => t.arg === 'gone-project'), { timeout: 15000 });
@@ -1547,7 +1546,7 @@ await section("A notebook on a project that is no longer there", async () => {
      'a notebook tab on a space that is gone is put away at the next poll');
 });
 // ...and one on show when its project goes (deleted from its Settings, or
-// elsewhere) gives way to Projects, not to the Profile (B94).
+// elsewhere) gives way to Projects, not to the Profile.
 await section("and one on show when its project goes", async () => {
   const made = await page.evaluate(async () => (await postJSON('/api/create', { name: 'gone-front', mode: 'init' })).name);
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'gone-front'), { timeout: 15000 });

@@ -80,13 +80,13 @@ _landing = []
 
 def landing_begins(folder):
     """The state under `folder` is being replaced whole (a move's bundle or
-    a backup landing, R227 step 8): from here every state file another
+    a backup landing): from here every state file another
     thread of this process would write there is refused, at once and
     without waiting, since what that thread holds is the state that is
     going. A writer already renaming its file finishes first. Refused, never
     held: a writer made to wait while it holds its module's lock would stop
     the landing, which takes those locks. The landing's own thread writes as
-    before. It stays so until landing_over(), or until the process ends,
+    before. It stays so until landing_over, or until the process ends,
     which is how a landing that worked ends."""
     with _gate:
         _landing[:] = [os.path.realpath(str(folder)), threading.get_ident()]
@@ -138,7 +138,7 @@ def _sync(f):
     """The file's bytes on the disk before it is renamed into place: without
     it a power cut after the rename could leave the name pointing at a file
     cut short, which every loader then read as empty and the next save wrote
-    over (B763). Never fatal: a filesystem that cannot sync keeps the rename."""
+    over. Never fatal: a filesystem that cannot sync keeps the rename."""
     with contextlib.suppress(OSError, ValueError):
         f.flush()
         os.fsync(f.fileno())
@@ -194,7 +194,7 @@ def set_aside(folder, name):
     return os.path.basename(dst)
 
 
-# ...and the same for a file that goes bad while this runs (B1082): a hand
+# ...and the same for a file that goes bad while this runs: a hand
 # edit with a syntax error, a restore cut short. Its loader reads it as
 # empty, as at start, and the next save writes that over it; a copy is kept
 # first, once for each state of the file, and the log names it. Which files
@@ -223,7 +223,7 @@ def keep_unreadable(path, why=""):
     return kept
 
 
-# ---- a state file read once while it stays the same file (R228 step 1) ----
+# ---- a state file read once while it stays the same file ----
 # The text of each state file read through here, kept by what the file is on
 # disk (its inode, size and times): on a /config served over the network each
 # open and read was a round trip, and one status read opened users.json
@@ -392,7 +392,7 @@ def write_json(path, obj, mode=0o644, sync=True):
 def write_text(path, text, mode=0o644, encoding="utf-8"):
     """Atomically replace `path` with `text`: a temporary of its own name
     beside it, renamed over it, so a reader never meets it half-written and
-    two writers never share a temp file (B196). The one copy of this: git.py,
+    two writers never share a temp file. The one copy of this: git.py,
     gitrelay.py, changelog.py and memory.py each carried their own and each
     met the fixed-temp-file race on its own before this."""
     path = _p(path)

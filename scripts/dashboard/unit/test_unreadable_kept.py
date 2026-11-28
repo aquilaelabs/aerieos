@@ -1,7 +1,7 @@
-"""A state file that goes bad while the controller runs keeps a copy (B1082).
+"""A state file that goes bad while the controller runs keeps a copy.
 
 At start an unreadable file in /config is copied aside before any loader
-reads it as empty (B763). One that went bad afterwards (a hand edit with a
+reads it as empty. One that went bad afterwards (a hand edit with a
 syntax error, a restore cut short) was read as empty by its loader and the
 next write saved that over it: one bug filed, and every space's rows and
 history were gone. Its loader keeps a copy now, once for each state of the

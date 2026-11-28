@@ -15,21 +15,21 @@ a briefed session reads:
     BY the build that ran it. No state.json on a /config that holds records
     is state 0, an install from before the stamp; on one that holds nothing
     it is a fresh install, stamped current with nothing to run.
-  * At start, before anything writes, gate() refuses a /config NEWER than
+  * At start, before anything writes, gate refuses a /config NEWER than
     this build (a downgrade: restore the copy taken before the upgrade) and
     one OLDER than SUPPORTED_FROM (nothing updates from it: install fresh),
     each in one sentence, and the controller does not start. The
     entrypoint asks the same question (`stateversion.py check`) before its
     hooks run, so a refused container writes nothing at all.
   * When the state is to move, the copy of /config is taken first
-    (backups/before-VERSION, the newest three kept), then migrate() runs
+    (backups/before-VERSION, the newest three kept), then migrate runs
     every numbered migration past the stamp, in order, once all the
     modules are configured, and stamps the last one that ran.
 
 A migration is statemigrations/NNNN_name.py with run(ctx): idempotent, so a
 start cut short runs it again safely, or NNNN_name.sql, a change to the
 database's schema, its statements apart by blank lines (migrations/0001's
-contract) and run in one transaction (R295: one place
+contract) and run in one transaction (one place
 and one numbered sequence for every migration; migrations/ beside db.py is
 the schema every supported install already has, and takes no new file). A
 fresh /config runs no .py, there being nothing in it to move, and every
@@ -69,7 +69,7 @@ SUPPORTED_FROM = 29
 # the git credentials and the wiki are all kept.
 # runner-tokens is a Docker volume of its own, root-only by design and kept
 # across an update by Docker, which this copy (made as the dashboard's
-# account) could not read anyway (B109).
+# account) could not read anyway.
 # The install key, where an install with no secrets folder keeps it beside
 # the state: it unseals every secret the copy holds, so a copy that carried
 # it was the secrets in the clear for whoever read the copy. It is no
@@ -83,13 +83,13 @@ SKIP = {BACKUPS, "logs", "snapshots", "project-snapshots", "images", "gitrelay",
 SKIP_GLOBS = (".reset-*", "*.lock", "*.tmp")
 
 # Why this start migrates nothing, when the copy before it failed; written
-# to /config/state-held too, which aerie doctor says in red (B109).
+# to /config/state-held too, which aerie doctor says in red.
 HELD = ""
 HELD_FILE = "state-held"
 
 
 # An update whose migration failed: /config was put back as it was and the
-# start refused (the operator, 13 Nov). This file, in /config, says which
+# start refused. This file, in /config, says which
 # build and why. The same build does not try again by itself while it is
 # there (each try would copy the whole state and move another aside), and a
 # start that migrates clean takes it away.
@@ -131,7 +131,7 @@ RECORDS = ("users.json", "builderbot.db", "settings.json", "projects.json",
 def migrations():
     """[(number, path)] of statemigrations/NNNN_*.py and NNNN_*.sql, in
     order: one numbered sequence for /config's files and the database's
-    schema (R295)."""
+    schema."""
     return sorted((int(p.name[:4]), p) for p in MIGRATIONS.iterdir()
                   if re.fullmatch(r"\d{4}_[A-Za-z0-9_]+\.(?:py|sql)", p.name))
 
@@ -283,7 +283,7 @@ def backup(state, version=None):
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     # What this account cannot read (a root-only file an operator put here)
-    # is left out and named, rather than holding the whole upgrade (B109).
+    # is left out and named, rather than holding the whole upgrade.
     unread = []
 
     def copy(src, dst, *, follow_symlinks=False):
@@ -346,13 +346,13 @@ def _newest_backup(state):
 
 def migrate(state, ctx, version=None):
     """Run every migration past the stamp, in order, and stamp each as it
-    lands. One that fails stops the start (the operator, 13 Nov): /config
-    is put back from the copy gate() took before any of them ran, a note in
+    lands. One that fails stops the start: /config
+    is put back from the copy gate took before any of them ran, a note in
     it says which migration and why (FAILED_FILE), and the process exits,
     so the release from before starts on a /config that is as it left it.
     It went on before, with a line in the log, and the new build ran on
     state half changed. Where there is no copy to put back (none could be
-    taken, which gate() said), nothing ran and nothing runs. The numbers
+    taken, which gate said), nothing ran and nothing runs. The numbers
     that ran."""
     if HELD:
         return []
@@ -414,7 +414,7 @@ def _did_not_land(state, version, name, err, ran):
 def restore(state, version):
     """Put back the copy a build took before it migrated `state`
     (backups/before-VERSION), for the build before it when a bare-metal
-    install's update did not come up (R90 step 5). With the controller
+    install's update did not come up. With the controller
     stopped: what the state holds of what the copy kept is moved aside, into
     backups/rolled-back-TIME, never deleted, and the copy's own is put in its
     place; what the copy leaves out on purpose (SKIP: the logs, the
@@ -452,7 +452,7 @@ def restore(state, version):
                 pass
         raise
     # ...and what the copy could not read is still in what was moved aside:
-    # brought back rather than lost (a root-only file, B109), a file inside
+    # brought back rather than lost (a root-only file), a file inside
     # a folder the copy took the rest of included.
     for rel in _not_copied(src):
         was, now = aside / rel, state / rel

@@ -1,4 +1,4 @@
-// A container asked for by a session (roadmap R71): the root shape applied
+// A container asked for by a session: the root shape applied
 // to docker. The session writes a compose file and hands it over with a
 // reason; the request waits on the administrators, and nobody else, in the
 // bell; Allow registers it through the Docker tab's own New container path
@@ -76,8 +76,8 @@ ok(/container sonarr-for-alpha on sandbox/.test(bell.text) && /a sonarr to test/
    `the bell row names the container and the node, and folds the compose file under the reason (${
      bell.sum})`);
 // Approve is read at a glance: its text against its own fill at the
-// contrast body text needs (WCAG's 4.5), in every theme (the operator, 5 Oct:
-// green on amber).
+// contrast body text needs (WCAG's 4.5), in every theme
+// (green on amber).
 await section("Approve is read at a glance", async () => {
   const low = await page.evaluate(async () => {
     const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(v => v / 255)
@@ -119,7 +119,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
 
 // ---- a session's ask belongs to its own project -------------------------------
 // So the session that asked can see what it asked for once it exists, and
-// work on it as its project's settings allow (the operator, 24 Sep).
+// work on it as its project's settings allow.
 await section("a session's ask belongs to its own project", async () => {
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
@@ -131,8 +131,8 @@ await section("a session's ask belongs to its own project", async () => {
   const row = (await api('/api/phone')).body.asks.find(a => a.id === bySession.body.id);
   ok(row && row.for === 'alpha', `a session's ask belongs to its own space when it names none (${row?.for})`);
   await api('/api/phone', { action: 'deny', id: bySession.body.id });
-  // ...and it is under the project's Agents may: Run its container (B250,
-  // the operator, 24 Sep): refused at deny, made at once at auto when it is
+  // ...and it is under the project's Agents may: Run its container:
+  // refused at deny, made at once at auto when it is
   // the project's own on its own node, and asked at auto all the same for
   // another project or a node it names.
   const S = asSession(tok);
@@ -167,7 +167,7 @@ ok(no.state === 'denied' && !(await api('/api/docker')).body.instances.some(i =>
 // ---- the same name twice is refused before it reaches anybody's bell ----------
 // It used to be queued, sit on the administrators' bell, and fail at Allow
 // with "pick another name", so a person was asked to decide on a request no
-// answer could build, and told the wrong way out for the case it met (B309).
+// answer could build, and told the wrong way out for the case it met.
 const dup = await ask({});
 const asks = (await api('/api/phone')).body.asks || [];
 ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.error || '')
@@ -180,8 +180,8 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
 // A container written here has no project tree behind it, and compose
 // resolves its relative paths against its own data directory, which is
 // empty: a new project's session wrote its compose at docker/ with
-// build: . and asked for it this way, and the build ran in an empty
-// directory (B329). Refused before the bell, and by create and Edit, with
+// build:. and asked for it this way, and the build ran in an empty
+// directory. Refused before the bell, and by create and Edit, with
 // the way a project's own code goes in.
 await section("a build from nowhere is refused before anybody is asked", async () => {
   const BUILT = 'services:\n  app:\n    build: .\n    ports:\n      - "8080:80"\n';
@@ -241,7 +241,7 @@ print(json.dumps({k: containers.relative_builds(v) for k, v in cases.items()}))
   }
 });
 
-// ---- the jump bar finds a container on any node (B26) -----------------------
+// ---- the jump bar finds a container on any node -----------------------
 // Each named by its node, and picking one opens Containers on that node with
 // its search narrowed to it.
 await section("the jump bar finds a container on any node", async () => {

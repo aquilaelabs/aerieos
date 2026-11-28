@@ -1,4 +1,4 @@
-"""What the dashboard's process does about the keys it holds (R158 step 6).
+"""What the dashboard's process does about the keys it holds.
 
 The install key, the accounts' keys while unlocked, a terminal's wrapped
 seal keys and the TLS private key all live in this process's memory for a
@@ -11,14 +11,14 @@ while. Three things keep them there and nowhere else:
   * no swap: every page is locked in memory (mlockall, MCL_FUTURE with
     MCL_ONFAULT so only what is touched is locked) where the memlock limit
     lets it, which docker-compose.yml raises; refused, the Doctor says so;
-  * zeroed where the language lets it: wipe() overwrites a bytes or
+  * zeroed where the language lets it: wipe overwrites a bytes or
     bytearray value in place once the key it held is let go, since Python
     cannot promise when the object is freed.
 
 What sessions ask for runs on the nodes, never in this process (the
 controller runs nothing), and on a node the agent that opens a seal is a
 process apart from the sessions, which run as their account's own user in
-a view of their own (R125, bb-session): the one separation step 6 asks for
+a view of their own (bb-session): the one separation step 6 asks for
 that the code already had. The agent does the same three things in its own
 process (aerieos_agent.base.harden).
 """

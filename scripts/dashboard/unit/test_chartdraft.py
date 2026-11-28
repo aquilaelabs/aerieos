@@ -1,4 +1,4 @@
-"""Draft from the compose (R281 step 4): each service a Deployment, a
+"""Draft from the compose: each service a Deployment, a
 Service named as the service where it has ports, a claim for each named
 volume; the service built from the root takes the deploy's image; what has
 no counterpart in a cluster is said in a comment; and the chart is written

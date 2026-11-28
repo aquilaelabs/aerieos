@@ -2,7 +2,7 @@
 """What a root helper written in shell keeps, sealed under the install key
 as the controller seals its own secrets (dashboard/signing.py): the deploy
 keys, which were plain files guarded by their mode alone, so a copy of
-/config taken as root carried every one of them ready to use (R243).
+/config taken as root carried every one of them ready to use.
 
     sealfile.py seal KEYFILE [PREVIOUS]     stdin sealed to stdout under the key in KEYFILE
     sealfile.py open KEYFILE [PREVIOUS]     a seal on stdin opened to stdout, under KEYFILE's

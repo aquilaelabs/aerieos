@@ -1,7 +1,7 @@
 // The notebook's memories, the second half of the Briefing view: read,
 // edited, written by hand and forgotten, and the refusal when a memory moved
 // on disk. One classic script beside index.html (docs/nodes.md §13): one file
-// per notebook view (R60). A factory makeNotebook calls per notebook.
+// per notebook view. A factory makeNotebook calls per notebook.
 
 "use strict";
 
@@ -21,7 +21,7 @@ function nbMemoryView({$, nb}){
   // #26's three exposures, and the quietest.
   nb.memIndexRev = "";
 
-  // The briefing's glance (R109): both halves of the tab counted as tiles,
+  // The briefing's glance: both halves of the tab counted as tiles,
   // in the order they sit: the rules, then what Claude remembers. Drawn by
   // whichever half arrives, so it is right after the first and complete
   // after the second; a half with none is said on the status line instead.
@@ -54,7 +54,7 @@ function nbMemoryView({$, nb}){
     // color, so a shut one still says something is wrong.
     // Lines for memories that are gone are taken out by rewriting the index
     // with nothing changed (save_index drops them and keeps every other line
-    // where it was), offered as its own press (B455).
+    // where it was), offered as its own press.
     const dangling = j.issues.filter(i => i.fix === "tidy").length;
     patch($("memDrift"), j.issues.length
       ? docSection("memory", "drift", "Index",
@@ -78,16 +78,16 @@ function nbMemoryView({$, nb}){
     // what it will do: the text is typed, not sent. See memory.py's notify().
     $("memCount").textContent = n ? "Memories: newest first" : "Memories";
     $("memN").textContent = n ? String(n) : "none";
-    // Open unless this page shut it, like every section (the operator, 8 Oct;
-    // it was folded unless opened, from 29 Sep, which every redraw put back:
-    // pressing Edit on a memory folded the whole section around the field,
-    // B594). The fold's state is the page's one toggle listener's, keyed like
+    // Open unless this page shut it, like every section
+    // (it was folded unless opened, from 29 Sep, which every redraw put back:
+    // pressing Edit on a memory folded the whole section around the field).
+    // The fold's state is the page's one toggle listener's, keyed like
     // every section.
     $("memSect").open = "briefing:memories" in sectOpen ? sectOpen["briefing:memories"] : true;
     // ...one section open at a time in a notebook (page-docs.js): the one
     // that stays where the person opened it. Open by the default alone it is
     // one of the view's sections like the rest, and a phone opens the view
-    // on its first, Code base (the operator, 24 Nov: it opened on Memories,
+    // on its first, Code base (it opened on Memories,
     // which no press had asked for, under a placeholder that had the top).
     if ($("memSect").open && sectOpen["briefing:memories"] === true) keepOpen($("memSect"));
     // Which were open before this redraw. Saving reloads the book, and folding
@@ -104,13 +104,13 @@ function nbMemoryView({$, nb}){
       const t = d.querySelector(".ixt"), h = d.querySelector(".ixh");
       if (ta || t) typed.set(d.dataset.file, {text: ta?.value, title: t?.value, hook: h?.value});
     });
-    // A role that reads the project and does not write it (B86): no Edit
+    // A role that reads the project and does not write it: no Edit
     // or Remove on a memory, and Write a memory dead with the reason.
     const ro = projWriteWhy(nb.memProj);
-    // Patched (R244), each memory by its file: one being edited keeps its
+    // Patched, each memory by its file: one being edited keeps its
     // fields, caret and fold when another memory or the index moves.
-    // Only the rows on show are built, a page at a time (pageLimit, R228
-    // step 13); one being edited is always among them, kept in the first
+    // Only the rows on show are built, a page at a time (pageLimit);
+    // one being edited is always among them, kept in the first
     // pages it was opened from.
     const lim = pageLimit($("memList"), "memList", j.memories.length);
     patch($("memList"), j.memories.slice(0, lim).map(m => `
@@ -353,7 +353,7 @@ function nbMemoryView({$, nb}){
   }
 
   function paintMemAdd(box){
-    // One form (R301), as a bug's report is: its title, the file and kind it
+    // One form, as a bug's report is: its title, the file and kind it
     // is written as, its hook and the memory itself, Cancel and Write it at
     // the foot.
     drawHTML(box, `<div class="memadd">${formBox({fields: [
@@ -407,7 +407,7 @@ function nbMemoryView({$, nb}){
 
 The file goes, and its line comes out of the`
       + ` index. A running session keeps what it already read.`)) return;
-    // Off the list once it is asked (the operator, 22 Nov), from the page's
+    // Off the list once it is asked, from the page's
     // own copy of the book, and back saying why if the server refuses.
     const now = () => {
       const j = nb.memLast, list = j?.memories || [], i = list.findIndex(m => m.file === file);

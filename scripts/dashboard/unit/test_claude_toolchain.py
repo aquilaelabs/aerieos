@@ -1,4 +1,4 @@
-"""Claude Code is a coding agent of each node (R145, R95): a row in the
+"""Claude Code is a coding agent of each node: a row in the
 Library and on the Installed page from the census and the latest known, installed on purpose, and
 required for a session, which is held where it is missing."""
 import os
@@ -60,7 +60,7 @@ class ClaudeToolchain(unittest.TestCase):
                       claudecode.holds().get("n1", ""))
 
     def test_none_installed_does_not_end_a_running_session(self):
-        # B540: the sweep ended live sessions on a stale "not installed".
+        # The sweep ended live sessions on a stale "not installed".
         self.use(node(claude=""))
         self.assertEqual(claudecode.holds(reap=True), {})
 

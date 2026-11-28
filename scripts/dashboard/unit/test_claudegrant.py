@@ -48,7 +48,7 @@ class Record(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.home, ".claude", ".bb-grant-codex.json")))
 
     def test_two_accounts_sharing_the_boxs_dotfiles_keep_their_own_record(self):
-        # The controller links each account's .config to the box's (B236):
+        # The controller links each account's .config to the box's:
         # a node saying the second account has no Codex login is about them.
         box = tempfile.mkdtemp()
         os.mkdir(os.path.join(box, ".config"))

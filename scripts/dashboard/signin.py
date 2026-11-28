@@ -36,8 +36,8 @@ import agents
 # The words the card waits for where a flow wants a code pasted back.
 PROMPT = "Paste code"
 
-# Every coding agent's flow reads the same in its job's log (R233 step 6,
-# R234 step 6): its own screens are driven on the node by
+# Every coding agent's flow reads the same in its job's log:
+# its own screens are driven on the node by
 # scripts/lib/login-flow.py from what its row in the agents' table or its
 # pack's manifest says of them (signin.flow), and what comes up the log is
 # that driver's lines, the link on one, a one-time code on another (the
@@ -110,9 +110,9 @@ CODE_JUNK = re.compile(r"[^!-~]+")
 
 
 class NodeFlow:
-    """The same flow, run on a NODE (roadmap R47).
+    """The same flow, run on a NODE.
 
-    Claude Code is installed where sessions run, and after R47 this container
+    Claude Code is installed where sessions run, and this container
     carries none, so the flow has to happen over there. It is a job of its
     own on the node, under a pty, as that machine's session account; what it
     prints comes back as the job's log and the code goes down on the reply to
@@ -217,7 +217,7 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
 
 
 def resume():
-    """The flows found again after the controller restarted (R227 step 13):
+    """The flows found again after the controller restarted:
     a sign-in is a job on a node, which the restart did not end, and what
     its page draws is read from that job's log, so each one still going is
     its account's flow again, its link shown and its code taken. They were

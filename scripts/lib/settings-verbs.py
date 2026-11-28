@@ -61,8 +61,7 @@ def push_state(state, proj):
     # A token is the controller's credential helper on the space's token
     # file: git-credential-bb now, git's own store in the form older installs
     # wrote. Counting the old form alone told every space linked since that
-    # its remote had no credential, and its session that it could not push
-    # (B1118).
+    # its remote had no credential, and its session that it could not push.
     auth = ("" if not url
             else "ssh" if url.startswith(("git@", "ssh://")) or (":" in url and "://" not in url)
             else "token" if "git-credential-bb" in helper or "store --file=" in helper
@@ -91,7 +90,7 @@ def show():
     prefs = dash.load("prefs", here)
     prefs.configure(state=state, write_json=lambda *a: None)
     rec = dict(prefs.get(proj) or {})
-    # The projects it reads as the repositories a session reads (R138): kept
+    # The projects it reads as the repositories a session reads: kept
     # by project key, which `bb -p` and a person know by its repositories'
     # names, not "beta-2".
     with contextlib.suppress(Exception):
@@ -104,7 +103,7 @@ def show():
     # nothing set, which is claude's own default.
     _mine = prefs.for_user(os.environ.get("BB_ACCOUNT_UID", ""), proj) if proj else {}
     rec["model"], rec["effort"] = _mine.get("model", ""), _mine.get("effort", "")
-    # ...and each other agent's pair (R95 step 19), which its launcher reads
+    # ...and each other agent's pair, which its launcher reads
     # at exec as Claude's reads these two.
     rec.update({k: v for k, v in _mine.items() if k.endswith(("_model", "_effort"))})
     try:
@@ -112,7 +111,7 @@ def show():
     except (OSError, ValueError):
         locks = {}
     lk = locks.get(proj) if isinstance(locks, dict) else None
-    # Locked AGAINST this seat (R119): an administrator's lock holds
+    # Locked AGAINST this seat: an administrator's lock holds
     # everybody, its owner's everybody but the owner. The owner as
     # membership.owner_of reads it: the record's, or AerieOS's owner for a
     # project from before there were owners, who is also the seat with no
@@ -120,7 +119,7 @@ def show():
     rec["locked"] = isinstance(lk, dict) and (bool(lk.get("admin")) or (
         os.environ.get("BB_ACCOUNT_UID", "") or _bb_owner(state)) != _owner_of(state, proj))
     rec["project"] = proj
-    # The toolchains this project's sessions may not use (R77), whole: the
+    # The toolchains this project's sessions may not use, whole: the
     # shipped ones switched off here, and every tool pack not switched on.
     # bb-tty takes them out of a session's PATH and its view of the store.
     try:
@@ -138,7 +137,7 @@ def show():
     on = set(rec.get("packs_on") or [])
     rec["toolchains_off"] = sorted(set(rec.get("tc_off") or []) | {p for p in packs if p not in on} | unfit)
     rec["packs_disabled"] = sorted(unfit)
-    # Whether a push can happen at all (B734): the rights the controller
+    # Whether a push can happen at all: the rights the controller
     # granted (push-rights.json, the clone dialog's or Link to a git host),
     # and what the remote authenticates with: an ssh address carries its
     # key, an https one needs the token the controller scoped into the
@@ -182,7 +181,7 @@ def show():
         print(json.dumps(rec))
         raise SystemExit(0)
     print(f"{proj}:")
-    # Nodes by the names the Nodes page shows (B58): the record keeps ids,
+    # Nodes by the names the Nodes page shows: the record keeps ids,
     # which say nothing to a person or a session reading this.
     named = {}
     with contextlib.suppress(Exception):
@@ -190,7 +189,7 @@ def show():
         nodes.db.open_readonly(state)
         named = {n["id"]: n["name"] for n in nodes.node_list(all=True)}
     # Hosting-only nodes listed under Also works on (prefs' hosts), named
-    # as the dialog shows them, so a session reads it has them (B712).
+    # as the dialog shows them, so a session reads it has them.
     for k in ("node", "nodes", "hosts", "reads", "sees", "model", "effort", "build", "test", "outputs", "policy", "locked",
               "toolchains_off"):
         v = rec.get(k)
@@ -222,21 +221,21 @@ def show():
                        ("Write the wiki", "wiki")):
         print(f"    Agents may: {label:<28} {gate.get(key) or 'auto'}")
     for label, key, dflt in (("Run its container", "devbuild", "deny"),
-                             # R91: its VMs, aerie vm.
+                             # Its VMs, aerie vm.
                              ("Make VMs", "makevms", "deny"),
-                             # R281 step 6: aerie k8s deploy and rollback.
+                             # Aerie k8s deploy and rollback.
                              ("Deploy to Kubernetes", "kube", "deny"),
-                             # R293: aerie discord apply.
+                             # Aerie discord apply.
                              ("Manage Discord", "discord", "deny"),
-                             # R169 step 5: a pack from the vetted catalog.
+                             # A pack from the vetted catalog.
                              ("Install a tool pack", "installpacks", "ask"),
                              ("Report AerieOS bugs", "report", "auto"),
-                             # R106: signing a build, and its keys and mapping.
+                             # Signing a build, and its keys and mapping.
                              ("Sign a build", "sign", "ask"),
                              ("Manage signing keys", "keys", "ask"),
-                             # R138: the tag and the forge's release.
+                             # The tag and the forge's release.
                              ("Tag and publish a release", "release", "ask"),
-                             # R270 step 6: a person's PC lent by the companion.
+                             # A person's PC lent by the companion.
                              ("Use a lent PC", "pc", "deny")):
         print(f"    Agents may: {label:<28} {rec.get(key) or dflt}")
     # Who may move the version is version.py's policy rather than a prefs
@@ -252,7 +251,7 @@ def show():
 
 
 def set_node():
-    """The project's node from a shell on the controller (R84), saved as its
+    """The project's node from a shell on the controller, saved as its
     Settings page saves it. A project with containers is sent to that page:
     moving it there keeps them on the node they run on, which needs the
     running dashboard."""

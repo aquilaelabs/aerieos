@@ -1,4 +1,4 @@
-"""A session sees a release's signing and asks for it again (R134): aerie sign
+"""A session sees a release's signing and asks for it again: aerie sign
 status prints whether the release APK can be signed and how the newest went,
 in the Signing view's words; aerie sign release asks the project's owner, under
 Sign a build, and Allow starts the look the Signing view's press starts; aerie
@@ -72,7 +72,7 @@ class Clients(unittest.TestCase):
                               capture_output=True, text=True, timeout=30, env=self.env())
 
     def test_a_build_here_and_not_yet_on_the_controllers_copy_is_waited_for(self):
-        # B1183: refused with "aerie build puts a build there" while the
+        # Refused with "aerie build puts a build there" while the
         # build sat in this tree's dist/, on its way to the controller.
         import shutil
         ws = tempfile.mkdtemp()
@@ -129,7 +129,7 @@ class Clients(unittest.TestCase):
         self.assertIn("signs none of its releases", self.sign("--status", "", "").stdout)
 
     def test_release_on_auto_starts_the_look_and_says_what_it_found(self):
-        # R190 step 5: waited for, the look's end told by the controller's
+        # Waited for, the look's end told by the controller's
         # own clock (its last look's time moving on), then each run said.
         ANSWER["release-sign"] = (200, {"ok": True, "started": True, "said": "looking"})
         ANSWER["release"] = lambda: (200, {"release": {"looking": False, "expect": ["v1.0.0-dev.9"], "last": {

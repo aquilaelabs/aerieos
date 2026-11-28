@@ -82,9 +82,9 @@ def payload():
 
 def is_claude(name):
     """An agent's session by name: claude-<project>, or an account's
-    u_xxxx~claude-<project>, for every live agent in the table (R95), so
+    u_xxxx~claude-<project>, for every live agent in the table, so
     the idle rule ends a Codex session as it ends a Claude one. Only the
-    account's prefix is taken off: a second slot's name ends in ~2 (R143)."""
+    account's prefix is taken off: a second slot's name ends in ~2."""
     return agents.is_session(re.sub(r"^u_[0-9a-f]{8}~", "", name))
 
 

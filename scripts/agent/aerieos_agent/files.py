@@ -1,4 +1,4 @@
-"""The file explorer's verbs on a node (R224): a request the controller
+"""The file explorer's verbs on a node: a request the controller
 signed, on the screen relay's port (screen.py), which the node's firewall
 opens to the controller alone.
 
@@ -249,7 +249,7 @@ def serve(conn, key, hdr, q, rest):
     blob, nonce, sig = (q.get("a") or [""])[0], (q.get("n") or [""])[0], (q.get("s") or [""])[0]
     if not signed(key, relaytls.subject(blob, nonce), (q.get("t") or [""])[0], sig):
         return _err(conn, 403, "not signed by this node's controller")
-    # A value of the controller's own on every request (R288): without one a
+    # A value of the controller's own on every request: without one a
     # signed request could be sent again for its two minutes, and every
     # controller this agent takes work from sends one.
     if not nonce:

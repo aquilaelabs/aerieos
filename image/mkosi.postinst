@@ -29,12 +29,11 @@ mkosi-chroot systemctl enable systemd-networkd systemd-resolved systemd-timesync
 # ends as a failed unit on every machine without a UPS.
 mkosi-chroot systemctl disable nut-server.service nut-monitor.service nut-driver-enumerator.service nut-driver-enumerator.path nut-driver.target nut.target >/dev/null 2>&1 || true
 # AerieOS's own units, enabled here rather than as links in the extra
-# tree (a symlink in the repository does not travel with the tree, B417):
+# tree (a symlink in the repository does not travel with the tree):
 # the first boot, the installer, which its condition keeps to the ISO, and
 # the health check that marks a trial slot good.
 mkosi-chroot systemctl enable aerieos-os-firstboot.service aerieos-os-installer.service aerieos-os-health.service aerieos-os-env.service aerieos-os-system-pool.service aerieos-os-restore.service
-# Every interface takes DHCP until the Network page says otherwise (R165
-# step 4's bare-metal half).
+# Every interface takes DHCP until the Network page says otherwise.
 mkosi-chroot install -d -m 0755 /etc/systemd/network
 cat > "$BUILDROOT/etc/systemd/network/80-dhcp.network" <<'NET'
 [Match]
@@ -44,7 +43,7 @@ Name=en* eth*
 DHCP=yes
 NET
 
-# Docker told of the NVIDIA runtime (R207): the toolkit's own tool writes
+# Docker told of the NVIDIA runtime: the toolkit's own tool writes
 # /etc/docker/daemon.json, so a container asking for the card
 # (gpus: all) gets it on a machine with one; on one without, the runtime
 # is named and never used.
@@ -52,7 +51,7 @@ mkosi-chroot nvidia-ctk runtime configure --runtime=docker >/dev/null
 
 # libvirt's network sockets: nothing here uses them, and the TLS one activates
 # libvirtd with no certificates, which then fails at every boot after the first
-# and takes the local socket down with it (B674).
+# and takes the local socket down with it.
 mkosi-chroot systemctl mask libvirtd-tls.socket libvirtd-tcp.socket >/dev/null 2>&1
 
 # Debian's driver lists nvidia-drm for every boot, which fails the boot's module

@@ -1,4 +1,4 @@
-"""A model router as a node feature (R144 step 1, the operator, 26 Oct).
+"""A model router as a node feature.
 
 LiteLLM runs as a container on a node the operator picks, with the
 provider keys (Anthropic, OpenAI, Google, OpenRouter, xAI, and any
@@ -20,7 +20,7 @@ master key the controller made) so its spend is its own (/key/info).
                        [...]}, "projects": {project: {"key": sealed,
                        "made": t}}, "models": [...], "models_at": t}}
 
-The compose file (compose_text) is nginx's shape (R171): written through
+The compose file (compose_text) is nginx's shape: written through
 containers.create_container as a System container, built by a compose job
 on the node, so the Containers page lists it with Up, Down and its log.
 """
@@ -53,7 +53,7 @@ project_names = None        # () -> every project's name
 job_add = None
 job_get = None              # jid -> the job row with its log
 node_gpu = None             # nid -> whether the node reports a graphics card, which Ollama is then given
-container_gone = None       # name -> True once no written container has that name (R238)
+container_gone = None       # name -> True once no written container has that name
 _lock = threading.Lock()
 SEALED = "bbseal:"
 PORT = 4000
@@ -74,7 +74,7 @@ NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,23}$")
 
 
 def pack():
-    """The router as an official pack (R172): a service a node deploys from
+    """The router as an official pack: a service a node deploys from
     its Library card, its configuration the fields the Node settings
     section asked before, written to packs/services/model-router by
     tools/packs-export.py and held to this by aerie lint."""
@@ -110,7 +110,7 @@ def _file():
     return STATE / "router.json"
 
 
-# Read once while the same file (R228 step 1); 0600, since the providers'
+# Read once while the same file; 0600, since the providers'
 # keys are in it.
 _store = statefile.Store(_file, write=lambda: write_json, mode=0o600, cached=True)
 
@@ -166,7 +166,7 @@ def _url(nid, rec=None):
 def _q(v):
     """A string as YAML reads it back whole: a JSON string is a YAML
     double-quoted scalar, so a quote, a backslash or a newline in a key or
-    an address is escaped rather than ending the value (B536)."""
+    an address is escaped rather than ending the value."""
     return json.dumps(str(v))
 
 
@@ -514,10 +514,10 @@ def disallow(nid, project):
     return {"ok": True}
 
 
-# ---- a container's own key (R238 step 7) -------------------------------------
+# ---- a container's own key -------------------------------------
 # An app that talks to a model (Paperclip) runs on the router with a key of
 # its own, made at the router when New container makes it and given by
-# whoever may set the router up (the operator, 18 Nov): the router's own
+# whoever may set the router up: the router's own
 # gate, docker-write, which is also New container's. Kept sealed under the
 # container's name, its spend read with the spaces', and deleted at the
 # router when the container goes.
@@ -667,8 +667,8 @@ def refresh_models(nid):
     return {"ok": True, "models": models}
 
 
-# The models walked with the open agent and AerieOS's tools (R144 step
-# 3): a session on one ran the briefing, bb, the hooks and a transcript
+# The models walked with the open agent and AerieOS's tools:
+# a session on one ran the briefing, bb, the hooks and a transcript
 # end to end. One goes here when that walk is done; the picker marks the
 # rest untested rather than hiding them, since the router routes to any.
 WALKED_MODELS = ()

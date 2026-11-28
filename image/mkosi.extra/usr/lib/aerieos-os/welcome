@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The console's welcome at every boot (R185): AerieOS's logo, the release
+# The console's welcome at every boot: AerieOS's logo, the release
 # this slot runs and the address the dashboard answers at, above the login
 # prompt. Written to /run/issue.d, which the console's getty reads with
 # /etc/issue (blank in the image, so Debian's own line goes); its \4 is the
@@ -18,7 +18,7 @@ mkdir -p "$(dirname "$OUT")"
     sed 's/\\/\\\\/g' "$LIB/logo"
     printf '\n        AerieOS%s, slot %s\n' "${ver:+ $ver}" "$("$LIB/slot" current 2>/dev/null || echo "?")"
     printf '        Open http://\\4:%s/ in a browser on this network.\n' "${port:-7680}"
-    # The way in at this screen (R194): admin, once a console password is
+    # The way in at this screen: admin, once a console password is
     # set on the Nodes page; while the machine is first set up, with none
     # (console-door); otherwise, where to set one.
     if [ -s "${BB_CONSOLE_HASH:-$( [ -d /var/lib/aerieos ] && echo /var/lib/aerieos || echo /var/lib/builderbot )/console-hash}" ]; then
@@ -28,8 +28,8 @@ mkdir -p "$(dirname "$OUT")"
     else
         printf '        To log in here, set a console password on the Nodes page.\n'
     fi
-    # ...and the way in when the dashboard itself is what does not answer
-    # (B621): the boot menu's Rescue entry, which needs no password.
+    # ...and the way in when the dashboard itself is what does not answer:
+    # the boot menu's Rescue entry, which needs no password.
     printf '        If the dashboard does not answer, restart and pick Rescue on the boot menu\n'
     printf '        for a root shell here; journalctl -u aerieos-controller says why.\n\n'
 } > "$OUT.new"

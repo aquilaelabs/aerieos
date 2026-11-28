@@ -1,4 +1,4 @@
-"""A GitHub release updated here keeps its tag (B696): every PATCH sends
+"""A GitHub release updated here keeps its tag: every PATCH sends
 tag_name, since GitHub moves a draft patched without it to a name of its own
 (untagged-ID), and a draft already moved is found by its title."""
 import os

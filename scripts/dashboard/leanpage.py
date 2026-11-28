@@ -1,4 +1,4 @@
-"""The page as it is served, without its comments (R228 step 15).
+"""The page as it is served, without its comments.
 
 The tree keeps every comment; what a browser is sent leaves them out, a third
 of the page's bytes. A tokenizer, not a pattern: a `//` inside a string, a
@@ -7,7 +7,7 @@ comment, and a newline a comment ended on is kept wherever automatic
 semicolon insertion could read it. Lines inside a template literal are never
 touched, so its whitespace is exactly the source's.
 
-strip_js, strip_css and strip_html each take text and give text; served()
+strip_js, strip_css and strip_html each take text and give text; served
 gives a page file's bytes as served, kept by what the file is on disk.
 """
 import os

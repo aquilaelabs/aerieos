@@ -1,4 +1,4 @@
-"""Enroll node's systems (R204, R97): a vetted one is offered as it is, and
+"""Enroll node's systems: a vetted one is offered as it is, and
 one that cannot be walked here says why beside its dev tag."""
 import os
 import sys
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
 
 class OfOs(unittest.TestCase):
-    """The system a census names (R210): what a row enrolled before the
+    """The system a census names: what a row enrolled before the
     system was recorded on it gets its script built for."""
     def test_the_census_names_the_system(self):
         for text, want in (("linux x86_64 Ubuntu 24.04.2 LTS", "ubuntu"), ("linux x86_64 Rocky Linux 9.4", "rocky"),

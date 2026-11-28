@@ -1,4 +1,4 @@
-"""The machine's disks in the census (R162 step 1): read off lsblk's and
+"""The machine's disks in the census: read off lsblk's and
 smartctl's JSON, loop and RAM devices left out, each partition's holding
 in words, the system disk marked; and the controller keeps each to its
 shape."""

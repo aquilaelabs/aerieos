@@ -9,8 +9,8 @@
 
 "use strict";
 
-// Less motion, asked for by the device or by the account in the gear's menu
-// (the operator, 19 Oct): the one gate every moving thing asks.
+// Less motion, asked for by the device or by the account in the gear's menu:
+// the one gate every moving thing asks.
 const noMotion = () => document.documentElement.dataset.motion === "reduce"
   || matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -68,7 +68,7 @@ function armModal(el){
         this.removeAttribute("hidden");
         // A dialog opens at its top: the box kept where it was last scrolled
         // to, and a field focused on the way in scrolled it further, so one
-        // opened on a phone could start halfway down (the operator, 30 Sep).
+        // opened on a phone could start halfway down.
         // Again after the frame, for what the opener fills and focuses.
         if (was){ modalTop(this); modalOpened(this); requestAnimationFrame(() => { modalTop(this); scrollHints(this); }); }
         return;
@@ -100,7 +100,7 @@ function modalWayOut(m){
 }
 
 // ---- a dialog and the keyboard ------------------------------------------
-// One place for what every dialog does with the keyboard (R88), rather than
+// One place for what every dialog does with the keyboard, rather than
 // an Escape listener per dialog, which seven of the sixteen had: it takes
 // the focus as it opens, so a screen reader starts in it and Tab starts
 // from it; Tab and Shift+Tab go round inside it rather than out to the page
@@ -272,15 +272,14 @@ function modalTop(el){
 
 // ---- scroll hints -------------------------------------------------------
 // A box that scrolls says so: a soft shadow on each edge with more past it,
-// gone at the end (the operator, 30 Sep). A phone hides its scrollbars until
+// gone at the end. A phone hides its scrollbars until
 // a finger moves, and a dialog cut off at a field boundary read as the whole
 // dialog. An inset shadow rather than a painted gradient, since several
 // themes put their own texture on these grounds; the classes are set here,
 // from the box's own numbers, on scroll and on a slow clock for content that
 // grows while nobody scrolls.
 // ...and the lists and logs that scroll inside a surface: a project's Reads
-// and nodes in its settings, the notebook's lists, a job's log, the chat
-// (the operator, 30 Sep).
+// and nodes in its settings, the notebook's lists, a job's log, the chat.
 const SCROLL_HINTED = ".modal:not([hidden]):not(.inline) > .box, .modal:not([hidden]):not(.inline) .sheetslot, .pane .doc.on, "
   + ".lbox, #roadmapList, #memList, #pendList, .dllog, .dmlog, .chatlog, .mpanel.show, .abpage, .dsboardwrap";
 function scrollHint(el){
@@ -289,7 +288,7 @@ function scrollHint(el){
   el.classList.toggle("scrolldown", more && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
 }
 // Without a root, the parts on show alone: a pane's page, an open dialog, an
-// open menu (R228 step 14). A box in a page left behind the one on show is
+// open menu. A box in a page left behind the one on show is
 // one content-visibility spares laying out, and measuring it laid it out
 // again, every look.
 const HINT_ROOTS = ".pane .doc.on, .modal:not([hidden]), .mpanel.show";
@@ -341,13 +340,13 @@ function foldHeight(el, from, to, done){
   // a test's press) scrolled what the fold had not reached yet up into
   // it, the scroll falling back as the box grew, so the control slid
   // from under the finger between its press and its release and the click
-  // went to the box (B1113). Hidden stands where clip is not known.
+  // went to the box. Hidden stands where clip is not known.
   el.style.overflow = "hidden"; el.style.overflow = "clip";
   // Held at where it ends until its end has been drawn: a finished tween
   // lets go of the box, which stood back at its natural height (a job's row
   // with its log still in it) while `done` drew it shut, and a list redrawn
   // there (reflow) read the rows under it from that height and slid them up
-  // a second time (the operator, 25 Nov: a skip as a job folds).
+  // a second time (a skip as a job folds).
   el.style.height = to + "px";
   const anim = el.animate([{height: from + "px"}, {height: to + "px"}],
                           {duration: 180, easing: "ease"});
@@ -379,7 +378,7 @@ function slideDetails(el, willOpen){
 }
 // Whether a fold reads as open to a press: where its slide is headed while
 // one runs, since it is held open for the tween, else its own flag. Read as
-// open mid-slide, a second press to open a fold sliding shut shut it (B838).
+// open mid-slide, a second press to open a fold sliding shut shut it.
 function foldOpen(el){
   return el.dataset.slideTo && el.getAnimations().some(a => a.id === "fold" && a.playState === "running")
     ? el.dataset.slideTo === "1" : el.open;
@@ -404,7 +403,7 @@ function arriveBox(el){
 // its place (arriveBox), as one that goes folds away (leaveBox), so what is
 // under it rides down rather than jumping: the bell's and Home's Attention
 // rows, and the line that counts what was put away, which came in a moment
-// after the row it counts had gone (the operator, 23 Nov: Dismiss skipped).
+// after the row it counts had gone (Dismiss skipped).
 // The list's first drawing, and one written whole, is the list's own
 // arrival, and nothing in it unrolls on its own. What is new is told by
 // `id`, what an element is, never by the element: a patched draw keeps
@@ -421,7 +420,7 @@ function arriveNew(root, sel, id){
 
 // ...and a row that goes leaves the way a box arrives, backwards: it fades as
 // its height folds to nothing, the rows under it riding up rather than
-// jumping (the operator, 22 Nov: a dismissed row just disappeared). `done`
+// jumping (a dismissed row just disappeared). `done`
 // runs once it has gone, where the page then draws without it; a newer
 // draw meanwhile may take it first, which is the same end. Canceled (a
 // refusal putting the row back), it is whole again at once.
@@ -469,7 +468,7 @@ function swapBox(el, paint){
 
 // What a press just redrew in place (a chip narrowing a list, Cards or a
 // List, a group picked) fades in as a rail page does: the in-half of the
-// fade through, on the parts that changed (the operator, 17 Oct). Only for
+// fade through, on the parts that changed. Only for
 // a press: a redraw the poll makes is not a change of page and never fades.
 function fadeIn(els){
   if (noMotion()) return;
@@ -481,7 +480,7 @@ function fadeIn(els){
   }
 }
 
-// ...and the out-half (the operator, 18 Oct: a section, a person, a chip
+// ...and the out-half (a section, a person, a chip
 // and a view switched with a cut where the rail fades through). What is on
 // show is copied before the press redraws it; the copy goes back where it
 // stood, in the parent the redraw left (or drew again) there, so the page's
@@ -489,7 +488,7 @@ function fadeIn(els){
 // fades in. The copy is inert, has no ids and wears .fghost, which every
 // reader of the parts skips, and is the page's own (data-own), which a
 // patch landing while it fades steps over: matched by the key it was
-// copied with, it would be taken for the part it copies (R244).
+// copied with, it would be taken for the part it copies.
 function ghostOf(el){
   if (!el || !el.offsetParent) return null;
   return { g: el.cloneNode(true), r: el.getBoundingClientRect(), home: el.parentNode };
@@ -516,7 +515,7 @@ function ghostOut(w, home){
   setTimeout(gone, 400);
 }
 // A view switched over the same things (Full and Compact, Cards and Rows) as
-// one motion (the operator, 24 Nov: half way through the fade the boxes
+// one motion (half way through the fade the boxes
 // popped to their new size, everywhere a view switches). Each thing drawn
 // in both views keeps its box: it tweens from the size and place it had to
 // the ones it has, on the fold's tween, the old drawing fading out inside it
@@ -584,8 +583,8 @@ function morphThrough(pick, swap, key = e => e.dataset.key || ""){
 // list's redraw inside it leaves the moving to the press (reflow).
 let pressMoving = 0;
 // A list drawn again with its things in a new order, or some of them gone
-// or come, as the Spaces page's cards always have (the operator, 24 Nov:
-// the Library's cards jumped to their new places when an update sorted them
+// or come, as the Spaces page's cards always have
+// (the Library's cards jumped to their new places when an update sorted them
 // anew): `draw` redraws `root`, each thing (`sel`, named by `key`) that
 // moved slides there from where it was, and each new one fades in. Inside a
 // press's own motion it only draws.
@@ -611,8 +610,8 @@ function fadeThrough(pick, swap){
   try{ swap(); }finally{ pressMoving--; }
   const now = parts();
   // Each part drawn again in its place tweens from the height it had to its
-  // new one, on the fold's tween, as its drawing fades through (the
-  // operator, 24 Nov: a detail beside a list, a settings section, popped to
+  // new one, on the fold's tween, as its drawing fades through
+  // (a detail beside a list, a settings section, popped to
   // its new size half way through the fade). All read before any moves.
   if (was.length === now.length){
     const ends = now.map(el => el.offsetHeight);
@@ -625,7 +624,7 @@ function fadeThrough(pick, swap){
   fadeIn(now);
 }
 
-// A chip's press as a move (R192, the operator, 31 Oct): what the list holds
+// A chip's press as a move: what the list holds
 // on both sides of the press slides from where it stood to where it stands
 // now, what the chip leaves out fades away where it was, and what it brings
 // in fades up in its place, so the eye follows the list rather than finding
@@ -664,8 +663,8 @@ function chipMove(scope, items, swap){
     host.classList.remove("justpainted");
     host.querySelectorAll(".justpainted").forEach(e => e.classList.remove("justpainted"));
   }
-  // One after another, so nothing moves through anything on show (the
-  // operator, 23 Nov: a filter's rows slid across the ones fading in and
+  // One after another, so nothing moves through anything on show
+  // (a filter's rows slid across the ones fading in and
   // out, their words drawn over each other): what leaves fades first, then
   // what stays slides to its place, then what arrives fades up there. What
   // stays keeps its order, so the sliding rows never cross each other.
@@ -721,7 +720,7 @@ function chipMove(scope, items, swap){
 }
 
 // A change inside a project's card fades in what it brings to the face on
-// show (the operator, 26 Oct: a box opening on the card appeared with a cut):
+// show (a box opening on the card appeared with a cut):
 // the box opened, or the repositories coming back as it shuts. Only those,
 // never the face through a copy of it: the copy went out before the face
 // came in, and the card's own ground showed between them, a flicker. `el`
@@ -736,8 +735,8 @@ function faceFade(el, swap){
   if (face.isConnected) fadeIn(shown().filter(e => !was.has(e)));
 }
 
-// The marker on the item on show slides to the one pressed (the operator,
-// 17 Oct): the line under a sub-nav's tab and a notebook strip's, the bar
+// The marker on the item on show slides to the one pressed:
+// the line under a sub-nav's tab and a notebook strip's, the bar
 // beside the rail's group. One element per strip, put back when a draw
 // replaced the strip's contents, moved from where it last stood (kept by
 // `key`, so a group's sub-nav never slides from another group's) to the
@@ -762,7 +761,7 @@ function slideMark(box, key, vertical = false){
   if (m.style[dim] !== `${size}px`) m.style[dim] = `${size}px`;
   const was = SLIDE_MARKS[key];
   SLIDE_MARKS[key] = {at, size, el: m};
-  // Transform alone, so the compositor runs it (the operator, 18 Oct: the
+  // Transform alone, so the compositor runs it (the
   // notebook's line stuttered): the marker takes its new size at once and
   // its old size is a scale that eases to 1, rather than a width animated
   // on the main thread, which the view drawn on the same press held up.
@@ -773,8 +772,8 @@ function slideMark(box, key, vertical = false){
 }
 
 // A block a choice shows or hides (a hint under a tick, a field a switch
-// asks for), slid in or out over its height rather than cut (the operator,
-// 24 Nov: every reveal moves); nothing when it is already so.
+// asks for), slid in or out over its height rather than cut
+// (every reveal moves); nothing when it is already so.
 function slideShow(el, show){
   if (el && el.hidden === !!show) slideHidden(el, !!show);
 }
@@ -797,21 +796,21 @@ function slideHidden(el, willShow, after){
 
 // ---- a press that is taken -------------------------------------------------
 // A press's own work holds its button until it is done, and a button still
-// waiting after a moment wears the ring (the operator, 8 Nov: buttons that
+// waiting after a moment wears the ring (buttons that
 // answered nothing for a while read as missed). Its work is what the press
 // asked for, never what happened to start near it: a request sent while a
 // click is being handled (postJSON, getJSON) asks for the clicked button's
-// ring, and a click handler set on an element (every press's, since R244
+// ring, and a click handler set on an element (every press's
 // sets them as properties) holds it through the promise it returns, the
 // questions it asks on the way included. A poll that starts just after a
 // click on a slow link is the page's own and holds nothing.
 //
 // One mechanism for the three ways a press says it is taken: pressHold is
-// the ring, pressing() is a press that is also kept from being pressed again
-// while it runs, and busy() puts a word in the button's place, which the
+// the ring, pressing is a press that is also kept from being pressed again
+// while it runs, and busy puts a word in the button's place, which the
 // ring stands down for.
 const PRESS_SHOW_MS = 200;
-// ...unless the ring has no room (the operator, 13 Nov: where the wheel would
+// ...unless the ring has no room (where the wheel would
 // disrupt a small space, like the rail's icons, none pops up). A strip of
 // presses packed side by side, or one over another, is that by its shape: a
 // group on the rail or the phone's bar grew a third line and pushed every
@@ -819,7 +818,7 @@ const PRESS_SHOW_MS = 200;
 // the page arriving is the answer. Anywhere else the ring is tried and
 // taken back off if it made its button taller, or its row taller or wider
 // than its box: a row of buttons that just fits a phone. A filter band is no
-// such strip (the operator, 22 Nov: Check on the Library's band stayed dead
+// such strip (Check on the Library's band stayed dead
 // with no ring for seconds, once its buttons moved onto the search's line):
 // its buttons are tried as any other's are, the ring in the word's place.
 const PRESS_TIGHT = ".rail, .railbar, .railmore, .pseg, .nbtabs, .dockline, .chip, header";
@@ -831,8 +830,8 @@ function pressRing(b){
   // page has not positioned becomes its frame for as long as it wears it.
   if (getComputedStyle(b).position === "static") b.classList.add("ringrel");
   b.classList.add("working");
-  // Never bigger: not wider, not taller, and its row not pushed (the
-  // operator, 22 Nov); a button the ring would grow wears none.
+  // Never bigger: not wider, not taller, and its row not pushed;
+  // a button the ring would grow wears none.
   if (b.offsetWidth <= was.w && b.offsetHeight <= was.h
       && (!row || (row.offsetHeight <= was.rh && row.scrollWidth - row.clientWidth <= was.over))) return true;
   b.classList.remove("working", "ringrel");
@@ -856,7 +855,7 @@ function pressQuiet(b){
   for (const m of document.querySelectorAll(".modal:not([hidden]):not(.inline)")) if (!m.contains(b)) return true;
   return false;
 }
-// A pick shows on the click (the operator, 22 Nov: a press must never look
+// A pick shows on the click (a press must never look
 // as if nothing happened): a chip in its band, or a segment of a segmented
 // control, wears `on` before its handler's work, and its siblings let go.
 // One already on is left as it is, for a handler that lets it go itself.
@@ -956,9 +955,9 @@ function pressRun(el, e, fn){
 // the click, and a second press queued a second job or met a refusal of
 // "one at a time". The ring after a moment where it has room, and given back as
 // its markup has it at the end (pressBack): a surface the page patches
-// (R244) keeps the button the press began on, which a redraw during the
+// keeps the button the press began on, which a redraw during the
 // press may have drawn disabled, or made another button in its place. Put
-// an `await askYes()` BEFORE the call, so canceling leaves the button alive.
+// an `await askYes` BEFORE the call, so canceling leaves the button alive.
 async function pressing(btn, fn){
   if (!btn || btn.disabled) return undefined;
   btn.disabled = true;
@@ -977,8 +976,8 @@ function busy(btn, word){
   if (!btn) return;
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  // The ring in its word's place at once, the button its own size (the
-  // operator, 22 Nov: "Checking..." grew the button); the word is what a
+  // The ring in its word's place at once, the button its own size
+  // ("Checking..." grew the button); the word is what a
   // screen reader says of it while it runs, and the toast says it in full.
   // Where even the ring would grow it (pressRing), it is dead and says
   // nothing more.
@@ -997,7 +996,7 @@ function busy(btn, word){
 function unbusy(btn, word){
   if (!btn) return;
   busyOff(btn);
-  // A button a patched surface drew (R244) is given back as its markup has
+  // A button a patched surface drew is given back as its markup has
   // it now: the redraw the press brought may have drawn it with another
   // label (a branch switched to) or disabled, and the word kept from before
   // the press would undo that.

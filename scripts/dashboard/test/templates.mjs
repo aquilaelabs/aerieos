@@ -1,6 +1,6 @@
-// A page waiting on its data waits as itself (R218 step 16): its template is
+// A page waiting on its data waits as itself: its template is
 // laid out the way the page lands. Nothing held that, so a page whose layout
-// moved kept the template of the one before it (the operator, 17 Oct: Users
+// moved kept the template of the one before it (Users
 // waited as a table after it became a list beside a detail). Each page and
 // notebook view here is drawn loaded, then put back to its template with its
 // reads held, and the two outlines compared: the bar, the tiles, the status
@@ -14,7 +14,7 @@ const PAGES = [
   ['schedules', '#/jobs/schedules', 'schedData = null; renderSchedulesInto(0)'],
   ['nodes', '#/machines/nodes', 'nodesList = null; renderNodesInto(0)'],
   ['storage', '#/machines/storage', 'storageList = null; renderStorageInto(0)'],
-  // Installed (R172): its sections are the kinds with anything there, which
+  // Installed: its sections are the kinds with anything there, which
   // the fixture's node has one or two of; the template draws the four.
   ['installed', '#/machines/installed', 'inst = null; renderInstalledInto(0)', ['title:Coding agents', 'title:Toolchains', 'title:Tool packs', 'title:Services']],
   // Deploy is an undeployed node's alone, which is not known while it waits.
@@ -26,7 +26,7 @@ const PAGES = [
   // This machine is a node's with a GPU or Claude Code row to show, which
   // is not known while it waits; on a phone, where it is drawn it is the one
   // open section, so the list's table is folded under it.
-  // The Library (R170): its five sections are always drawn, so the template
+  // The Library: its five sections are always drawn, so the template
   // is the page. Its address is where #/build/toolchains and #/build/apps
   // land now, so those pages are not measured by address.
   ['library', '#/build/library', 'lib = null; renderLibraryInto(0)'],
@@ -49,7 +49,7 @@ const PAGES = [
 ];
 // A notebook view's template is what a project not yet read shows: the view
 // is drawn loaded on one project and waiting on another.
-// Every view of the notebook (the operator, 18 Nov: the Docker view waited
+// Every view of the notebook (the Docker view waited
 // as four tiles and a lone Containers, and lands as two and a bar).
 const VIEWS = ['briefing', 'roadmap', 'bugs', 'git', 'tests', 'analysis', 'design', 'artifacts', 'docker', 'vms', 'signing',
                'wiki', 'sessions', 'permissions', 'settings'];
@@ -123,21 +123,21 @@ const outline = sel => {
     card: card ? box(card) : null,
     // a part still on its way, saying so (its dots): not landed yet
     busy: !!first('.dots'),
-    // What the page is made of, not only whether it has a bar (R218, the
-    // operator 18 Oct: Containers and Nodes waited as pages they had
+    // What the page is made of, not only whether it has a bar
+    // (Containers and Nodes waited as pages they had
     // stopped being): the bar's parts in order (its picker with its word or
     // without, a search, Cards and List, its buttons), the jump bar, and
     // the titles of the sections on show. A notebook view's status line on
     // its control row counts as the row's words: a row waiting without them
     // and landing with them moved its buttons from beside the tiles to under
-    // them (the operator, 18 Nov).
+    // them.
     barSig: bar ? [...bar.children].filter(shown).map(e => e.matches('label.pick') ? (e.querySelector('.pickw') ? 'picker' : 'picker without its word')
       : e.matches('input') ? 'search' : e.matches('.pseg') ? 'a switch' : e.matches('.actbar') ? 'buttons'
       : e.matches('.nbsaidslot') ? 'words' : null).filter(Boolean).join(', ') : '',
     jump: !!first('.sectjump'),
     titles: [...root.querySelectorAll('details.sect > summary .t')].filter(shown).map(e => e.textContent.trim()).filter(Boolean),
     // ...and which of the page's own sections stand open: at a desk every
-    // one, on a phone one (the operator, 24 Nov: a phone's template stood
+    // one, on a phone one (a phone's template stood
     // them all open, and all but one folded away as the page came).
     opened: [...root.querySelectorAll('details.sect[open]')].filter(d => shown(d) && !d.parentElement.closest('details.sect'))
       .map(d => d.querySelector(':scope > summary .t')?.textContent.trim()).filter(Boolean),
@@ -178,7 +178,7 @@ const differ = (got, tpl, skip = []) => {
   return out.join('; ');
 };
 
-// A placeholder bar keeps the inset of what it stands for (B864: Home's
+// A placeholder bar keeps the inset of what it stands for (Home's
 // Last jobs had its bars on its card's edge): none within 6px of the edged
 // box it waits in.
 const onTheWall = sel => {
@@ -283,7 +283,7 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
     ok(!why, `the notebook's ${v} view waits as itself ${where}${why ? `: ${why}` : ''}`);
   }
   // A reload on a view draws that view's own template before anything is
-  // read, as a press does (B865: five plain rows, then the view's head).
+  // read, as a press does (five plain rows, then the view's head).
   for (const v of ['roadmap', 'bugs', 'tests', 'wiki']){
     const release = await hold(page), releaseStatus = await hold(page, /\/api\/status/);
     // Read as the page's own script finishes, before the first read could
@@ -303,7 +303,7 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
     await ready(page);
   }
   // The Projects page waits only at a reload, for the first status read:
-  // its template is R138's cards (R141), in the grid's columns, each with
+  // its template is the space cards, in the grid's columns, each with
   // the card's parts and its actions at the foot.
   {
     const cards = () => [...document.querySelectorAll('.pgrid .pcard')].filter(e => e.checkVisibility())

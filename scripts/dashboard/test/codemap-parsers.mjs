@@ -1,10 +1,10 @@
-// aerie map against real parsers (roadmap R158): what the map says about this
+// aerie map against real parsers: what the map says about this
 // tree, and about small trees in the languages babel and python cannot
 // read, checked against babel's parse of every .js and .mjs here and the
 // page's inline scripts, against python's own ast for every .py, and
 // against answers written by hand for TypeScript, JSX, Kotlin, shell, C and
 // PHP. A scanner regression is a red check here, rather than a gate that
-// quietly skipped the suite it needed (8 Oct: run by hand over thirteen
+// quietly skipped the suite it needed (run by hand over thirteen
 // projects, this found some twenty ways the map read code wrong).
 // No browser. Babel is the one inside Playwright's bundle; without it the
 // babel half says it was skipped, never that it passed.
@@ -15,7 +15,7 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
 const CODEMAP = `${REPO}/scripts/lib/codemap.py`;
-// The index as two files since format 5 (R228 step 16): what each file
+// The index as two files since format 5: what each file
 // calls and passes by name beside the rest, joined back here per file.
 const readIndex = root => {
   const idx = JSON.parse(readFileSync(join(root, '.bb-map', 'map5.json'), 'utf8'));
@@ -60,7 +60,7 @@ function truth(code, file) {
       if (par.type === 'AssignmentExpression' && par.left.type === 'MemberExpression' && !par.left.computed)
         return par.left.property.name;
       if (par.type === 'AssignmentPattern' && par.left.type === 'Identifier') {
-        // a parameter's default, destructured or not, is no definition (B601)
+        // a parameter's default, destructured or not, is no definition
         let up = path.parentPath;
         while (up && /^(AssignmentPattern|ObjectPattern|ArrayPattern|ObjectProperty)$/.test(up.node.type)) up = up.parentPath;
         return up && /Function|ClassMethod|ObjectMethod/.test(up.node.type) ? null : par.left.name;
@@ -146,7 +146,7 @@ if (!babel) {
        Object.keys(bad).length ? ': ' + Object.entries(bad).slice(0, 3).map(([f, b]) => `${f} ${show(b)}`).join(' | ') : ''}`);
   // The page's inline scripts, at their own lines: the head's, which reads
   // the theme before the first paint and begins the page's reads, and the
-  // one line that runs boot() (page-boot.js holds the rest since R9 step 5).
+  // one line that runs boot (page-boot.js holds the rest step 5).
   const page = 'scripts/dashboard/index.html';
   const html = readFileSync(join(REPO, page), 'utf8');
   const only = html.replace(/[^\n]/g, ' ').split('');
@@ -199,7 +199,7 @@ print(json.dumps(bad[:10] + [len(bad)]))
 }
 
 // ---- 3. the languages no parser here reads, answered by hand --------------------
-// Each was a way the map went wrong on a real project (B576 to B590). The
+// Each was a way the map went wrong on a real project. The
 // expected lines are the code's own, counted by hand and held here.
 const FIX = `${DIR}/codemap-parsers`;
 const fixture = {

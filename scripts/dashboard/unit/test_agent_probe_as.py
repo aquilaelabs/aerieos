@@ -1,6 +1,6 @@
 """The root agent asks a binary for its version as the account that owns
 it, as root only where the binary and every folder above it are root's
-alone, and as nobody otherwise (B523: a build or a session could replace
+alone, and as nobody otherwise (a build or a session could replace
 the toolchain store's java or its own claude, which root ran). The name is
 looked at once and the file it led to is what runs: a link in a store the
 jobs account writes could otherwise be pointed at a root-owned program for

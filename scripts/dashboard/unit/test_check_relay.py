@@ -1,8 +1,8 @@
-"""The stop hook's house-rule check (bb-check-relay, B759): it never waits for
+"""The stop hook's house-rule check (bb-check-relay): it never waits for
 a test run that holds the lock, since a session's own suites are what hold
 it, and a refused check is skipped rather than reported; and when it does
 block, the failing checks lead, not a tail of passing lint lines. Where the
-project's new asks cut a test run (B824), the checks run detached and the
+project's new asks cut a test run, the checks run detached and the
 stop goes through at once; the verdict is served on the next hand-back."""
 import time
 import json

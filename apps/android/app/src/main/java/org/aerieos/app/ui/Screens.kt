@@ -120,8 +120,8 @@ fun <T> load(key: Any?, fetch: suspend () -> T): Pair<Loaded<T>, () -> Unit> {
 }
 
 // Pull down to re-read, on every list: the gesture a phone expects, and the
-// only way to (the operator, 2 Oct: a Refresh button beside it said the same
-// thing twice). `reload` is a load()'s second half; the indicator shows while the
+// only way to (a Refresh button beside it said the same
+// thing twice). `reload` is a load's second half; the indicator shows while the
 // pull is held and goes when the fetch it started has landed.
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -139,7 +139,7 @@ fun Pull(loading: Boolean, reload: () -> Unit, content: @Composable () -> Unit) 
 
 @Composable
 fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) -> Unit) {
-    // Adding another AerieOS (R132) starts blank; the first sign-in
+    // Adding another AerieOS starts blank; the first sign-in
     // offers what was there before.
     var server by remember { mutableStateOf(if (adding) "https://" else store.server.ifBlank { "https://" }) }
     var user by remember { mutableStateOf(if (adding) "" else store.user) }
@@ -174,7 +174,7 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
                 try {
                     // What its https address is held to from now on, and the
                     // password traded for this phone's own token over it: the
-                    // password is kept nowhere (R290).
+                    // password is kept nowhere.
                     val pin = withContext(Dispatchers.IO) { Pins.learn(server.trim()) }
                     val got = Api.signIn(server.trim(), user.trim(), password, android.os.Build.MODEL ?: "a phone", code, pin)
                     val api = Api(server.trim(), user.trim(), "", got.token, pin)
@@ -191,7 +191,7 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
                 busy = false
             }
         }) { Text(if (busy) "Signing in" else "Sign in") }
-        // Said before the sign-in, not after (B273): over http the password
+        // Said before the sign-in, not after: over http the password
         // travels in the clear on this network, on every poll.
         if (server.trim().startsWith("http://"))
             Text("Over http the sign-in and every poll travel in the clear on this network; use https where the dashboard has it",
@@ -213,17 +213,17 @@ fun HomeScreen(store: Store, onAdmin: (Boolean) -> Unit, onWaiting: (Int) -> Uni
     val s = st.value
     if (s != null){
         onAdmin(s.obj("can").optBoolean("admin", false)); onWaiting(s.int("phone_asks"))
-        // The grants the page reads (R137): installing on a node is toolchains-write's.
+        // The grants the page reads: installing on a node is toolchains-write's.
         onTools(s.obj("can").optBoolean("toolchains-write", s.obj("can").optBoolean("admin", false)))
     }
     var find by rememberSaveable { mutableStateOf("") }
-    // The account's own session on each project, any agent's (R128): the
+    // The account's own session on each project, any agent's: the
     // name the server gives one is the prefix, then the agent's id and the
     // project as tmux spells it (Agents.kt).
     fun sessionOf(project: String) = ownSession(s, project)
     // The projects the account keeps on its sidebar, as the sidebar has
     // them; All shows the rest, and a search looks through every one. An
-    // archived one is out of sight (R119): folded at the foot under
+    // archived one is out of sight: folded at the foot under
     // Archived, as the Projects page has it, and found by a search.
     val listed = s?.arr("projects") ?: emptyList()
     val every = listed.filter { !it.bool("archived") }
@@ -254,7 +254,7 @@ fun HomeScreen(store: Store, onAdmin: (Boolean) -> Unit, onWaiting: (Int) -> Uni
                     Pill((if (a.id == "claude") "" else "${a.name} ") + sessionWord(row),
                          if (sessionWord(row) == "working") Warn else Ok)
                 }
-                // A real lock now (R119), no longer the archive flag.
+                // A real lock now, no longer the archive flag.
                 if (p.bool("locked")){ Spacer(Modifier.width(6.dp)); Pill(if (p.bool("locked_admin")) "locked by admin" else "locked", Warn) }
                 if (p.bool("archived")){ Spacer(Modifier.width(6.dp)); Pill("archived", Dim) }
             }
@@ -282,7 +282,7 @@ fun HomeScreen(store: Store, onAdmin: (Boolean) -> Unit, onWaiting: (Int) -> Uni
                 Mark(26.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    // Several controllers (R132): the one in front by name,
+                    // Several controllers: the one in front by name,
                     // and a tap on it lists the others.
                     if (pairings.size > 1 && here != null) {
                         Row(Modifier.clickable { pick = true }, verticalAlignment = Alignment.CenterVertically) {
@@ -398,7 +398,7 @@ fun ApprovalsScreen(store: Store) {
                         if (a.strs("env_keys").isNotEmpty()) Dim("and an env file setting " + a.strs("env_keys").joinToString(", "))
                         if (a.str("for").isNotBlank()) Dim("shown under ${a.str("for")}")
                     }
-                    // An edit of a release (R139): the notes it would put on
+                    // An edit of a release: the notes it would put on
                     // the page are the request, read before Allow.
                     if (kind == "release-edit" && a.str("detail").isNotBlank()) {
                         var open by remember(a.int("id")) { mutableStateOf(false) }
@@ -411,7 +411,7 @@ fun ApprovalsScreen(store: Store) {
                         OutlinedButton(onClick = { scope.launch { said = answer(api, a.int("id"), false); reloadPh() } }) { Text("Deny") }
                         // A phone's commands come one after another: the rest
                         // from this session run without asking until taken
-                        // back (the operator, 4 Oct).
+                        // back.
                         if (kind == "phone" || kind == "phone-use") {
                             Spacer(Modifier.width(8.dp))
                             OutlinedButton(onClick = { scope.launch { said = answer(api, a.int("id"), true, session = true); reloadPh() } }) { Text("This session") }
@@ -705,10 +705,10 @@ private fun InstallNewer(api: Api, apk: String, sha: String = "", url: String = 
                     dir.mkdirs()
                     dir.listFiles()?.forEach { it.delete() }
                     // The controller's own copy from its release when it holds
-                    // one (R272), else the one in AerieOS's dist/.
+                    // one, else the one in AerieOS's dist/.
                     val file = api.download(url.ifBlank { api.apkPath(apk) }, java.io.File(dir, apk))
                     // What arrived is what the dashboard named, or it is not
-                    // installed (B273): the download crosses the same network
+                    // installed: the download crosses the same network
                     // as the sign-in, and the installer checks nothing.
                     if (sha.isNotBlank()) {
                         val md = java.security.MessageDigest.getInstance("SHA-256")
@@ -838,7 +838,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
                     Text("This app is behind the dashboard", color = Warn, fontWeight = FontWeight.SemiBold)
                     Text("The dashboard serves API $serverApi and this build was written for ${BuildConfig.TARGET_API}. Some screens may show blanks until the newer app is installed" +
                         (if (m.str("apk").isNotBlank()) ": ${m.str("apk")}." else "."))
-                    // The newest signed build can be this very app (B625: dev.2414
+                    // The newest signed build can be this very app (dev.2414
                     // was offered to the phone running dev.2414, and Install it
                     // reinstalled it); then a newer one has to be built and signed.
                     val same = m.str("apk").isNotBlank() && m.str("apk").contains("-" + BuildConfig.VERSION_NAME.replace('+', '-') + "-")
@@ -886,7 +886,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
             }
             Switch(checked = turns, enabled = watch, onCheckedChange = { turns = it; watchSaid = "" })
         }
-        // R125: an ask in seconds rather than on Android's alarm, which an
+        // An ask in seconds rather than on Android's alarm, which an
         // idle phone stretches to nine minutes or more.
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -914,7 +914,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         val every = poll.trim().toIntOrNull()
         val pollOk = every != null && every in 10..300
-        // The lock (R133): the phone's own, so a phone with no screen lock
+        // The lock: the phone's own, so a phone with no screen lock
         // set has nothing to ask for, and the switch says so.
         SectionHead("Lock", inset = false)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -943,7 +943,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
         // this device, as the dashboard keeps its own per browser.
         SectionHead("Colors", inset = false)
         // Dark, Light or System beside the scheme, as the dashboard's gear
-        // has them (R50 step 16); each swatch shows the half that is on.
+        // has them; each swatch shows the half that is on.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (m in Schemes.modes)
                 androidx.compose.material3.FilterChip(selected = Schemes.mode == m,
@@ -974,7 +974,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
         Text("app ${BuildConfig.VERSION_NAME} api ${BuildConfig.TARGET_API}" +
             (if (m != null) "\ndashboard ${m.str("version").ifBlank { "unstamped" }} api ${m.int("api")}" else ""),
             color = Dim, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-        // The controllers this app is paired with (R132): the one in front
+        // The controllers this app is paired with: the one in front
         // marked, a tap on another switches, and Forget takes one off.
         SectionHead("Controllers", inset = false)
         val here = store.pairing
@@ -1017,7 +1017,7 @@ fun ToolsScreen(store: Store, mayTools: Boolean) {
     val (nd, _) = load("tools-nodes") { api.nodes() }
     val nodes = nd.value?.arr("nodes")
         ?.filter { it.str("kind") == "agent" && it.str("state") != "retired" } ?: emptyList()
-    // A node's store and never the controller's (B358): toolchains are
+    // A node's store and never the controller's: toolchains are
     // installed on nodes. The screen opens on the first node there is, and
     // asks nothing until it has one.
     if (nodes.none { it.str("id") == node }) node = nodes.firstOrNull()?.str("id") ?: ""
@@ -1142,7 +1142,7 @@ fun ToolsScreen(store: Store, mayTools: Boolean) {
             }
             Hairline()
         }
-        // The coding agents on the node (R95): Claude Code left the
+        // The coding agents on the node: Claude Code left the
         // toolchains for the Agents page and its own /api/agents, with
         // Codex CLI and Copilot CLI beside it. Install, Update or Remove,
         // under the same grant; a sign-in stays the dashboard's.

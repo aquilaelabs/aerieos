@@ -1,4 +1,4 @@
-"""The Windows companion kept current by its controller (R270 step 9): a
+"""The Windows companion kept current by its controller: a
 newer copy fetched only when the controller holds one, kept only when it
 matches the controller's sha256, and swapped in at the next start; a
 checkout never replaced."""
@@ -48,7 +48,7 @@ class Update(unittest.TestCase):
             p.stop()
 
     def test_an_update_is_held_to_the_releases_signed_list(self):
-        # B1168: the controller's sha256 alone was the check; the list's
+        # The controller's sha256 alone was the check; the list's
         # signature is checked here, with keys this copy carries.
         import base64
         import shutil
@@ -82,7 +82,7 @@ class Update(unittest.TestCase):
             self.assertIn("carries no release signer", update.proven(proof, "aerieos-companion-0.9.1.exe", sha))
 
     def test_a_later_dev_build_is_newer(self):
-        # B1171: -dev.N was ignored, so a dev companion never moved on.
+        # -dev.N was ignored, so a dev companion never moved on.
         from bbcompanion import update
         self.assertTrue(update.newer("0.9.0-dev.6312", "0.9.0-dev.6168"))
         self.assertTrue(update.newer("0.9.0", "0.9.0-dev.6312"), "the release above its dev builds")
@@ -134,7 +134,7 @@ class Update(unittest.TestCase):
 
 
 class Handshake(unittest.TestCase):
-    """R79 step 8: the app says which door and release it is on every call,
+    """The app says which door and release it is on every call,
     and says plainly when its controller's door is older than it needs."""
 
     def test_every_call_says_the_door_and_the_release(self):
@@ -175,7 +175,7 @@ if __name__ == "__main__":
 
 
 class SignIn(unittest.TestCase):
-    """https:// to a controller that serves plain HTTP is said as that, not as OpenSSL's words (B210)."""
+    """https:// to a controller that serves plain HTTP is said as that, not as OpenSSL's words."""
 
     def said(self, url, error):
         from bbcompanion import core
@@ -198,7 +198,7 @@ class SignIn(unittest.TestCase):
 
 
 class KeptPin(unittest.TestCase):
-    """R290 step 2: the companion holds the controller to what it met at
+    """The companion holds the controller to what it met at
     sign-in: a name's certificate by the system's authorities, else the key."""
 
     def ctl(self, scheme):

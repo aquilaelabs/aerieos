@@ -1,4 +1,4 @@
-"""What a session looks with (R95): one capture per source, shared by
+"""What a session looks with: one capture per source, shared by
 `aerie capture shot` and `aerie capture reel`. A source is anything that draws: a page Playwright
 opens, the running emulator's screen, an X display. A shot is that source
 at rest (frames a quarter second apart until a second of them match); a
@@ -8,13 +8,13 @@ As a program: `capture.py shot --emu [PKG] | --display :N [--settle|--now]
 [--drive FILE] [--mark] OUT` takes the picture, `capture.py mark FILE URL...`
 records a page's shot as a capture, `capture.py ls DIST` lists the
 captures under a project's dist/ and `capture.py prune DIST [--days N]
-[NAME...]` removes them (R96). BB_CAPTURE_FFMPEG is the ffmpeg binary,
+[NAME...]` removes them. BB_CAPTURE_FFMPEG is the ffmpeg binary,
 BB_CAPTURE_ADB the emulator's adb, BB_CAPTURE_NODE_PATH and BB_CAPTURE_CHROME what a
 page needs, BB_CAPTURE_AUTH the credential a dashboard page takes, BB_CAPTURE_TRUST
-the origins it may go to (the controller's, B143), and
+the origins it may go to (the controller's), and
 BB_CAPTURE_SCRATCH where the working files go.
 
-What stays and what goes (R96): dist/ is what a project ships and the
+What stays and what goes: dist/ is what a project ships and the
 Artifacts view lists it, so a capture leaves there only what a person reads
 (a reel's sheet.png and frames.json, a shot's png), each with a record of who
 asked and when, and the working files (the recording, the full-size frames)
@@ -65,7 +65,7 @@ def font():
 def maker():
     """Who asked and when, written into a capture's record so the Artifacts
     tab can say whose it is: the session's account (BB_ACCOUNT_NAME), else
-    the unix user, and the node (R96)."""
+    the unix user, and the node."""
     try:
         user = getpass.getuser()
     except (KeyError, OSError):
@@ -78,7 +78,7 @@ def scratch(name):
     """The working files' directory for one capture: the recording and the
     full-size frames live on this machine's own disk (BB_CAPTURE_SCRATCH,
     else /tmp/bb-capture-UID), never in dist/ on the share, which lists
-    what ships (R96). Made empty: a capture made again under the same name
+    what ships. Made empty: a capture made again under the same name
     starts over."""
     base = os.environ.get("BB_CAPTURE_SCRATCH") or os.path.join(
         os.environ.get("TMPDIR") or "/tmp", f"bb-capture-{os.getuid()}")
@@ -206,7 +206,7 @@ def in_front(adb, pkg):
     # ...and asked directly, since the window dump's wording moves between
     # releases: an app that is also the keyboard, up over its own setup
     # screen, read as not in front, and the launch took the keyboard down
-    # (report #68, B529). The input method service says whose keyboard is
+    # (report #68). The input method service says whose keyboard is
     # showing; the activity manager names the activity resumed on top.
     ime = run([adb, "shell", "dumpsys", "input_method"], timeout=20).stdout or ""
     cur = re.search(r"mCurMethodId=([\w.]+)/", ime)
@@ -221,7 +221,7 @@ def bring_up(adb, pkg):
     """Put PKG on the screen when it is not already there. Not when it is:
     a launch restarts its launcher activity, which takes down the dialog,
     the deep screen or the keyboard a session just drove into place, and
-    the shot came back with the app's front page instead (B387)."""
+    the shot came back with the app's front page instead."""
     if pkg and not in_front(adb, pkg):
         run([adb, "shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"], timeout=30)
 
@@ -237,7 +237,7 @@ def display_ready(display):
 def display_size(display):
     """The display's size from xdpyinfo or xdotool, whichever the node has,
     or "" for none: x11grab then takes the whole screen, where a guessed
-    size bigger than the screen failed the grab (B213)."""
+    size bigger than the screen failed the grab."""
     if shutil.which("xdpyinfo"):
         r = run(["xdpyinfo", "-display", display], timeout=10)
         m = re.search(r"dimensions:\s+(\d+x\d+)", r.stdout or "")
@@ -293,7 +293,7 @@ def at_rest(grab, settle=True, quiet=4, cap=6.0):
 
 
 # A timed touch for a drive script on the emulator ($BB_TOUCH tap|hold|glide,
-# touch.py): adb's input verbs are too slow to time a gesture (R101).
+# touch.py): adb's input verbs are too slow to time a gesture.
 TOUCH = f"python3 {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'touch.py')}"
 
 
@@ -359,7 +359,7 @@ def from_url(url, seconds, drive, work, page=None):
     shutil.rmtree(vdir, ignore_errors=True)
     os.makedirs(vdir)
     env = dict(os.environ, NODE_PATH=node_path)
-    # A session's token opens none of the controller's page (R227 step 4):
+    # A session's token opens none of the controller's page:
     # a reel of the controller's own address with nothing else to sign in
     # with says so, and the token goes to no page.
     auth, trust = os.environ.get("BB_CAPTURE_AUTH", ""), os.environ.get("BB_CAPTURE_TRUST", "")

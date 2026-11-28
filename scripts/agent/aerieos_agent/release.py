@@ -1,4 +1,4 @@
-"""Whether new agent code is AerieOS's own release (R227 step 1).
+"""Whether new agent code is AerieOS's own release.
 
 A node took its agent's update on a digest the controller named, so whoever
 held the controller could put any code on a node as root. A node that has
@@ -10,7 +10,7 @@ The key is pinned when the node is enrolled (`enroll --release-key HEX`, as
 the Enroll script carries it) or at the machine's own console afterwards
 (`aerieos-agent release-key HEX`), and is never taken from the
 controller's word on a running node. A spare may be pinned with it, after a
-comma (R232): an update signed by either is taken, so the key the builds
+comma: an update signed by either is taken, so the key the builds
 sign with can be replaced by the spare with no node cut off. A build from a
 branch carries no signature: a node its owner uses for those says so at its
 console (`aerieos-agent unsigned on`), which is kept in node.json like the
@@ -33,13 +33,13 @@ Ed25519, by the `cryptography` library the nodes are provisioned with
 (tokenseal.py's): nothing here is hand-built, and a node that pinned a key
 and lacks the library refuses the update rather than taking it unchecked.
 
-The tools root installs from the bundle are held by the bundle's list below
-(R267 step 28): the provisioner with the machine's own helper in it, the
+The tools root installs from the bundle are held by the bundle's list below:
+the provisioner with the machine's own helper in it, the
 helper that builds a session's view, the one that cuts a pack's install off
 the network and the provisioner's family files are files a release ships
 in it, and root keeps its copy of them only from a tar that list passed.
 
-So is everything else a release ships in the bundle (R267 step 6): aerie,
+So is everything else a release ships in the bundle: aerie,
 its library, the shipped catalog, the publishers' keys a download is checked
 against, the terminal's launcher and the hooks. The bundle carries the list
 of those files, a line each with its sha256 (nodes/bundle.list, the form of
@@ -152,7 +152,7 @@ def pinned(state):
 
 
 def spare(state):
-    """The spare release key pinned beside the first (R232): a pair whose
+    """The spare release key pinned beside the first: a pair whose
     private half is kept apart from the release build's, so the key a build
     signs with can be lost or replaced without a visit to every node."""
     return clean_key((state or {}).get("release_spare"))

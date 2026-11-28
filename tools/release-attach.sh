@@ -3,7 +3,7 @@
 # on that one release. GitHub's release-by-tag endpoint does not answer for
 # a draft, and `gh release view TAG` fell back to the drafts inconsistently:
 # v0.9.0-dev.4797 ended with two drafts, the apps on one and the OS image on
-# the other (2 Nov). So the release is looked up among every release, drafts
+# the other. So the release is looked up among every release, drafts
 # included, by its tag; created as a draft when there is none (a dev tag a
 # pre-release and never the latest); and each file is uploaded to it by its
 # id, an asset of the same name replaced. Every job that attaches a file
@@ -15,8 +15,8 @@
 # id, then each file as it lands. --notes and --title are used only when the
 # release is made here; a release that exists keeps its own.
 #
-# --publish-when-whole LIST is the seal's last step (seal-release.yml; the
-# operator, 11 Nov): a dev build's release goes out by itself, and only once
+# --publish-when-whole LIST is the seal's last step (seal-release.yml):
+# a dev build's release goes out by itself, and only once
 # every file LIST names (.release-files, @VER@ the version, * a pattern) is
 # on it, its signed list of files among them, which is made last. Two dev
 # builds were published by hand from the git host's own page minutes after
@@ -69,7 +69,7 @@ id="$(find_release || true)"
 [ -n "$id" ] || id="$(mend_untagged || true)"
 if [ -z "$id" ]; then
     pre=(--draft)
-    # Any name after the version is a pre-release: -dev.N, -rc.N (R218).
+    # Any name after the version is a pre-release: -dev.N, -rc.N.
     case "$tag" in v*-*) pre+=(--prerelease --latest=false) ;; esac
     if [ -n "$notes" ]; then
         gh release create "$tag" --repo "$repo" --verify-tag "${pre[@]}" --title "$title" --notes-file "$notes" >/dev/null
@@ -87,7 +87,7 @@ if [ -z "$id" ]; then
 else
     echo "release $id is $tag's"
     # A published release is what people downloaded: no file of it is
-    # replaced or added after (R290), whatever job asks. A re-run's files
+    # replaced or added after, whatever job asks. A re-run's files
     # go on a release cut again from a fixed commit.
     if [ "${#files[@]}" -gt 0 ] && [ "$(gh api "repos/$repo/releases/$id" --jq '.draft')" = false ]; then
         echo "release-attach: $tag is published, and a published release's files are not changed: cut another" >&2

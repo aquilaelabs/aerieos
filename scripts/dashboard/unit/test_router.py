@@ -1,4 +1,4 @@
-"""A model router on a node (R144 step 1, router.py): the keys kept sealed,
+"""A model router on a node (router.py): the keys kept sealed,
 the compose file with LiteLLM, its database and Ollama, a route per
 provider with a key, Deploy and Remove as a written container, a project
 allowed with a key of its own made at the router and handed to its
@@ -166,7 +166,7 @@ class Router(unittest.TestCase):
         self.assertEqual(router.seal_all(again=True) >= 3, True)
 
     def test_a_key_or_an_address_stays_inside_its_value(self):
-        # B536: written between bare quotes, a quote ended the value and a
+        # Written between bare quotes, a quote ended the value and a
         # newline in an address ended the inline config, adding compose keys.
         self.assertIn("one line", router.set_keys("n1", {"custom": [{"name": "lab", "base": "http://x\n  evil:\n    image: x"}]})["error"])
         self.assertIn("one line", router.set_keys("n1", {"providers": {"anthropic": "sk\nevil: 1"}})["error"])
@@ -206,7 +206,7 @@ class Router(unittest.TestCase):
         self.assertIn("ANTHROPIC_API_KEY: \"sk-ant-old\"", router.compose_text("n1", router.record("n1")), "opened by the previous key, sealed again under today's")
 
     def test_a_container_s_own_key_is_made_kept_read_back_and_dropped(self):
-        """R238 step 7: an app's router field takes a key of the container's
+        """An app's router field takes a key of the container's
         own, made once at the router, found again by its address, deleted
         with the container, and counted in the router's spend."""
         self.assertIn("not deployed", router.container_key("n1", "paperclip")["error"])
@@ -275,7 +275,7 @@ class Router(unittest.TestCase):
         self.assertEqual(router.refresh_spend("n1"), {"web": 1.25})
         self.assertEqual(router.spend_for("web"), 1.25)
         self.assertIsNone(router.spend_for("app"))
-        # A local model's tokens per second off the key's log (R144 step 3):
+        # A local model's tokens per second off the key's log:
         # the two ollama calls averaged (24 and 30), the hosted one left
         # out, a call with no tokens left out; and the walked mark.
         self.assertEqual(router.rate_for("web"), {"ollama/qwen2.5-coder:7b": 27.0})

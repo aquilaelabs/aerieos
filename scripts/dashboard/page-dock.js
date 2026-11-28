@@ -1,4 +1,4 @@
-// The dock (R218 step 4, the design's the-dashboard/dock): the foot of every
+// The dock (the design's the-dashboard/dock): the foot of every
 // page, holding the terminals and the chat. Shut it is one line, the open
 // terminals as tabs with their session dots, Chat, and + for a new shell;
 // up it takes the height kept for it (half the screen to begin with) and
@@ -31,7 +31,7 @@ function dockKeep(){
   }catch(e){ /* private mode */ }
 }
 
-// A terminal and the chat are the dock's (R250 step 2); every other tab is a
+// A terminal and the chat are the dock's; every other tab is a
 // page.
 const slotFor = t => t?.kind === "term" || t?.kind === "chat" ? 1 : 0;
 
@@ -116,7 +116,7 @@ function dockBar(){
       <button type="button" class="ic dx dclose" data-close="${esc(t.id)}" aria-label="close ${esc(names.get(t.id) || tabLabel(t))}"
         title="close: ends the session, asked first">×</button></span>`; }).join("");
   const t = tabOf(cur), chatOn = t?.kind === "chat";
-  // Chat first (the operator, 15 Oct): it is always there while terminals
+  // Chat first: it is always there while terminals
   // come and go, so it never scrolls off the start of the line.
   return `<div class="dockline" role="tablist" aria-label="the chat and terminals">
       <span class="dtab dchat${chatOn ? " on" : ""}${waiting ? " unread" : ""}"><button type="button" class="dlbl" data-dchat
@@ -133,8 +133,8 @@ function dockBar(){
 
 // An Any model session's tab says what its project has spent through the
 // router so far (the key is the project's, so the spend is), and for a
-// local model its tokens per second, as the router's log last measured it
-// (R144 step 3); nothing for the other agents, whose spend is their own.
+// local model its tokens per second, as the router's log last measured it;
+// nothing for the other agents, whose spend is their own.
 function dockSpend(t){
   const a = t.kind === "term" ? agentOfArg(String(t.arg)) : null;
   if (!a || a.agent.id !== "open") return "";
@@ -150,17 +150,17 @@ function dockSpend(t){
 function wireDockBar(bar){
   bar.querySelectorAll("[data-dock]").forEach(b => b.onclick = e => { e.stopPropagation(); if (!dockSwallow) dockShow(b.dataset.dock, true); });
   bar.querySelectorAll("[data-min]").forEach(b => b.onclick = e => hideTab(b.dataset.min, e));
-  // Close ends the session, as a middle click does (the operator, 17 Oct:
-  // minimize alone left no way to end one from its tab).
+  // Close ends the session, as a middle click does
+  // (minimize alone left no way to end one from its tab).
   bar.querySelectorAll("[data-close]").forEach(b => b.onclick = e => {
     e.stopPropagation();
     const t = tabOf(b.dataset.close);
     if (t) killSession(sessionOf(t.arg));
   });
   // A tab held and dragged takes a new place on the line (the strip's
-  // gesture, kept when the dock took its place: the operator, 17 Oct).
+  // gesture, kept when the dock took its place: the operator).
   // Set rather than added, as every handler here is: a redraw patches the
-  // line and keeps its tabs (R244), and one added again at each would
+  // line and keeps its tabs, and one added again at each would
   // start a drag twice.
   bar.querySelectorAll(".dtab[data-id] .dlbl").forEach(b =>
     b.onpointerdown = e => dockDragStart(e, b.closest(".dtab").dataset.id));
@@ -293,7 +293,7 @@ function dockDragEnd(){
 }
 
 // The terminal in front brought into view on the line, which scrolls inside
-// itself: with more tabs than fit, the one in front sat past its end (B740).
+// itself: with more tabs than fit, the one in front sat past its end.
 // Which one that was is the page's, not the bar's: a bar built anew forgot it
 // and put a line scrolled along back at the tab in front.
 let dockFront = "";
@@ -307,10 +307,10 @@ function dockReveal(bar){
     line.bbEdges.observe(line);
   }
   // The ends' arrows first, since putting one there moves the tabs by the
-  // line's gap (B318), then the tab brought into view, then the ends again.
+  // line's gap, then the tab brought into view, then the ends again.
   dockEdges(line);
   // Only when the tab in front changed: a line scrolled along by its arrow
-  // or a finger stays there while a session's dot moves (B322).
+  // or a finger stays there while a session's dot moves.
   const front = on?.dataset.id || "";
   const moved = front !== dockFront;
   dockFront = front;
@@ -327,16 +327,16 @@ function dockReveal(bar){
 }
 
 // The line fades at an edge with more tabs past it, one side at a time
-// (the operator, 16 Oct, as the strip it replaced did): hard against an
+// (as the strip it replaced did): hard against an
 // end, that edge shows a whole tab and is left sharp.
 function dockEdges(line){
   // ...and on a desk, an arrow at that end and a mouse's drag, as a row of
-  // big chips has (the operator, 24 Oct): the chips' own ends (chipsEdge).
+  // big chips has: the chips' own ends (chipsEdge).
   chipsEdge(line);
 }
 
 // The pane's classes and height for the dock's state, each draw.
-// ...and going down, it slides back into its line (the operator, 16 Oct),
+// ...and going down, it slides back into its line,
 // as it slid out of it: the page takes its shut layout at once, and the
 // dock, laid over it at the height it had, slides down until only its line
 // shows, then drops back into its row.

@@ -60,8 +60,8 @@ def _wire_nodes(m, path):
 def verdicts(m):
     """[(state, sentence)], one per node with a daemon. state is ok, FAIL or skip."""
     # The daemon is a node's (there is no DOCKER_HOST to read: the sandbox VM
-    # is a node record, docs/nodes.md §11), and there is no primary among them (the
-    # operator, 25 Sep): each node's daemon gets its own line, named, so a
+    # is a node record, docs/nodes.md §11), and there is no primary among them:
+    # each node's daemon gets its own line, named, so a
     # box with two nodes does not read one machine's silence as "the docker
     # daemon" being down. No node with one is not a fault to report red on
     # every run of a box that never wanted dev instances (noise is how a

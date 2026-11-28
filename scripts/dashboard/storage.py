@@ -1,4 +1,4 @@
-"""The Storage page (R169): what every node's disks hold, and whose.
+"""The Storage page: what every node's disks hold, and whose.
 
 The agent walks its disks once an hour (its storage.py) and the census
 carries the walk; this module turns those into the tab's answer for one
@@ -34,8 +34,8 @@ def node_view(n, may_see):
     hidden = {**other, "total": sum(other.values())} if any(other.values()) else None
     out = {"node": n["id"], "name": n.get("name") or n["id"], "live": n.get("live"),
             "host_only": bool((n.get("config") or {}).get("host_only")),
-            # The controller's own machine (R90) and its disks as the census
-            # lists them (R162 step 1): the Storage page's Disks section.
+            # The controller's own machine and its disks as the census
+            # lists them: the Storage page's Disks section.
             "own": bool((n.get("config") or {}).get("own")),
             "disks": (n.get("reported") or {}).get("disks") or [],
             "shares": (n.get("reported") or {}).get("shares") or [],
@@ -49,7 +49,7 @@ def node_view(n, may_see):
             "smb": bool((((n.get("reported") or {}).get("features") or {}).get("shares") or {}).get("smb")),
             "nfs": bool((((n.get("reported") or {}).get("features") or {}).get("shares") or {}).get("nfs")),
             "pools": (n.get("reported") or {}).get("pools") or [],
-            # Pools on its disks another machine made, to import (R163 step 1).
+            # Pools on its disks another machine made, to import.
             "pools_importable": (n.get("reported") or {}).get("pools_importable") or [],
             "zfs": bool((((n.get("reported") or {}).get("features") or {}).get("storage") or {}).get("zfs")),
             "measured": bool(st.get("at")), "at": int(st.get("at") or 0), "took_s": int(st.get("took_s") or 0),
@@ -58,10 +58,10 @@ def node_view(n, may_see):
             "workspace": st.get("workspace") or {}, "homes": st.get("homes") or {},
             "docker": st.get("docker") or {}, "slow": st.get("slow") or [],
             "projects": mine, "other": hidden,
-            # The phones of the projects this account sees (R123), whose
+            # The phones of the projects this account sees, whose
             # Remove the page offers where it may write on the node.
             "phones": [p for p in st.get("phones") or [] if may_see(p.get("project") or "")]}
-    # Its memory fence (R110 step 4): [max MB, used MB], null for none, and
+    # Its memory fence: [max MB, used MB], null for none, and
     # left out where the agent is too old to say.
     smp = (n.get("reported") or {}).get("sample") or {}
     return out | ({"fence": smp["fence"]} if "fence" in smp else {})
@@ -77,7 +77,7 @@ def view(nodes, who, *, is_admin, nodes_for, may_see, level_of):
     for n in nodeset.live_agents(nodes):
         if allowed is not None and n["id"] not in allowed:
             continue
-        # Whether it may measure this one (R260: Storage held node by node).
+        # Whether it may measure this one (Storage held node by node).
         out.append(dict(node_view(n, lambda name: is_admin(who) or may_see(who, name)),
                         may_measure=is_admin(who) or level_of(who, "storage", node=n["id"]) == "write"))
     write = is_admin(who) or level_of(who, "storage") == "write"

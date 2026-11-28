@@ -90,7 +90,7 @@ def section(script, until):
 # The three ways an agent is first fetched, each as the script runs it.
 PATHS = {
     "a managed node": (LINUX, "# ---- a GUEST node", "AGENT",
-                       ('    hdr="$(mktemp)"\n    # Tried again on a transient answer (B747), as the own node',
+                       ('    hdr="$(mktemp)"\n    # Tried again on a transient answer, as the own node',
                         '    chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"\n    svc_stop aerieos-agent')),
     "a guest": (LINUX, "# ---- a GUEST node", "agent",
                 ('    say "the agent, from ${CONTROLLER}"\n    local hdr want', '    chmod 755 "${agent}.new"; mv -f "${agent}.new" "$agent"')),

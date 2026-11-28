@@ -1,4 +1,4 @@
-"""A VM's hardware beyond its size (R100): CPU pinning, a memory ceiling it
+"""A VM's hardware beyond its size: CPU pinning, a memory ceiling it
 may balloon to, its network, a project folder shared in by virtiofs, and
 devices passed through from the host (USB, PCI, a GPU with its vBIOS).
 
@@ -60,7 +60,7 @@ def host_hw(sys_root="/sys"):
         if not (v and p) or _read(f"{d}/bDeviceClass") == "09":     # hubs are the host's own
             continue
         name = " ".join(x for x in (_read(f"{d}/manufacturer"), _read(f"{d}/product")) if x)[:80]
-        # What names it again after a replug or a reboot (R116): its serial,
+        # What names it again after a replug or a reboot: its serial,
         # and its port (bus-port.port, the physical socket) when two are
         # alike; and what the host does with it, which a Give refuses on.
         port = os.path.basename(d)
@@ -86,7 +86,7 @@ def host_hw(sys_root="/sys"):
             continue
         link = f"{d}/iommu_group"
         drv = f"{d}/driver"
-        # What the host itself needs of it (R116 step 4): the interface its
+        # What the host itself needs of it: the interface its
         # default route leaves by, a storage controller with a mounted disk
         # behind it, the USB controller a device the host uses hangs off.
         host = ""
@@ -105,7 +105,7 @@ def host_hw(sys_root="/sys"):
             "bridges": bridges(sys_root), "vnets": vnets(), "tpm": tpm_here()}
 
 
-# Devices held for VMs from boot (R163 step 16): each PCI address given to
+# Devices held for VMs from boot: each PCI address given to
 # vfio-pci before any driver of the host's can take it, as the machine a VM
 # came from held them, so a card the host would have taken is free when
 # the VM starts. A udev rule by address (driver_override), which a device
@@ -148,7 +148,7 @@ def hold_for_vms(addrs, sys_root="/sys", path=None):
     return held, said
 
 
-# What a VM's interface can be (R219 step 4, as the old system's form
+# What a VM's interface can be (as the old system's form
 # offers): the space's own network, the host's LAN, any bridge on the host
 # by name, or a libvirt network by name; and its model, from QEMU's list.
 NET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
@@ -189,7 +189,7 @@ def net_ok(net):
     kind, _, name = str(net or "").partition(":")
     # Never a container network's bridge (docker0, br-<id>), which the
     # listing leaves out: picked by name, it put a VM on another space's
-    # containers' network (R247 step 5).
+    # containers' network.
     return kind in ("br", "net") and bool(NET_NAME.fullmatch(name)) and not name.startswith("bbvm-") \
         and not (kind == "br" and DOCKER_BR.fullmatch(name))
 
@@ -242,7 +242,7 @@ def _lan_pci(sys_root="/sys"):
             for line in f.read().splitlines()[1:]:
                 p = line.split()
                 if len(p) > 3 and p[1] == "00000000" and int(p[3], 16) & 2:
-                    # A bridge (br0, R219) has no device: its port is the card.
+                    # A bridge (br0) has no device: its port is the card.
                     ports = sorted(glob.glob(f"{sys_root}/class/net/{p[0]}/brif/*"))
                     names = [os.path.basename(x) for x in ports] or [p[0]]
                     for n in names:
@@ -260,7 +260,7 @@ USB_PORT_RE = re.compile(r"\d{1,3}-[\d.]{1,20}")
 
 
 def usb_want(d):
-    """A device as the controller names one (R116): its vendor and product,
+    """A device as the controller names one: its vendor and product,
     its serial and its port; None when it is not that shape."""
     if not isinstance(d, dict) or not (USB_ID_RE.fullmatch(str(d.get("vendor"))) and USB_ID_RE.fullmatch(str(d.get("product")))):
         return None
@@ -297,7 +297,7 @@ def usb_same(a, b):
 
 
 def usb_hostdev(dev, by_address=False):
-    """libvirt's hostdev for one USB device (R116 step 3): by vendor and
+    """libvirt's hostdev for one USB device: by vendor and
     product, optional at the VM's start so a stick pulled out does not keep
     it from starting, and by its bus and device number too when the host
     has two alike, so the right one goes."""
@@ -452,7 +452,7 @@ def clean(hw, vcpus, mem_mb, project=""):
                 return None, "a shared folder is one of the space's own, under /workspace"
             # Where it really is: virtiofsd serves a link's target as root,
             # so a link to / or to another project's folder in the project's
-            # tree gave the VM that (B541). Resolved, inside the project's own
+            # tree gave the VM that. Resolved, inside the project's own
             # folder, and the resolved path is what the domain is given.
             root, real = os.path.realpath("/workspace/" + parts[2]), os.path.realpath(path)
             if real != root and not real.startswith(root + "/"):
@@ -544,7 +544,7 @@ def apply(xml, hw, vcpus, mem_mb, lan="", network="", vbios_dir="", fsd=""):
     if "net" in hw:
         nic = dev.find("interface")
         mac = nic.find("mac") if nic is not None else None
-        # On the LAN, a port on the host's bridge where it has one (R219);
+        # On the LAN, a port on the host's bridge where it has one;
         # a bridge or a libvirt network by name, as picked (step 4).
         net = hw["net"]
         kind, _, name = net.partition(":")
@@ -646,7 +646,7 @@ def read(xml):
     kind = nic.get("type") if nic is not None else ""
     br = src.get("bridge", "") if src is not None else ""
     vn = src.get("network", "") if src is not None else ""
-    # The LAN is the card's macvtap or the host's own bridge (br0, R219);
+    # The LAN is the card's macvtap or the host's own bridge (br0);
     # another bridge or a libvirt network is named, a space's is "project".
     out["net"] = ("lan" if kind == "direct" or (kind == "bridge" and br == lanbridge_name())
                   else f"br:{br}" if kind == "bridge" and br

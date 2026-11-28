@@ -1,7 +1,7 @@
 """An agent the vendor installs as a release folder (Codex CLI: bin/codex,
 bin/codex-code-mode-host, codex-resources) is pinned whole, with the command
-and its helpers links into it, so it finds its helpers beside itself (B247:
-only bin/codex was copied, and every command a Codex session ran failed).
+and its helpers links into it, so it finds its helpers beside itself
+(only bin/codex was copied, and every command a Codex session ran failed).
 
 What is pinned is read out of the account's home by a process of the
 account and written by root: root follows no name there, and what the
@@ -175,7 +175,7 @@ class ReadAsTheAccount(unittest.TestCase):
 
 
 class ReleaseRoot(unittest.TestCase):
-    """Only a link into a vendor's own folder pins a release whole (B262):
+    """Only a link into a vendor's own folder pins a release whole:
     Copilot CLI's binary IS the file in ~/.local/bin, and its "release" was
     the account's whole ~/.local."""
 

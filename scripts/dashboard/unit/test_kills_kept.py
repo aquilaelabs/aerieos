@@ -1,4 +1,4 @@
-"""A session's End is kept until its node takes it (R227 step 13): it was
+"""A session's End is kept until its node takes it: it was
 held in memory, so one pressed just before the controller restarted was
 forgotten and the row it took off the page came back. Kept in the store with
 when it was asked, taken once, and dropped when nobody took it in a day."""

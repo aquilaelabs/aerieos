@@ -1,20 +1,20 @@
 // The notebook's Bugs view: the tracker, its form, its sorts and Send to
 // Claude. One classic script beside index.html (docs/nodes.md §13): one file
-// per notebook view (R60). A factory makeNotebook calls per notebook.
+// per notebook view. A factory makeNotebook calls per notebook.
 
 "use strict";
 
-// A press handler set, not added (R244): a row drawn again is kept, and a
+// A press handler set, not added: a row drawn again is kept, and a
 // listener added on every draw would answer each press once per draw.
 function onPress(root, sel, fn){ const b = root.querySelector(sel); if (b) b.onclick = fn; }
 
-// Whether a report answers a search (R254 step 1): its number (B12 or 12)
+// Whether a report answers a search: its number (B12 or 12)
 // or any of its words, case aside. An empty search is all.
 function bugMatch(b, q){
   return idOrWords("b", b.id, () => ["title", "area", "repro", "expected", "actual", "notes", "status_note"].map(k => b[k]), q);
 }
 
-// What a report knows (R254 step 3), as facts in place of a dotted line:
+// What a report knows, as facts in place of a dotted line:
 // who reported it and when, the build it was seen in and on, when and how
 // it was closed, the build that closed it and the release that shipped
 // the fix (shippedIn, from the CHANGELOG's dated headings).
@@ -24,20 +24,20 @@ function bugFacts(b, rel, words, refs, untie = false){
   return factGrid([
     ["Reported", `${b.at ? rmDay(b.at) : ""}${b.by ? `, by ${byWho(b.by, b)}` : ""}`],
     ["Seen in", b.seen_in || ""], ["Seen on", b.seen_on || ""],
-    // Whether its steps show it (R124), from "not tried" up.
+    // Whether its steps show it, from "not tried" up.
     ["Happens", REPRO_WORDS[b.reproduces || "untried"] || ""],
     // The agent a report names is the one that reported it; which agent's
     // session closed it is not stored, so that one reads as Claude.
     ["Closed", closed ? `${words[b.status] || b.status}${b.closed_at ? ", " + rmDay(b.closed_at) : ""}${
       b.status_by ? `, by ${byWho(b.status_by)}` : ""}${b.status_note ? `: ${b.status_note}` : ""}` : ""],
-    // The commits that fixed it (R255), or the build it was closed in
+    // The commits that fixed it, or the build it was closed in
     // where none is named.
     ["Fixed in", closed ? (b.commits || []).join(", ") || b.fixed_in || "" : ""],
     ["Shipped in", shipped === null ? "not yet: planned for the next release" : shipped || ""],
     ["Changelog", clRefs(refs, untie), {html: true}]]);
 }
 
-// A fixed bug's answer for the release check (R255): a tied line, a line
+// A fixed bug's answer for the release check: a tied line, a line
 // naming its fix commit, or its notes saying why it needs none.
 const BUG_ANSWER = /(?:^|\n)(?:\[[^\]\n]*\]\s*)?Changelog:\s*(.+)/;
 const bugOwed = (b, refs) => b.status === "fixed" && !(refs || []).length && !BUG_ANSWER.test(b.notes || "");
@@ -45,7 +45,7 @@ const bugOwed = (b, refs) => b.status === "fixed" && !(refs || []).length && !BU
 // (roadmap.py's refs): drawn on the press until the answer brings its own.
 const bugTiedTo = words => ({in: "Unreleased", text: words, words, tied: true});
 
-// Whether a report's steps reproduce it (R124), in the order a reader
+// Whether a report's steps reproduce it, in the order a reader
 // weighs them: every time first, the ones nobody has tried last.
 const REPRO_ORDER = ["always", "sometimes", "once", "untried"];
 const REPRO_WORDS = {always: "always", sometimes: "sometimes", once: "once", untried: "not tried"};
@@ -97,7 +97,7 @@ function nbBugsView({$, nb, project}){
     },
   });
 
-  // A report changed on the press (the operator, 22 Nov: a press must never
+  // A report changed on the press (a press must never
   // look as if nothing happened): done to the page's own copy of the
   // tracker and drawn before the server answers, as nbPoster's opts.now.
   // `bug` changes a copy of the report, `refs` answers its changelog lines
@@ -176,7 +176,7 @@ function nbBugsView({$, nb, project}){
   // it lives, how to make it happen, and the gap between should and does.
   function bugForm(b){
     const v = k => esc(b?.[k] || "");
-    // One form (R301): the report's fields on the grid, the steps and the
+    // One form: the report's fields on the grid, the steps and the
     // notes across it, Cancel and the primary at the foot.
     const repr = `<div class="pseg bfRepr" role="radiogroup" aria-label="whether the steps reproduce it">${REPRO_ORDER.map(k => `<button type="button" data-repr="${k}" role="radio" class="${(b?.reproduces || "untried") === k ? "on" : ""}" aria-checked="${(b?.reproduces || "untried") === k}">${REPRO_LABELS[k]}</button>`).join("")}</div>`;
     return `<div class="memadd bugform">${formBox({fields: [
@@ -193,7 +193,7 @@ function nbBugsView({$, nb, project}){
       foot: [`<button type="button" class="stop bfCancel">Cancel</button>`, `<button type="button" class="primary bfGo">${b ? "Save the bug" : "Report it"}</button>`]})}</div>`;
   }
 
-  // The form's one-of-four (R124): a press moves the pick.
+  // The form's one-of-four: a press moves the pick.
   function reprPick(box){
     box.querySelectorAll(".bfRepr [data-repr]").forEach(b => b.onclick = () =>
       box.querySelectorAll(".bfRepr [data-repr]").forEach(x => {
@@ -211,13 +211,13 @@ function nbBugsView({$, nb, project}){
             notes: box.querySelector(".bfNotes").value};
   }
 
-  // Report a bug, the control row's primary (R109): its form unrolls under
+  // Report a bug, the control row's primary: its form unrolls under
   // the row, as every view's add does, and rolls back on Cancel or a send.
-  // Not drawn for a role that only reads the project (the operator, 21 Oct:
-  // what a role does not give is not advertised), and its form shut.
+  // Not drawn for a role that only reads the project
+  // (what a role does not give is not advertised), and its form shut.
   function drawBugAdd(){
     const box = $("bugAdd"), btn = $("bugNew");
-    // ...and the caret back on the press where it was in the form (R286).
+    // ...and the caret back on the press where it was in the form.
     const shut = () => { const back = box.contains(document.activeElement); swapBox(box, () => {
       box.innerHTML = ""; box.hidden = true; btn.setAttribute("aria-expanded", "false"); if (back) btn.focus(); }); };
     btn.hidden = !!projWriteWhy(project);
@@ -267,10 +267,10 @@ function nbBugsView({$, nb, project}){
     if (nb.bugs.releases !== undefined) nb.bugReleases = nb.bugs.releases;
     const rows = sortedBugs();
     const open = rows.filter(b => b.status === "open").length;
-    // The glance (R109): what is open, each severity among the open ones
+    // The glance: what is open, each severity among the open ones
     // from the worst, and what is closed, as tiles; the worst two in their
-    // colors while any is open. What the tracker is for is its empty state
-    // (R119 step 4), so an empty one draws none.
+    // colors while any is open. What the tracker is for is its empty state,
+    // so an empty one draws none.
     const sevN = s => rows.filter(b => b.status === "open" && b.severity === s).length;
     viewGlance(hint, !rows.length ? [] : [
       {label: "open", value: open},
@@ -282,7 +282,7 @@ function nbBugsView({$, nb, project}){
     const sortBar = $("bugSortBar");
     if (sortBar) sortBar.hidden = rows.length < 2;
     setHidden($("bugFind"), rows.length < 2 && !nb.bugFind);
-    // Narrowed by a chip (All, Open, Closed) and the search (R254 step 1).
+    // Narrowed by a chip (All, Open, Closed) and the search.
     nb.bugChip = ["", "open", "closed"].includes(nb.bugChip) ? nb.bugChip : "";
     // A press on any of the three bands moves the reports in this view.
     const view = () => $("bugList")?.closest(".nbview"), reports = "#bugList details.bug";
@@ -290,12 +290,12 @@ function nbBugsView({$, nb, project}){
                                          {key: "closed", label: "Closed", count: rows.length - open}], nb.bugChip, "data-bgchip"),
              "data-bgchip", view, reports, k => { nb.bugChip = k; drawBugs(true); });
     const q = (nb.bugFind || "").trim().toLowerCase();
-    // ...and by the release a report was seen in (the operator, 21 Oct).
+    // ...and by the release a report was seen in.
     const vers = versionChips(rows, b => b.seen_in, "Unknown");
     if (nb.bugVer && !vers.some(v => v.key === nb.bugVer)) nb.bugVer = "";
     chipBand($("bugVers"), chipButtons(vers, nb.bugVer, "data-bgver", undefined, "Any version"),
              "data-bgver", view, reports, k => { nb.bugVer = k; drawBugs(true); });
-    // ...and by whether it reproduces (R124).
+    // ...and by whether it reproduces.
     const reprN = k => rows.filter(b => (b.reproduces || "untried") === k).length;
     if (!REPRO_ORDER.includes(nb.bugRepr)) nb.bugRepr = "";
     chipBand($("bugRepro"), chipButtons(REPRO_ORDER.map(k => ({key: k, label: REPRO_LABELS[k], count: reprN(k)})),
@@ -307,10 +307,10 @@ function nbBugsView({$, nb, project}){
     const held = new Set([...list.querySelectorAll(".bug[open]")].map(d => d.dataset.id));
     // Only the rows on show are built, a page at a time (pageLimit): every
     // one of 795 built and all but 25 hidden was three seconds on a phone
-    // for each press of a chip (the operator, 17 Oct).
+    // for each press of a chip.
     const vis = rows.filter(shown);
     const lim = pageLimit(list, "bugList", vis.length);
-    // A role that reads the project and does not write it (B86): a report
+    // A role that reads the project and does not write it: a report
     // carries no verbs, and Report a bug says why above the list.
     const ro = projWriteWhy(project);
     drawHTML(list, vis.slice(0, lim).map(b => `
@@ -337,8 +337,8 @@ function nbBugsView({$, nb, project}){
               >Send to ${esc(sendAgent(project).name)}</button>
             <button type="button" class="bEdit">Edit</button>
             ${b.status === "open"
-              // Five at most on a bar, the rest behind More (R210): six
-              // were cut short at 344px (R254 step 7). Mark fixed stays on
+              // Five at most on a bar, the rest behind More: six
+              // were cut short at 344px. Mark fixed stays on
               // the bar, the other closes and Remove go under it, Remove
               // last as the one that cannot be undone.
               ? `<button type="button" class="bFix">Mark fixed</button>
@@ -346,7 +346,7 @@ function nbBugsView({$, nb, project}){
                    `<button type="button" class="bNa" title="it was real and stopped applying: the feature went away">Not applicable</button>`,
                    `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`])}`
               : b.status === "fixed"
-              // What the changelog says of it (R255) under More, Remove last.
+              // What the changelog says of it under More, Remove last.
               ? `<button type="button" class="bReopen">Reopen</button>
                  ${actMore([`<button type="button" class="bTie"${(nb.bugs.lines || []).length ? "" : ` disabled title="nothing is unreleased to tie it to"`}>Tie to a line</button>`,
                    `<button type="button" class="bLine">Write a line</button>`,
@@ -359,7 +359,7 @@ function nbBugsView({$, nb, project}){
           </div>`}
         </div>
       </details>`).join("")
-      // What the tracker is for, as its empty state (R119 step 4).
+      // What the tracker is for, as its empty state.
       || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this space.</div>`));
     paginate(list, ":scope > .bug", {key: "bugList", noun: "reports", total: vis.length, more: () => drawBugs()});
     wireMore(list);
@@ -370,7 +370,7 @@ function nbBugsView({$, nb, project}){
       // fires after the browser has already snapped it open.
       const sum = d.querySelector("summary");
       if (sum) sum.onclick = e => { e.preventDefault(); slideDetails(d, !foldOpen(d)); };
-      // The closing note typed in the row (R254 step 6), the box the Delete
+      // The closing note typed in the row, the box the Delete
       // below and the roadmap's drop open, not the browser's prompt: one
       // shape for every question this view asks, and one a phone lays out.
       // A close, a reopen, a tie and an untie are drawn on the press
@@ -391,7 +391,7 @@ function nbBugsView({$, nb, project}){
         () => ask("na", "What stopped it applying?", "Close: not applicable"));
       onPress(d, ".bReopen",
         () => postBug({action: "status", id, status: "open", note: ""}, {now: bugNow(id, {bug: bugClosed("open")})}));
-      // The changelog's half of a fixed bug (R255): kept in the notebook,
+      // The changelog's half of a fixed bug: kept in the notebook,
       // the public line naming its commits alone.
       d.querySelectorAll("[data-untie]").forEach(x => x.onclick = () => {
         const line = x.dataset.untie;
@@ -523,7 +523,7 @@ function nbBugsView({$, nb, project}){
         // away is the thing that would otherwise hold the redraw off.
         body.querySelector(".bfCancel").onclick = () => drawBugs(true);
         body.querySelector(".bfGo").onclick = async () => {
-          // Fixed in (R255): the commits added and taken off, written first
+          // Fixed in: the commits added and taken off, written first
           // so a refused hash leaves the form open to put right.
           const field = body.querySelector(".bfCommits");
           if (field){

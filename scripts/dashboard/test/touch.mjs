@@ -8,13 +8,13 @@ const page = await newPage(browser, { viewport: { width: 400, height: 700 }, has
 await page.goto(URL);
 await page.waitForFunction(() => typeof state !== 'undefined' && state && !document.body.classList.contains('booting'), null, { timeout: 40000 });
 // Where an element is, read in the one call that finds it, and waited for
-// until it has a box (B521): a handle taken first and measured after read
+// until it has a box: a handle taken first and measured after read
 // null when a poll's redraw replaced the element in between.
 const rectOf = sel => page.waitForFunction(s => { const e = document.querySelector(s);
   const r = e?.getBoundingClientRect(); return r && r.width && r.height ? { x: r.left, y: r.top, width: r.width, height: r.height } : null; },
   sel, { timeout: 10000 }).then(h => h.jsonValue());
 
-// On a phone the terminals are the dock's (R218 step 4): a tap on one on
+// On a phone the terminals are the dock's: a tap on one on
 // its line brings the sheet up with it, the whole height above the bottom
 // bar; the chevron puts it down; a page opened puts it down too.
 await page.evaluate(() => { for (let i = 0; i < 2; i++) newShell(''); dockToggle(false); });
@@ -32,7 +32,7 @@ await page.waitForFunction(w => panes[1] === w && dockUp, want, { timeout: 5000 
 ok(await page.evaluate(() => getComputedStyle(document.getElementById('pane0')).display === 'none'),
    "a tap on a terminal brings the dock's sheet up over the page");
 // Up, it is the full width of the screen, between the header and the
-// bottom bar, which stay (the operator, 16 Oct): measured once its slide
+// bottom bar, which stay: measured once its slide
 // up out of the line has ended.
 ok(await page.evaluate(() => getComputedStyle(document.getElementById('pane1')).animationName === 'dockUp'),
    '...sliding up out of its line as it opens');
@@ -43,7 +43,7 @@ const up = await page.evaluate(() => { const r = s => document.querySelector(s).
   const under = m.offsetParent ? m.getBoundingClientRect() : b;
   return { left: Math.round(d.left), right: Math.round(innerWidth - d.right), top: Math.round(d.top - h.bottom), foot: Math.round(under.top - d.bottom), bar: Math.round(b.height) }; });
 ok(!up.left && !up.right && !up.top && !up.foot && up.bar > 0, `...and up it spans the screen's width between the header and the bottom bar ${JSON.stringify(up)}`);
-// One line where two boxes meet, never two (the operator, 16 Oct): the
+// One line where two boxes meet, never two: the
 // header's over the dock, the bottom bar's under the Keys row.
 const meet = await page.evaluate(() => { const w = (s, side) => getComputedStyle(document.querySelector(s))['border' + side + 'Width'];
   return { dockTop: w('#pane1', 'Top'), keysFoot: w('#mobar', 'Bottom') }; });
@@ -62,7 +62,7 @@ ok(!box.left && !box.right && !box.top && !box.foot, `...and the page's box is f
 ok(await page.evaluate(() => getComputedStyle(document.querySelector('#pane1 > .bar')).borderBottomWidth === '0px'),
    "...and the dock's line shut on the bottom bar draws no second line under itself");
 // ...and shut, it slides back into its line, laid over the page, which has
-// its own layout at once (the operator, 16 Oct).
+// its own layout at once.
 await page.evaluate(() => dockToggle(true));
 await page.waitForFunction(() => !document.getElementById('pane1').getAnimations().some(a => a.playState === 'running'), null, { timeout: 5000 });
 const down = await page.evaluate(() => { dockToggle(false);
@@ -79,7 +79,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // ---- pull to refresh (page-pull.js) ---------------------------------------
 // The page scrolls inside its panes, so a phone browser's own pull never
 // fires; the page's does: a drag down from the top re-reads the dashboard,
-// and the header has no ↻ beside it any more (the operator, 2 Oct).
+// and the header has no ↻ beside it any more.
 await section("pull to refresh", async () => {
   ok(!(await page.$('header button[aria-label="refresh now"], #hdr button[aria-label="refresh now"]')),
      'the header carries no refresh button');
@@ -91,7 +91,7 @@ await section("pull to refresh", async () => {
   // after its list is first drawn, and its redraw replaces the rows: a
   // finger that came down on a row so replaced has its moves and its lift
   // sent to the row taken out, which never reached the page's listener on
-  // the document (B815, B831; the page hears them on the row since, B854).
+  // the document (the page hears them on the row since).
   // The page is still let finish its reads first, and a drag whose row went
   // mid-gesture is made again rather than counted.
   await page.evaluate(() => openNodesTab());
@@ -103,7 +103,7 @@ await section("pull to refresh", async () => {
   while (drags < 3 && !pulled){
     drags++;
     // On the list's first row, under the page's bar: since the search took
-    // the bar row over the list (the operator, 29 Oct), twenty pixels into
+    // the bar row over the list, twenty pixels into
     // the list was the search box, where a drag is the field's, not a pull.
     top = await page.evaluate(() => {
       const list = document.querySelector('.doctab.nodestab .doclist');
@@ -126,7 +126,7 @@ await section("pull to refresh", async () => {
   await page.evaluate(() => { window.__pulls = 0; });
   await finger(page, 200, top, 200, top + 30);
   ok(await page.evaluate(() => window.__pulls) === 0, '...and a short one does not');
-  // ...nor one that starts on a terminal's output (B411): the finger is
+  // ...nor one that starts on a terminal's output: the finger is
   // scrolling the terminal, which has its own scroll back, and the page
   // leaves it alone. Stood in for by a terminal's own box over the list.
   await page.evaluate(() => { window.__pulls = 0;
@@ -140,7 +140,7 @@ await section("pull to refresh", async () => {
 });
 
 // A dock tab held and dragged takes a new place on the line (the strip's
-// gesture, kept when the dock took its place: the operator, 17 Oct), and a
+// gesture, kept when the dock took its place: the operator), and a
 // quick swipe across the line scrolls it rather than picking a tab up. Each
 // terminal's tab carries Close beside minimize.
 await section("A dock tab held and dragged takes a new place on the line", async () => {
@@ -176,14 +176,14 @@ await section("A dock tab held and dragged takes a new place on the line", async
      '...and the tabs list keeps the new order');
   ok(await page.$$eval('#pane1 .dtab[data-id]', ts => ts.every(t => t.querySelector('[data-min]') && t.querySelector('[data-close]'))),
      "each terminal's tab carries minimize and close");
-  // Chat stays anchored at the line's start (the operator, 17 Oct): held,
+  // Chat stays anchored at the line's start: held,
   // it lifts nothing, and a terminal dragged past it lands after it.
   const first = () => page.evaluate(() => document.querySelector('#pane1 .dockline > .dtab')?.classList.contains('dchat'));
   const chat = await page.$eval('#pane1 .dtab.dchat .dlbl', e => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
   const before2 = await order(), t1 = await box(before2[1]), hash0 = await page.evaluate(() => location.hash);
   await finger(page, chat.x + chat.w / 2, chat.y + chat.h / 2, t1.x + t1.w - 4, t1.y + t1.h / 2, 700);
   ok(await first() && JSON.stringify(await order()) === JSON.stringify(before2), 'Chat held and dragged moves nothing: it is anchored');
-  // ...and the swipe at the line's start stays the line's (B820): it fell
+  // ...and the swipe at the line's start stays the line's: it fell
   // through to the browser's swipe-back and the page went back a page.
   ok(await page.evaluate(() => location.hash) === hash0, `...nor does the swipe take the page back (${hash0})`);
   const t1b = await box(before2[1]);

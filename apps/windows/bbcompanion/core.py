@@ -1,4 +1,4 @@
-"""The companion app's sync (R270 step 3): a folder on this machine kept in
+"""The companion app's sync: a folder on this machine kept in
 step with an AerieOS project, both ways, by the node agent's own sync
 (aerieos_agent.wssync), shared rather than copied, spoken through the
 device door (/api/v1/device/) with the person's device token.
@@ -98,7 +98,7 @@ class DeviceDoor:
 
 
 def lock_word(row):
-    """A project's lock as the list says it (R119), from its row on the
+    """A project's lock as the list says it, from its row on the
     device door: "" when it is not locked, ", locked" when the lock leaves
     this account in (its owner's own), ", locked against you" when it holds
     this account out, which the controller keeps read-only."""
@@ -190,7 +190,7 @@ class Companion:
     def _lending(self):
         """Lend this PC's verbs to its projects while the app runs: a long
         poll on the door for what sessions ask, each run on its own thread
-        (a build is long), its result posted back (R270 step 6)."""
+        (a build is long), its result posted back."""
         lent = {p: pc.lent_verbs(c) for p, c in self.lend.items()}
         lent = {p: v for p, v in lent.items() if v}
         while lent and not self.stopped.is_set():
@@ -216,7 +216,7 @@ class Companion:
 
     def _updates(self):
         """A look for a newer app at start and once a day, and at once when
-        the door says this one is too old (R270 step 9)."""
+        the door says this one is too old."""
         while not self.stopped.is_set():
             try:
                 self.update = update.check(self.door.ctl)
@@ -267,7 +267,7 @@ def sign_in(url, username, password, name, pin=""):
 
 
 def kept_pin(ctl):
-    """What this PC holds the controller to from now on (R290 step 2),
+    """What this PC holds the controller to from now on,
     from the sign-in's own connection: over https, the name's certificate
     by the system's authorities where it is one (a Let's Encrypt name, an
     edge in front), else the key the controller met at sign-in, so a

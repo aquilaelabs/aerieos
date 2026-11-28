@@ -1,4 +1,4 @@
-"""A node's projects as a synced copy (R162): the controller's wssync.py and
+"""A node's projects as a synced copy: the controller's wssync.py and
 the agent's, end to end in one process, over a connection that hands each
 call to the controller's module the way channel.py would."""
 import hashlib
@@ -156,7 +156,7 @@ class Sync(unittest.TestCase):
         return os.path.join(self.tmp, k, "workspace", "alpha", rel)
 
     def test_a_node_cannot_plant_what_git_runs_on_the_controller(self):
-        """B618: the controller runs git in every tree, and git runs what its
+        """The controller runs git in every tree, and git runs what its
         config and hooks name, so a node's write of either is refused and
         audited; an ordinary config change (an upstream) still lands."""
         def put(rel, body=b"", link=""):
@@ -182,7 +182,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(code, 200, out)
         self.assertEqual(read(f"{self.ws}/alpha/.git/config"), fine.decode())
         self.assertEqual(put("src/link", link="../a.txt")[1], 200, "a link inside the space is fine")
-        # B531: a link to "." reads harmless, and a link under it to ".."
+        # A link to "." reads harmless, and a link under it to ".."
         # read as inside by its path landed at the top and named the parent.
         self.assertEqual(put("p", link=".")[1], 200)
         out, code = put("p/q", link="..")
@@ -191,7 +191,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(put("p/escaped.txt", b"x")[1], 200, "a file through a link inside the space lands inside it")
 
     def test_a_git_config_the_controller_already_holds_comes_back_as_already_so(self):
-        """B732: the controller writes the project's own credential helper
+        """The controller writes the project's own credential helper
         into its config and the sync carries that down, so the node sending
         the same bytes back is not planting anything; refused, the file
         stayed pending on every tick and every push from the node was
@@ -284,7 +284,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(ctl_sync.projects("n1")["reads"], {"beta": ctl_sync.rev_of("beta")})
 
     def test_nothing_is_copied_while_the_share_is_still_mounted_there(self):
-        # A node moving off the share (R163) hears it is synced before its
+        # A node moving off the share hears it is synced before its
         # storage apply has unmounted /workspace: it waits, and says why.
         real = os.path.ismount
         root = self.n["n1"].root
@@ -309,7 +309,7 @@ class Sync(unittest.TestCase):
         self.assertEqual((sorted(got["projects"]), sorted(got["reads"])), (["alpha"], ["beta"]))
 
     def test_a_second_accounts_worktree_goes_both_ways(self):
-        # B615: a worktree the controller holds comes down to the project's
+        # A worktree the controller holds comes down to the project's
         # nodes, one made on a node goes up, and its .git line is each
         # side's own, never sent.
         wt = f"{self.ws}/.worktrees/alpha/u_12345678"
@@ -335,7 +335,7 @@ class Sync(unittest.TestCase):
                       "a worktree is its space's nodes' alone")
 
     def test_a_nodes_index_wins_over_one_refreshed_here(self):
-        # B617: git status on the controller rewrote .git/index; the node's
+        # Git status on the controller rewrote .git/index; the node's
         # own index after a commit then lost to it and came back stale.
         write(f"{self.ws}/alpha/.git/index", "index before\n")
         self.turn("n1")
@@ -393,7 +393,7 @@ class Sync(unittest.TestCase):
 
     def test_a_whole_pass_opens_the_tree_as_its_owner_and_the_agents_records_as_root(self):
         # The sync does a tree's file work as the tree's owner and its own
-        # records as root (R240). One place missed the second half (13 Nov):
+        # records as root. One place missed the second half:
         # a removal goes up as an empty file kept beside the records, it was
         # written as the owner, refused, and no removal reached the
         # controller. A suite's node is not root, where the two brackets
@@ -516,7 +516,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "offline\n")
 
     def test_one_path_that_cannot_be_sent_stops_nothing_after_it_and_is_said(self):
-        # B806: an exception in one path's put ended the pass, the path was
+        # An exception in one path's put ended the pass, the path was
         # not counted, and every change sorted after it waited unsaid.
         self.turn()
         s = self.n["n1"]
@@ -544,7 +544,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(s.status()["alpha"]["error"], "")
 
     def test_many_removals_go_up_in_one_call(self):
-        # B789: after a git gc a tick holds thousands of removals, one
+        # After a git gc a tick holds thousands of removals, one
         # request each; they go together, and each is applied.
         self.turn()
         os.makedirs(self.at("n1", "src/many"), exist_ok=True)
@@ -600,7 +600,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(node_sync.MAX_FILE, ctl_sync.MAX_FILE)
 
     def test_claude_codes_worktrees_are_not_synced(self):
-        # B68: an agent's worktree under .claude/worktrees has a .git file
+        # An agent's worktree under .claude/worktrees has a .git file
         # the controller refuses, which held the whole project behind.
         for side in (node_sync, ctl_sync):
             self.assertTrue(side.skipped(".claude/worktrees/agent-1/.git"))

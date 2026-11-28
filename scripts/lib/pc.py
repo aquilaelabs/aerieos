@@ -1,5 +1,5 @@
 """Behind `aerie pc` (cmd_pc in bb): a person's Windows PC lent to this project
-by the Windows companion (R270 step 6). A fixed table of verbs, each run on
+by the Windows companion. A fixed table of verbs, each run on
 the PC as its person set it up there, under the project's Agents may: Use a
 lent PC; never a command string.
 

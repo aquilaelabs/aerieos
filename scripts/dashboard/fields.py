@@ -1,7 +1,7 @@
-"""A request body's fields, read one way (R77).
+"""A request body's fields, read one way.
 
-Every handler read its fields through the server's field(), and when a
-handler's logic moved into its module (a gate plus one call, R77) the
+Every handler read its fields through the server's field, and when a
+handler's logic moved into its module (a gate plus one call) the
 module needed the same reader. One copy here rather than one handed to
 each: no imports from the rest of the dashboard, so a module bb loads by
 path can use it too.

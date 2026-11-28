@@ -1,4 +1,4 @@
-"""Static routes on a node (the operator, 7 Oct): every network backend the
+"""Static routes on a node: every network backend the
 agent drives renders a node's routes beside its address, in either mode,
 and dhcpcd, which has no setting for one, refuses them by name rather than
 dropping them. What each file says, read back as text."""

@@ -1,4 +1,4 @@
-"""A project's file access over FTP (ftp.py, R151): the settings' checks,
+"""A project's file access over FTP (ftp.py): the settings' checks,
 what a node is told to run, the login the node relays, and who may set it
 (the ftp grant, named only)."""
 import json
@@ -40,7 +40,7 @@ class Ftp(unittest.TestCase):
                 "bob": {"uid": "u_4", "role": "user", "projects": ["beta"], "password": pw},
             }
             users._save(d)
-        # Since R152 an account holds what its roles give, and since R155 a
+        # An account holds what its roles give, and a
         # role on a project is given on it: ann's on alpha lets her in.
         roles.set_role("member", "projects", {"projects": "write", "files": "write"})
         self.nodes = {"alpha": "n1", "beta": "n1", "gamma": "n2"}
@@ -65,7 +65,7 @@ class Ftp(unittest.TestCase):
         self.assertEqual(ftp.save("gamma", {"on": True}, "boss")[0]["port"], 2121)
 
     def test_kept_on_for_a_while_then_off_by_itself(self):
-        # R196 (the operator, 1 Nov): on for an hour, then off, said in the
+        # On for an hour, then off, said in the
         # audit and told to the node so its server stops.
         import time
         v, code = ftp.save("alpha", {"on": True, "for": 3600}, "boss")
@@ -135,7 +135,7 @@ class Ftp(unittest.TestCase):
         self.assertEqual(ftp.login("n1", "alpha", "ann", "password1", "a")["access"], "")
 
     def test_an_account_with_two_factor_gives_its_code_after_its_password(self):
-        # B723: its password alone opened its files over FTP.
+        # Its password alone opened its files over FTP.
         class Mfa:
             used = []
 
@@ -148,7 +148,7 @@ class Ftp(unittest.TestCase):
                 cls.used.append((uid, code))
                 return code == "123456"
 
-            # The account's hold on wrong codes, the web sign-in's (R288).
+            # The account's hold on wrong codes, the web sign-in's.
             missed_by = []
 
             @classmethod
@@ -174,7 +174,7 @@ class Ftp(unittest.TestCase):
         self.assertEqual(ftp.login("n1", "alpha", "adm", "password1123456", "10.0.0.5")["access"], "")
         self.assertNotIn(("u_2", "123456"), Mfa.used, "a code is asked of an account that has a second factor, and no other")
         # A wrong code counts against the account's hold, and a held account
-        # is refused before its code is read (R288).
+        # is refused before its code is read.
         self.assertEqual(Mfa.missed_by, [("acct:u_3",)])
         for _ in range(2):
             ftp.login("n1", "alpha", "ann", "password1000000", "10.0.0.6")
@@ -224,7 +224,7 @@ class Ftp(unittest.TestCase):
         # Only the ports this test holds are asked for real: in a whole unit
         # run, another module's server listening in the same ten read as
         # this one's, and the save named it or was refused where it should
-        # pass (B968).
+        # pass.
         real = ftp._answers
         mine = {held, held - 3}
         self.addCleanup(setattr, ftp, "_answers", real)

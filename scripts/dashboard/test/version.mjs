@@ -171,7 +171,7 @@ print(json.dumps(m.release('relproj', **json.loads(${
 // the MERGE commit on the default branch, while the checkout stays on the
 // branch that was merged. Releasing there tags a commit no image was ever
 // built from, and leaves the build that did ship reading -dev forever, which
-// is what would have happened to 0.5.0, measured (B94).
+// is what would have happened to 0.5.0, measured.
 //
 // A real bare remote rather than a stub: the whole question is what
 // origin/HEAD points at and whether HEAD is behind it, and a fake answer to
@@ -369,7 +369,7 @@ await section("An entry goes under a category, and the tool is where a session l
      && body.indexOf('### Fixed') < body.indexOf('### Upgrading'),
      "a space's own category is kept as typed and goes on the end, while the six keep their usual order among themselves");
   // The verb stamps HEAD, and an entry that names HEAD itself was written
-  // with the hash twice (B336): a stamp typed on the end is the entry's own.
+  // with the hash twice: a stamp typed on the end is the entry's own.
   const head = execFileSync('git', ['-C', Y, 'rev-parse', '--short=7', 'HEAD'], { env }).toString().trim();
   yb('changelog', 'add', `Named its own commit (${head})`, '--cat', 'Fixed');
   const once = readFileSync(`${Y}/CHANGELOG.md`, 'utf8').split('\n').find(l => l.includes('Named its own commit'));
@@ -631,8 +631,8 @@ await section("categories: the shape a changelog reader already knows", async ()
      'the numbered list names each category, an uncategorised line above them all, and counts straight through');
   cl('rm', numOf('LOOSE'));
 
-  // The limit is on what is being written, not on what the file holds
-  // (B352): a line longer than it, there by hand, refused every add after
+  // The limit is on what is being written, not on what the file holds:
+  // a line longer than it, there by hand, refused every add after
   // it in words that blamed the new line, and the verbs could not shorten
   // it either, since each of them writes the whole section.
   const long = 'LONGLINE ' + 'a line that ran on '.repeat(60);
@@ -968,7 +968,7 @@ await ready(page);
 await page.evaluate(() => openNotebook('alpha'));
 await page.waitForSelector('#roadmapList, .nb', { timeout: 20000 });
 await nbGo(page, 'artifacts', NB);
-// One section open at a time in a notebook (the operator, 5 Oct): Build is
+// One section open at a time in a notebook: Build is
 // first, so Version is opened.
 await page.waitForSelector(`${NB} [data-sect="artifacts:version"]`, { timeout: 20000 });
 await openFold(page, `${NB} [data-sect="artifacts:version"]`);
@@ -1006,7 +1006,7 @@ await section("Build and Version are sections of this tab, and a shut one still 
 // The SHAPE, and the ordinal against git rather than against a literal. The
 // ordinal is the commit count, and alpha is the shared fixture: an earlier
 // file in a full run commits into it, so a hardcoded 3 was right when this
-// file ran alone and wrong when it ran after git.mjs (B85). What the
+// file ran alone and wrong when it ran after git.mjs. What the
 // assertion is actually about is that the line is the version, built from the
 // target, the count and the sha.
 await section("The SHAPE, and the ordinal against git rather than against a literal", async () => {
@@ -1056,7 +1056,7 @@ ok(!execFileSync('git', ['-C', A, 'status', '--porcelain'], { env }).toString().
 // The policy is the answer to "when should this be incremented" for a
 // session: the operator decides how much of the decision to delegate. The
 // Version section says it and opens the Permissions view, where it is set
-// beside every other dial (R223); that view writes it with the same call.
+// beside every other dial; that view writes it with the same call.
 ok(await page.$eval(`${NB} #verBox .verpol`, e => /Agent access/.test(e.textContent) && !!e.querySelector('[data-verpolgo]')),
    'the Version section says the agent\'s access and offers Change on Permissions');
 const polSet = await page.evaluate(async () => (await postJSON('/api/version', {project: 'alpha', action: 'policy', policy: 'minor'})).error || 'written');
@@ -1093,7 +1093,7 @@ NB = nb('beta');
 // same thing initWith below works around.
 let polOpts = [];
 for (let t = 0; t < 30 && !polOpts.length; t++){
-  // Move the version is a dial on the Permissions view (R223), its first
+  // Move the version is a dial on the Permissions view, its first
   // choice on a repository the space's own (inherit), left out here.
   polOpts = await page.$$eval('#rnGateVersion option',
                               os => os.map(o => o.value).filter(v => v !== 'inherit')).catch(() => []);
@@ -1167,7 +1167,7 @@ await initWith('v1.2');
 await quiet(400);
 ok(!existsSync(`${B}/VERSION`), 'a malformed starting version is refused, not written');
 // ...by the server too, not only by the page's pattern, which sends nothing
-// for it (B820): asked directly, it says no and writes nothing.
+// for it: asked directly, it says no and writes nothing.
 // Asked from here, not the page, whose console would carry the refusal.
 const malformed = await call('/api/version', { project: 'beta', action: 'init', value: 'v1.2', component: '' });
 malformed.body = malformed.body || {};
@@ -1331,7 +1331,7 @@ await section("the editor: the arrangement is a gesture, not a file to hand-edit
 
   const arranged = await shape();
   // A mark on a row the editor drew before the Save: a redraw from the
-  // answer replaces the rows, so the mark going is the proof it drew (B820).
+  // answer replaces the rows, so the mark going is the proof it drew.
   await page.$eval(`${NB} .clog .clrow`, r => { r.dataset.beforeSave = '1'; });
   await page.click(`${NB} .clog #clSave`);
   await until(async () => /saved/.test(
@@ -1477,7 +1477,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
 // A project may carry its version somewhere else, and a bump that moves one
 // and not the other commits a lie. AerieOS is the case: its minor IS the
 // compatibility window, written again in the agent, and 0.5.0 only came out
-// consistent because a person moved both by hand before pressing Bump (B91).
+// consistent because a person moved both by hand before pressing Bump.
 //
 // The hook is generic (an executable tools/version-stamp, run from the repo
 // root with the new version and the part), so this exercises the mechanism on
@@ -1495,7 +1495,7 @@ await section("a repo's own stamps travel with the number", async () => {
   chmodSync(`${S}/tools/version-stamp`, 0o755);
   execFileSync('git', ['-C', S, 'add', '-A'], { env });
   execFileSync('git', ['-C', S, 'commit', '-qm', 'first'], { env });
-  registerProject('stampproj');      // made here, not by create (R154)
+  registerProject('stampproj');      // made here, not by create
   setPolicyFor('stampproj', 'minor');
   const sb = (...a) => { try {
       return { out: execFileSync('bash', [BB, 'version', ...a], { cwd: S, env }).toString(), code: 0 };
@@ -1543,10 +1543,10 @@ await section("a repo's own stamps travel with the number", async () => {
   ok(undone.includes('stamped.txt') && undone.includes('VERSION'),
      `...in one commit, the way it went (${undone.join(', ')})`);
 
-  // ---- what a window move costs, before it is pressed (B92) --------------
+  // ---- what a window move costs, before it is pressed --------------
   // One project can move the compatibility window: the one whose checkout IS
   // AerieOS. What that window holds, now a session's briefing is assembled
-  // per session and cannot be from another one (R63 step 3), is a node's
+  // per session and cannot be from another one, is a node's
   // AGENT: every project bound to a node is held until that node is updated,
   // and the sessions on it end. Nothing said so before the button was pressed.
   // The two files that move the window are the test, rather than a project's
@@ -1595,7 +1595,7 @@ ok(/no session is running/.test(askDead.error || ''),
 ok((await page.errors).every(e => /400/.test(e)),
    '...and the only failed request afterwards is the refusal just asked for');
 
-// ---- where a bump lands (B338) -----------------------------------------------
+// ---- where a bump lands -----------------------------------------------
 // A bump commits on whatever branch the checkout is on and never pushes, and
 // that stays. What a project released from main met was the row not saying
 // so: it was bumped to 0.8.0 on a branch already merged into main, unpushed,
@@ -1623,9 +1623,9 @@ await section("where a bump lands", async () => {
   g('checkout', '-q', 'claude/polish');
 
   const LNB = nb('landproj');
-  await takeOn('landproj');            // made by hand here, so the owner takes it on (R135)
+  await takeOn('landproj');            // made by hand here, so the owner takes it on
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'landproj'), { timeout: 20000 });
-  // Drafts (the operator, 1 Nov): a project on no forge has none and says
+  // Drafts: a project on no forge has none and says
   // nothing; one with drafts shows each one's notes, and Publish waits for a
   // release that is whole.
   const asked = [];
@@ -1655,7 +1655,7 @@ await section("where a bump lands", async () => {
                     said: await draftRow('v9.9.9-dev.1').textContent() };
   ok(drafted.notes === 'whole' && drafted.shut && !drafted.open && /Not whole yet: the\.iso/.test(drafted.said),
      `a draft shows its notes to correct, and Publish waits until it is whole (${JSON.stringify(drafted).slice(0, 120)})`);
-  // What else holds a draft back is said on its row (R206 step 3): a tag
+  // What else holds a draft back is said on its row: a tag
   // that is not on the git host stops the press, placeholder notes are put
   // right in the box, so its press stays.
   const held = { notes: await draftRow('v9.9.8').locator('[data-drafthold="notes"]').textContent(),
@@ -1688,10 +1688,10 @@ await section("where a bump lands", async () => {
      && /switch to main on the Git view and pull first/.test(staged.text),
      `a bump staged on a branch already merged into main says where Save would commit it and how to bump main (${staged?.text})`);
   // Red as an error is everywhere, beside the plain staged line's yellow, and
-  // in the value column with it: the class drew nothing until B338, and a
+  // in the value column with it: a class that draws nothing leaves it plain, and a
   // long line dropped under the label.
   // Found and read in the one call, and only once both lines are in the
-  // page and laid out (B487, B662): the row is drawn again as the bump
+  // page and laid out: the row is drawn again as the bump
   // lands, and lines found by one call and read by the next were read off a
   // copy already taken out, where every computed color is an empty string.
   const look = await page.waitForFunction(name => {
@@ -1747,7 +1747,7 @@ await section("where a bump lands", async () => {
 // thousands of conversations see, and one did exactly what a number in a
 // briefing does: a session asked to give a new project its first version read
 // 0.4.0 out of the file it had been briefed with and proposed it, having
-// derived nothing. The file changed under R63 step 3; the trap did not.
+// derived nothing. The file has changed since; the trap has not.
 await section("The briefing every session is handed", async () => {
   const brief = readFileSync(new globalThis.URL(
     '../../../config/templates/briefing.md', import.meta.url), 'utf8');
@@ -1771,7 +1771,7 @@ execFileSync('git', ['-C', A, 'init', '-q', '.'], { env });
 execFileSync('git', ['-C', B, 'init', '-q', '.'], { env });
 execFileSync('git', ['-C', A, 'remote', 'add', 'origin',
                      'git@github.com:owner/alpha.git'], { env });
-// ---- Move the version, with the other Agents may dials (B448) ---------------
+// ---- Move the version, with the other Agents may dials ---------------
 // An owner who set every dial on the settings panel to auto still found the
 // version locked, since the policy lived on the Artifacts tab alone. The
 // panel carries it now and writes the same policy.

@@ -1,4 +1,4 @@
-"""The AerieOS companion app (R270): a folder on this machine kept in step
+"""The AerieOS companion app: a folder on this machine kept in step
 with an AerieOS project, as a node's synced copy is.
 
     python -m bbcompanion                      the window (sign in, pick projects, watch them)

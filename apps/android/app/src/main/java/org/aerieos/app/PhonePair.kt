@@ -1,4 +1,4 @@
-// Connecting this phone to a node from the phone itself (R114), in place of
+// Connecting this phone to a node from the phone itself, in place of
 // typing an address, a port and a code into the dashboard's Phone tab.
 //
 // Android shows the pairing code only in its own Wireless debugging screen,

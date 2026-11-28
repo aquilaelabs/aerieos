@@ -1,10 +1,10 @@
 """A synced node's Claude conversations and memories, kept in step with the
-controller's (B613).
+controller's.
 
 Every account's ~/.claude/projects is a link to
 /workspace/.claude/<uid>/projects (lib/common.sh's claude_projects_link).
 On the controller that is the original. A node holds its projects as a
-synced copy (R162, R163) with no share, so this keeps that directory on
+synced copy with no share, so this keeps that directory on
 the node itself, owned by the
 session account, and mirrors it with the controller's (claudesync.py
 there), for the folders of the projects the node holds:
@@ -137,7 +137,7 @@ class ClaudeMirror:
         self.listed_at = 0.0
         self.rec = None
         self.thread = None
-        self.left = 0             # files here not yet agreed with the controller, for the drain (R164)
+        self.left = 0             # files here not yet agreed with the controller, for the drain
 
     def start(self):
         if self.thread is None:
@@ -173,7 +173,7 @@ class ClaudeMirror:
 
     def owner(self, uid=""):
         """Who an account's copies belong to: its own user where accounts
-        run as their own users (R125), so its sessions can read and add to
+        run as their own users, so its sessions can read and add to
         them and the shared session account cannot; the session account
         otherwise, as wssync owns the tree."""
         if uid and os.geteuid() == 0 and getattr(self.agent, "account_users_on", lambda: False)():

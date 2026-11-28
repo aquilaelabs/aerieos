@@ -1,4 +1,4 @@
-"""A space's Discord server from a layout kept as code (R293), against a
+"""A space's Discord server from a layout kept as code, against a
 stand-in for Discord's API: a bot's token taken and a user's refused, the
 server pulled into the layout's shape, a plan that says what applying a
 file adds, changes and removes and which of those a person allows, and an
@@ -273,7 +273,7 @@ class Apply(Base):
         self.assertTrue(any(a[1] == "discord-apply" for a in self.audits))
 
     def test_onboarding_is_left_on_a_server_that_is_not_community_and_set_on_one(self):
-        # The operator, 26 Nov: onboarding questions in the layout; nothing
+        # Onboarding questions in the layout; nothing
         # turns Community on, and the plan says so where it is off.
         self.connect()
         self.w.pins["911"][0]["author"]["id"] = "800"

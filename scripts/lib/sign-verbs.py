@@ -1,4 +1,4 @@
-"""Behind `aerie sign` (cmd_sign in bb, R106): ask the controller to sign a
+"""Behind `aerie sign` (cmd_sign in bb): ask the controller to sign a
 build in the project's dist/ with one of its keys, wait for the project's
 owner when its dial is `ask`, then follow the sign job to its verdict. The
 session sends a file name and a route and gets a file back in dist/; the
@@ -27,7 +27,7 @@ def ago(at):
 
 
 def status_verb(rest):
-    """aerie sign status [TAG] (R134): whether the project's release APKs can be
+    """aerie sign status [TAG]: whether the project's release APKs can be
     signed, and how the newest went, in the Signing view's and the bell's
     words."""
     tag = rest[0] if rest else ""
@@ -60,7 +60,7 @@ def status_verb(rest):
 
 
 def release_verb(why, rest):
-    """aerie sign release --why (R134 step 5): the Signing view's Look for
+    """aerie sign release --why: the Signing view's Look for
     unsigned APKs now, under the Sign a build dial. --again TAG names a
     release whose signed APK is replaced by its own run's, signed again:
     the owner's answer whatever the dial."""
@@ -79,8 +79,8 @@ def release_verb(why, rest):
         o = waits.outcome("", r["id"], "the look was not allowed")
         if o.get("code"):
             sys.exit(f"[builderbot] ERROR: {o.get('out') or 'it was not started'}")
-    # The look is waited for and what it found said run by run (R190
-    # step 5): "looking" alone left v0.9.0-dev.4501's missing APK
+    # The look is waited for and what it found said run by run:
+    # "looking" alone left v0.9.0-dev.4501's missing APK
     # unexplained.
     print("[builderbot] looking for unsigned release APKs, waiting for what the look finds", file=sys.stderr)
     t0 = time.time()
@@ -115,7 +115,7 @@ def said_look(last, expect):
 
 
 def keys_verb(sub, route, why, rest):
-    """aerie sign keys | key new NAME | map PACKAGE KEY (R106 step 6)."""
+    """aerie sign keys | key new NAME | map PACKAGE KEY."""
     if sub == "--keys":
         d = bbapi.call("/api/signing", {"action": "keys", "project": project})
         need(d)
@@ -161,7 +161,7 @@ if sys.argv[1].startswith("--"):
     sys.exit(0)
 file, route, why = sys.argv[1], sys.argv[2], sys.argv[3]
 # The build is read from the controller's copy of dist/: on a synced node it
-# goes up first (R163).
+# goes up first.
 import syncwait  # noqa: E402
 if not syncwait.up(project, "the controller signs the build in its copy of dist/"):
     sys.exit("[builderbot] ERROR: not asked: the build here has not reached the controller yet; try again in a moment")
@@ -173,7 +173,7 @@ def ask():
 r = ask()
 # ...and where the controller's copy still has no such build while this
 # tree does, it is on its way: asked again until it lands rather than
-# refused with "aerie build puts a build there" (B1183).
+# refused with "aerie build puts a build there".
 here = [os.path.join(d, "dist", file.removeprefix("dist/")) for d in (os.getcwd(), os.path.join(os.environ.get("WORKSPACE") or "/workspace", project))]
 until = time.time() + 300
 missing = f"no {file.removeprefix('dist/')} in "

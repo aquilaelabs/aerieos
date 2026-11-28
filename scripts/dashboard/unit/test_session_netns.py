@@ -1,4 +1,4 @@
-"""bb-session's network for a session (R79, B325): the veth's far end is put
+"""bb-session's network for a session: the veth's far end is put
 in the session's namespace by the namespace's file, never by the init's
 pid, which the ip that bb-session runs (inside the PID namespace it
 unshared) cannot see."""

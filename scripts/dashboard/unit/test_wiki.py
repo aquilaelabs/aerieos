@@ -1,4 +1,4 @@
-"""wiki.py (R112): a project's wiki, kept as a repository of forge-shaped
+"""wiki.py: a project's wiki, kept as a repository of forge-shaped
 pages. Pages are written, read, refused when stale, held under ask and
 refused under deny for a session, exported as a zip, and pushed to and
 pulled from a stand-in for the forge's wiki (a bare repository on disk,
@@ -70,7 +70,7 @@ class Wiki(unittest.TestCase):
         self.assertGreaterEqual(len(wiki.history("app")), 4)
 
     def test_a_page_that_is_a_link_is_never_written_through(self):
-        # B532: a wiki pulled from a forge may hold a link where a page is;
+        # A wiki pulled from a forge may hold a link where a page is;
         # a save wrote through it to wherever it pointed.
         outside = self.tmp / "outside.json"
         outside.write_text("{}")
@@ -84,7 +84,7 @@ class Wiki(unittest.TestCase):
         self.assertEqual(outside.read_text(), "{}")
 
     def test_a_rename_moves_the_links_to_it(self):
-        """B46: every link to a renamed page follows it, in the same commit,
+        """Every link to a renamed page follows it, in the same commit,
         and a link to another page or a forge address is left alone."""
         wiki.save("app", "Second Page", "see [[Second Page]] itself\n", who=ME)
         wiki.save("app", "Home", "[[Second Page]], [[the second|Second-Page]], [two](Second-Page.md),\n"

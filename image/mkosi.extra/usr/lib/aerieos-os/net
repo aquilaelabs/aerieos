@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The stick's network settings (R161 step 12): BB_HOSTNAME and the static
+# The stick's network settings: BB_HOSTNAME and the static
 # address keys in the stick's aerieos.env (the stick maker's --set, or the
 # file edited by hand on the ESP), as the env step read them into
 # /run/aerieos-os/net. With BB_NET_ADDRESS the wired interfaces take that

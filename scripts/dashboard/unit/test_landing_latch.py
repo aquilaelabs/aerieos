@@ -1,5 +1,5 @@
 """While a landing replaces the state, no other thread's state file lands in
-it (R227 step 8): refused at once, never held, since a writer made to wait
+it: refused at once, never held, since a writer made to wait
 while holding its module's lock would stop the landing. The landing's own
 thread writes; a folder elsewhere is untouched; a landing that put the old
 state back lets the writers go on."""

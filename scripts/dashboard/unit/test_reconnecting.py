@@ -1,6 +1,6 @@
 """Right after the controller starts, a node it heard a moment before it went
-down is reconnecting, not down: its project cards say so quietly rather than in red
-(the operator, 7 Oct). The function, read from server.py and run on its own
+down is reconnecting, not down: its project cards say so quietly rather than in red.
+The function, read from server.py and run on its own
 (importing the server opens /config)."""
 import ast
 import os

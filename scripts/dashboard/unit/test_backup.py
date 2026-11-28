@@ -1,4 +1,4 @@
-"""The configuration backed up and found again (R161 step 4, backup.py): a
+"""The configuration backed up and found again (backup.py): a
 copy is the move's bundle sealed under the password's key, written to every
 folder where copies go with the five newest kept, listed, found by a fresh
 install, and restored through the move's gate; nothing without a password."""
@@ -90,7 +90,7 @@ class Backup(unittest.TestCase):
         self.assertIn("password, not a move token", move.restore(found[0]["path"], "tok", state_dir=fresh).get("error", ""))
 
     def test_a_copy_carries_the_install_key_and_the_restore_takes_it(self):
-        # R227 step 10 (the operator, 15 Nov): the key inside, sealed like the
+        # The key inside, sealed like the
         # rest, so the password alone brings back what the state keeps sealed.
         from unittest import mock
         key = b"k" * 32

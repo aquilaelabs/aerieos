@@ -1,4 +1,4 @@
-"""A copy of /config opens nothing (R135 step 5): with an install key, the
+"""A copy of /config opens nothing: with an install key, the
 secrets the controller keeps there (a project's git token, the tunnel's and
 Cloudflare's tokens) are ciphertext, the sign-in cookies' key is not kept at
 all, and none of them is found in any file of the state, byte for byte; a

@@ -1,4 +1,4 @@
-"""A patch line's own rules (R112 step 5): a house rule named patch, or
+"""A patch line's own rules: a house rule named patch, or
 patch-SOMETHING, says in its files what a patch release may not change, and
 the check preflight runs on a patch line fails on a changed file under it."""
 import json
@@ -16,7 +16,7 @@ RULES = [{"name": "patch", "paths": ["scripts/dashboard/statemigrations"], "text
 
 def run(files, rules=RULES):
     # Through a file, as bb hands them over: a project's rules outgrow one
-    # environment variable (B434).
+    # environment variable.
     tree = tempfile.mkdtemp()
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         f.write(json.dumps(rules))

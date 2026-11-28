@@ -1,4 +1,4 @@
-"""Other disks and shares (R162 step 4): the controller's record held to
+"""Other disks and shares: the controller's record held to
 its shapes with a share's password sealed and never listed, the hello's
 copy with it opened, and the agent mounting what the record says and
 unmounting what it no longer says, an SMB share's credentials root's

@@ -1,4 +1,4 @@
-"""A project's daily snapshots (R165): what the sync carries, stored once by
+"""A project's daily snapshots: what the sync carries, stored once by
 content, a day reusing what did not change, pruned to the project's days
 with the objects nobody names removed, and restored whole or a file at a
 time after a snapshot of the tree as it is, so the restore can be undone."""
@@ -110,8 +110,8 @@ class Snap(unittest.TestCase):
         self.assertEqual(len(self.objects()), n - 1, "and the object only it named")
         self.keep["alpha"] = 0
         snapshots.daily()
-        # 0 days is no snapshot taken, and what a repository has stays (the
-        # operator, 13 Nov): it removed them all at the next daily look.
+        # 0 days is no snapshot taken, and what a repository has stays:
+        # it removed them all at the next daily look.
         had = snapshots.days("alpha")
         self.assertTrue(had)
         for f in (paths.of("project-snapshots") / "days" / "alpha").glob("*.json"):

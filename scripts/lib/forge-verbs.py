@@ -1,4 +1,4 @@
-"""Behind `aerie forge` (R188): the project's git host worked through the
+"""Behind `aerie forge`: the project's git host worked through the
 controller, which holds the project's token and runs each verb with it
 (dashboard/forgeaccess.py); the token never reaches here.
 
@@ -19,8 +19,8 @@ GROUPS = ("pr", "issue", "run", "release")
 SWITCHES = {"draft", "approve", "request-changes", "failed", "job", "json"}
 # Every flag some verb reads (dashboard/forgeaccess.py), --body-file read
 # here into --body: anything else is refused by name, where it was sent and
-# dropped, and a pull request made with no description said nothing (B1123,
-# report #132).
+# dropped, and a pull request made with no description said nothing
+# (report #132).
 FLAGS = SWITCHES | {"base", "body", "body-file", "branch", "field", "head", "label", "lines", "method",
                     "name", "ref", "size", "state", "title"}
 
@@ -33,13 +33,13 @@ verb = words.pop(0)
 if verb in GROUPS:
     if not words:
         die(f"aerie forge {verb} needs an action: aerie forge -h lists each group's")
-    # show is view, as the notebook's verbs say it (R289).
+    # show is view, as the notebook's verbs say it.
     act = words.pop(0)
     verb = f"{verb} {'view' if act == 'show' else act}"
 pos, flags = [], {}
 while words:
     w = words.pop(0)
-    # --field is -f's long name, a list as -f's is (B1062: read as one plain
+    # --field is -f's long name, a list as -f's is (read as one plain
     # flag, its value was taken a character at a time).
     if w in ("-f", "--field") or w.startswith("--field="):
         if w.startswith("--field="):
@@ -77,7 +77,7 @@ as_json = bool(flags.pop("json", False))
 r = bbapi.call("/api/forge", {"project": proj, "verb": verb, "args": {"pos": pos, "flags": flags}},
                timeout=120)
 if isinstance(r, dict) and r.get("error"):
-    # The host's own refusal, with the next thing to do (R289): a 403 is the
+    # The host's own refusal, with the next thing to do: a 403 is the
     # token's scopes, which whoami measures, and a 404 on runs is a host
     # whose Actions are off for the repository.
     e = str(r["error"])
@@ -91,7 +91,7 @@ if as_json:
 elif verb == "whoami":
     print(r.get("briefing") or json.dumps(r.get("measure"), indent=1))
 elif verb == "owed":
-    # What the git host owes this repository's workflows (R267 step 29).
+    # What the git host owes this repository's workflows.
     for row in r:
         mark = {"ok": "[ok]  ", "owed": "[owed]"}.get(row.get("state"), "[?]   ")
         print(f"  {mark} {row.get('what')}" + (f": {row['why']}" if row.get("why") else ""))

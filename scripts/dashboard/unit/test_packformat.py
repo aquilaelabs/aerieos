@@ -1,4 +1,4 @@
-"""The catalog's format number (R234): a manifest says the format it needs,
+"""The catalog's format number: a manifest says the format it needs,
 an entry repeats it, an install too old for one says so and adds nothing,
 and a manifest that was valid at a number stays valid at every later one.
 
@@ -74,7 +74,7 @@ class Kept(unittest.TestCase):
 
 
 class Makers(unittest.TestCase):
-    """Who a tool is by (the operator, 12 Nov): a line a card draws, from a
+    """Who a tool is by: a line a card draws, from a
     manifest, an index entry or a shipped row; said wrong it is nobody."""
 
     def test_a_maker_is_one_line_of_plain_words(self):
@@ -113,7 +113,7 @@ class Makers(unittest.TestCase):
 
 
 class Framework(unittest.TestCase):
-    """The framework's version is two numbers (the operator, 12 Nov): the
+    """The framework's version is two numbers: the
     format, which an install must read to run an entry, and a second for
     what was added that an earlier install leaves out; a manifest says the
     version it is written for, and what it uses is in that version."""
@@ -198,7 +198,7 @@ class Number(unittest.TestCase):
 
 
 class Tiers(unittest.TestCase):
-    """Who stands behind an entry (the operator, 12 Nov): Packaged by Aerie,
+    """Who stands behind an entry: Packaged by Aerie,
     Verified and Vetted are what a person reads; the stored words stay."""
 
     def test_the_index_s_words_are_kept_and_one_not_met_reads_as_vetted(self):

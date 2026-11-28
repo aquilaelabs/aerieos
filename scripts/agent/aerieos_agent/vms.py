@@ -1,7 +1,7 @@
-"""The VMs a node runs (R91): KVM through libvirt, on a node whose VM host
+"""The VMs a node runs: KVM through libvirt, on a node whose VM host
 feature is installed. Every command is built here from a fixed table with
 checked arguments, run as the jobs account (in the libvirt group), or as the
-agent itself on the controller's own machine (R165 step 1: the jobs account is
+agent itself on the controller's own machine (the jobs account is
 kept out of libvirt's group there, which is root), never by a
 session; the controller sends what to make, never a command line."""
 import contextlib
@@ -36,9 +36,9 @@ KEY_RE = re.compile(r"(ssh-(ed25519|rsa)|ecdsa-sha2-nistp(256|384|521)) [A-Za-z0
 ACTIONS = ("create", "start", "stop", "restart", "remove", "snapshot", "revert", "snapshot-rm",
            "eject", "disk-grow", "disk-add", "iso-add", "iso-rm", "hardware", "autostart", "vbios",
            "usb-give", "usb-take", "clone")
-# A domain another system or a person made, as libvirt names it (R163 step 12).
+# A domain another system or a person made, as libvirt names it.
 FOREIGN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}")
-# An installer ISO a person fetched onto this node (R99), by its own name.
+# An installer ISO a person fetched onto this node, by its own name.
 ISO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.iso")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 MAC_RE = re.compile(r"[0-9a-f]{2}(:[0-9a-f]{2}){5}")
@@ -49,7 +49,7 @@ DISK_DEVS = ("vda", "vdb", "vdc", "vdd")
 # libvirt's own <metadata>, so a domain somebody else made is never ours.
 META_NS = "https://builderbot.dev/vm/1"
 # What a VM may be given, whatever is asked: the controller's limits are the
-# real ones (R91 step 7); these keep a typo from asking for a terabyte.
+# real ones; these keep a typo from asking for a terabyte.
 MAX_VCPUS, MAX_MEM_MB, MAX_DISK_GB = 64, 262144, 4096
 
 
@@ -62,9 +62,9 @@ def _state_word(s):
 
 def guest_facts(name):
     """What a running VM's QEMU guest agent says of it, the way VMware Tools
-    would (R110 step 8, the operator, 22 Oct): {hostname, os, kernel, ips,
+    would: {hostname, os, kernel, ips,
     users, fs: [[mount, used MB, total MB], ...]}, or {} where the agent does
-    not answer. One guestinfo call; libvirt's lines are key : value."""
+    not answer. One guestinfo call; libvirt's lines are key: value."""
     got = {}
     for ln in _run(VIRSH + ["guestinfo", name, "--os", "--hostname", "--interface", "--user", "--filesystem"],
                    timeout=10).splitlines():
@@ -91,7 +91,7 @@ def guest_facts(name):
 def vm_memory():
     """{domain: [usable MB, available MB]} for every running VM AerieOS
     made, from the balloon's statistics in one domstats call, for the
-    heartbeat (R110 step 8). A VM whose balloon has no stats period yet is
+    heartbeat. A VM whose balloon has no stats period yet is
     given one, so its next heartbeat has them."""
     out, cur = {}, ""
     for ln in _run(VIRSH + ["domstats", "--balloon", "--state-running"], timeout=15).splitlines():
@@ -114,16 +114,16 @@ WALL_FILE = "/etc/bb-session.wall"
 
 
 def own_here():
-    """Whether this node is its controller's own machine (R90): the wall
+    """Whether this node is its controller's own machine: the wall
     between the controller and the sessions is in force here, and a VM job
     runs as the agent itself (root) rather than the jobs account, which is
-    kept out of libvirt's group on that machine (R165 step 1)."""
+    kept out of libvirt's group on that machine."""
     return os.path.exists(os.environ.get("BB_WALL_FILE") or WALL_FILE)
 
 
 def vms_other():
-    """The libvirt domains on this machine that AerieOS did not make
-    (R165 step 1): a name without the bbvm- prefix, or one with the prefix
+    """The libvirt domains on this machine that AerieOS did not make:
+    a name without the bbvm- prefix, or one with the prefix
     and without the agent's own metadata marker. Name, state, vCPUs and
     memory, for the VMs page to list read-only for an administrator;
     nothing here ever acts on one."""
@@ -131,7 +131,7 @@ def vms_other():
         return []
     out = []
     # One name a line: a name may have spaces in it (one made on another
-    # system, R163 step 11), which a split on whitespace cut in two.
+    # system), which a split on whitespace cut in two.
     for name in [n.strip() for n in _run(VIRSH + ["list", "--all", "--name"], timeout=15).splitlines() if n.strip()][:128]:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", name):
             continue
@@ -167,7 +167,7 @@ def vms_now():
         ip = ""
         if info.get("state") == "running":
             # Its project's network's lease, else what its guest agent says
-            # (a VM on the LAN, R100), the loopback aside.
+            # (a VM on the LAN), the loopback aside.
             for src in ("lease", "agent"):
                 for line in _run(VIRSH + ["domifaddr", name, "--source", src], timeout=10).splitlines():
                     m = re.search(r"ipv4\s+([0-9.]+)/", line)
@@ -178,7 +178,7 @@ def vms_now():
                     break
         snaps = [s for s in _run(VIRSH + ["snapshot-list", name, "--name"], timeout=10).split() if SNAP_RE.fullmatch(s)]
         mem = re.match(r"(\d+)", info.get("max memory", ""))
-        # Its screen while it runs (R99), and an installer's ISO still in
+        # Its screen while it runs, and an installer's ISO still in
         # its drive, which the row offers to eject.
         screen = info.get("state") == "running" and vmhw.screen_at(_run(VIRSH + ["dumpxml", name], timeout=10))
         iso = ""
@@ -186,7 +186,7 @@ def vms_now():
             p = line.split(None, 1)
             if len(p) == 2 and p[0] == "sda" and p[1].strip().startswith(iso_dir() + "/"):
                 iso = os.path.basename(p[1].strip())
-        # Its hardware beyond size (R100), read off its own XML, and whether
+        # Its hardware beyond size, read off its own XML, and whether
         # it starts with its host.
         hw = vmhw.read(_run(VIRSH + ["dumpxml", name, "--inactive"], timeout=10))
         facts = guest_facts(name) if info.get("state") == "running" else {}
@@ -208,7 +208,7 @@ VMNET_PRIVATE = ("10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
 
 
 def vmnet_table(ctl, lan=False):
-    """The VMs' own firewall (R91 step 8), whole: a VM reaches the internet,
+    """The VMs' own firewall, whole: a VM reaches the internet,
     the controller (its address and port) and its own project's network;
     not another project's VMs, not the LAN unless `lan`, and of this node
     only the DHCP and DNS libvirt serves it. Nothing starts a connection
@@ -266,7 +266,7 @@ def vmnet_keep(ctl, lan=False, now=0.0, nft="nft"):
 
 
 def usb_kept(name):
-    """The USB devices a VM was given from the node's page (R116), as the
+    """The USB devices a VM was given from the node's page, as the
     controller named them (vendor, product, serial, port, name), kept beside
     its disk so each is found again at its start wherever it is plugged in
     now; nothing for a VM given none."""
@@ -345,19 +345,19 @@ def user_data(hostname, user, keys, enroll=""):
     lines = ["#cloud-config", f"hostname: {hostname}", "ssh_pwauth: false", "users:",
              f"  - name: {user}", "    sudo: ALL=(ALL) NOPASSWD:ALL", "    shell: /bin/bash",
              # One uid on every image, which a shared folder's files are
-             # inside the VM (R100, vmhw.GUEST_UID).
+             # inside the VM (vmhw.GUEST_UID).
              f"    uid: {vmhw.GUEST_UID}",
              "    ssh_authorized_keys:"]
     lines += [f"      - {json.dumps(k)}" for k in keys]
     # bash where the image has none (Alpine's): the account's shell, and
-    # what the enroll script runs in, which never started there (R97's walk).
+    # what the enroll script runs in, which never started there.
     # ...and sudo, which the account is given and Alpine does not carry.
     bash = "command -v bash >/dev/null && command -v sudo >/dev/null || apk add --no-cache bash sudo >/dev/null 2>&1 || true"
     # ...and Alpine's sshd turns a key away for an account whose password is
     # locked (!), which cloud-init leaves; no password (*) lets the key in.
     bash += f'; if command -v apk >/dev/null; then sed -i "s/^{user}:!/{user}:*/" /etc/shadow; fi'
     # ...and QEMU's guest agent, which says a VM's address when it is on the
-    # LAN (R100), where the LAN's DHCP gives it and libvirt keeps no lease.
+    # LAN, where the LAN's DHCP gives it and libvirt keeps no lease.
     bash += ("; command -v qemu-ga >/dev/null || { apk add --no-cache qemu-guest-agent || "
              "{ apt-get update -qq && apt-get install -y -qq qemu-guest-agent; } || dnf install -y -q qemu-guest-agent || "
              "zypper -n -q in qemu-guest-agent || pacman -S --noconfirm qemu-guest-agent; } >/dev/null 2>&1; "
@@ -422,14 +422,14 @@ def domain_xml(name, project, vcpus, mem_mb, disk, seed, network, boot="bios", f
     `lan`, the host's interface, puts it on the LAN instead (macvtap), as a
     VM made a node is: the controller reaches a node at its own address,
     which a project network behind the host's NAT does not have.
-    R99: `installer` boots `seed` (then an installer's ISO) before the disk;
+    `installer` boots `seed` (then an installer's ISO) before the disk;
     `extra` are further disks (vdb on); every disk gives freed space back
     (discard); a screen over VNC on a unix socket libvirt makes in the
     domain's own folder (never a loopback port, which any account of the
     machine could dial), with `vnc_pw` when given, for the dock's Screen;
     `mac` keeps the address a DHCP reservation knows."""
     mac_el = f"<mac address={quoteattr(mac)}/>" if mac else ""
-    # On the LAN: a port on the host's bridge where it has one (R219), which
+    # On the LAN: a port on the host's bridge where it has one, which
     # reaches the host too, else macvtap on the card, which does not.
     nic = (lanbridge.nic_xml(lan, mac_el)
            if lan else f"<interface type='network'>{mac_el}<source network={quoteattr(network)}/><model type='virtio'/></interface>")
@@ -525,8 +525,8 @@ class VmsMixin:
             job.say("refused: this node's VM host feature is not installed (its Features section installs it)\n")
             return "failed", 78
         # The jobs account, in libvirt's group; on the controller's own
-        # machine the agent itself, since that group is root there (R165
-        # step 1) and the wall keeps the jobs account out of it.
+        # machine the agent itself, since that group is root there
+        # and the wall keeps the jobs account out of it.
         who = {} if own_here() else self.drop_privileges({})
         if not who and os.geteuid() == 0:
             self._vm_dirs_roots(job)
@@ -547,7 +547,7 @@ class VmsMixin:
 
     def _vm_dirs_roots(self, job):
         """Where the root agent writes VMs' files, root's alone, and no link
-        in them (B552): a machine provisioned before handed them to the jobs
+        in them: a machine provisioned before handed them to the jobs
         account, and every write here follows a link, so one it left named
         any file on the machine for root to write over."""
         for d in [VM_DIR] + [os.path.join(VM_DIR, s) for s in ("images", "disks", "iso", vmhw.VBIOS_DIR)]:
@@ -701,7 +701,7 @@ class VmsMixin:
         project = str(spec.get("project") or "")
         user = str(spec.get("user") or "builder")
         keys = [str(k).strip() for k in (spec.get("keys") or [])][:8]
-        # From an installer (R99): its ISO on this node, a blank disk, no seed.
+        # From an installer: its ISO on this node, a blank disk, no seed.
         iso = str((spec.get("installer") or {}).get("iso") or "") if isinstance(spec.get("installer"), dict) else ""
         try:
             vcpus, mem, disk_gb = int(spec.get("vcpus") or 0), int(spec.get("mem_mb") or 0), int(spec.get("disk_gb") or 0)
@@ -793,7 +793,7 @@ class VmsMixin:
             return "failed", 70
         text = domain_xml(name, project, vcpus, mem, disk, seed, str(spec.get("network") or ""), boot, fw,
                           nvram, lan, extra=extra, installer=bool(iso), mac=mac, vnc_pw=vnc_pw)
-        # Its hardware beyond size (R100), where New VM gave any.
+        # Its hardware beyond size, where New VM gave any.
         hw, why = vmhw.clean(spec.get("hw"), vcpus, mem, project=str(spec.get("project") or ""))
         if hw is None or (hw and not self._vm_hw_ok(job, hw)):
             if why:
@@ -807,7 +807,7 @@ class VmsMixin:
         job.step("starting it")
         if self._vm_run(job, VIRSH + ["define", xml], who) != 0:
             return "failed", 70
-        # Starting with its host is asked for (R100), but for a node, whose
+        # Starting with its host is asked for, but for a node, whose
         # whole point is to be there.
         if spec.get("autostart") is True or enroll:
             self._vm_run(job, VIRSH + ["autostart", name], who, say=False)
@@ -891,7 +891,7 @@ class VmsMixin:
         for d in hw.get("devices") or []:
             # A USB device the host uses (the stick it boots from, a disk it
             # has mounted): named here by vendor and product, which libvirt
-            # attaches the first of, so any alike that the host uses (B870).
+            # attaches the first of, so any alike that the host uses.
             if d["type"] == "usb":
                 used = next((u for u in host["usb"] if u["vendor"] == d["vendor"] and u["product"] == d["product"]
                              and u["use"]), None)
@@ -910,7 +910,7 @@ class VmsMixin:
                 # One the host needs (its LAN card, a disk controller with a
                 # disk mounted, the USB controller of a device it uses), or one
                 # in an IOMMU group with such a device, which goes to the VM
-                # with it (B870).
+                # with it.
                 if row["host"]:
                     job.say(f"refused: {d['addr']} is the host's own: {row['host']}\n")
                     return False
@@ -979,7 +979,7 @@ class VmsMixin:
 
     def _vm_vbios(self, job, spec, name, who):
         """A GPU's vBIOS dumped through sysfs, as root, or a .rom given on
-        the VMs page kept in its place (R100)."""
+        the VMs page kept in its place."""
         if spec.get("rom"):
             got = vmhw.vbios_keep(str(spec.get("addr") or ""), str(spec["rom"]),
                                   os.path.join(VM_DIR, vmhw.VBIOS_DIR), job.say)
@@ -993,7 +993,7 @@ class VmsMixin:
     def _vm_iso_add(self, job, spec, name, who):
         """An installer's ISO onto this node, kept only when it matches the
         SHA-256 given: from an https address, or uploaded on the VMs page
-        and fetched from the controller with this node's own token (R99)."""
+        and fetched from the controller with this node's own token."""
         iso = spec.get("iso") if isinstance(spec.get("iso"), dict) else {}
         fname, url, want = str(iso.get("name") or ""), str(iso.get("url") or ""), str(iso.get("sha256") or "").lower()
         upload = str(iso.get("upload") or "")
@@ -1006,7 +1006,7 @@ class VmsMixin:
         if os.path.isfile(path):
             # The same name is not the same file: ISOs are the node's, so one
             # a person added from their own address answered another's ask
-            # for the official one with success (R247 step 5).
+            # for the official one with success.
             h = hashlib.sha256()
             with open(path, "rb") as f:
                 for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -1079,7 +1079,7 @@ class VmsMixin:
 
     def _vm_start(self, job, spec, name, who):
         # A USB device given by its numbers (two alike on the host) has new
-        # ones after a replug or a reboot (R116): its hostdev pointed at
+        # ones after a replug or a reboot: its hostdev pointed at
         # where it is now before the VM starts, by its serial or its port.
         kept = usb_kept(name)
         if self._vm_exists(name, who):
@@ -1104,7 +1104,7 @@ class VmsMixin:
         return self._vm_usb(job, spec, name, who, give=False)
 
     def _vm_usb(self, job, spec, name, who, give):
-        """A USB device given to a VM, or taken back (R116 step 3): libvirt's
+        """A USB device given to a VM, or taken back: libvirt's
         hostdev attached live to a running VM and written into its
         definition (detached and struck out for a take), so it has it now
         and at its next start. Refused for a device the host boots from,
@@ -1173,7 +1173,7 @@ class VmsMixin:
         return self._vm_simple(job, name, who, ["reboot", name])
 
     def _vm_clone(self, job, spec, name, who):
-        """A VM AerieOS did not make, made one of a space's (R163 step 12):
+        """A VM AerieOS did not make, made one of a space's:
         each of its disk files copied into this node's VM folder as qcow2
         (the originals untouched), its UEFI variables copied, and the domain
         defined again under `name` with AerieOS's marker, its own UUID, and

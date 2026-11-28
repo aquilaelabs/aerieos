@@ -1,4 +1,4 @@
-"""Enroll script on an enrolled node's row (R210): the script is built from
+"""Enroll script on an enrolled node's row: the script is built from
 the row's own answers, the system among them, with no dialog."""
 import os
 import sys

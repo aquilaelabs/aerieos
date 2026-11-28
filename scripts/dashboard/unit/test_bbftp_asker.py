@@ -2,7 +2,7 @@
 pipes the agent started it with, and a pipe that closes means the agent is
 gone. An agent updating itself execs in place, keeping its pid, so the
 server's parent watch never saw it and the server held the port refusing
-every login (B573): it ends instead, leaving the port to the new agent's.
+every login: it ends instead, leaving the port to the new agent's.
 pyftpdlib is stood in for, so this runs without it."""
 import io
 import json

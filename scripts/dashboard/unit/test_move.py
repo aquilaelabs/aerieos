@@ -1,8 +1,8 @@
-"""Moving a controller to another home (R90 step 12, move.py): the bundle
+"""Moving a controller to another home (move.py): the bundle
 sealed under a token shown once, the nodes' challenges, the restore held to
 the version gate and refused under another token, the old home marked
-moved, and what the new home answers a node's knock; and the second pass
-(R175): the move armed with no life and the bundle packed fresh, a late
+moved, and what the new home answers a node's knock; and the second pass:
+the move armed with no life and the bundle packed fresh, a late
 node handed its challenge after the move, the landing told both ways under
 the move key, the pull's proof, the pieces, and the nodes not yet here."""
 import contextlib
@@ -71,7 +71,7 @@ class Move(unittest.TestCase):
         return head, out
 
     def test_a_bundle_is_sealed_a_piece_at_a_time_and_every_piece_is_held_to_its_place(self):
-        # B558: never whole in memory; here pieces of 4 KiB over a
+        # Never whole in memory; here pieces of 4 KiB over a
         # repository of 64 KiB of noise, so a bundle is many pieces.
         (self.ws / "alpha" / "big.bin").write_bytes(os.urandom(64 << 10))
         move.PIECE, was = 4096, move.PIECE
@@ -94,7 +94,7 @@ class Move(unittest.TestCase):
         self.assertEqual((self.tmp / "new-ws" / "alpha" / "big.bin").read_bytes(), (self.ws / "alpha" / "big.bin").read_bytes())
 
     def test_a_bundle_is_packed_in_place_and_the_one_before_goes_first(self):
-        # A full disk on the old home (the operator, 8 Nov): the body went to
+        # A full disk on the old home: the body went to
         # a file beside the bundle and was copied after, and the bundle
         # before stayed until the new one was done, so packing took three
         # times the bundle's room.
@@ -152,7 +152,7 @@ class Move(unittest.TestCase):
             move.split_form(src, "application/x-www-form-urlencoded", "bundle", dest)
 
     def test_a_landing_without_room_is_refused_before_it_takes_the_bundle(self):
-        # B588: a stick before a system pool lands on its own partition.
+        # A stick before a system pool lands on its own partition.
         from unittest import mock
         with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=2 << 30)):
             why = move.room_for(5 << 30, self.tmp)
@@ -186,7 +186,7 @@ class Move(unittest.TestCase):
         self.assertEqual([p.suffix for p in (self.state / "move").iterdir()], [".aeriemove"], "the bundle before went with the next")
 
     def test_a_manifest_changed_after_the_bundle_was_made_is_refused(self):
-        # B724: the plain line's origin, kind and versions were believed.
+        # The plain line's origin, kind and versions were believed.
         r = move.prepare("user:ann", "https://new.example")
         path = self.tmp / "config" / "move" / r["bundle"]
         head, line, body = path.read_bytes().split(b"\n", 2)
@@ -249,7 +249,7 @@ class Move(unittest.TestCase):
         self.assertEqual(move.restored()["from"], "https://old.example/")
         self.assertFalse(move.status()["prepared"], "landed, the move is used")
         self.assertEqual(move.for_node("n_1"), {}, "the new home tells its nodes of no move: the record came with the bundle")
-        # The nodes not yet here (R175 step 3): both, until each says hello
+        # The nodes not yet here: both, until each says hello
         # after the landing; each with its follow line.
         self.configure(new_state, bare=True, url="https://new.example/")
         nh = move.not_yet_here()
@@ -265,7 +265,7 @@ class Move(unittest.TestCase):
         move.node_here("n_9")
         self.assertEqual([x["id"] for x in move.not_yet_here()], ["n_2"], "a hello here takes a node off the list; a stranger is nobody's")
         # The old home, marked moved: read-only, saying where; and a late
-        # node still hears the move with its challenge (R175 step 2).
+        # node still hears the move with its challenge.
         self.configure(self.state, bare=False)
         self.assertEqual(move.mark_moved("https://new.example")["to"], "https://new.example")
         self.assertEqual(move.moved_to(), "https://new.example")
@@ -284,8 +284,8 @@ class Move(unittest.TestCase):
         with open(os.path.join(os.path.dirname(__file__), "..", "server.py"), encoding="utf-8") as f:
             self.assertIn('self._json(move.moved_answer(late.get("node") or "", tls.key_pin()), 410)', f.read())
         # A node enrolled at the home tunnel's public hostname is told that
-        # hostname, never the new home's local address (the operator, 10 Nov:
-        # a server elsewhere could not follow a move to a LAN address).
+        # hostname, never the new home's local address
+        # (a server elsewhere could not follow a move to a LAN address).
         move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
         try:
             self.assertEqual(move.for_node("n_2")["url"], "https://aerie.example.com")
@@ -297,7 +297,7 @@ class Move(unittest.TestCase):
         self.assertIn("not withdrawn", move.forget("user:ann")["error"])
 
     def test_a_repositorys_links_move_as_links_and_one_leading_out_stays_behind(self):
-        # B556: links were skipped, so a moved repository showed them deleted.
+        # Links were skipped, so a moved repository showed them deleted.
         import os
         (self.ws / "alpha" / "README.md").write_text("hi\n")
         os.symlink("README.md", self.ws / "alpha" / "README")
@@ -315,7 +315,7 @@ class Move(unittest.TestCase):
         self.assertFalse(os.path.lexists(self.tmp / "new-ws" / "alpha" / "outside"), "one leading out is not restored")
 
     def test_a_space_folder_already_here_is_set_aside_never_merged(self):
-        # B707: the new controller's own alpha and the moved alpha's files
+        # The new controller's own alpha and the moved alpha's files
         # were mixed in one folder.
         (self.ws / "alpha" / "README.md").write_text("moved\n")
         (self.ws / ".trash" / "old").mkdir(parents=True)
@@ -360,7 +360,7 @@ class Move(unittest.TestCase):
         return got, new_state
 
     def test_a_workspace_copy_that_fails_is_said_with_what_was_set_aside(self):
-        # B725: the copy's error escaped restore() after this controller's
+        # The copy's error escaped restore after this controller's
         # alpha had gone to the trash, and the line saying so was lost.
         got, new_state = self.land_with_copy_failing("workspace")
         self.assertIn("could not be copied", got.get("error", ""), got)
@@ -369,14 +369,14 @@ class Move(unittest.TestCase):
         self.assertFalse((new_state / "users.json").exists())
 
     def test_secrets_the_home_cannot_take_are_said_and_the_rest_lands(self):
-        # B728: a secrets folder that is root's stopped the whole landing.
+        # A secrets folder that is root's stopped the whole landing.
         got, new_state = self.land_with_copy_failing("secrets")
         self.assertTrue(got.get("ok"), got)
         self.assertIn("secrets were not written", " ".join(got.get("said") or []))
         self.assertTrue((new_state / "users.json").exists())
 
     def test_share_users_made_here_are_kept_through_a_landing(self):
-        # B716: the accounts a stick made from the old system's share users
+        # The accounts a stick made from the old system's share users
         # went with the state the move replaced, and the shares lost them.
         r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
         new_state = self.tmp / "new-config"
@@ -402,7 +402,7 @@ class Move(unittest.TestCase):
         self.assertEqual(os.stat(new_state / "users.json").st_mode & 0o777, 0o600)
 
     def test_a_backup_arms_nothing_and_lands_under_its_own_token(self):
-        # The operator, 6 Nov: a copy of the controller to keep, under a token
+        # A copy of the controller to keep, under a token
         # the person records, no move armed and no node told; landed, it
         # never tells the controller it came from, and nodes still there
         # follow by its key.
@@ -427,7 +427,7 @@ class Move(unittest.TestCase):
         self.assertTrue(rec.get("key_b64") and rec.get("token_hash") == move.token_hash(r["token"]), "nodes still there follow by its key")
 
     def test_a_restore_that_fails_puts_the_state_back(self):
-        # B557: a failure after the swap left the new state half restored
+        # A failure after the swap left the new state half restored
         # and the old one aside, unsaid.
         r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
         new_state = self.tmp / "new-config"
@@ -445,7 +445,7 @@ class Move(unittest.TestCase):
         self.assertEqual([p.name for p in new_state.iterdir() if p.name.startswith(".move")], [], "nothing of the landing left")
 
     def test_a_carried_key_the_home_cannot_take_is_said(self):
-        # B623: INSTALL_KEY in the new home's environment, so the carried key
+        # INSTALL_KEY in the new home's environment, so the carried key
         # is not taken; the landing reported ok and nothing said why the
         # moved state's sealed settings answered Locked.
         r = move.prepare("user:ann", "https://new.example", repos=False, carry_key=True)
@@ -461,7 +461,7 @@ class Move(unittest.TestCase):
         self.assertIn("INSTALL_KEY", json.loads((new_state / "move.json").read_text()).get("said", [""])[0]) if (new_state / "move.json").is_file() else None
 
     def test_a_landing_cut_midway_is_marked_and_said_and_finishes_on_the_next(self):
-        # B622: the power goes between the renames; the next start finds the
+        # The power goes between the renames; the next start finds the
         # mark, the bell says what is where, and the same bundle lands again.
         r = move.prepare("user:ann", "https://new.example", repos=False, carry_key=False)
         new_state = self.tmp / "new-config"
@@ -496,7 +496,7 @@ class Move(unittest.TestCase):
         self.assertTrue((new_state / "users.json").is_file())
 
     def test_a_landing_swaps_inside_a_state_folder_it_cannot_rename(self):
-        # B594: the parent is root's on an installed machine, a mount point's
+        # The parent is root's on an installed machine, a mount point's
         # in a container. Here the parent is read-only, as it is for the
         # controller's account there.
         r = move.prepare("user:ann", "https://new.example")
@@ -517,7 +517,7 @@ class Move(unittest.TestCase):
         self.assertEqual(Path(got["moved_aside"]).parent, new_state)
 
     def test_a_store_whose_path_cannot_be_made_lands_under_the_state(self):
-        # B598: and the record stops naming the path.
+        # And the record stops naming the path.
         (self.state / "paths.json").write_text(json.dumps({"gitrelay": "/nowhere/gitrelay"}))
         r = move.prepare("user:ann", "https://new.example")
         new_state = self.tmp / "new-config"
@@ -531,7 +531,7 @@ class Move(unittest.TestCase):
         self.assertNotIn("gitrelay", json.loads((new_state / "paths.json").read_text()))
 
     def test_a_state_this_build_does_not_read_is_refused(self):
-        # B600: before it lands, not at the next start.
+        # Before it lands, not at the next start.
         r = move.prepare("user:ann", "https://new.example")
         with mock.patch.object(move.stateversion, "SUPPORTED_FROM", 99):
             got = self._land(self.tmp / "config" / "move" / r["bundle"], r["token"])
@@ -573,7 +573,7 @@ class Move(unittest.TestCase):
         self.assertFalse((Path(got["moved_aside"]) / ".server.pid").exists(), "never set aside with the old state")
 
     def test_deploy_keys_go_to_the_helper_where_this_home_cannot_write_them(self):
-        # B966: the home's deploy-keys folder is the root helper's; a landing
+        # The home's deploy-keys folder is the root helper's; a landing
         # that merged into it stopped there and went back whole.
         dk = self.state / "deploy-keys"
         dk.mkdir()
@@ -599,7 +599,7 @@ class Move(unittest.TestCase):
         self.assertEqual(os.listdir(new_state / "deploy-keys"), [], "nothing written there by the landing itself")
 
     def test_a_landing_says_a_key_left_behind_and_spaces_with_no_folder(self):
-        # B953, B956: what stays locked, and the spaces whose repositories
+        # What stays locked, and the spaces whose repositories
         # did not come, said in the landing's result.
         (self.state / "claude-prefs.json").write_text(json.dumps({"projects": {"alpha": {}, "gone": {}}}))
         r = move.prepare("user:ann", "https://new.example")
@@ -669,7 +669,7 @@ class Move(unittest.TestCase):
         self.assertEqual((move.status()["how"], move.status()["landed_at"]), ("told", 5))
         self.assertEqual(self.audits[-1][0], "moved-by-landing")
         self.assertEqual(move.take_landing({"hash": th, "at": 5, "proof": move.landed_proof(key, 5)})[0]["moved"], True, "told twice is one answer")
-        # The pull's proof (R175 step 5): refused after the move, so a
+        # The pull's proof: refused after the move, so a
         # fresh old controller is armed for it.
         now = int(time.time())
         pull = lambda nonce, at=now, **kw: move.serve_fetch({"hash": th, "nonce": nonce, "at": at, "tproof": move.fetch_proof(key, nonce, at), **kw})  # noqa: E731
@@ -704,7 +704,7 @@ class Move(unittest.TestCase):
         path, why, st = pull("n2")
         m, _ = move.read_manifest(path)
         self.assertEqual(m["counts"]["state"], 3, "the record, the users and the later file")
-        # The new side answering the old one's asking (R175 step 4), once
+        # The new side answering the old one's asking, once
         # the bundle landed there.
         new_state = self.tmp / "new-config"
         new_state.mkdir()
@@ -720,7 +720,7 @@ class Move(unittest.TestCase):
         self.assertIn("tell_error", move.restored())
 
     def test_a_secrets_folder_the_dashboard_cannot_list_is_said_on_its_piece(self):
-        # B728: root's folder on a machine of its own was walked as empty,
+        # Root's folder on a machine of its own was walked as empty,
         # and the piece said nothing of it.
         os.chmod(self.secrets, 0o100)
         self.addCleanup(os.chmod, self.secrets, 0o700)
@@ -751,7 +751,7 @@ class Move(unittest.TestCase):
         self.assertNotIn("gitrelay", r["counts"], "no store ticked, none carried")
 
     def test_the_install_key_under_the_secrets_travels_only_by_its_tick(self):
-        # B619: an install keeps its key at secrets/install-key (lib/boot.sh);
+        # An install keeps its key at secrets/install-key (lib/boot.sh);
         # the secrets are packed whole, and the key went with them unticked.
         (self.secrets / "install-key").mkdir()
         (self.secrets / "install-key" / "key").write_bytes(b"k" * 32)
@@ -767,7 +767,7 @@ class Move(unittest.TestCase):
         self.assertEqual(pcs["secrets"]["size"], len("DEPLOY=1\n"), "the tick's size leaves the key's folder out too")
 
     def test_the_install_key_beside_the_state_travels_only_by_its_tick(self):
-        # B720: an install with no secrets folder keeps its key at
+        # An install with no secrets folder keeps its key at
         # /config/.install-key (lib/boot.sh), which the state's walk packed.
         (self.state / ".install-key").mkdir()
         (self.state / ".install-key" / "key").write_bytes(b"k" * 32)
@@ -778,7 +778,7 @@ class Move(unittest.TestCase):
             self.assertEqual("install-key" in names, carry)
 
     def test_the_database_goes_as_a_snapshot_never_a_file_copy(self):
-        # B720: the server writes its database all the while; a copy of the
+        # The server writes its database all the while; a copy of the
         # file read across a write is torn. What a backup reads is whole,
         # its log folded in, with no -wal or -shm beside it.
         import sqlite3

@@ -1,6 +1,6 @@
 """A line told to a Claude session on a node (the bell's Resume, Send to
 Claude): Enter only once the line is seen on the screen, and seen for long
-enough that an idle session's slow redraw is not taken for a dialog (B774)."""
+enough that an idle session's slow redraw is not taken for a dialog."""
 import os
 import sys
 import unittest

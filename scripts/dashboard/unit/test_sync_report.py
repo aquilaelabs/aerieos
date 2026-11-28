@@ -3,7 +3,7 @@ account's worktree of one (.worktrees/P/u_x). The controller keeps those
 names as sent, slashes included, because the session gate (server.py's
 session_where) looks a worktree's unit up under its real name: with the
 slashes stripped it was never found ready, and a session on a project the
-account has a worktree of waited for a copy that was there all along (B693)."""
+account has a worktree of waited for a copy that was there all along."""
 import os
 import sys
 import tempfile

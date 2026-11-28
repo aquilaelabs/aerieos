@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The notebook's Git view: what a project's repository holds, read out for
-the page, and the handful of things the page may do to it (roadmap R36).
+the page, and the handful of things the page may do to it.
 
 Every answer is git plumbing run on the CONTROLLER against
 the project's tree on the share (the one place with the credentials, the
@@ -18,7 +18,7 @@ DIFF_MAX bytes is cut with a line saying so, because a page is not the
 place to read a vendored library's arrival.
 
 Path-pure like changelog.py: functions take the project's directory,
-configure() only knows where the workspace and the worktrees are.
+configure only knows where the workspace and the worktrees are.
 """
 import contextvars
 import os
@@ -57,7 +57,7 @@ EXCLUDE = None            # tree -> the code map kept out of a new repository
 AUDIT = None              # (principal, action, project, detail) -> the audit row
 HOST_OF = None            # a remote's URL -> {name, kind} of the git host it is on
 CI_OF = None              # project -> what the last look at its CI found (ciwatch.read)
-CI_FIX = None             # (project, where) -> that finding's line written (ciwatch.fix, R117 step 4)
+CI_FIX = None             # (project, where) -> that finding's line written (ciwatch.fix)
 
 LOG_MAX = 100             # commits the history shows first, a page
 LOG_MOST = 2000           # ...and the most one read brings, paged a hundred at a time
@@ -82,7 +82,7 @@ def configure(*, workspace, worktrees=None, tell=None, tmux_name=None, state=Non
                      STATE=Path(state) if state else None)
 
 
-# ---- reading a tree without running what it carries (B153) -----------------
+# ---- reading a tree without running what it carries -----------------
 #
 # A session can write .git/config, .git/hooks and .gitattributes in its own
 # project, and git EXECUTES what those name: core.fsmonitor on status, a
@@ -101,7 +101,7 @@ def configure(*, workspace, worktrees=None, tell=None, tmux_name=None, state=Non
 # Objects are borrowed through alternates rather than copied, and refs are
 # mirrored by READING them off the filesystem rather than by asking git in the
 # tree, which would be the same exposure one step smaller. gitrelay owns that
-# reading already, for git's network half (B148).
+# reading already, for git's network half.
 #
 # WRITES go the same way, with the parts of the tree that are DATA rather than
 # instructions kept: its objects, so a commit's objects land where the session
@@ -244,7 +244,7 @@ def _atomic(path, text):
     whose temporary name is unique per call. A fixed `.new` raced with itself
     here: the Git view polls, two reads built the mirror at once, and the
     second rename found the file already moved, which _own answered by
-    falling back to the tree (B153, git.mjs asserts the log carries no
+    falling back to the tree (git.mjs asserts the log carries no
     fallback)."""
     statefile.write_text(path, text)
 
@@ -406,7 +406,7 @@ def _git(repo, *args, timeout=20):
     """stdout of one git READ in `repo`, or None when it failed.
 
     Through the controller's own git dir where one can be built, so the tree's
-    hooks, fsmonitor and diff drivers are not this process's to run (B153).
+    hooks, fsmonitor and diff drivers are not this process's to run.
     """
     own = _own(repo)
     argv = (["git", f"--git-dir={own}", f"--work-tree={repo}", *args] if own
@@ -495,7 +495,7 @@ def status(repo):
         if f["path"] in counts:
             f["added"], f["removed"] = counts[f["path"]]
     # Each file's time and size, so the page can tell a diff it already has
-    # from one that moved and read only those again (B833).
+    # from one that moved and read only those again.
     for f in st["files"]:
         try:
             s = os.lstat(os.path.join(repo, f["path"]))
@@ -614,7 +614,7 @@ def branches(repo):
     trees = _worktrees(repo)
     names = ACCOUNTS() if ACCOUNTS else {}
     # Which refs main already contains, in one call rather than one per row,
-    # and for the REMOTE refs too (roadmap R69 step 1). Until this the
+    # and for the REMOTE refs too. Until this the
     # "only on <host>" fold knew nothing about its own rows, so the one safe
     # delete, a branch whose every commit is already on main, was the one
     # thing the view could not offer.
@@ -649,7 +649,7 @@ def branches(repo):
                     mb, ma = int(parts[0]), int(parts[1])
             # Commits main lacks, but nothing in them main does not already
             # have: work that shipped another way, a revert, a rebuild
-            # elsewhere (R69 step 3). Ancestry alone calls that "N commits
+            # elsewhere. Ancestry alone calls that "N commits
             # waiting", which is what sent somebody merge-tree archaeology to
             # find out that merging it would move no file. Three dots, so the
             # question is what the branch ADDS since they parted, which does
@@ -658,7 +658,7 @@ def branches(repo):
             # A READ, through _git. It went through _run once, and _run
             # rebuilds the write directory before it starts: this is on the
             # Git view's poll path, so every poll tore the refs and the merge
-            # state out from under whatever write was in flight (B203).
+            # state out from under whatever write was in flight.
             # --quiet answers 0 for no difference, and _git answers None for
             # anything else, a failure included, which reads as "not the
             # same" and is the safe way to be wrong.
@@ -774,7 +774,7 @@ def branch_owner(repo, branch, trees=None, main=None, names=None):
     return ""
 
 
-# What changes the project directory's working tree, the owner's (B236):
+# What changes the project directory's working tree, the owner's:
 # action -> (what, for "only X can ..."; the question an administrator is put).
 TREE_WRITES = {
     "commit": ("commit in it", "Commit in {who}'s working tree?"),
@@ -792,7 +792,7 @@ def not_yours(repo, action, args, uid, kind="", admin=False):
     a refusal, {"confirm"} for the question to put before sending it again
     with `confirmed`.
 
-    The operator's rule, 24 Sep. A branch's own account does as it likes with
+    The rule: a branch's own account does as it likes with
     it, and main is everybody's. Anybody else who is not an administrator may
     not merge it, merge into it, have a session merge or rebase it, switch to
     it or delete it. An administrator may, since an administrator controls
@@ -803,7 +803,7 @@ def not_yours(repo, action, args, uid, kind="", admin=False):
     """
     args = args if isinstance(args, dict) else {}
     names = ACCOUNTS() if ACCOUNTS else {}
-    # The project directory is the owner's session's tree (B236): what writes
+    # The project directory is the owner's session's tree: what writes
     # its working files or moves its branch is the owner's, or an
     # administrator's who is asked and waits for that session to finish.
     tree = TREE_WRITES.get(action) or (TREE_WRITES["switch"] if action == "branch" and args.get("switch") else None)
@@ -843,7 +843,7 @@ def not_yours(repo, action, args, uid, kind="", admin=False):
         if not ask:
             continue                 # an administrator switches and deletes as git allows
         # The agent whose branch it is (claude/, codex/, copilot/, grok/): a
-        # Codex session works on its own branch in its own tree (R95 step 16).
+        # Codex session works on its own branch in its own tree.
         ag = agents.get(b.split("/", 1)[0]) or agents.default()
         if WORKING and WORKING(Path(repo).name, o, ag.id):
             return {"error": f"{who}'s {ag.name} session is working right now: "
@@ -884,7 +884,7 @@ def payload(project, what, sha="", path="", n=None, branch=""):
     return {"error": "unknown question"}
 
 
-# ---- the actions (R36 step 2) ----------------------------------------------
+# ---- the actions ----------------------------------------------
 # Each one is a FIXED git command with checked arguments, the way every
 # executing endpoint on this dashboard is a table lookup and never a string:
 # a ref through check-ref-format, a sha through SHA_RE against the log, a
@@ -894,7 +894,7 @@ def payload(project, what, sha="", path="", n=None, branch=""):
 # ssh alias, in its config already), which is why they run here and not on
 # a node. Refusals are sentences; nothing here guesses.
 
-# Whose press this git work is (R154): the server sets it for a person's
+# Whose press this git work is: the server sets it for a person's
 # request, so their own token is asked before the project's.
 ACTING = contextvars.ContextVar("git_acting", default="")
 
@@ -909,7 +909,7 @@ def _creds(repo):
     """The credential helper for this project, out of the CONTROLLER's own
     record rather than out of the tree's config.
 
-    B153 is why this is needed at all: the mirror copies `remote.*` and
+    Why this is needed at all: the mirror copies `remote.*` and
     `branch.*` from the tree and nothing else, because a credential helper is
     a command the tree names and this process is not going to run what a
     checkout asks it to. The consequence was a Git view that could read
@@ -933,7 +933,7 @@ def _run(repo, *args, env=None, timeout=30, index=True):
     """{code, out} of one git command, stderr folded into out.
 
     Through the controller's own git dir where one can be built, so what the
-    tree's config names is not this process's to run (B153). `index=False` for
+    tree's config names is not this process's to run. `index=False` for
     a command that has no business with the working tree: plumbing that reads
     objects and writes objects, where handing it the tree's index would let it
     stage things under somebody who is working in that checkout.
@@ -1068,7 +1068,7 @@ def act(repo, action, args, env=None, may_push=True):
         # changes along as git does: it starts at the commit they were made
         # on, so nothing is carried onto a wrong branch. Through switch's own
         # dirty check it was made and then refused, a branch left behind and
-        # the tree where it was (B858).
+        # the tree where it was.
         if args.get("switch") and at == "HEAD":
             return _done(_run(repo, "switch", "-c", name, env=env), f"on {name}, new")
         r = _run(repo, "branch", "--", name, at, env=env)
@@ -1102,7 +1102,7 @@ def act(repo, action, args, env=None, may_push=True):
         if name == into:
             return {"error": f"{name} is the branch the tree is on" if into == here
                              else f"{name} cannot be merged into itself"}
-        # Two branches with no commit in common (B234). git refuses them by
+        # Two branches with no commit in common. git refuses them by
         # default, because it is usually the wrong branch; here it is how a
         # project that began without a repository comes together, so the
         # page asks and sends `unrelated` with the answer. Asked last on each
@@ -1121,7 +1121,7 @@ def act(repo, action, args, env=None, may_push=True):
             # in-place merge below, and anything else is a shell's.
             main = _main_branch(repo)
             if into != main:
-                # No main at all (B164): a repository whose only branches
+                # No main at all: a repository whose only branches
                 # are neither main nor master. The name was interpolated
                 # empty and the refusal read "or on :".
                 if not main:
@@ -1221,7 +1221,7 @@ def act(repo, action, args, env=None, may_push=True):
             # Whether anything would be LOST is a different question, and for
             # work that shipped another way the answer is no: say which of
             # the two this is, so the second press is a decision rather than
-            # a shrug (R69 step 3).
+            # a shrug.
             main = _main_branch(repo)
             same = bool(main) and _run(repo, "diff", "--quiet", f"{main}...{name}",
                                        index=False)["code"] == 0
@@ -1233,7 +1233,7 @@ def act(repo, action, args, env=None, may_push=True):
         return _done(r, f"{name} deleted")
     if action == "delete-remote":
         # The branch on the git host, which is a push that removes a ref
-        # rather than anything local (R69 step 1). Offered only where it
+        # rather than anything local. Offered only where it
         # cannot lose work: every commit on it is already on main, checked
         # HERE and not only in the view, because what the row says and what
         # the button does have to be the same fact.
@@ -1270,7 +1270,7 @@ def _behind_upstream(repo, branch):
     A merge into a branch whose upstream has moved is how a copy of main on
     the share ends up 294 commits behind the git host and one commit ahead of
     it at the same time: the merge is fine, and then it cannot go anywhere
-    without a reconcile nobody asked for (R69 step 2). The network bar
+    without a reconcile nobody asked for. The network bar
     already says pull first when both have moved; this is the same sentence
     said before the thing that causes it, rather than after.
     """
@@ -1356,7 +1356,7 @@ def _no_cred_why(repo, out):
     if m:
         host = m.group(1)
     where = f"{host} " if host else ""
-    # Each person's own token (R159; the operator, 23 Nov): the one asking
+    # Each person's own token: the one asking
     # is told about theirs.
     if _creds(repo):
         return (f"{where}rejected your token for this space: it is expired, revoked "
@@ -1367,7 +1367,7 @@ def _no_cred_why(repo, out):
             "Git said it had no credential and no terminal to ask at.")
 
 
-# ---- Send to Claude (R36 step 3) --------------------------------------------
+# ---- Send to Claude --------------------------------------------
 # A commit, a diff, a branch or a conflict, handed to the project's session
 # as a line the operator could have typed, the way a roadmap step and the
 # version question arrive. The line names what was picked precisely enough
@@ -1388,7 +1388,7 @@ ASKS = {
 
 def ask(repo, project, kind, args, sessions=(), session=""):
     """Compose the ask and type it into `session`: the presser's own Claude
-    session on the project (B235). The bare name alone was the owner's, so a
+    session on the project. The bare name alone was the owner's, so a
     second account's press typed into the owner's conversation."""
     if TELL is None or TMUX_NAME is None:
         return {"error": "no way to reach a session from here"}
@@ -1439,7 +1439,7 @@ def in_use(project, action, args, uid):
     and the session is no reason to refuse it: that is the merge the
     operator makes to accept a session's work while it keeps working."""
     # A new branch switched to moves the branch the session is on as a
-    # switch does (B859: it went round this, the tree moved under an open
+    # switch does (it went round this, the tree moved under an open
     # session).
     switching = action == "switch" or (action == "branch" and bool(args.get("switch")))
     lands_here = switching or (
@@ -1451,7 +1451,7 @@ def in_use(project, action, args, uid):
     # while that session is open at all, since it changes the branch the
     # session is on; a merge only while it is WORKING, since a session at
     # its prompt sees the changed files when it next reads them, and it
-    # was one merely open that refused the operator's own merge, 24 Sep.
+    # was one merely open that refused the operator's own merge.
     # "your" to the owner: "the owner's" read as somebody else's.
     owner_uid = OWNER_UID()
     whose = "your" if uid == owner_uid else f"{OWNER_NAME()}'s"
@@ -1464,7 +1464,7 @@ def in_use(project, action, args, uid):
     return ""
 
 
-# A push read for secrets first (R219, pushscan through gitrelay): SCAN
+# A push read for secrets first (pushscan through gitrelay): SCAN
 # answers {held: [findings]} for the project's tree and OKAY records what a
 # person approved. Set by server.py; None in a test that has neither.
 SCAN = None
@@ -1472,18 +1472,18 @@ OKAY = None
 
 
 def verb(project, action, req, me, *, prefix, principal):
-    """One of the Git view's actions (roadmap R36 step 2), once server.py
-    has let this account act on the project and in_use() has said the tree
+    """One of the Git view's actions, once server.py
+    has let this account act on the project and in_use has said the tree
     is free: `ask` puts a question to the presser's own session, and
-    anything else is act() under the account's author and the project's
+    anything else is act under the account's author and the project's
     own credentials, audited. {ok} or {error}."""
     if action == "ask":
-        # The presser's own session, by the name the roadmap's send uses
-        # (B235): the bare name alone was the owner's.
+        # The presser's own session, by the name the roadmap's send uses:
+        # the bare name alone was the owner's.
         return ask(WORKSPACE / project, project, field(req, "kind"), req.get("args") or {},
                    SESSIONS(), session=running_session(prefix, project, set(SESSIONS()), field(req, "session")))
     if action == "ci-fix":
-        # The CI watch's fix for one line (R117 step 4): written into the
+        # The CI watch's fix for one line: written into the
         # working tree, uncommitted, never pushed; Changes shows it.
         args = req.get("args") if isinstance(req.get("args"), dict) else {}
         r = CI_FIX(project, str(args.get("where") or "")) if CI_FIX else {"error": "the CI watch is off"}
@@ -1516,7 +1516,7 @@ def verb(project, action, req, me, *, prefix, principal):
 
 
 def view(name, what, sha="", path="", n=0, branch=""):
-    """The notebook's Git view (roadmap R36): plumbing reads on the
+    """The notebook's Git view: plumbing reads on the
     project's tree, for a project the server has let this account see. A
     sha and a path are checked here against what the repository itself
     reports; nothing from the query reaches a command line as anything
@@ -1528,12 +1528,12 @@ def view(name, what, sha="", path="", n=0, branch=""):
         # the project's push rights, granted once in the clone dialog.
         r["remote"] = has_remote(WORKSPACE / name)
         r["push"] = MAY_PUSH(name)
-        # Whose working tree this is (B236): the page says so to anybody
+        # Whose working tree this is: the page says so to anybody
         # else, and offers them nothing that changes it.
         r["owner"] = OWNER_NAME() or ""
         # The host by its name (GitHub, Gitea, or the machine's own),
         # so the view can say "in step with GitHub" and not "origin".
         r["host"] = HOST_OF(remote_url(WORKSPACE / name))
-        # What the CI watch last found (R117), for the CI section.
+        # What the CI watch last found, for the CI section.
         r["ci"] = CI_OF(name) if CI_OF else {}
     return r

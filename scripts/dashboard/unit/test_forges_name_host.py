@@ -1,4 +1,4 @@
-"""Migration 0044 (R205): a forge token kept before entries had ids (keyed
+"""Migration 0044: a forge token kept before entries had ids (keyed
 by its host, with no host of its own) and one kept with a port's colon as
 git's credential lines write it (%3a) each come out naming the host
 accountkeys._entries made of them until 27 Nov, so the account's Keys page

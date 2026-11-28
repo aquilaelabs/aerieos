@@ -2,8 +2,8 @@
 // language (colors as tokens, type, shape, space, motion and the operator's
 // own rules) and pages laid out as labeled blocks on a phone or desktop
 // frame, each named for what it is for and the platform it is built for.
-// Two sections, the pages and the themes, open like every page's (the
-// operator, 19 Oct: they folded for no reason); each shows one at a time, chosen on a pulldown, and each entry, the
+// Two sections, the pages and the themes, open like every page's
+// (they folded for no reason); each shows one at a time, chosen on a pulldown, and each entry, the
 // language included, carries its rules as a section inside it, every rules
 // list the Briefing's.
 // Every edit is staged and its section's Save (Themes or Pages) writes it at
@@ -27,7 +27,7 @@ function nbDesignView({$, nb, project, root}){
   // so two pages added before a Save do not share a board.
   nb.dsSel = {};
   // Which theme, rule and page each section shows: one at a time, chosen
-  // on the section's pulldown (the operator, 28 Sep: listing every page
+  // on the section's pulldown (listing every page
   // and every theme at once was the whole view scrolled past). A theme and
   // a rule by index, a page by its key; what is added is shown.
   nb.dsShow = {theme: 0, page: null};
@@ -60,7 +60,7 @@ function nbDsClone(o){ return JSON.parse(JSON.stringify(o)); }
 function nbDsHolderSlug(name){ return (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "color"; }
 
 // Nothing here changes: a locked project's notebook, or a role that reads
-// the project and does not write it (B101).
+// the project and does not write it.
 function nbDsRo({root, project}){ return root.classList.contains("ro") || !!projWriteWhy(project); }
 
 function nbDsLoadDesign(ds){
@@ -84,7 +84,7 @@ function nbDsLoadDesign(ds){
 }
 
 // ---- the glance and the add bar ---------------------------------------------
-// Its pages and themes as tiles (R109), and the file's state on the line
+// Its pages and themes as tiles, and the file's state on the line
 // under them, with no pages said there while there are none.
 function nbDsDrawHint(ds){
   const {$, nb} = ds;
@@ -124,8 +124,8 @@ function nbDsFillTemplates(ds){
   drawHTML(tpl, rows.map(t => `<option value="${esc(t.key)}">${esc(t.label)}</option>`).join(""));
   if (was && rows.some(t => t.key === was)) tpl.value = was;
 }
-// The add bar is drawn at the top of the Pages section on every draw
-// (the operator, 29 Sep), so it is wired then rather than once.
+// The add bar is drawn at the top of the Pages section on every draw,
+// so it is wired then rather than once.
 function nbDsWireAdd(ds){
   const {$, nb, root} = ds;
   if (!$("dsAdd")) return;
@@ -176,7 +176,7 @@ function nbDsTouched(ds){
 
 // ---- drawing --------------------------------------------------------------------
 function nbDsOpt(rows, cur, keyed = "key", labeled = "label"){ return optionList((rows || []).map(r => [r[keyed], r[labeled]]), cur); }
-// Its editors are forms like every other (R301; the operator, 27 Nov): each
+// Its editors are forms like every other: each
 // field formField, its label over it.
 
 // What each section shows, kept in range: a removed theme leaves the
@@ -195,7 +195,7 @@ function nbDsDrawDesign(ds){
   if (!nb.dsData){ drawHTML(body, skel("design")); return; }
   const sh = nbDsShown(ds);
   nb.dsRuleLists = {};
-  // Patched (R244): an edit draws the view again, and the control it was
+  // Patched: an edit draws the view again, and the control it was
   // made in keeps its focus, a field its caret, a fold its state. Every
   // handler below is set rather than added, the patch keeping the element.
   patch(body, nbDsPagesSection(ds, sh.page) + nbDsThemesSection(ds, sh.theme));
@@ -212,9 +212,9 @@ function nbDsDrawDesign(ds){
     paginate(host, ":scope > details.rulerow", {key, noun: "rules"});
   });
   // A project read-only to you reads its design: what a role does not give
-  // is not drawn (the operator, 21 Oct), so every press that would change
+  // is not drawn, so every press that would change
   // it is gone, a fold's own toggle kept, and the fields stay to read,
-  // dead, the pulldowns that pick what is shown live (B293).
+  // dead, the pulldowns that pick what is shown live.
   // Taken away, so a project that is yours to change again gives them back.
   giveBack(body);
   if (nbDsRo(ds)){
@@ -230,7 +230,7 @@ function nbDsPick(id, text, rows, cur, help = ""){
 }
 
 // One of the language's four choices. Its first line is no choice at
-// all, which is where a design starts (the operator, 29 Sep): each
+// all, which is where a design starts: each
 // choice carries a sentence a session holds the work to, so one that
 // nobody made must say nothing.
 function nbDsChoice(rows, cur){ return `<option value=""${cur ? "" : " selected"}>not chosen</option>` + nbDsOpt(rows, cur); }
@@ -278,7 +278,7 @@ function nbDsThemesSection(ds, t){
 // rule first, then a row a rule, folded, its name and whether it stands
 // in every briefing or arrives on its triggers, opening to be read, and
 // Edit turning the row into its form. The same list serves the language's
-// rules, a theme's own and a page's own (the operator, 29 Sep): a rules
+// rules, a theme's own and a page's own: a rules
 // section inside the page and the theme, following the pulldown.
 function nbDsRulesList(ds, key, rules){
   const {nb} = ds;
@@ -410,7 +410,7 @@ function nbDsThemeBand(ds, t, i, n){
     </div>`;
 }
 
-// The theme's other half (R216): the same tokens for the opposite mode,
+// The theme's other half: the same tokens for the opposite mode,
 // so one name is one scheme with a dark half and a light one, and the
 // app's mode switch picks the half. Started from the colors above, names
 // and meanings kept, hexes to be set; removed whole.
@@ -429,7 +429,7 @@ function nbDsLightHalf(t, i){
 
 // The pages: the add bar (a platform, a template, Add page), a pulldown
 // of them, and the chosen one's board and fields. Shut on a new tab,
-// like the language and the themes (the operator, 29 Sep): the board is
+// like the language and the themes: the board is
 // the big thing on this view, and it opens on what is added.
 // A page's line: what it is for, its platform and how many blocks.
 function nbDsPageSaid(ds, p){
@@ -441,8 +441,7 @@ function nbDsPagesSection(ds, p){
   const n = nb.dsPages.length;
   const P = nbDsPresets(ds);
   // A new page starts from a template, or as a copy of a page here (its
-  // blocks, layouts, rules and notes), blank by default (the operator,
-  // 29 Sep).
+  // blocks, layouts, rules and notes), blank by default.
   const add = `<div class="field" data-add="design">${formBox({fields: [
         formField("dsPlatform", "Platform", `<select id="dsPlatform"></select>`, {help: "the platform the new page is for"}),
         formField("dsTemplate", "Template", `<select id="dsTemplate"></select>`, {help: "the layout the new page starts from"}),
@@ -540,7 +539,7 @@ function nbDsBoardHtml(ds, p){
   const key = nbDsKeyOf(p);
   // In the blocks' order, which is the drawing order: a later one draws
   // over an earlier one where they overlap, and the layers beside the
-  // board are the way to one another covers (the operator, 29 Sep).
+  // board are the way to one another covers.
   const inner = p.blocks.length
     ? p.blocks.map((b, i) => `<div class="dsblock${nb.dsSel[key] === i ? " on" : ""}" tabindex="0" role="button"
             data-i="${i}" data-style="${nbDsBlockStyle(ds, b)}" aria-label="${esc(nbDsKindLabel(ds, b.kind))}${b.label ? ": " + esc(b.label) : ""}">
@@ -662,8 +661,8 @@ function nbDsSettle(p, i, before, sizing){
   }
   return moved;
 }
-// A page remembers where its blocks sat on each frame it has been on
-// (B348): to Phone and back to Desktop left them squeezed into the
+// A page remembers where its blocks sat on each frame it has been on:
+// to Phone and back to Desktop left them squeezed into the
 // phone's six columns, because the clamp that fits them to the smaller
 // frame was never undone. Leaving a frame keeps its layout; arriving on
 // one that has a layout for these blocks takes it, and only a frame
@@ -770,7 +769,7 @@ function nbDsWireBlocks(ds, el, p, key){
     if (e.target.value) b.in = +e.target.value; else delete b.in;
     // Brought within its parent now, here and on every other frame's
     // layout, and drawn over it: a block that came before its parent in
-    // the list moves to just after it (the operator, 29 Sep).
+    // the list moves to just after it.
     if (b.in){
       nbDsFitIn(b, p.blocks[b.in - 1]);
       for (const rows of Object.values(p.layouts || {})) nbDsFitIn(rows[i], rows[b.in - 1]);
@@ -930,7 +929,7 @@ function nbDsWireThemes(ds, body, t){
   body.querySelector("#dsThemeAdd").onclick = () => {
     const key = body.querySelector("#dsThemeFrom").value;
     // Blank, a preset, or a copy of a theme here, choices and rules
-    // included (the operator, 29 Sep).
+    // included.
     let nt, base;
     if (key.startsWith("copy:")){
       const src = L.themes[+key.slice(5)];
@@ -981,7 +980,7 @@ function nbDsWireThemeBand(ds, body, t){
     const f = nbDsFromScheme(P, e.target.value, t.name);
     // An action, not a setting: the pulldown goes back to keeping the
     // colors once they are filled. Its markup always draws that first
-    // line, so a patch alone would leave the pick showing (R244).
+    // line, so a patch alone would leave the pick showing.
     e.target.value = "";
     t.mode = f.mode; t.colors = f.colors; nbDsTouched(ds); nbDsDrawDesign(ds);
   };
@@ -1024,12 +1023,12 @@ function nbDsWireThemeBand(ds, body, t){
   };
 }
 
-// The view is passive by design (the operator, 28 Sep): nothing here
+// The view is passive by design: nothing here
 // reaches into a session. A session meets the design on its own, through
 // the rules the briefing names and aerie design show, and a person who wants
 // it applied now copies the prompt into one.
 
-// ---- each section's Save and Revert (the operator, 5 Oct) -------------------------
+// ---- each section's Save and Revert -------------------------
 // The design is one record, but its two sections stage apart: Themes holds
 // the language (its themes, choices, notes and rules), Pages the pages. A
 // section's Save writes its half over what is saved of the other, and its

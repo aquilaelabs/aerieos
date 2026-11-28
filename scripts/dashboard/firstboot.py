@@ -1,4 +1,4 @@
-"""A prepared configuration's first boot on the controller (R161 step 8).
+"""A prepared configuration's first boot on the controller.
 
 The stick's root step (image/mkosi.extra/usr/lib/aerieos-os/firstboot-take)
 takes builderbot/firstboot.json off the ESP before the controller starts and
@@ -11,7 +11,7 @@ the plan names disks, which that page walks through. What
 needs disks adopted first (the shares, the pools, the array) and the apps
 are kept for the piece that adopts them, said as waiting. The handed file is
 removed; what is kept in /config/firstboot.json never holds the password
-hash nor an SMB hash. The own node's row draws the report (view()).
+hash nor an SMB hash. The own node's row draws the report (view).
 
 Format 1:
     {"format": 1, "first_run": "skip" | "ask",
@@ -28,14 +28,14 @@ import time
 from pathlib import Path
 
 RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/var/lib/aerieos-os/firstboot/firstboot.json"))
-# ...where an image before it handed it over, in memory (B943).
+# ...where an image before it handed it over, in memory.
 RUN_BEFORE = Path("/run/aerieos-os/firstboot/firstboot.json")
 STATE = None
 # The name a pool may be mounted under (adopt.POOL_RE, nodes._adopt_want).
 POOL_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 PCI_ADDR = re.compile(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]")
 write_json = users = settings = None
-hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)
+hold_first = lambda: None    # noqa: E731 (held.arm_first)
 WAITS = {"shares": "a share is served from a pool or the array once they are adopted",
          "pools": "adopted on the Nodes page, under The old system's disks: Check, then Adopt",
          "array": "adopted on the Nodes page, under The old system's disks: Check, then Adopt",
@@ -67,7 +67,7 @@ def _write_private(path, data):
 
 
 def people_after_claim():
-    """The plan's people made once the owner is (B946), where the stick came
+    """The plan's people made once the owner is, where the stick came
     with no owner's password: said on This machine's From the stick, the
     kept file then gone. Nothing when there were none."""
     p = _people_file()
@@ -122,14 +122,14 @@ def apply(path=None):
                     settings.set_many({"setup_done": True})
                     done.append({"what": "first run", "said": "skipped: the owner signs in"})
         else:
-            # Its people kept until the first-run page makes the owner (B946):
+            # Its people kept until the first-run page makes the owner:
             # their SMB passwords are what the shares are served to.
             ppl = [{k: p.get(k) for k in ("name", "role", "smb_nt") if p.get(k)} for p in cfg.get("people") or [] if isinstance(p, dict)]
             if ppl:
                 _write_private(_people_file(), {"people": ppl})
             waiting.append({"what": "accounts", "said": "no owner's password came with it: the first-run page makes the owner"
                             + (f", and the {len(ppl)} people it names are made then" if ppl else "")})
-        # Held on the disks (R161 step 11): the start this configuration came
+        # Held on the disks: the start this configuration came
         # with shows them on the Nodes page before anything mounts.
         if cfg.get("hold_first_start"):
             hold_first()
@@ -156,7 +156,7 @@ def apply(path=None):
 
 
 def adopt_want(cfg):
-    """What the stick's plan names to adopt (R163 step 9), as the
+    """What the stick's plan names to adopt, as the
     storage-adopt request takes it: the data disks by slot and serial with
     their filesystem, the parity disks to leave alone, the pools by name and
     UUID; an encrypted disk is listed apart with why, since its key is not
@@ -167,7 +167,7 @@ def adopt_want(cfg):
     # and emulated from the parity, wrong, new): its contents may live only
     # in the parity until the old system rebuilds it, so it is set apart,
     # and the array is said degraded, which refuses a writable adoption and
-    # the takeover (B940); a slot with no disk at all is no disk.
+    # the takeover; a slot with no disk at all is no disk.
     degraded = []
     for x in [*(ar.get("disks") or []), *(ar.get("parity") or [])]:
         if not isinstance(x, dict):
@@ -193,7 +193,7 @@ def adopt_want(cfg):
     parity = [{"slot": str(x.get("slot") or "parity"), "id": str(x["id"])} for x in ar.get("parity") or [] if isinstance(x, dict) and x.get("id")]
     # A pool the adopt cannot take is set apart with why, as a disk is: one
     # left in the request would fail its shape check whole, and nothing of
-    # the stick's would adopt (B612).
+    # the stick's would adopt.
     pools = []
     for p in (cfg or {}).get("pools") or []:
         if not isinstance(p, dict) or not p.get("name"):
@@ -207,12 +207,12 @@ def adopt_want(cfg):
             skipped.append({"slot": name, "id": uuid or name, "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
         else:
             pools.append({"name": name, "fs": fs, "uuid": uuid})
-    # A cache disk the old system kept in its array's cache slot (B625: no
+    # A cache disk the old system kept in its array's cache slot (no
     # config/pools, as before its pools), offered as a pool named for its
     # slot and found by its disk, since no pool record names its UUID. Only
     # then: with pool records, the cache slots are their members (cache,
     # cache2), and a second member taken as a pool of its own never imports
-    # and holds the merged tree back for good (B941).
+    # and holds the merged tree back for good.
     has_records = any(isinstance(p, dict) and p.get("name") for p in (cfg or {}).get("pools") or [])
     rows = [x for x in ([] if has_records else ar.get("cache") or []) if isinstance(x, dict) and x.get("id")]
     slots = {str(x.get("slot") or "cache") for x in rows}
@@ -238,8 +238,8 @@ def adopt_want(cfg):
 
 
 def share_requests(cfg):
-    """The plan's shares as storage-share's set-many takes them (R163 step
-    9), each served from the merged tree where its files were: SMB as its
+    """The plan's shares as storage-share's set-many takes them,
+    each served from the merged tree where its files were: SMB as its
     security said (public: everybody as a guest; secure: everybody reads as a
     guest and its writers write; private: the people on its lists, each as read
     or write), NFS to the hosts its export named, a Time Machine share kept one.
@@ -298,7 +298,7 @@ def kept_config():
 
 
 def mover_moves(pools, cfg=None):
-    """Each share's places on an array taken over (R163 step 3), as the
+    """Each share's places on an array taken over, as the
     old system had them: [{share, land, from, to}], land where its new
     files go (a pool, or the array) and the mover's from and to (both empty
     when it leaves the share be). A share that wrote to a pool and moved to
@@ -337,7 +337,7 @@ def mover_cron(cfg=None):
 
 
 def met(waiting, done, reported):
-    """The waits the machine has met since the report was written (B634):
+    """The waits the machine has met since the report was written:
     the array once a data disk the plan named is mounted, the pools once
     one is, the shares once the machine serves any; each moves to done with
     what is there now. The report on disk is left as written."""
@@ -364,7 +364,7 @@ def view(reported=None):
     """The own node's section: what the stick's prepared configuration did,
     and what its plan names to adopt; None when this install had none.
     `reported` is the machine's own node's census, which says which waits
-    have been met since (B634)."""
+    have been met since."""
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -385,10 +385,10 @@ def view(reported=None):
             "mover_cron": mover_cron(cfg), "mover_words": _cron_words(mover_cron(cfg)),
             "shares": {"rows": rows, "notes": notes} if rows or notes else None,
             # Where the old system's containers and VMs are read from, and its
-            # networks of fixed addresses (R163 steps 10, 11).
+            # networks of fixed addresses.
             "apps_from": {"docker": {"image": str(dk.get("image") or ""), "autostart_file": str(dk.get("autostart_file") or "")},
                           "vms": {"image": str(vm.get("image") or ""),
-                                  # The devices it held for its VMs from boot (R163 step 16).
+                                  # The devices it held for its VMs from boot.
                                   "vfio": [str(a) for a in (vm.get("vfio") or [])[:32] if isinstance(a, str) and PCI_ADDR.fullmatch(a)]},
                           "networks": nets,
                           "containers": len(cfg.get("apps") or [])} if dk or vm or cfg.get("apps") else None}

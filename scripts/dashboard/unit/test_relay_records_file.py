@@ -1,4 +1,4 @@
-"""A records file named on a node reaches the controller (B962): `aerie bug
+"""A records file named on a node reaches the controller: `aerie bug
 add --from FILE` and `aerie roadmap add --from FILE` were relayed with the
 path alone, and the controller's copy of the tree holds nothing in dist/ or
 /tmp, so the read said No such file for a file that was there. The node's

@@ -1,4 +1,4 @@
-"""/config's state version (R79): a fresh /config is stamped, one newer
+"""/config's state version: a fresh /config is stamped, one newer
 than the build or older than it migrates from is refused in one sentence,
 one about to move is copied first (the newest three kept, what grows left
 out), and the numbered migrations past the stamp run once, in order, each
@@ -174,7 +174,7 @@ class Gate(unittest.TestCase):
 
 
 class ClaimFromAShell(unittest.TestCase):
-    """B436: the owner made from a shell on a new install, before its first
+    """The owner made from a shell on a new install, before its first
     start, leaves a stamped store, which that start takes as its own."""
     def test_a_claim_on_a_fresh_store_stamps_it(self):
         import subprocess
@@ -216,7 +216,7 @@ class Migrate(unittest.TestCase):
         self.assertEqual(sv.read(self.state), (3, "0.6.0"))
 
     def test_a_schema_change_runs_in_the_one_sequence_and_on_a_fresh_install_alone_of_the_two_kinds(self):
-        # R295: statemigrations/ holds the database's changes too, numbered
+        # statemigrations/ holds the database's changes too, numbered
         # with /config's; a fresh /config runs the schema files and no .py.
         (self.mig / "0004_add_t.sql").write_text("CREATE TABLE t (x INTEGER);\n")
         (self.mig / "0005_m.py").write_text("def run(ctx):\n    ctx['ran'].append(5)\n")
@@ -242,7 +242,7 @@ class Migrate(unittest.TestCase):
                 if p.is_file() and not sv._skipped(p.relative_to(self.state).parts[0])}
 
     def test_a_failure_puts_the_state_back_and_stops_the_start(self):
-        # The operator, 13 Nov: it went on, the new build running on state
+        # It went on, the new build running on state
         # half changed, with one line in the log.
         (self.state / "state.json").write_text('{"state": 1, "by": "0.5.0"}')
         (self.state / "roadmap.json").write_text('{"items": [1, 2, 3]}')
@@ -357,7 +357,7 @@ class Migrate(unittest.TestCase):
             self.assertIn("disk full", sv.HELD)
             self.assertEqual(sv.migrate(self.state, {"ran": []}), [])
         self.assertEqual(sv.read(self.state), (None, ""))
-        # B109: said where aerie doctor reads it, and cleared once nothing is held.
+        # Said where aerie doctor reads it, and cleared once nothing is held.
         self.assertIn("disk full", (self.state / sv.HELD_FILE).read_text())
         with mock.patch.object(sv, "HELD", ""), redirect_stdout(io.StringIO()):
             sv.gate(self.state, "0.6.0")
@@ -365,7 +365,7 @@ class Migrate(unittest.TestCase):
 
     @unittest.skipIf(os.geteuid() == 0, "root reads everything")
     def test_what_it_cannot_read_does_not_hold_the_upgrade(self):
-        # B109: the root-only runner-tokens volume stopped every upgrade.
+        # The root-only runner-tokens volume stopped every upgrade.
         (self.state / "users.json").write_text('{"users": {}}')
         (self.state / "wiki" / "alpha").mkdir(parents=True)
         rt = self.state / "runner-tokens"

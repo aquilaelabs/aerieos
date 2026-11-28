@@ -1,6 +1,6 @@
 // The Claude sign-in (signin.py, claudegrant.py, page-signin.js): one
 // account's, on one node. A person signs in on each node they work on, from
-// that node's Installed page (R95 step 15, R172), and signs out there; a project's Claude
+// that node's Installed page, and signs out there; a project's Claude
 // button goes to its node's sign-in when that node has none; and an account
 // that does not administer sees a node's settings and changes nothing on it
 // but its own sign-in.
@@ -23,7 +23,7 @@ const me = uidOf('test');
 
 // ---- a node of this file's own ----------------------------------------------
 const box = await call('/api/v1/nodes', { action: 'enroll', name: 'signbox' });
-// Codex CLI installed beside Claude Code, as its census says it (R95 step 3).
+// Codex CLI installed beside Claude Code, as its census says it.
 const SE = { up: true, term: true, user: 'bb', workspace: true, writable: true, boot: '4.4', up_s: 5000, claude: '1.0.0 (Claude Code)',
              codex: 'codex-cli 0.163.0' };
 const agent = await call('/api/v1/agent/enroll',
@@ -32,7 +32,7 @@ const agent = await call('/api/v1/agent/enroll',
 const asNode = { Authorization: 'Bearer ' + agent.token };
 // The heartbeat, which is also how an agent takes its next job: what it says
 // about sessions and logins rides the sample.
-// ...with each project's synced copy there (R163), as an agent says.
+// ...with each project's synced copy there, as an agent says.
 const beat = (sample = {}) => call('/api/v1/agent/work', { sample: { cpu_pct: 1, mem_mb: 4096, mem_used_mb: 512,
   sync: { alpha: { ready: true, rev: 1 }, beta: { ready: true, rev: 1 }, gamma: { ready: true, rev: 1 }, delta: { ready: true, rev: 1 } }, ...sample }, running: [], wait: 0 }, asNode);
 await beat({ sessions: [] });
@@ -43,8 +43,8 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
 await page.goto(URL);
 await ready(page);
-// Since R170 a node's sign-in lives on the Library, on the agent's card, opened by the door that names it.
-// Since R181 step 2 it is on Claude Code's own page on that node.
+// A node's sign-in lives on the Library, on the agent's card, opened by the door that names it.
+// It is on Claude Code's own page on that node.
 const block = () => page.$eval(`.thingtab [data-instnode="${box.id}"][data-thing="agent:claude-code"] [data-signin="${box.id}"][data-siagent="claude"]`, e => e.textContent.replace(/\s+/g, ' ').trim());
 const redraw = () => page.evaluate(async () => { await refresh(); readMoved('nodes'); drawPanes(); });
 
@@ -52,7 +52,7 @@ const redraw = () => page.evaluate(async () => { await refresh(); readMoved('nod
 await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'beta')?.session_node);
 ok(await page.evaluate(([a, b]) => !!claudeOn(a) && !claudeOn(b), [sandbox.id, box.id]),
    'signed in on one node is not signed in on another: each is asked about by itself');
-// The project's Claude button is on its card on the Projects page (R218 step 3).
+// The project's Claude button is on its card on the Projects page.
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.pgrid .pcard[data-row="beta"] [data-c]', { timeout: 15000 });
 const PC = '.pgrid .pcard[data-row="beta"] [data-c]';
@@ -69,8 +69,8 @@ await page.waitForSelector('#resumemenu [data-signin-node]', { timeout: 20000 })
 const menu = await page.$eval('#resumemenu', m => ({ head: m.querySelector('.rmhead b')?.textContent.trim() || '',
   lines: [...m.querySelectorAll('.rmline')].map(l => `${[...l.querySelector('.rmwho').children].map(e => e.textContent.trim()).join(' ')}: ${
     [...l.querySelectorAll('button')].map(b => b.textContent.trim()).join('/')}`) }));
-// Start is one line, the agents installed there a pulldown (the operator,
-// 26 Oct): Claude first with its sign-in in place of New, and ChatGPT among
+// Start is one line, the agents installed there a pulldown:
+// Claude first with its sign-in in place of New, and ChatGPT among
 // them, Codex CLI being there too, with its own sign-in once picked.
 const startOf = () => page.$eval('#resumemenu', m => { const l = m.querySelector('.rmline:has(#rmAgentSel)');
   return { agents: [...(m.querySelector('#rmAgentSel')?.options || [])].map(o => o.textContent.trim()),
@@ -92,8 +92,8 @@ ok(await terms() === before && await page.$('#resumemenu') === null
    && (await page.evaluate(() => location.hash)) === `#/machines/installed/${encodeURIComponent(box.id)}/${encodeURIComponent('agent:claude-code')}`,
    '...which opens Claude Code\'s own page on that node at its sign-in (R181 step 2), and starts no session');
 // The page holds the coding agents installed on the node, and Claude Code
-// whether or not it is, in the table's order, each saying where it stands
-// (R95 step 15, R172): here Claude Code and Codex CLI are installed, a row
+// whether or not it is, in the table's order, each saying where it stands:
+// here Claude Code and Codex CLI are installed, a row
 // each on the Installed page.
 await page.evaluate(id => openInstalledOn(id), box.id);
 await page.waitForFunction(id => !!document.querySelector(`.installedtab [data-instnode="${id}"] .irow[data-irow^="agent:"]`), box.id, { timeout: 20000 });
@@ -205,7 +205,7 @@ ok(/signbox is draining and takes no new work/.test(await block()) && drained.st
    `a node that takes no work offers no sign-in, with the reason on the row, and the server says the same (${drained.error})`);
 await call('/api/v1/nodes', { action: 'online', id: box.id });
 
-// ---- another coding agent's sign-in, on this node (R95 step 3) --------------
+// ---- another coding agent's sign-in, on this node --------------
 // ChatGPT's, for Codex CLI: a device flow, so the section shows the link and
 // the one-time code the flow printed, for the person to enter on OpenAI's
 // page; nothing is pasted back. The node's report names the account.
@@ -244,23 +244,23 @@ await section("another coding agent's sign-in, on this node", async () => {
   await call('/api/v1/agent/result', { job: xo.id, state: 'succeeded', exit: 0 }, asNode);
 });
 
-// ---- the agent a project's Start opens (R95 step 4) --------------------------
+// ---- the agent a project's Start opens --------------------------
 await section("the agent a project's Start opens", async () => {
   const set = await call('/api/prefs', { project: 'beta', agent_default: 'codex' });
   await page.evaluate(() => openProjectsTab());
-  // One word on every card (the operator, 22 Oct): Start agent, the agent it
+  // One word on every card: Start agent, the agent it
   // opens named in its title and first in its chooser.
   await refreshUntil(page, () => (b => !!b && /^ChatGPT:/.test(saidOf(b)))(document.querySelector('.pgrid .pcard[data-row="beta"] [data-c]')));
   ok(!set.error && await page.$eval(PC, b => b.textContent.trim() === 'Start agent' && /^ChatGPT:/.test(saidOf(b))),
      `a space whose settings name ChatGPT says Start agent on its card, its title naming ChatGPT (${set.error || 'saved'})`);
-  // Every agent in the table starts a session now (Any model since R144), so
+  // Every agent in the table starts a session now (Any model), so
   // the one that cannot is one the table does not have.
   const refused = await call('/api/prefs', { project: 'beta', agent_default: 'nope' });
   ok(refused.status === 400 || /agent_default is one of/.test(refused.error || ''),
      `...and an agent that cannot start a session is refused as the one Start opens (${refused.error})`);
   await call('/api/prefs', { project: 'beta', agent_default: 'claude' });
   await refreshUntil(page, () => (b => !!b && /^Claude:/.test(saidOf(b)))(document.querySelector('.pgrid .pcard[data-row="beta"] [data-c]')));
-  // Who may (R95 step 10): an agent a project switches off is offered
+  // Who may: an agent a project switches off is offered
   // nowhere there, and its terminal is refused on the server whoever asks.
   await call('/api/prefs', { project: 'beta', agents_off: 'codex' });
   await refreshUntil(page, () => ((state?.projects || []).find(p => p.name === 'beta')?.prefs?.agents_off || []).includes('codex'));
@@ -284,7 +284,7 @@ await section("the agent a project's Start opens", async () => {
 await call('/api/users', { action: 'add', name: 's.user', password: 's.user-pass-1', role: 'user' });
 await call('/api/users', { action: 'edit', name: 's.user', projects: ['beta'] });
 // A Claude session is work on the project, so it holds Projects Write there,
-// and a terminal to watch it in (B86: Start Claude is dead without them).
+// and a terminal to watch it in (Start Claude is dead without them).
 await call('/api/roles', { action: 'set', name: 'si-worker', scope: 'projects', perms: { projects: 'write', terminal: 'write' } });
 await call('/api/roles', { action: 'assign', name: 's.user', project_roles: { beta: ['si-worker'] } });
 // ...with the name and email its commits carry, which a session waits for.
@@ -298,14 +298,14 @@ await section("the Claude Code versions it is sent are those nodes", async () =>
   // A new account's first page opens the welcome panel over everything.
   await up.waitForSelector('#aboutModal:not([hidden])', { timeout: 15000 }).then(() => up.evaluate(() => closeAbout()), () => {});
   await up.waitForSelector('#aboutModal', { state: 'hidden', timeout: 15000 });
-  // A new account pins what it wants (the operator, 7 Oct): beta, here.
+  // A new account pins what it wants: beta, here.
   await up.evaluate(() => fetch('/api/project-pin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'beta', pinned: true }) }));
   await refreshUntil(up, () => (state?.projects || []).some(p => p.name === 'beta' && p.session_node)
                                && document.querySelector('.pgrid .pcard[data-row="beta"] [data-c]')?.disabled === false);
   await up.click('.pgrid .pcard[data-row="beta"] [data-c]');
   await up.click('#resumemenu [data-signin-node]');
-  // ...which lands on Claude Code's own page on that node (R181 step 2).
+  // ...which lands on Claude Code's own page on that node.
   const PG = `.thingtab [data-instnode="${box.id}"][data-thing="agent:claude-code"]`;
   await up.waitForSelector(`${PG} [data-signin="${box.id}"][data-siagent="claude"]`, { timeout: 20000 });
   const seen = await up.evaluate(pg => {
@@ -356,7 +356,7 @@ await section("the Claude Code versions it is sent are those nodes", async () =>
   await up.context().close();
 });
 
-// Your coding agents (R294 step 6): a person's sign-ins, every node theirs to
+// Your coding agents: a person's sign-ins, every node theirs to
 // sign in on, listed on their Profile, Sign in run there with its code field,
 // and the nodes their spaces are not on left out.
 await section("a person's agents' sign-ins on their Profile", async () => {

@@ -1,5 +1,5 @@
 """A compose job that fails on a node whose agent is behind this
-controller's says so after its reason (B133): a fix that is the agent's,
+controller's says so after its reason: a fix that is the agent's,
 sent to an agent without it, read like any other failure."""
 import os
 import shutil

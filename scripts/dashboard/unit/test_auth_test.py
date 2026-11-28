@@ -1,4 +1,4 @@
-"""projects.auth_test, the project settings' Test (the operator, 7 Oct):
+"""projects.auth_test, the project settings' Test:
 whether what a project authenticates with can read and push, and what it is
 missing when it cannot. Real git throughout: the remote is an https URL that
 git's url.insteadOf sends to a local bare repository, so ls-remote and the
@@ -62,7 +62,7 @@ class AuthTest(unittest.TestCase):
         projects.grant_push("app", "example.test", "owner/app", "token")
 
     def test_bb_forge_asks_about_the_projects_own_repository_alone(self):
-        # B544: the tree's origin is a session's to rewrite; pointed at
+        # The tree's origin is a session's to rewrite; pointed at
         # another repository on the host, aerie forge took the project's token
         # there. The repository on record is the one asked about, and an
         # origin that disagrees with it is refused.

@@ -58,7 +58,7 @@ await section("the login page is the one open door", async () => {
   const html = await r.text();
   ok(r.status === 200 && html.includes('Sign in'), 'the login page is the one open door');
   // ...in AerieOS's own colors: nobody is signed in, so no scheme a person
-  // picked is worn there (the operator, 17 Oct).
+  // picked is worn there.
   ok(html.includes('--bg:#172136') && !html.includes('bb.theme'),
      '...wearing the Default scheme and never the scheme this browser kept');
 });
@@ -85,7 +85,7 @@ ok(r.status === 200, 'the cookie alone opens the API');
 r = await bare('/termws?arg=shell', { headers: { Cookie: cookie } });
 ok(r.status === 400 && (await r.json()).error.includes('a websocket is asked for here'),
    'the cookie alone opens a terminal, whose socket is what a plain request is told to ask for');
-// B721: SameSite=Strict keeps the cookie from other sites, not from another
+// SameSite=Strict keeps the cookie from other sites, not from another
 // origin of the same site (an app this install routes); a change asked for
 // by such a page is refused, the dashboard's own page and a token's client not.
 const change = headers => bare('/api/settings', { method: 'POST', body: JSON.stringify({ set: {} }),
@@ -103,7 +103,7 @@ r = await bare('/login', { method: 'POST',
   body: 'username=test&password=test&next=//evil.example/' });
 ok(r.headers.get('location') === '/', 'a protocol-relative next is not followed');
 // ...nor one a browser reads as another host (a backslash is a slash to it),
-// nor one carrying a line break, which was a header of its own (R288).
+// nor one carrying a line break, which was a header of its own.
 for (const bad of ['/%5Cevil.example/', '/%0D%0ASet-Cookie:%20x=1']){
   r = await bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `username=test&password=test&next=${bad}` });
@@ -111,7 +111,7 @@ for (const bad of ['/%5Cevil.example/', '/%0D%0ASet-Cookie:%20x=1']){
      `a next of ${decodeURIComponent(bad).replace(/[\r\n]/g, '\\n')} is not followed (${r.status} ${r.headers.get('location')})`);
 }
 // Another site's page neither signs a visitor in (to its own account here)
-// nor out (R288).
+// nor out.
 r = await bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Sec-Fetch-Site': 'cross-site' },
   body: 'username=test&password=test&next=/' });
 ok(r.status === 403 && !r.headers.get('set-cookie'), `a sign-in posted from another site is refused (${r.status})`);
@@ -153,11 +153,11 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
 await page.goto(URL);
 await page.waitForFunction(() => typeof state !== 'undefined' && !!state && Array.isArray(state.projects), { timeout: 40000 });
-ok(page.url().split('#')[0] === URL, 'preemptive basic auth bypasses the login page');   // the page's address rides the hash (R218)
+ok(page.url().split('#')[0] === URL, 'preemptive basic auth bypasses the login page');   // the page's address rides the hash
 
 // And a browser with no credentials walks the login flow end to end.
 const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-await ctx2.addInitScript(() => { window.BB_NO_TOUR = true; });     // the tour is tour.mjs's (R94)
+await ctx2.addInitScript(() => { window.BB_NO_TOUR = true; });     // the tour is tour.mjs's
 const page2 = await ctx2.newPage();
 await page2.goto(URL);
 await page2.waitForURL('**/login**');
@@ -176,7 +176,7 @@ ok(await page2.$eval('#bOut', b => {
   const c = document.getElementById('bCards').getBoundingClientRect();
   return Math.abs(r.height - c.height) < 2 && Math.abs(r.width - c.width) < 8;
 }), "sign out sits in the header at its neighbors' size");
-// Asked first (the operator, 16 Oct): a dialog, its Also end my sessions
+// Asked first: a dialog, its Also end my sessions
 // unticked, and Sign out in it is what leaves.
 await page2.click('#bOut');
 await page2.waitForSelector('#outModal:not([hidden])', { timeout: 5000 });
@@ -383,7 +383,7 @@ await section("a strip each", async () => {
   // themselves, a sign-out is one account's on one node, and an account that
   // does not administer signs in and out on the nodes its own projects work
   // on and no others. Driven against a node rather than tmux: the sessions
-  // are a node's (R47), and its census is what says who has one open.
+  // are a node's, and its census is what says who has one open.
   {
     const term = (h, arg) => bare('/termws?arg=' + encodeURIComponent(arg), { headers: h });
     const H = OWNER;
@@ -410,11 +410,11 @@ await section("a strip each", async () => {
     const census = (sessions, more = {}) => bare('/api/v1/agent/work', { method: 'POST',
       headers: { ...H, Authorization: 'Bearer ' + agent.token, ...more },
       body: JSON.stringify({ sample: { cpu_pct: 1, mem_mb: 4096,
-        // ...with each project's synced copy there (R163), as an agent says.
+        // ...with each project's synced copy there, as an agent says.
         mem_used_mb: 512, sessions, sync: { alpha: { ready: true, rev: 1 }, beta: { ready: true, rev: 1 }, gamma: { ready: true, rev: 1 }, delta: { ready: true, rev: 1 } } }, running: [], wait: 0 }) });
     // A node's address is where its call came from: an X-Forwarded-For it
     // sends itself, with no proxy this install trusts in front, names
-    // nothing (B722), here or on a sign-in's row.
+    // nothing, here or on a sign-in's row.
     await census([], { 'X-Forwarded-For': '10.0.0.99' });
     const talkbox = ((await napi('/api/v1/nodes')).nodes || []).find(n => n.id === box.id);
     ok(talkbox?.agent?.addr === '127.0.0.1', `a node's own X-Forwarded-For does not set its address (${talkbox?.agent?.addr})`);
@@ -565,7 +565,7 @@ await section("a strip each", async () => {
     ok(/not a node one of your spaces builds on|none of your spaces/.test(pk.error || ''),
        '...and the same for what that node has installed');
     // ...while a project of theirs with no node is told so in the project's
-    // own words, not refused as a node outside their scope (B258): there is
+    // own words, not refused as a node outside their scope: there is
     // no primary docker manager for it to have landed on, so what it has is
     // no containers anywhere, and the way out is its settings.
     const own = await (await bare('/api/docker?project=beta', { headers: other })).json();
@@ -604,13 +604,13 @@ await section("a strip each", async () => {
        '...nor file a bug on it');
     ok((await post(adm, '/api/prefs', { project: 'alpha', build: 'make' })).status === 403,
        '...nor change its settings');
-    // The owner too (R135): the seeded "*" became the projects that existed
+    // The owner too: the seeded "*" became the projects that existed
     // at start, and a project taken off the owner's own list is read-only
     // to the owner until it is put back, exactly as for an administrator.
     {
       const mine = () => (projects(owner)).then(ps => ps.find(p => p.name === 'alpha')?.mine);
       const list = (await (await bare('/api/users', { headers: owner })).json()).users.find(u => u.name === 'test').projects;
-      // By project (R138): the list names alpha's project, by its key.
+      // By project: the list names alpha's project, by its key.
       const ak = projectKey('alpha');
       ok(!list.includes('*') && list.includes(ak) && await mine() === true,
          `the owner's "*" became the spaces that exist, alpha's among them (${list.join(', ')})`);
@@ -621,7 +621,7 @@ await section("a strip each", async () => {
       await post(owner, '/api/users', { action: 'edit', name: 'test', projects: list });
       ok(await mine() === true, '...until it is put back');
     }
-    // The resume offer is the asking account's own (B489): a transcript the
+    // The resume offer is the asking account's own: a transcript the
     // owner's sessions wrote is offered to the owner, and not to an account
     // that never had a conversation there, whose bb-tty could not find it.
     {
@@ -635,7 +635,7 @@ await section("a strip each", async () => {
          `a conversation is offered to resume to the account that had it, and to nobody else (owner ${theirs}, admin ${JSON.stringify(notTheirs)})`);
     }
     // A user's own settings on a project they work on save with the node
-    // riding along unchanged, as the dialog sends it (B488); naming
+    // riding along unchanged, as the dialog sends it; naming
     // another node is still an administrator's.
     const kept = await post(other, '/api/prefs', { project: 'beta', node: '', nodes: [], git_name: 'Sharer S.' });
     const moved = await post(other, '/api/prefs', { project: 'beta', node: 'elsewhere' });
@@ -654,8 +654,8 @@ await section("a strip each", async () => {
        'a user reads only the jobs of spaces they were given');
     ok(!((await (await bare('/api/status', { headers: other })).json()).attention || []).length,
        '...and the bell\'s node alerts, which only an administrator can act on, are not theirs');
-    // Memories are the reader's own, in the reader's home, not the owner's
-    // (bug B67): a user opening the Memory tab must not see what the owner's
+    // Memories are the reader's own, in the reader's home, not the owner's:
+    // a user opening the Memory tab must not see what the owner's
     // sessions remembered, and what they write must land where their own
     // sessions read.
     {
@@ -750,10 +750,10 @@ print(u.remove("second"))`], { encoding: 'utf8' });
        `the poll says what is unread (${JSON.stringify(st.chat?.unread)})`);
     ok((st.chat.people || []).includes('test') && !(st.chat.people || []).includes('sharer'),
        '...and who there is to talk to, without listing yourself');
-    // When each was last here (the operator, 4 Oct): a time for everybody,
+    // When each was last here: a time for everybody,
     // and the list says it beside the name.
     ok(st.chat.seen && st.chat.seen.test > 0, `...and when each was last here (${JSON.stringify(st.chat.seen)})`);
-    // The chat is the dock's Chat tab (R250 step 2): opened from the line,
+    // The chat is the dock's Chat tab: opened from the line,
     // the list beside the conversation.
     await page.evaluate(() => { chatWith = null; document.querySelector('[data-dchat]')?.click(); refresh(); });
     await page.waitForFunction(() => /\((here now|.*ago|never signed in)\)/.test(
@@ -770,7 +770,7 @@ print(u.remove("second"))`], { encoding: 'utf8' });
     ok(!(after.chat.unread || {})[`dm:${uidOf('test')}`],
        '...and reading a conversation is what marks it seen');
 
-    // The panel keeps a reader's place (the operator, 25 Sep: scrolling up,
+    // The panel keeps a reader's place (scrolling up,
     // something kept snapping it to the bottom): the poll repaints only
     // when the conversation changed, and pins to the end only for a reader
     // already there.
@@ -778,8 +778,8 @@ print(u.remove("second"))`], { encoding: 'utf8' });
       for (let i = 0; i < 40; i++) await chat(owner, { action: 'send', who: 'sharer', text: `an older line ${i}` });
       await page.evaluate(() => { if (tabOf(panes[1])?.kind !== 'chat' || !dockUp) openChatTab(); chatOpen({ who: 'sharer' }); });
       await page.waitForFunction(() => document.querySelectorAll('#chatlog .chatmsg').length >= 40, null, { timeout: 15000 });
-      // ...and laid out taller than its box, the dock up and done sliding
-      // (B650): read while the dock was still coming up, the log had no
+      // ...and laid out taller than its box, the dock up and done sliding:
+      // read while the dock was still coming up, the log had no
       // height, read as not tall, and a scroll to the top had nothing to move.
       await page.waitForFunction(() => { const l = document.getElementById('chatlog');
         return l && l.clientHeight > 0 && l.scrollHeight > l.clientHeight
@@ -882,7 +882,7 @@ ${code}`], { encoding: 'utf8' }).trim();
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
   // Controller settings are an administrator's, and so is changing a global
-  // rule (R63), which reaches every project, including ones this account
+  // rule, which reaches every project, including ones this account
   // cannot see: a project's Briefing offers it only where may_global says.
   const asUser = await (await as('/api/status')).json();
   ok(asUser.can?.admin === false,
@@ -923,7 +923,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   ok(renoded.status === 403 && /node is shared/.test((await renoded.json()).error || ''),
      '...and moving it to another node, because a node is shared');
   // The project's settings, its build command among them, are Project
-  // settings Write's (B19, the operator, 19 Oct), which a plain member's
+  // settings Write's, which a plain member's
   // role only reads.
   const built = await post('/api/prefs', { project: 'alpha', build: './gradlew' });
   ok(built.status === 403, '...and so is the project\'s build command, which needs Project settings Write');
@@ -966,7 +966,7 @@ await section("the Users tab", async () => {
   await page.evaluate(() => openUsersTab());
   await page.waitForSelector('.userstab [data-upick]', { timeout: 15000 });
 
-  // A page of settings (the operator, 17 Oct): the accounts a list beside
+  // A page of settings: the accounts a list beside
   // the picked one's settings, Remove at their foot.
   const rows = () => page.$$eval('.userstab [data-upick]', rs => rs.map(r => ({
     name: r.dataset.upick, text: r.textContent.replace(/\s+/g, ' ').trim() })));
@@ -991,19 +991,19 @@ await section("the Users tab", async () => {
   await page.fill('#uNewFull', 'Tab Made');
   await page.fill('#uNewEmail', 'tab@example.invalid');
   ok(!await page.$('#uNewRole'), 'Add user asks for no role: it is given beside the account once added (R152)');
-  // Typed twice (R134): two that differ add nobody, Add asleep while they
-  // do (the operator, 18 Oct: a press is awake only when it can act).
+  // Typed twice: two that differ add nobody, Add asleep while they
+  // do (a press is awake only when it can act).
   ok(await page.$eval('#uAdd', b => b.disabled) && !(await page.$('.userstab [data-upick="tabmade"]')) && !await page.$eval('#uaddmodal', m => m.hidden),
      'two passwords that differ add nobody: Add sleeps, and the dialog stays');
   const addWhy = () => page.$eval('#uAddWhyF', f => f.hidden ? '' : f.textContent.trim());
   ok(/differ/.test(await addWhy()), `...and the dialog says why Add sleeps (B37: ${await addWhy()})`);
-  // Shorter than the 8 the hint asks for: Add sleeps and says so (B37).
+  // Shorter than the 8 the hint asks for: Add sleeps and says so.
   await page.fill('#uNewPw', 'short12');
   await page.fill('#uNewPw2', 'short12');
   ok(await page.$eval('#uAdd', b => b.disabled) && /shorter than 8/.test(await addWhy()),
      `a 7-character password leaves Add asleep, the dialog saying why (B37: ${await addWhy()})`);
-  // A refusal from the server is written in the dialog, which stays open
-  // (B37): answered here, since a 4xx the page asks for is a console error.
+  // A refusal from the server is written in the dialog, which stays open:
+  // answered here, since a 4xx the page asks for is a console error.
   await page.fill('#uNewPw', 'tabmadepw1');
   await page.fill('#uNewPw2', 'tabmadepw2');
   await page.route('**/api/users', r => r.request().method() === 'POST'
@@ -1017,7 +1017,7 @@ await section("the Users tab", async () => {
      'a refused Add says why in the dialog, and the dialog stays open (B37)');
   await page.fill('#uNewPw2', 'tabmadepw1');
   // A reload landing between typing and Add repaints the tab; what was
-  // typed survives it (B422: it emptied the form, and Add sent nothing).
+  // typed survives it (it emptied the form, and Add sent nothing).
   await page.evaluate(async () => { await loadUsers(); });
   ok(await page.$eval('#uNewName', e => e.value) === 'tabmade' && await page.$eval('#uNewPw', e => e.value) === 'tabmadepw1',
      'what is typed into Add user survives the list being drawn again');
@@ -1025,7 +1025,7 @@ await section("the Users tab", async () => {
   await page.waitForFunction(() => document.querySelector('.userstab [data-upick="tabmade"].on')
     && document.getElementById('uaddmodal').hidden, null, { timeout: 15000 });
   ok(true, 'Add makes an account from the tab, shuts the dialog and shows the account it made');
-  // Its roles are the owner's to give at once, without a reload (B32).
+  // Its roles are the owner's to give at once, without a reload.
   await page.waitForFunction(() => /no space|Spaces/.test(document.querySelector('.userstab #ueAccess')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
   {
     const acc = await page.$eval('.userstab #ueAccess', e => e.textContent.replace(/\s+/g, ' ').trim());
@@ -1038,7 +1038,7 @@ await section("the Users tab", async () => {
   }
 
   // Which Anthropic account each AerieOS account is signed in as, taken
-  // from the record a node reported, since no login lives here (R47), and two
+  // from the record a node reported, since no login lives here, and two
   // on one login said out loud, since Anthropic's terms allow one person per
   // Claude account.
   ok(/signed in to no agent yet/.test(await detail()), 'an account says when it is signed in to no agent yet (B296)');
@@ -1068,7 +1068,7 @@ await section("the Users tab", async () => {
   writeFileSync(`${DIR}/home/.claude/.bb-grant.json`, seed);
 
   // ...and giving it a project: its roles and projects are picked in its
-  // settings, beside its name, and saved with them (the operator, 17 Oct).
+  // settings, beside its name, and saved with them.
   await page.evaluate(async () => { await fetch('/api/roles', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'set', name: 'reader', scope: 'projects', perms: { projects: 'read' } }) }); await loadRoles(); });
   await pick('tabmade');
@@ -1100,7 +1100,7 @@ await section("the Users tab", async () => {
     .find(p => p.name === 'tabmade')?.project_roles?.[k]?.includes('reader'), projectKey('alpha'), { timeout: 15000 });
   ok(true, 'its one Save puts it on alpha with a role there');
   // Only its roles changed, and the account is read again all the same: not
-  // left unsaved, its header and row saying what it holds (B33).
+  // left unsaved, its header and row saying what it holds.
   await page.waitForFunction(() => /on 1 space/.test(document.querySelector('.userstab .rdetail .rhead')?.textContent || ''),
                              null, { timeout: 15000 }).catch(() => {});
   {
@@ -1141,8 +1141,8 @@ await section("the Users tab", async () => {
   ok(notYours.status === 403, 'accounts are an administrator\'s');
 
   await pick('tabmade');
-  // The account leaves the list on the press, before the server has answered
-  // (the operator, 22 Nov), once its question is answered.
+  // The account leaves the list on the press, before the server has answered,
+  // once its question is answered.
   const removed = page.waitForResponse(r => r.url().endsWith('/api/users') && /"remove"/.test(r.request().postData() || ''), { timeout: 15000 });
   await page.click('.userstab #ueRemove');
   await page.waitForFunction(() => !document.querySelector(
@@ -1163,7 +1163,7 @@ await section("what a session holds", async () => {
   const post = (path, body) => as(path, { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-  // A session is a caller of its own kind (R227 step 4): its token reaches
+  // A session is a caller of its own kind: its token reaches
   // the routes its own verbs and hooks use and nothing else. What it reads
   // there is its own space's, and another space reads as absent.
   const mine = await as('/api/brief?project=alpha');
@@ -1171,7 +1171,7 @@ await section("what a session holds", async () => {
   const otherSaid = (await other.json().catch(() => ({}))).error || '';
   ok(mine.status === 200 && other.status !== 200 && /not a space/.test(otherSaid),
      `a session's token reads its own space, and another reads as absent, not refused (${mine.status}; ${other.status}: ${otherSaid})`);
-  // The page's own reads are a person's (the operator, 15 Nov): the status
+  // The page's own reads are a person's: the status
   // read carried the controller's settings, the person's layout and the key
   // store's state to a session that asked.
   for (const path of ['/api/status', '/api/revs', '/api/live', '/api/findings', '/api/users', '/api/home', '/api/roles']) {
@@ -1211,7 +1211,7 @@ await section("what a session holds", async () => {
   // was never bound to.
   ok((await post('/api/prefs', { project: 'alpha', gate: { roadmap: 'auto' } })).status === 403,
      'a session cannot change its space\'s settings');
-  // Nor queue a job at all (R35): a job runs as the node's enrolled account,
+  // Nor queue a job at all: a job runs as the node's enrolled account,
   // outside the session's view, so its own node is no better than another.
   for (const [what, body] of [['on its own node', { action: 'run', project: 'alpha', argv: ['true'] }],
                               ['on another node', { action: 'run', project: 'alpha', node: 'n_elsewhere', argv: ['true'] }],
@@ -1276,7 +1276,7 @@ await section("the Profile tab", async () => {
   // The Profile tab itself, on the owner's page, and the Administration card
   // beside it: the card is an administrator's and this page is one.
   await page.evaluate(() => openProfileTab());
-  // Its own Save, not its template's fields (R218 step 16), which stand in
+  // Its own Save, not its template's fields, which stand in
   // while the profile is on its way.
   await page.waitForSelector('.profiletab #pfSave', { timeout: 15000 });
   ok(await page.$eval('.profiletab', el => /test/.test(el.textContent) && !!el.querySelector('#pfSave')
@@ -1295,19 +1295,19 @@ await section("the Profile tab", async () => {
   });
   ok(rv.asleep && rv.woke && rv.back && rv.again,
      `...and Revert beside Save, asleep until a field changes and putting it back (${JSON.stringify(rv)})`);
-  // ...and says what the account may do, once (R255 step 5): its roles by
+  // ...and says what the account may do, once: its roles by
   // name in its head and every area it holds, with its level.
   const wm = await page.$eval('.profiletab', el => ({ bar: el.closest('.doc')?.querySelector('.docbarrow')?.textContent || '',
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])) }));
-  // Its roles a fact of the page's head now (the operator, 25 Oct).
-  // ...its roles on the head's status line since R274 (the operator, 23 Nov).
+  // Its roles a fact of the page's head now.
+  // ...its roles on the head's status line.
   wm.roles = await page.$eval('.profiletab .pghead .pgline', l => l.textContent).catch(() => '');
   ok(/AerieOS's owner/.test(wm.roles) && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Spaces === 'Write',
      `...and what it may do: its roles by name, and each area with its level (${JSON.stringify(wm).slice(0, 160)})`);
   ok(await page.evaluate(() => !!document.querySelector('#rail [data-rail="people"]') && railAllows('settings') && railAllows('users')),
      'an administrator is offered People and the controller\'s settings on the rail');
-  // The ? beside a label opens its words in a tooltip beside it (the
-  // operator, 26 Oct), fixed to the window so no pane clips it, and a second
+  // The ? beside a label opens its words in a tooltip beside it,
+  // fixed to the window so no pane clips it, and a second
   // press shuts it.
   await page.click('.profiletab .help');
   const said = await page.evaluate(() => {
@@ -1351,7 +1351,7 @@ await section("the Profile tab", async () => {
     ok(shb.status === 403 && /no role on this space/.test((await shb.json()).error || ''),
        '...while a shell in a space an administrator has not taken on is refused, and says how to take it on');
     // fetch writes with git and wants an author; a policy read and an
-    // ls-remote do not, and answer for the same account (B128).
+    // ls-remote do not, and answer for the same account.
     const git = await bare('/api/v1/bb', { method: 'POST',
       headers: { ...noauthor, 'Content-Type': 'application/json' },
       body: JSON.stringify({ argv: ['git', 'fetch'], cwd: `${DIR}/ws/beta` }) });
@@ -1372,7 +1372,7 @@ await section("the Profile tab", async () => {
        `the status payload carries admin: ${asUser.admin} for a user, ${asOwner.admin} for the owner`);
     // A plain account cannot queue a job with its password either: a job
     // runs outside every view as the node's own account, in the docker
-    // group, which is what a session was already refused (R35).
+    // group, which is what a session was already refused.
     for (const body of [{ action: 'run', project: 'alpha', argv: ['true'] },
                         { action: 'emu', project: 'alpha', argv: ['emu', 'list'] }]) {
       const r = await bare('/api/v1/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json',
@@ -1381,7 +1381,7 @@ await section("the Profile tab", async () => {
       ok(r.status === 403 && /needs Jobs Write/.test(why),
          `a plain account cannot queue a ${body.action} job, which would run outside every view (${r.status}: ${why.slice(0, 50)})`);
     }
-    // ...nor stop or clear the project job (B171): a clone or a link is the
+    // ...nor stop or clear the project job: a clone or a link is the
     // create dialog's, and so is its Abort and its Dismiss.
     const plainAuth = { 'Content-Type': 'application/json',
       Authorization: 'Basic ' + Buffer.from('plainone:plainonepw1').toString('base64') };
@@ -1391,7 +1391,7 @@ await section("the Profile tab", async () => {
     }
     ok(JSON.stringify(asUser.project_job) === '{}' && typeof asOwner.project_job?.running === 'boolean',
        `...and its status carries no space job to draw, while an administrator's does (${JSON.stringify(asUser.project_job)})`);
-    // B172: a session is its owner's. The name says whose (u_<uid>~...),
+    // A session is its owner's. The name says whose (u_<uid>~...),
     // and the owner's own here keep bare names; nobody ends or types into
     // anybody else's. Decided before the session is looked up, so a
     // name is enough to ask with.
@@ -1414,11 +1414,11 @@ await section("the Profile tab", async () => {
     const across = await act(sessAuth, '/api/send', { session: 'claude-beta', macro: 'lx-ls' });
     ok(across.status === 403, `a session's token cannot reach its own account's session on another space (${across.status})`);
     // ...nor its own space's: typing into a person's shell is no verb of a
-    // session's, and its token reaches what its verbs use (R227 step 4).
+    // session's, and its token reaches what its verbs use.
     const home = await act(sessAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
     ok(home.status === 403 && /a session's token does not reach this/.test(home.error || ''), `...nor its own space's (${home.status}: ${(home.error || '').slice(0, 50)})`);
     // A session's token carries its person's id, and the Profile page is
-    // that person's alone (B764): no read of it, no notification sent
+    // that person's alone: no read of it, no notification sent
     // elsewhere, no browser sign-in of theirs ended.
     {
       const read = await fetch(URL.replace(/\/$/, '') + '/api/profile', { headers: sessAuth });
@@ -1433,7 +1433,7 @@ await section("the Profile tab", async () => {
     // version panel is closed to a session's token outright.
     await act(ownerAuth, '/api/users', { action: 'edit', name: 'plainone', projects: ['alpha'] });
     for (const [path, body, why] of [
-        // Its owner's or an administrator's (R119), not a grant's.
+        // Its owner's or an administrator's, not a grant's.
         ['/api/lock', { name: 'alpha', locked: true }, /owner or an administrator/],
         ['/api/pin', { name: 'status', pinned: true }, /needs Controller Write/],
         ['/api/project-auth', { name: 'alpha' }, /needs .+ Write|rename/],
@@ -1445,13 +1445,13 @@ await section("the Profile tab", async () => {
       const r = await act(plainAuth, path, body);
       ok(r.status === 403 && why.test(r.error), `a plain account cannot ${path} ${body.action || ''} (${r.status}: ${r.error.slice(0, 50)})`);
     }
-    // The project pins are a person's own (the operator, 27 Sep): a plain
+    // The project pins are a person's own: a plain
     // account unpins alpha for itself and the owner's card still shows
     // it; a session pins for nobody.
     {
       const rows = async h => ((await (await fetch(URL.replace(/\/$/, '') + '/api/status', { headers: h })).json()).projects || []);
-      // A new account starts with nothing pinned and pins what it wants (the
-      // operator, 7 Oct), where the owner made before that keeps all of them.
+      // A new account starts with nothing pinned and pins what it wants,
+      // where the owner made before that keeps all of them.
       const fresh = await rows(plainAuth);
       ok(fresh.length > 0 && fresh.every(p => p.pinned === false),
          `a new account starts with nothing pinned (${fresh.filter(p => p.pinned).map(p => p.name)})`);
@@ -1476,7 +1476,7 @@ await section("the Profile tab", async () => {
       ok(sarch.status === 403, `...and a session archives for nobody (${sarch.status})`);
       await act(plainAuth, '/api/archive', { name: 'alpha', archived: false });
     }
-    // A project's signing keys (R106): a session never reaches them, not
+    // A project's signing keys: a session never reaches them, not
     // even the listing, and never downloads one; a person who sees the
     // project reads which keys exist and nothing secret.
     {
@@ -1489,7 +1489,7 @@ await section("the Profile tab", async () => {
          && plr.status === 200 && pl.keys && typeof pl.map === 'object' && !JSON.stringify(pl).includes('pass'),
          `a session reaches no signing key, not even the list or a backup, and a person reads only which exist (${sl.status}/${sb.status}/${plr.status})`);
     }
-    // aerie sign (R106 step 3): a session asks only to sign its own project's
+    // aerie sign: a session asks only to sign its own project's
     // build, under its dial. A key and a build are put in place for it; the
     // session never reads either back. Ask (the default) waits on the
     // project's owner, Deny names the setting, and nothing it cannot sign
@@ -1523,9 +1523,9 @@ await section("the Profile tab", async () => {
         body: JSON.stringify({ action: 'sign', project: 'beta', file: 'x.apk', route: 'sideload', why: 'w' }) });
       ok(denied.status === 403 && /Sign a build/.test(denied.body.error || '') && other.status === 403,
          `...at Deny it is refused naming the setting, and another space's build is never its to sign (${denied.status}/${other.status})`);
-      // Managing keys (R106 step 6): at Ask a new key or a mapping waits on
+      // Managing keys: at Ask a new key or a mapping waits on
       // the owner too, and a session reads which keys exist but no secret.
-      // A key is made only once the backups have a password (2 Oct).
+      // A key is made only once the backups have a password.
       const unlocked = await sign({ action: 'generate', key: 'watch', route: 'sideload', why: 'too early' });
       await bare('/api/signing', { method: 'POST', headers: ownerAuth,
         body: JSON.stringify({ action: 'backup-password', project: 'alpha', new: 'a-backup-password' }) });
@@ -1546,7 +1546,7 @@ await section("the Profile tab", async () => {
          `...a session reads the keys without a secret, proposes a new one for the owner to allow, and at Deny is refused naming the setting (${keyAsk?.cmd?.join(' ')})`);
       for (const a of [keyAsk, rotAsk]) if (a) await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: a.id }) });
       await bare('/api/prefs', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ project: 'alpha', sign: 'ask', keys: 'ask', node: '' }) });
-      // A release's signing (R134): a session reads whether its APK can be
+      // A release's signing: a session reads whether its APK can be
       // signed and how the newest went, and asks for the look again under
       // Sign a build; a project that hands over no APK has nothing to ask.
       {
@@ -1572,7 +1572,7 @@ await section("the Profile tab", async () => {
       await bare('/api/signing', { method: 'POST', headers: ownerAuth,
         body: JSON.stringify({ action: 'backup-password', project: 'alpha', current: 'a-backup-password', new: '' }) });
       rmSync(`${DIR}/state/signing/alpha`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-      // aerie version release (R138): a session asks to tag and publish its
+      // aerie version release: a session asks to tag and publish its
       // own project's release, under its dial. What could not be released is
       // refused before anybody is asked; Ask names the tag and the commit to
       // the project's owner; Deny names the setting; another project is
@@ -1602,14 +1602,14 @@ await section("the Profile tab", async () => {
         const ownerAsks = await (await bare('/api/phone', { headers: ownerAuth })).json();
         const ask = (ownerAsks.asks || []).find(a => a.id === asked.body.id);
         // A VERSION file written and not committed is no version of the
-        // commit, which is what a release reads (R206 step 4).
+        // commit, which is what a release reads.
         ok(/has no version/.test(noVersion.body.error || '') && /has no version/.test(dirtyAsked.body.error || '')
            && asked.status === 200 && ask && ask.kind === 'release'
            && ask.tag === 'v1.2.3' && ask.sha === sha && !gitR('tag', '--list', 'v1.2.3'),
            `a session's aerie version release is refused before anybody is asked when it could not happen, then waits on the space's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
         await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: asked.body.id }) });
         // An Android APK the release could not have signed is said before
-        // the tag (R134 step 4), and --without-apk goes on to the ask.
+        // the tag, and --without-apk goes on to the ask.
         {
           mkdirSync(`${R}/.github/workflows`, { recursive: true });
           writeFileSync(`${R}/.github/workflows/app.yml`, 'jobs: {b: {steps: [{with: {name: bb-release-apk-x}}]}}\n');
@@ -1633,7 +1633,7 @@ await section("the Profile tab", async () => {
         ok(denied.status === 403 && /Tag and publish a release/.test(denied.body.error || '') && [400, 403].includes(other.status)
            && !gitR('tag', '--list', 'v1.2.3'),
            `...at Deny it is refused naming the setting, another space is never its to release, and nothing was tagged (${denied.status}/${other.status})`);
-        // aerie version release --edit (R139): the published release's notes
+        // aerie version release --edit: the published release's notes
         // and files, under the same dial, each edit its own ask that the
         // owner reads whole. What may be attached is the project's own: a
         // build in dist/ or a committed file, checked before anybody is asked.
@@ -1665,11 +1665,11 @@ await section("the Profile tab", async () => {
         }
         rmSync(R, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       }
-      // ...and how busy a node is (R108), for its own project only.
+      // ...and how busy a node is, for its own project only.
       const nb = await bare('/api/node-busy?project=beta', { headers: sessAuth });
       ok(nb.status === 403, `a session asks how busy only its own space's nodes are (${nb.status})`);
     }
-    // A project's owner and its people (membership.py, the operator, 1 Oct).
+    // A project's owner and its people (membership.py).
     // Invite only keeps an administrator from adding themselves; AerieOS's
     // owner is never kept out; people join by accepting an invitation.
     {
@@ -1681,7 +1681,7 @@ await section("the Profile tab", async () => {
       const adminAuth = { 'Content-Type': 'application/json',
         Authorization: 'Basic ' + Buffer.from('adminone:adminonepw1').toString('base64') };
       // Which other projects a project's sessions may read is AerieOS's
-      // owner's alone (the operator, 6 Oct): an administrator on the project
+      // owner's alone: an administrator on the project
       // is refused a change and may still save the dialog around it.
       {
         await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
@@ -1697,7 +1697,7 @@ await section("the Profile tab", async () => {
            `only AerieOS's owner changes which spaces a space's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
       }
       // Where a space's repository links and how it pushes are its owner's
-      // (the operator, 23 Nov: one git host link, which only the owner
+      // (one git host link, which only the owner
       // changes): an administrator on the space is refused the address, the
       // switch, a deploy key, Unlink and Link, each naming the owner; giving
       // their own token stays theirs.
@@ -1736,8 +1736,8 @@ await section("the Profile tab", async () => {
            && mine.body.owner?.me === true,
            `where a space links and how it pushes are its owner's: an administrator on it is refused each change, naming the owner, and told whose it is (${refused.join(', ') || 'all refused'}; ${JSON.stringify(read.body.owner)})`);
       }
-      // A key's backup goes to a person with Releases write ON the project
-      // (the operator, 1 Oct; R255 step 3): adminone sees alpha and holds no
+      // A key's backup goes to a person with Releases write ON the project:
+      // adminone sees alpha and holds no
       // role on it.
       {
         mkdirSync(`${DIR}/state/signing/alpha/default`, { recursive: true });
@@ -1751,7 +1751,7 @@ await section("the Profile tab", async () => {
         ok(off.status === 403 && /give yourself one on it/.test(offMsg.error || '') && on.status === 200
            && listOff.body.may_backup === false && listOn.body.may_backup === true,
            `a signing key's backup is for a person with a role on the space only, and the dialog offers it only to them (${off.status}/${on.status})`);
-        // A backup password, the project's owner's (the operator, 1 Oct):
+        // A backup password, the project's owner's:
         // then every download needs it, AerieOS's owner's included,
         // carried in a POST body and never a URL; five misses hold them.
         const notOwner = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha', new: 'a-long-password' });
@@ -1766,16 +1766,16 @@ await section("the Profile tab", async () => {
         const change = await post(ownerAuth, '/api/signing', { action: 'backup-password', project: 'alpha', current: 'nope', new: '' });
         ok(notOwner.status === 403 && short.status === 400 && set.body.backup_locked === true && plain.status === 403
            && wrong.status === 403 && change.status === 403
-           // The right one: the backup wrapped under it (R111), or, where the
-           // project's node cannot wrap it now (B232: which node, and why), said
+           // The right one: the backup wrapped under it, or, where the
+           // project's node cannot wrap it now (which node, and why), said
            // so, never the bare key.
            && (right.status === 200 || (right.status === 409 && /no node to sign on|is offline|install (it|them) on its Toolchains|takes no new work/.test(rightSaid))),
            `a backup password is the space owner's to set, and then every download asks for it, a plain link and a wrong one refused (${plain.status}/${wrong.status}/${right.status} ${rightSaid})`);
         for (let i = 0; i < 5; i++) await dl('nope');
         const held = await dl('a-long-password');
         ok(held.status === 429, `...and five wrong in a row hold the downloads, even for the right one (${held.status})`);
-        // Handing the project on leaves the password where it is (the
-        // operator, 2 Oct): the new owner changes it only with it.
+        // Handing the project on leaves the password where it is:
+        // the new owner changes it only with it.
         await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
         await post(ownerAuth, '/api/members', { action: 'set', project: 'alpha', owner: 'adminone' });
         const blind = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha', new: 'taken-over-pw' });
@@ -1794,11 +1794,11 @@ await section("the Profile tab", async () => {
       ok(view.status === 200 && view.body.owner === 'test' && set.body.invite_only === true
          && /invite only/.test(self.body.error || '') && notOwner.status === 403,
          `gamma belongs to the owner, who makes it invite only, and an administrator then cannot add themselves to it or lift that (${view.body.owner}; ${(self.body.error || '').slice(0, 60)})`);
-      // AerieOS's owner may add THEMSELVES to an invite-only project
-      // (R135), the one difference from an administrator.
+      // AerieOS's owner may add THEMSELVES to an invite-only project,
+      // the one difference from an administrator.
       {
         const list = (await (await bare('/api/users', { headers: ownerAuth })).json()).users.find(u => u.name === 'test').projects;
-        // By project (R138): the list names gamma's project by its key.
+        // By project: the list names gamma's project by its key.
         const GK = projectKey('gamma');
         const without = list.filter(p => p !== GK);
         await post(ownerAuth, '/api/users', { action: 'edit', name: 'test', projects: without });
@@ -1826,7 +1826,7 @@ await section("the Profile tab", async () => {
       ok(moved.body.owner === 'adminone' && offer.body.owner === 'adminone' && offer.body.offered === 'plainone'
          && off && off.by === 'adminone' && took.body.owner === true && now.body.owner === 'plainone',
          `AerieOS's owner hands a space on at once; its own owner offers it, and it moves when accepted (${moved.body.owner} -> offered ${offer.body.offered} -> ${now.body.owner})`);
-      // The owner role the handover made is gamma's alone (B726): the roles
+      // The owner role the handover made is gamma's alone: the roles
       // payload says whose it is, and the People section offers it under
       // gamma and no other project.
       const rl = await (await bare('/api/roles', { headers: ownerAuth })).json();
@@ -1834,7 +1834,7 @@ await section("the Profile tab", async () => {
       ok(gOwner && /^Owner of /.test(gOwner.label || '') && gOwner.scope === 'projects',
          `a space's owner role carries its space (${JSON.stringify(gOwner || {}).slice(0, 80)})`);
       // One named before a rename is tied to its project by its note, and
-      // one whose project is gone is not offered at all (B369).
+      // one whose project is gone is not offered at all.
       for (const [name, of] of [['gamma-was_owner', 'gamma'], ['vanished-xyz_owner', 'vanished-xyz']])
         await post(adminAuth, '/api/roles', { action: 'set', name, scope: 'projects', perms: { projects: 'write' }, note: `the owner of ${of}` });
       const rl2 = (await (await bare('/api/roles', { headers: adminAuth })).json()).roles || {};
@@ -1845,7 +1845,7 @@ await section("the Profile tab", async () => {
       await page.click('.userstab [data-upick="plainone"]');
       await page.waitForSelector('.userstab #ueAccess .setrow', { timeout: 15000 });
       // Where the role is offered, as the Add to project row in an
-      // account's settings fills its role picker for each project (R255 step 9).
+      // account's settings fills its role picker for each project.
       const where = await page.evaluate(n => (rolesData.projects || []).filter(pn => rolesOnProject(pn).some(r => r.name === n)), gOwner?.name || '');
       ok(where.length === 1 && isG(where[0]),
          `...and the People section offers it under gamma alone (${JSON.stringify(where)})`);
@@ -1879,7 +1879,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // Routes are matched in order and a prefix route takes every path it
 // prefixes, so one listed after a shorter prefix of itself is never reached:
 // /api/pin and /api/project-pin were that once, found only because the two
-// handlers also shared a name. Read from both tables (R60), with each method
+// handlers also shared a name. Read from both tables, with each method
 // they name checked to exist, since a typo there is a 500 on first use.
 await section("the route tables", async () => {
   const got = JSON.parse(execFileSync('python3', ['-c', `
@@ -1901,7 +1901,7 @@ out["GATES"] = {"none": sorted(named - set(gates)), "stale": sorted(set(gates) -
                 "central": sum(1 for g in gates.values() if g[0] != "handler")}
 out["SESSION"] = sorted(ns["SESSION_ROUTES"])
 print(json.dumps(out))`], { encoding: 'utf8' }));
-  // Every route names who may reach it, beside the routes (R227): one that
+  // Every route names who may reach it, beside the routes: one that
   // names nothing is refused by the dispatcher, and is caught here first.
   const G = got.GATES; delete got.GATES;
   const SESSION = new Set(got.SESSION); delete got.SESSION;
@@ -1930,7 +1930,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   ok(noQuery.every(x => !x.endsWith(' 404')) && (await bare('/api/artifacts?project=alpha', { headers: OWNER })).status === 200,
      `a route asked for with no query is answered by its own handler, never as no such route (${noQuery.join(', ')})`);
   // A session is refused by the dispatcher on every route its table does
-  // not name (R227 step 4): each one asked with a session's token, so a
+  // not name: each one asked with a session's token, so a
   // route added tomorrow is closed to a session until somebody names it.
   const named = new Set(Object.values(got).flatMap(t => t.routes.map(r => r[2])));
   const stale = [...SESSION].filter(n => !named.has(n));
@@ -1984,7 +1984,7 @@ await section("maintenance mode", async () => {
     c.on('data', d => { got += d; if (!t.status && got.includes('\r\n\r\n')) { t.status = got.split('\r\n')[0]; t.sock = c; res(t); } });
     // ...with the User-Agent the sign-in was made with (fetch's, node), as a
     // browser's socket carries its own: a sign-in is held to its browser,
-    // and one with none is refused (R288).
+    // and one with none is refused.
     c.write(`GET /termws?arg=sh%3A${n}%3Aalpha&cols=80&rows=24 HTTP/1.1\r\nHost: ${u0.host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n`
       + `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nUser-Agent: node\r\nCookie: ${cookie}\r\n\r\n`);
   });
@@ -2002,8 +2002,8 @@ await section("maintenance mode", async () => {
   let r = await set(adm, true);
   ok(r.status === 403 && /only the owner/.test((await r.json()).error || ''), 'an administrator cannot switch maintenance mode on');
   // Turning it on asks first, listing everybody else's sessions and
-  // terminals with what each is doing, since it ends them (the operator,
-  // 27 Oct); the owner's own are not in it.
+  // terminals with what each is doing, since it ends them;
+  // the owner's own are not in it.
   // The terminal's session is made a moment after its socket opens: asked
   // again until it is there, since an ask changes nothing.
   let ask = {};
@@ -2040,7 +2040,7 @@ await section("maintenance mode", async () => {
   r = await form('maintuser', 'maintpass11');
   ok(!r.headers.get('set-cookie') && SAID.test(await r.text()), '...a sign-in is refused with it, and no cookie minted');
   ok(SAID.test(await (await bare('/login')).text()), '...the sign-in page says it before anybody tries');
-  // Asked of a route a session's token reaches (R227 step 4): the page's
+  // Asked of a route a session's token reaches: the page's
   // status read is a person's.
   ok((await bare('/api/meta', { headers: { Authorization: 'Bearer ' + userTok } })).status === 503,
      "...a session of theirs is answered 503");
@@ -2053,14 +2053,14 @@ await section("maintenance mode", async () => {
   await page.waitForFunction(() => document.getElementById('maintband') && !document.getElementById('maintband').hidden, null, { timeout: 15000 })
     .then(() => true, () => false).then(v => ok(v, "the owner's page shows the maintenance band"));
   // ...whose link opens Controller settings at Maintenance, where it is
-  // switched off (the operator, 26 Oct).
+  // switched off.
   await page.click('#maintband [data-maintgo]');
   const went = await page.waitForFunction(() => tabOf(panes[0])?.kind === 'settings'
       && document.querySelector('.settingstab .snav .rrow.on')?.dataset.spick === 'maint', null, { timeout: 10000 })
     .then(() => true, () => false);
   ok(went, "...and its link opens Controller settings at Maintenance");
   // ...and sends it showing, so it is there at the first paint rather than
-  // once the first status read lands (the operator, 26 Oct).
+  // once the first status read lands.
   const served = (await bigGet('/', owner)).body.toString();
   ok(/<div class="banner maint" id="maintband" role="status">/.test(served),
      "the page is served with the maintenance band already showing while it is on");
@@ -2079,10 +2079,9 @@ await section("maintenance mode", async () => {
      '...and the page is served with it hidden again');
 });
 
-// A terminal's socket opens from this dashboard's own page and no other
-// (B312): the sign-in cookie was SameSite=Lax, which a browser still sent
-// with a websocket from another hostname of the same site (Strict since
-// R158 step 4, and the Origin check stands either way). A socket from
+// A terminal's socket opens from this dashboard's own page and no other:
+// the sign-in cookie was SameSite=Lax, which a browser still sent
+// with a websocket from another hostname of the same site (Strict and the Origin check stands either way). A socket from
 // another origin is refused before anything is relayed; one from this
 // origin, or from a tool that sends no Origin, gets past that check.
 await section("A terminal's socket opens from this dashboard's own page and no other", async () => {
@@ -2107,7 +2106,7 @@ await section("A terminal's socket opens from this dashboard's own page and no o
      `a terminal's or a screen's socket from another origin is refused, and this origin's is not (${JSON.stringify(got)})`);
 });
 
-// Kept connections (R228 step 9): a read after a read goes on the same
+// Kept connections: a read after a read goes on the same
 // connection, and who asked is proved for each request, never carried from
 // the one before it on that connection; a request that carried a body ends
 // its connection, which a handler may not have read whole.

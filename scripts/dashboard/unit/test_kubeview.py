@@ -1,4 +1,4 @@
-"""The Kubernetes view (R281 step 5): the version an image names, a pod's
+"""The Kubernetes view: the version an image names, a pod's
 state as a person reads it (a container waiting says why), where a
 workload answers (an Ingress, a load balancer, a node port, or its
 Service inside the cluster), and Scale held to what can be scaled."""

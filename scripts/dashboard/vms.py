@@ -1,4 +1,4 @@
-"""The VM manager (R91): a project's VMs on the nodes whose VM host feature is
+"""The VM manager: a project's VMs on the nodes whose VM host feature is
 installed, made, started, stopped, snapshotted and removed as `vm` jobs the
 agent runs from its own fixed table (scripts/agent/aerieos_agent/vms.py).
 
@@ -39,7 +39,7 @@ ACTIONS = ("start", "stop", "restart", "remove", "snapshot", "revert", "snapshot
            "hardware", "autostart", "usb-give", "usb-take")
 USB_ID_RE = re.compile(r"0x[0-9a-f]{4}")
 USB_PORT_RE = re.compile(r"\d{1,3}-[\d.]{1,20}")
-# R99: an installer's ISO on a node, a VM's further disks, its MAC and the
+# An installer's ISO on a node, a VM's further disks, its MAC and the
 # password its screen asks for (VNC takes eight characters at most).
 ISO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.iso")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -70,7 +70,7 @@ _seen = {"nodes": None, "sig": 0}
 
 
 
-# A VM's network by name and its model (R219 step 4), as the agent's vmhw has them.
+# A VM's network by name and its model, as the agent's vmhw has them.
 _NET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
 NET_MODELS = ("virtio", "e1000e", "e1000", "rtl8139", "vmxnet3")
 
@@ -88,7 +88,7 @@ job_get = None
 
 def _why(job, fallback):
     """Why a vm job failed, for its row: the agent's own refusal from the
-    job's log when it said one, not the bare exit code (B191)."""
+    job's log when it said one, not the bare exit code."""
     said = job.get("error") or ""
     if (not said or said.startswith("exit ")) and job_tail and job.get("id"):
         refused = [ln for ln in job_tail(job["id"]).splitlines() if ln.startswith("refused: ")]
@@ -115,8 +115,8 @@ def _file():
 
 def _load():
     """The VMs' record. One that is there and not an object of objects is
-    kept aside and read as empty, as every store is (B1025: [] or null raised
-    here, and the VMs page with it; B1082's copy before a save)."""
+    kept aside and read as empty, as every store is ([] or null raised
+    here, and the VMs page with it)."""
     try:
         d = json.loads(_file().read_text())
     except OSError:
@@ -204,7 +204,7 @@ def nets_on(nid):
     return dict(_load()["nets"].get(nid) or {})
 
 
-# Who has a VM's Screen or Console open now (the operator, 21 Oct): kept in
+# Who has a VM's Screen or Console open now: kept in
 # memory while each websocket lasts, for the row's warning. A Screen is
 # shared (VNC, several people at once, one keyboard); a Console is one at a
 # time, a second taking it from the first.
@@ -261,7 +261,7 @@ def _live(n):
     return {v.get("name"): v for v in ((n or {}).get("reported") or {}).get("vms") or [] if isinstance(v, dict)}
 
 
-# A VM that belongs to the machine rather than a project (R165 step 3): the
+# A VM that belongs to the machine rather than a project: the
 # NAS's own apps and desktops, keyed under this name, an administrator's to
 # make and act on under the VMs area, never a session's, and on any VM
 # host (the own machine first, where there is one).
@@ -281,7 +281,7 @@ def view(projects=None):
         live = _live(n).get(rec.get("domain"))
         # A report taken before this VM was made is of an earlier one of its
         # name (the domain is the same): its address and guest facts are not
-        # this VM's, so it waits as one just made until the next (B319).
+        # this VM's, so it waits as one just made until the next.
         told = int(((n or {}).get("reported") or {}).get("at") or 0)
         since = told and told < int(rec.get("made_at") or 0)
         if since:
@@ -294,13 +294,13 @@ def view(projects=None):
             snaps = list(live.get("snapshots") or [])
             snaps += [x for x in rec.get("snaps") or [] if x not in snaps]
             row.update(state=live.get("state") or "unknown", ip=live.get("ip") or "", snapshots=snaps,
-                       # Its screen, and what its drive holds now (R99): the
+                       # Its screen, and what its drive holds now: the
                        # node says, after an Eject or a person's own change.
                        screen=bool(live.get("screen")), iso=live.get("iso") or "",
                        hw=live.get("hw") or {}, autostart=bool(live.get("autostart")),
-                       # The USB devices it holds (R116), as they were named.
+                       # The USB devices it holds, as they were named.
                        usb=live.get("usb") or [],
-                       # What its guest agent says of it (R110 step 8).
+                       # What its guest agent says of it.
                        guest=live.get("guest") or {})
             # A node VM is on the LAN, where the host sees no lease of its:
             # its address is the one its agent dials in from.
@@ -309,12 +309,12 @@ def view(projects=None):
                 row["ip"] = (vn.get("agent") or {}).get("addr") or ""
         elif since:
             # Not reported since it was made: its own record's state stands,
-            # with no address yet (B319).
+            # with no address yet.
             row.update(ip="", guest={})
         elif rec.get("state") == "made" and time.time() - rec.get("made_at", 0) < 180:
             # Made a moment ago and not in the node's report yet: its record's
             # "made", which the page reads as starting, not missing, which it
-            # read for one poll (R97's walk).
+            # read for one poll.
             pass
         elif rec.get("state") not in ("making", "failed", "removing"):
             # Made, and the node's last report does not list it: not there.
@@ -324,8 +324,8 @@ def view(projects=None):
 
 
 def others():
-    """The libvirt domains on each node that AerieOS did not make (R165
-    step 1), as its census says: an administrator reads them on the VMs page
+    """The libvirt domains on each node that AerieOS did not make,
+    as its census says: an administrator reads them on the VMs page
     by name, state and size, and nothing acts on one from here."""
     out = []
     for n in node_list():
@@ -408,7 +408,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
     name = str(req.get("name") or "").strip().lower()
     if not NAME_RE.fullmatch(name):
         return {"error": f"a VM's name is letters, digits and dashes, up to 31, starting with a letter or digit: not {name or 'nothing'}"}
-    # From an installer (R99): a person's ISO on the node, which a person
+    # From an installer: a person's ISO on the node, which a person
     # then installs on the VM's Screen; never a session's, which has no
     # screen to install from.
     iso = str(req.get("iso") or "").strip()
@@ -452,7 +452,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
         return {"error": "a VM needs an ssh public key to let anyone in: give one (aerie vm new reads ~/.ssh/id_ed25519.pub)"}
     # A VM made a node gets its sessions' account from the enroll script
     # (builder, without sudo): its own account, which cloud-init gives sudo,
-    # is another, or every session there would be root (R97's walk).
+    # is another, or every session there would be root.
     user = str(req.get("user") or ("admin" if req.get("node_agent") is True else "builder")).strip().lower()
     if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) or user == "root":
         return {"error": f"the VM's account is a plain Linux name, not {user}"}
@@ -554,8 +554,8 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
 
 def clone(principal, project, req, admin=False, session=False):
     """A VM AerieOS did not make (another system's, adopted, or one made by
-    hand on the node) cloned into `project` as one of its own (R163 step
-    12): an administrator's, its disks copied on its node by the job, the
+    hand on the node) cloned into `project` as one of its own:
+    an administrator's, its disks copied on its node by the job, the
     original left as it is. Recorded as making, as New VM's is."""
     if session or not admin:
         return {"error": "cloning a VM AerieOS did not make into a space is an administrator's, on the VMs page"}
@@ -592,7 +592,7 @@ def clone(principal, project, req, admin=False, session=False):
     return {"ok": True, "key": key, "job": r["job"], "domain": dom}
 
 
-UPLOAD_MAX = 16 * 2**30         # an installer's ISO, uploaded (R99): DVD-sized and then some
+UPLOAD_MAX = 16 * 2**30         # an installer's ISO, uploaded: DVD-sized and then some
 
 
 def upload_dir():
@@ -640,7 +640,7 @@ def iso_upload(principal, stream, size, node_id, name):
 def iso(principal, action, req):
     """An installer's ISO fetched onto a VM host from an https address and
     kept only when it matches the SHA-256 given (iso-add), or taken off it
-    (iso-rm): a person's, queued as the node's vm job (R99)."""
+    (iso-rm): a person's, queued as the node's vm job."""
     nid = str(req.get("node") or "")
     pick = next((n for n in hosts() if n["id"] == nid or n["name"] == nid), None)
     if not pick:
@@ -679,7 +679,7 @@ def _net_name(subnet):
 
 def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
     """A VM's hardware beyond size from what New VM, the Hardware dialog or
-    aerie vm asked (R100): (record, "") or (None, why). A device passed through
+    aerie vm asked: (record, "") or (None, why). A device passed through
     is an administrator's; the LAN is a person's, since it takes the VM past
     the firewall that keeps a project's VMs off it; a shared folder is one of
     the project's own; a CPU thread another VM on the node is pinned to is
@@ -718,7 +718,7 @@ def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
                                                   and not name.startswith("bbvm-")):
             return None, "a VM's network is its space's, the LAN, a bridge on the host or a libvirt network, by name"
         # Anything but its space's own network takes the VM past the firewall
-        # that keeps a space's VMs to themselves (R219 step 4): a person's.
+        # that keeps a space's VMs to themselves: a person's.
         if net != "project" and not person:
             return None, ("putting a VM on the LAN, a host bridge or another network is a person's: it takes it past "
                           "the firewall that keeps a space's VMs to themselves; its Hardware dialog on the VMs page does it")
@@ -756,7 +756,7 @@ def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
 
 
 def vbios(principal, req, admin):
-    """A GPU's vBIOS dumped on its node (R100): an administrator's, queued as
+    """A GPU's vBIOS dumped on its node: an administrator's, queued as
     the node's vm job, which reads it as root."""
     if not admin:
         return {"error": "dumping a GPU's vBIOS is an administrator's"}
@@ -824,7 +824,7 @@ def act(principal, project, name, action, req=None):
             return {"error": f"{name} is {rec['state']}: wait for that to end"}
         # Remove clears a create that stalled, but not one still going: the
         # agent found nothing to remove, the record went, and the create
-        # then made a VM nobody had on record (B553).
+        # then made a VM nobody had on record.
         if action == "remove" and rec.get("state") == "making" and job_get and rec.get("job"):
             j = job_get(rec["job"], with_log=False) or {}
             if j.get("state") in ("queued", "assigned", "running"):
@@ -872,7 +872,7 @@ def act(principal, project, name, action, req=None):
         if action == "autostart":
             spec["on"] = req.get("on") is True
         if action in ("usb-give", "usb-take"):
-            # A USB device given to a VM, or taken back (R116): an
+            # A USB device given to a VM, or taken back: an
             # administrator's, since a device can be a disk or a key; named
             # as the node's census names it, and for a give one the node
             # lists now and no other VM here holds.
@@ -908,7 +908,7 @@ def act(principal, project, name, action, req=None):
 
 
 def usb_named(d, n, domain, give):
-    """A USB device as a request names it (R116): (the device as the node's
+    """A USB device as a request names it: (the device as the node's
     census lists it, "") or (None, why). For a give it must be plugged in
     now, not used by the host and not another VM's; a take names what the
     VM holds, plugged in or not."""

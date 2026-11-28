@@ -27,10 +27,10 @@ def outcome(auth, rid, denied, unanswered=""):
     outcome once it is done. A refusal from the API ends the verb with its
     sentence, a No with `denied` (the verb's own words), and silence with the
     quarter hour's, and `unanswered` where the verb can say what still
-    happens (B127: a build the ask still starts once allowed)."""
+    happens (a build the ask still starts once allowed)."""
     # A read that nothing answered (a timeout, a restart) is asked again, a
     # minute's worth in a row, before the verb gives up saying the ask was
-    # made and its number (B1070: one slow read ended it with a bare 'The
+    # made and its number (one slow read ended it with a bare 'The
     # read operation timed out').
     missed = 0
     for _ in range(900):

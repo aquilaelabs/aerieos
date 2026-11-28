@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The move off another NAS rehearsed inside the walked stick, as root, with
-the branch's own agent (R163 step 4): three blank disks and the NVMe laid out
+the branch's own agent: three blank disks and the NVMe laid out
 as the old system left them (an XFS and a btrfs data disk with files, a
 parity disk with an empty partition, a btrfs cache pool), its Docker and
 libvirt image files on the array (a container that started with the

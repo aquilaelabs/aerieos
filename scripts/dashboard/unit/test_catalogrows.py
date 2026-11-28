@@ -1,5 +1,5 @@
-"""A shipped toolchain's recipe from the catalog when the catalog's is newer
-(R234 step 4): every row comes back whole from its official pack's
+"""A shipped toolchain's recipe from the catalog when the catalog's is newer:
+every row comes back whole from its official pack's
 manifest, a newer one is fetched at its pin and held to its shape, the
 controller's table carries it in the shipped row's place and the nodes'
 bundle in a file beside the shipped one, and the image's copy is what runs

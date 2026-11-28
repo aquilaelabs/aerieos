@@ -1,4 +1,4 @@
-"""A stand-in for Discord's REST API, for the browser suites (R293), as
+"""A stand-in for Discord's REST API, for the browser suites, as
 agent-stub.py stands in for a node: the server the harness's controller
 calls through BB_DISCORD_API. One server, "Shop community", with a role, a
 category and two channels; a bot's token is the one in TOKEN. Its world is

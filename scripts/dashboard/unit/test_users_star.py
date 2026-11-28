@@ -1,4 +1,4 @@
-"""The owner takes projects on like everybody (R135): "*" on a record
+"""The owner takes projects on like everybody: "*" on a record
 lists every project and takes none on, migrate_star turns an owner's "*"
 into the projects that exist, and take_on adds to any list."""
 import json

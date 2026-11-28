@@ -108,10 +108,10 @@ def _project(d, project):
 # wall time wherever they exist and the registry has to be able to say so; a
 # parser that only knows the two statuses one runner happens to print is a
 # parser that has to be rewritten the day a test is skipped.
-# ...with the engine it ran in, [chromium], since every suite runs in each
-# (R263 step 5); its results outside Chromium carry the engine in their names.
+# ...with the engine it ran in, [chromium], since every suite runs in each;
+# its results outside Chromium carry the engine in their names.
 BANNER = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+)(?: \[\w+\])? ==\s*$")
-# A file run again, alone, after it failed in the whole run (B124). Its lines
+# A file run again, alone, after it failed in the whole run. Its lines
 # are not recorded: the run's own timings are the ones worth keeping, and
 # the second copy of a file's roster would read as every test doubled.
 RETRY = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+)(?: \[\w+\])? again ==\s*$")
@@ -125,7 +125,7 @@ LOAD = re.compile(r"^\[dashboard-test\] load: ([0-9.]+) ([0-9.]+) on (\d+) cores
 
 def load_of(text):
     """{load1, load5, cores} as the run ended (the harness's own line), the
-    busiest of them when the log holds several, or None (R108)."""
+    busiest of them when the log holds several, or None."""
     best = None
     for raw in text.splitlines():
         m = LOAD.match(re.sub(r"^\d{9,}\.\d+ ", "", raw))
@@ -197,7 +197,7 @@ def _align(old, new):
     # and it would otherwise be unpaired on every ingest. With the tail gone
     # it matches exactly here, wherever an insertion above it moved it to,
     # and never falls through to the likeness pass where a neighbor of
-    # similar wording could claim it (bug B121).
+    # similar wording could claim it.
     a, b = [_stem(x["name"]) for x in old], [_stem(x["name"]) for x in new]
     # Standard LCS table. These are per-file rosters (a couple of hundred at
     # most), so the quadratic table is cheaper than being clever.
@@ -325,7 +325,7 @@ def ingest(project, text, by="you"):
             "n": len(roster), "suites": len(by_suite),
             "wall": round(sum(s["wall"] or 0 for s in suites.values()), 1),
             "ms": sum(r["ms"] or 0 for r in roster),
-            # What these seconds were measured under (R108): a run on a busy
+            # What these seconds were measured under: a run on a busy
             # machine is not compared with a quiet one's as if it were.
             **({"load": lo} if (lo := load_of(text)) else {})})
         del p["runs"][:-KEEP_RUNS]
@@ -449,7 +449,7 @@ def _latest(t):
 # sentence of four words or more ("a press on the page around it puts it
 # away", or test_a_release_whose_apk_never_came_is_said), where a terse one
 # (test_login, LoginWorks) is a name, and the test wants a line from aerie
-# tests note (the operator, 17 Nov: the view called all 8091 of this
+# tests note (the view called all 8091 of this
 # repository's undescribed, every one a sentence).
 _NAME_WORDS = re.compile(r"[A-Za-z0-9']+")
 
@@ -473,7 +473,7 @@ def payload(project):
     # The revision of THIS answer, for the panel to record as what it read.
     # The panel used to record the page's token as of when the answer landed,
     # which is a different moment: a write between the read here and that
-    # record was marked seen and never re-read (B201).
+    # record was marked seen and never re-read.
     rev = int(p.get("rev") or 0)
     tests = []
     for key, t in (p.get("tests") or {}).items():
@@ -543,7 +543,7 @@ def payload(project):
         # tests cost and what the suite costs: the difference is the harness.
         "last_wall_ms": int((runs[-1].get("wall") or 0) * 1000) if runs else 0,
         # The run going right now, if aerie test said so (begin/end), or None:
-        # the view names it before the last run's record (R99).
+        # the view names it before the last run's record.
         "running": running(project),
     }
 
@@ -586,8 +586,8 @@ def revisions():
 # What `aerie test` says at its start and its end, per project, kept in memory
 # only: a controller restart forgets a run, which costs one note sent early
 # and never one held back. The companion app reads it to time its "Claude
-# is waiting on you" note by the project's During-a-test-run setting (the
-# operator, 30 Sep): where a new ask waits for the run, the note waits for
+# is waiting on you" note by the project's During-a-test-run setting:
+# where a new ask waits for the run, the note waits for
 # the run too. A run whose end never arrived (a session killed under it)
 # is forgotten after STALE_S rather than holding that note for good.
 RUNNING = {}

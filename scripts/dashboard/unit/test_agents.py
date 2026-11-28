@@ -1,4 +1,4 @@
-"""agents.py: the table of coding agents (R95 step 1). Claude's adapter is
+"""agents.py: the table of coding agents. Claude's adapter is
 the one live row, and every name and argument reads as it did before the
 table; the page's copy (page-agents.js) and the node agent's prefixes are
 held to the table here."""
@@ -64,7 +64,7 @@ class Names(unittest.TestCase):
         self.assertEqual(agents.of_session(""), (None, ""))
 
     def test_the_open_agent_s_names_are_read_as_its(self):
-        # Any model (R144 step 2): its sessions and its arguments are its.
+        # Any model: its sessions and its arguments are its.
         self.assertEqual(agents.of_session("open-alpha"), (agents.get("open"), "alpha"))
         self.assertEqual(agents.of_arg("open:alpha"), (agents.get("open"), "alpha"))
         self.assertTrue(idle.is_claude("open-alpha"))
@@ -115,7 +115,7 @@ class Names(unittest.TestCase):
 
 class Asker(unittest.TestCase):
     """The dials hold for every agent's session alike; which agent asked is
-    named on the record beside `by`, for display (the operator, 22 Oct)."""
+    named on the record beside `by`, for display."""
 
     def test_a_session_s_record_names_its_agent(self):
         with unittest.mock.patch.dict(os.environ, {"BB_AGENT": "codex"}):
@@ -143,7 +143,7 @@ class Asker(unittest.TestCase):
 
 
 class Transcripts(unittest.TestCase):
-    """aerie transcripts (the operator, 22 Oct): the asking account's own
+    """aerie transcripts: the asking account's own
     conversations on the project, each marked with its agent, and never
     another account's."""
 
@@ -166,7 +166,7 @@ class Transcripts(unittest.TestCase):
 
 
 class Briefing(unittest.TestCase):
-    """R95 step 5: one briefing for every agent, named where it matters."""
+    """One briefing for every agent, named where it matters."""
 
     def test_another_agent_is_told_what_it_is_ahead_of_the_block(self):
         import preamble
@@ -179,7 +179,7 @@ class Briefing(unittest.TestCase):
 
 
 class State(unittest.TestCase):
-    """R95 step 7: another agent's session says working, waiting and asking
+    """Another agent's session says working, waiting and asking
     through its hooks, and its turn is its own beside a Claude one's."""
 
     def test_a_turn_marks_it_working_and_its_end_waiting_under_its_own_name(self):
@@ -195,7 +195,7 @@ class State(unittest.TestCase):
         hooks.verb("turn-done", {"agent": "codex"}, {}, "u_0123abcd", "alpha")
         hooks.verb("asking", {"agent": "copilot", "text": "may I?"}, {}, "u_0123abcd", "alpha")
         hooks.verb("turn", {}, {}, "u_0123abcd", "alpha")
-        # A second slot says which it is (R143); a slot out of range is the first.
+        # A second slot says which it is; a slot out of range is the first.
         hooks.verb("turn", {"agent": "codex", "slot": "2"}, {}, "u_0123abcd", "alpha")
         hooks.verb("turn", {"agent": "codex", "slot": "12"}, {}, "u_0123abcd", "alpha")
         self.assertEqual(said, [("alpha", "u_0123abcd", "codex", "working", 1), ("alpha", "u_0123abcd", "codex", "waiting", 1),
@@ -219,7 +219,7 @@ class ByPath(unittest.TestCase):
 
 
 class OtherTranscripts(unittest.TestCase):
-    """R95 step 8: Codex's and Copilot's logs, kept by their Stop hook in
+    """Codex's and Copilot's logs, kept by their Stop hook in
     an <agent>/ folder of the tree's transcripts folder, listed, read and
     shown as Claude's are, each marked with its agent."""
 
@@ -379,7 +379,7 @@ class Copies(unittest.TestCase):
                 self.assertEqual(tuple(m.group(1).split()), xs, (ag, kind))
 
     def test_the_android_app_s_copy_is_the_live_rows(self):
-        # The companion app finds and starts any live agent's session (R128):
+        # The companion app finds and starts any live agent's session:
         # its table (apps/android/.../Agents.kt) is the live rows, Claude first,
         # with each other agent's own models.
         path = os.path.join(HERE, "..", "..", "..", "apps", "android", "app", "src", "main", "java",
@@ -399,7 +399,7 @@ class Copies(unittest.TestCase):
             self.assertEqual(tuple(re.findall(r'"([^"]+)"', efforts)), xs, aid)
 
     def test_the_vscode_extension_s_copy_is_the_live_rows(self):
-        # Its session terminal opens any live agent's session (R128).
+        # Its session terminal opens any live agent's session.
         with open(os.path.join(HERE, "..", "..", "..", "apps", "vscode", "extension.js")) as f:
             js = f.read()
         body = js[js.index("const AGENTS = ["):js.index("];", js.index("const AGENTS = ["))]
@@ -447,7 +447,7 @@ class Sessions(unittest.TestCase):
     def test_the_list_is_read_fresh_and_the_poll_s_token_may_be_kept(self):
         # A list read on demand (a space's settings, an administrator's End)
         # names a session started a moment ago; the revisions poll's token may
-        # use a listing a few seconds old (R228 step 2).
+        # use a listing a few seconds old.
         kept = [{"name": "claude-alpha", "claude": {"state": "working"}}]
         projsessions.configure(
             sessions=lambda: self.rows, live_sessions=lambda: kept,

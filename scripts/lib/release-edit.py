@@ -1,4 +1,4 @@
-"""Behind `aerie version release --edit` (R139), and --remove, which takes files
+"""Behind `aerie version release --edit`, and --remove, which takes files
 off the release as its own ask: the published release's notes
 replaced and files attached, made by the controller with the project's own
 token under Agents may: Tag and publish a release, every edit its own ask.
@@ -7,7 +7,7 @@ Run where it is typed, never relayed: the notes are a file the session
 wrote (its scratchpad, or stdin), and a relayed verb ran on the
 controller, which sees /workspace and nothing else, so a scratchpad file
 was "No such file or directory" and stdin arrived empty (report 60,
-Shebang-DevBoard, 5 Oct). Only the API call goes to the controller.
+Shebang-DevBoard). Only the API call goes to the controller.
 
 Arguments: the project, then the words after `aerie version`: [--for DIR]
 release --edit --why "..." [--tag TAG] [--notes FILE|-] [--attach FILE]...
@@ -38,7 +38,7 @@ for word in ("release", "--edit"):
     if word in rest:
         rest.remove(word)
 why, tag, notes, attach, remove = "", "", None, [], []
-# --withdraw TAG (R190 step 3): the release and its tag taken back, always
+# --withdraw TAG: the release and its tag taken back, always
 # a person's answer.
 withdraw = ""
 if "--withdraw" in rest:
@@ -72,8 +72,8 @@ while rest:
         if not p.startswith(root + os.sep):
             fail(f"--attach {val}: a file in {proj}, a build in dist/ or a committed one")
         attach.append(os.path.relpath(p, root))
-# Taking files off is its own ask and never part of an edit (the operator,
-# 5 Oct): the person reading it sees a removal and nothing else.
+# Taking files off is its own ask and never part of an edit:
+# the person reading it sees a removal and nothing else.
 if remove and (notes is not None or attach):
     fail("a removal is its own ask: run --remove without --notes and --attach, and the edit after it")
 if withdraw and (remove or notes is not None or attach or tag):
@@ -86,7 +86,7 @@ else:
     body = {"action": "release-edit", "project": proj, "component": comp, "why": why,
             "tag": tag, "notes": notes, "attach": attach}
 # The files attached are read from the controller's copy: on a synced node
-# they go up first (R163).
+# they go up first.
 if attach:
     import syncwait  # noqa: E402
     if not syncwait.up(proj, "the controller attaches the files from its copy"):

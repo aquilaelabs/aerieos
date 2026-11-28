@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sign an AerieOS release's list of its files (R199): SHA256SUMS, which every
+"""Sign an AerieOS release's list of its files: SHA256SUMS, which every
 install holds a file it takes to, and SHA256SUMS.sig, which it verifies
 against its own config/release-signers. The namespace says the channel, and
 so who holds the key:

@@ -1,5 +1,5 @@
-"""The briefing says the project's Agents may dials as they stand (the
-operator, 27 Oct): a session told only the defaults said a release would
+"""The briefing says the project's Agents may dials as they stand:
+a session told only the defaults said a release would
 wait on the owner's answer where the dial was auto."""
 import os
 import sys

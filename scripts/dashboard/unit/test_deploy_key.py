@@ -1,5 +1,5 @@
-"""A project's own deploy key, made or pasted in its settings (the operator,
-12 Oct): the private half goes to the root-only helper on stdin and no
+"""A project's own deploy key, made or pasted in its settings:
+the private half goes to the root-only helper on stdin and no
 further, the key is wired as the ssh remote to switch to, and one in use
 is not forgotten out from under the push."""
 import os
@@ -48,7 +48,7 @@ class DeployKey(unittest.TestCase):
         self.assertEqual(projects.deploy_key("app", "key-store", "not a key")[1], 400)
 
     def test_an_install_keys_change_seals_the_deploy_keys_again_or_says_it_could_not(self):
-        # The pass installkey runs over every sealed store (R243).
+        # The pass installkey runs over every sealed store.
         from unittest import mock
         self.assertEqual(projects.deploy_keys_seal_all(), 0, "a start with no change: the helper's own load does it")
         with mock.patch.object(projects.os.path, "exists", lambda p: False):

@@ -1,5 +1,5 @@
-"""A session's token reaches the routes its table names and nothing else
-(R227 step 4). Held here without a server: the table names only routes there
+"""A session's token reaches the routes its table names and nothing else.
+Held here without a server: the table names only routes there
 are, every path a session-side client names (aerie, its library, bb-tty and
 the hooks) is in it, and the dispatcher's question refuses a session on any
 other route before the route's own gate is read."""

@@ -1,4 +1,4 @@
-"""R208 step 6: a project's Agents may dials are the defaults for every
+"""A project's Agents may dials are the defaults for every
 repository in it; a repository's notebook sets one apart as its own
 override, and "inherit" gives it back."""
 import json
@@ -37,7 +37,7 @@ class Overrides(unittest.TestCase):
             self.assertTrue(repos.add(self.key, d).get("ok"))
 
     def test_just_for_you_from_the_space_s_door_reaches_every_repository(self):
-        # R294 step 5: the space's card wrote the first repository's alone.
+        # The space's card wrote the first repository's alone.
         r, status = prefs.dialog_save("app", {"scope": "project", "codex_model": "gpt-5.5"}, "u_0000aaaa")
         self.assertEqual(status, 200, r)
         for repo in ("app", "server"):
@@ -49,7 +49,7 @@ class Overrides(unittest.TestCase):
                           prefs.for_user("u_0000aaaa", "server").get("codex_effort")), ("high", "low"))
 
     def test_push_rules_are_the_space_s_default_and_a_repository_s_own(self):
-        # R294 step 4 (the operator, 25 Nov): how a repository pushes and what
+        # How a repository pushes and what
         # the git host allows were the space's alone while edited on one
         # repository's Permissions view, so a change there changed every one.
         r = prefs.set_prefs("app", scope="project", gitpol={"main": "allow"}, forgepol={"workflows": "deny"})
@@ -111,7 +111,7 @@ class Overrides(unittest.TestCase):
     def test_a_record_from_before_the_list_keeps_what_its_notebook_set(self):
         # A released install's repository record: its gate values stored,
         # no overrides list. Each stays that repository's own, once migration
-        # 0037 has written the list (R295).
+        # 0037 has written the list.
         f = Path(self.tmp) / "claude-prefs.json"
         d = json.loads(f.read_text()) if f.is_file() else {"projects": {}}
         d.setdefault("projects", {})["server"] = {"gate": {"bugs": "deny"}, "pc": "auto"}
@@ -143,7 +143,7 @@ class Overrides(unittest.TestCase):
 
 
     def test_a_repository_narrows_its_spaces_hosting_nodes_and_sets_its_test_node_apart(self):
-        # R223: the space's hosting nodes are its own list; a repository keeps
+        # The space's hosting nodes are its own list; a repository keeps
         # its containers off some of them, never adding one; Test node is a
         # dial a repository may set apart.
         r = prefs.set_prefs("app", scope="project", node="n_cccccccc", hosts=["n_aaaaaaaa", "n_bbbbbbbb"], test_node="")

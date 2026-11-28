@@ -1,4 +1,4 @@
-"""A shell in a pod, in the dock (R281): the dock's terminal socket spliced
+"""A shell in a pod, in the dock: the dock's terminal socket spliced
 to the Kubernetes API's exec, translated between the two.
 
 The page speaks AerieOS's own terminal frames (termws): a binary frame from

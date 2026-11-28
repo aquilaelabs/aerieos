@@ -1,4 +1,4 @@
-"""A session's relayed verb waits past the longest the controller takes (B995).
+"""A session's relayed verb waits past the longest the controller takes.
 
 The relay's client gave up at 200 s, and 960 s for a release, while the
 controller may wait 120 s for a slot and run a verb 180 s (900 s for a

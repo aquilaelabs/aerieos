@@ -1,6 +1,6 @@
 """aerie jobs names each job by what it did: a line told to a Claude session
 says which session and what it said, where it read as `exec` with an empty
-command and a failed one could not be explained (B775)."""
+command and a failed one could not be explained."""
 import http.server
 import json
 import os

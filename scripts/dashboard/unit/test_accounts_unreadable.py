@@ -1,5 +1,5 @@
-"""An accounts file that is there and cannot be read is not a fresh install
-(B763): no first account is made over it, nothing is saved over it, and a
+"""An accounts file that is there and cannot be read is not a fresh install:
+no first account is made over it, nothing is saved over it, and a
 state file written is on the disk before its name points at it."""
 import json
 import os

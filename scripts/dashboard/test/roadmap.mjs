@@ -5,7 +5,7 @@
 // Claude session bb-tty starts, which is the whole point: something noticed
 // mid-task and left undone used to live in the conversation and die with it.
 import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, until, quiet as quietFor, settled as pageSettled, URL, DIR, closePage, nbGo, projectKey, section, pageCall } from './lib.mjs';
-// The add band unrolls the box in its place (R119 step 4): typing a line
+// The add band unrolls the box in its place: typing a line
 // presses Add to roadmap first, as a person does.
 const unroll = async pg => { if (await pg.$eval('#roadmapForm', f => f.hidden)) await pg.click('#roadmapShow'); };
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ const read = () => existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : {
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 
-// A row's shelf, pencil and bin sit on the open row (R223): opened first,
+// A row's shelf, pencil and bin sit on the open row: opened first,
 // the way a thumb does, by its caret.
 const rowOpen = async sel => {
   await page.evaluate(s => { const row = document.querySelector(s); const acts = row?.querySelector('.rowacts');
@@ -35,7 +35,7 @@ const rowOpen = async sel => {
 // A row's reword box is the one right under it (row.after(box)), and every
 // fill, read and press here goes to that one rather than the first
 // .editbox in the page. Save pressed, the box is waited out; still open, what
-// the page holds is said and Save is pressed once more (B415): the box stayed
+// the page holds is said and Save is pressed once more: the box stayed
 // open for minutes in one run in four alone with the press reported done, and
 // a guard that says only "the handler did not run" left nothing to find it by.
 const rewordBox = row => `${row} + .editbox`;
@@ -61,7 +61,7 @@ const rewordSave = async box => {
 };await page.goto(URL);
 await ready(page);
 
-const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page (R218 step 3)
+const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page
 // Nothing the panel does reaches disk until Save. Every assertion about the
 // file goes through this, which is also the assertion that staging works.
 const saveList = async () => {
@@ -83,7 +83,7 @@ const open = () => page.$$eval('#roadmapList .roadmap', ts => ts.map(t => ({
   claude: !!t.querySelector('.who:not(.fin)') })));
 
 // ---- adding ------------------------------------------------------------
-// The row and its notebook icon went with R218 step 3: a project is a
+// The row and its notebook icon went: a project is a
 // page, opened by its name on the Projects page or by openNotebook.
 
 await page.evaluate(n => openNotebook(n), 'alpha');
@@ -330,7 +330,7 @@ ok((await open()).some(i => i.can),
    '...so the arrows are live again');
 
 // ---- what a session is told --------------------------------------------
-// Counts and the verbs (R202): the list itself is a `aerie roadmap` away, and
+// Counts and the verbs: the list itself is a `aerie roadmap` away, and
 // the items a prompt names arrive on that prompt (preamble.mjs).
 const prompt = execFileSync(BB, ['roadmap', '--prompt'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
@@ -347,7 +347,7 @@ execFileSync(BB, ['roadmap', 'add', 'rework the picker',
            WORKSPACE: `${DIR}/ws` } });
 await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForFunction(() => document.querySelectorAll('#roadmapList .roadmap[data-step="1"]').length === 1);
-// A group is a fold now (the operator, 29 Sep): its row is the summary and
+// A group is a fold now: its row is the summary and
 // its steps open under it on a tap. Checked once, then every group is
 // opened as it is drawn, since the rest of this file reaches into steps.
 await section("A group is a fold now", async () => {
@@ -355,10 +355,10 @@ await section("A group is a fold now", async () => {
   const first = await page.$eval('#roadmapList details.grp:has(.roadmap[data-step="1"])', d => ({ open: d.open, steps: d.querySelectorAll('.roadmap[data-step]:not([data-step="-1"])').length,
     shown: [...d.querySelectorAll('.roadmap[data-step]:not([data-step="-1"])')].some(r => r.checkVisibility()) }));
   ok(!first.open && !first.shown, `a group starts folded, its steps out of sight (${JSON.stringify(first)})`);
-  // A step's send lines up under its item's, off the card's edge (B51).
+  // A step's send lines up under its item's, off the card's edge.
   // Measured once the rows carry a send: one is drawn once the status read
   // has said this account writes the space (projWriteWhy), which under a
-  // whole run's load came after the list (B834); when none comes, why.
+  // whole run's load came after the list; when none comes, why.
   const sends = await page.waitForSelector('#roadmapList details.grp:has(.roadmap[data-step="1"]) .roadmap .go',
     { state: 'attached', timeout: 20000 }).then(() => '', () => page.evaluate(() =>
       ` none drawn: read-only ${JSON.stringify(projWriteWhy('alpha') || '')}, ${
@@ -483,7 +483,7 @@ ok(read().projects.alpha.at(-1).text === 'rework the picker',
 const shelvedPrompt = execFileSync(BB, ['roadmap', '--prompt'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
-// A state dir this copy cannot write (a checkout's bb on a node, B228):
+// A state dir this copy cannot write (a checkout's bb on a node):
 // the list still prints and the exit is clean; marking it read is a
 // courtesy, not the point.
 const unwritable = execFileSync(BB, ['roadmap'],
@@ -530,7 +530,7 @@ ok((await bins()).includes('1'),
 // is clipped and cannot be scrolled up into it. Scrolled to show its Save
 // (a browser's scroll into view does), the box let it fall back as it grew,
 // so the button slid from under a press and the click went to the box: a
-// step never dropped, a target never set (B1113).
+// step never dropped, a target never set.
 await section("a box on its way in is clipped, never scrolled", async () => {
   const got = await page.evaluate(() => {
     const host = document.querySelector('.pane .doc.on #roadmapList') || document.body;
@@ -561,7 +561,7 @@ await section("a box on its way in is clipped, never scrolled", async () => {
 // and it is optional, because a reason demanded is a reason typed as "x".
 await rowOpen(`#roadmapList .roadmap[data-id="${c1.id}"][data-step="0"]`);
 await page.click(`#roadmapList .roadmap[data-id="${c1.id}"][data-step="0"] .rm`);
-// The row's own box, the one right under it (B415, as the reword's).
+// The row's own box, the one right under it (as the reword's).
 const dropBox = `#roadmapList .roadmap[data-id="${c1.id}"][data-step="0"] + .dropbox`;
 await page.waitForSelector(dropBox, { timeout: 10000 });
 ok(await page.$$eval('#roadmapList .roadmap', ts => ts.length) > 0
@@ -571,9 +571,9 @@ ok(await page.evaluate(() => document.activeElement?.tagName !== 'INPUT'),
    '...without the cursor in the field, like every other box in this window');
 await page.click(`${dropBox} .stop`);
 // Waited for rather than read in the same breath as the click, which a
-// loaded box lost once (B292); a Cancel that never closes the box still
+// loaded box lost once; a Cancel that never closes the box still
 // fails here, and the line says which half it was. Still open, what the
-// page holds is said and Cancel is pressed once more (B415).
+// page holds is said and Cancel is pressed once more.
 await section("Waited for rather than read in the same breath as the click, which a", async () => {
   const gone = () => page.waitForSelector(dropBox, { state: 'detached', timeout: 5000 }).then(() => true, () => false);
   let shut = await gone();
@@ -634,7 +634,7 @@ ok(grp().steps[1].text === 'and check it at both sizes',
    'aerie roadmap step edit rewords one step, numbered the way a human reads it');
 bbRoadmap('step', 'rm', c1.id, '2');
 ok(grp().steps.length === 1, 'aerie roadmap step rm drops one step and leaves the rest');
-// ...and says which moved up when it was not the last (B818): a fold that
+// ...and says which moved up when it was not the last: a fold that
 // removed one went on naming the old numbers.
 bbRoadmap('step', 'add', c1.id, 'a second');
 bbRoadmap('step', 'add', c1.id, 'a third');
@@ -657,7 +657,7 @@ bbRoadmap('mv', c1.id, 'down');
 ok(JSON.stringify(orderNow()) === JSON.stringify(wasOrder), '...and back down');
 bbRoadmap('shelve', c1.id);
 ok(read().projects.alpha.at(-1).shelved, 'aerie roadmap shelve parks one');
-// ...and asking for it back is a request (R78): held for a person on the
+// ...and asking for it back is a request: held for a person on the
 // project with its reason, the item still shelved until they answer. The
 // pending suite walks the approval; here the ask and the hold.
 ok(/asked to take R\d+ off the shelf: held for approval on the notebook/.test(bbRoadmap('unshelve', c1.id, 'the blocker is gone'))
@@ -784,7 +784,7 @@ ok(log.every(e => /^(claude|you)( · \S+)?$/.test(e.by)),
 // of them apart, and a session carries its account's because a session has
 // an author too. The audit on the Nodes tab has done this since accounts
 // existed, and the notebook's four logs had not.
-// This account's own is "you" and "claude", said once (B51: "you · stencil"
+// This account's own is "you" and "claude", said once ("you · stencil"
 // named one person twice); another account's carries its name.
 ok(log.some(e => e.by === 'you') && log.some(e => e.by === 'claude') && !log.some(e => /· test$/.test(e.by)),
    '...this account\'s own said once, as you and claude');
@@ -819,7 +819,7 @@ ok(true, '...and says so plainly when nothing does');
 await page.fill('#histFind', '');
 await page.waitForFunction(() => document.querySelectorAll('#roadmapHist .hist').length > 1,
                            { timeout: 10000 });
-// One way to page it (R254 step 5): a page at a time, no count to pick; a
+// One way to page it: a page at a time, no count to pick; a
 // day's first line carries the day, and each id is a link to its row.
 const before = await page.$$eval('#roadmapHist .hist', hs => hs.length);
 const hv = await page.$$eval('#roadmapHist .hist', hs => ({ shown: hs.filter(h => !h.hidden).length,
@@ -828,7 +828,7 @@ const hv = await page.$$eval('#roadmapHist .hist', hs => ({ shown: hs.filter(h =
 ok(hv.shown <= 30 && hv.day && hv.ids > 0 && !hv.pick,
    `the log pages itself with no count to pick, heads each day, and links each item (${JSON.stringify(hv)})`);
 // A wait on the answer, not a half-second sleep: under a loaded whole run
-// the list was read mid-redraw with fewer lines than it ends with (B413).
+// the list was read mid-redraw with fewer lines than it ends with.
 const answered = page.waitForResponse(r => /"action":"history"/.test(r.request().postData() || ''),
                                       { timeout: 15000 });
 await page.selectOption('#histWhen', '0');
@@ -993,7 +993,7 @@ ok(await page.$eval('#roadmapList .roadmap:has(.who) .body',
 // pressed and nothing is crossed out.
 execFileSync('tmux', ['send-keys', '-t', 'claude-alpha', '-l', '--', 'stty -echo; echo ECHO-OFF-NOW']);
 execFileSync('tmux', ['send-keys', '-t', 'claude-alpha', 'Enter']);
-// Waited for on what the shell printed after it ran stty (B345, B486), not on
+// Waited for on what the shell printed after it ran stty, not on
 // the tty's flags: a shell at its prompt has echo off in the tty while its
 // line editor reads (it draws what is typed itself), so the flags read -echo
 // before the shell had even taken the line, and between taking it and stty
@@ -1010,7 +1010,7 @@ await section("Waited for on what the shell printed after it ran stty", async ()
 // ...and the pane quiet: under a whole run's load a line sent earlier still
 // had its shell's "command not found" on the way, which repeats the line, and
 // it landed after the server's one-second settle and counted as this send's
-// echo (B609). Two captures a second apart, the same, before the send.
+// echo. Two captures a second apart, the same, before the send.
 await section("and the pane quiet", async () => {
   const cap = () => execFileSync('tmux', ['capture-pane', '-p', '-t', 'claude-alpha'], { encoding: 'utf8' });
   let prev = cap();
@@ -1045,7 +1045,7 @@ ok(/remove\s+R\d+\s+delete a space/.test(bbRoadmapEarly('history', '-n', '4')),
 
 // ---- finishing one -------------------------------------------------------
 // A session says a thing is done through bb; a person, with Done on its row
-// (R254 step 2, below). It comes off the list when it does: a list is read to find out what
+// (below). It comes off the list when it does: a list is read to find out what
 // is left, and something finished is not left. The log is where it goes, and
 // what tells "ticked off" apart from "dropped".
 const fin = await post({ action: 'add', project: 'alpha', text: 'a job to finish' });
@@ -1053,8 +1053,8 @@ const finId = String(fin.body.item.id);
 bbRoadmap('done', finId);
 ok(!read().projects.alpha.some(r => String(r.id) === finId),
    'aerie roadmap done takes the item off the list rather than fading it in place');
-// ...and the Roadmap tab can still show it (R78): a Finished section under
-// the list (R254 step 1), shut until opened, draws the ticked-off items with
+// ...and the Roadmap tab can still show it: a Finished section under
+// the list, shut until opened, draws the ticked-off items with
 // their plans, and the head counts them.
 await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForFunction(() => { const s = document.querySelector('.nb #roadmapDoneSect');
@@ -1069,20 +1069,20 @@ ok(await page.$eval(`.nb #roadmapDoneList .grp.done[data-done="${finId}"] .txt`,
 ok(await page.evaluate(() => !!(document.querySelector('.nb #roadmapList').compareDocumentPosition(document.querySelector('.nb #roadmapDoneList')) & Node.DOCUMENT_POSITION_FOLLOWING)),
    '...below the live and shelved ones');
 // Its "done" line is the row's sub line in the data voice, not the summary's
-// bold body text (B51).
+// bold body text.
 ok(await page.$eval(`.nb #roadmapDoneList .grp.done[data-done="${finId}"] > summary .sub`, s =>
      Number(getComputedStyle(s).fontWeight) < 600 && getComputedStyle(s).color !== getComputedStyle(s.closest('summary')).color),
    '...its done line dim and not bold');
 // A finished item is a fold like an open one, with Reopen where no release
-// has shipped it (R254 step 2).
+// has shipped it.
 await page.click(`.nb #roadmapDoneList .grp.done[data-done="${finId}"] > summary`);
 await page.waitForSelector(`.nb #roadmapDoneList .grp.done[data-done="${finId}"][open] [data-reopen]`, { state: 'visible', timeout: 5000 });
 await page.click(`.nb #roadmapDoneList [data-reopen="${finId}"]`);
 await page.waitForFunction(id => [...document.querySelectorAll('.nb #roadmapList > .grp')].some(g => g.dataset.id === id), finId, { timeout: 10000 });
-// Drawn back on the press (the operator, 22 Nov), and the file follows.
+// Drawn back on the press, and the file follows.
 ok(await until(() => read().projects.alpha.some(r => String(r.id) === finId), 10000),
    'Reopen on a finished item puts it back on the list on the press, and the server has it');
-// Its fold carries what it knows (R254 step 3): when it was added and by
+// Its fold carries what it knows: when it was added and by
 // whom; and what shipped a thing is read off the CHANGELOG's dated
 // releases, never typed (step 4).
 await page.click(`.nb #roadmapList > .grp[data-id="${finId}"] > summary .dtog`);
@@ -1103,14 +1103,14 @@ await page.waitForFunction(id => notebooks.get('alpha').where() === 'roadmap' &&
   && [...document.querySelectorAll('.nb #roadmapList > .grp:not(.off)')].map(g => g.dataset.id).join() === id, finId, { timeout: 5000 });
 ok(true, '...and following one opens the Roadmap narrowed to that item');
 await page.fill('.nb #roadmapFind', '');
-// Done on its row ticks it off from the page (R254 step 2, the operator, 16
-// Oct), logged as the person's, and it goes under Finished.
+// Done on its row ticks it off from the page,
+// logged as the person's, and it goes under Finished.
 if (await page.$eval(`.nb #roadmapList > .grp[data-id="${finId}"] .rowacts`, a => a.hidden))
   await page.click(`.nb #roadmapList > .grp[data-id="${finId}"] > summary .dtog`);
 await page.waitForSelector(`.nb #roadmapList > .grp[data-id="${finId}"] .dn`, { state: 'visible', timeout: 5000 });
 await page.click(`.nb #roadmapList > .grp[data-id="${finId}"] .dn`);
 await page.waitForFunction(id => ![...document.querySelectorAll('.nb #roadmapList > .grp')].some(g => g.dataset.id === id), finId, { timeout: 10000 });
-// Off the list on the press (the operator, 22 Nov), the file following.
+// Off the list on the press, the file following.
 ok(await until(() => !read().projects.alpha.some(r => String(r.id) === finId)
    && read().history.alpha.some(e => e.act === 'done' && String(e.id) === finId && e.by === 'you' && e.step == null), 10000),
    '...and Done on its row ticks it off from the page on the press, logged as the person\'s');
@@ -1145,7 +1145,7 @@ ok(new RegExp(`done\\s+R${finId}\\s+a job to finish`).test(afterDone),
 ok(/\bdone\b/.test(afterDone) && /\bremove\b/.test(afterDone),
    '...which is what tells "ticked off" apart from "dropped": both leave, '
    + 'and only the log says which happened');
-// ...and its number is never handed out again (bug B72): a number is the
+// ...and its number is never handed out again: a number is the
 // item's own, and "a gap means something was removed" only holds if nothing
 // is numbered twice. It used to be max(on the list)+1, so ticking the
 // newest items off gave their numbers to the next adds.
@@ -1186,8 +1186,8 @@ writeFileSync(FILE, JSON.stringify(many));
 const more = await post({ action: 'add', project: 'gamma', text: 'a thirty-first, beside forty parked' });
 ok(more.status === 200 && !more.body.error,
    'a list of thirty open and forty parked takes another: the parked are not counted and thirty is not the limit');
-// The cap is a guard against a runaway, not a working limit (the operator,
-// 15 Oct): five thousand open.
+// The cap is a guard against a runaway, not a working limit:
+// five thousand open.
 many.projects.gamma = Array.from({ length: 5000 }, (_, i) =>
   ({ id: i + 1, text: `item ${i + 1}`, done: false, added: 1, by: 'you' }));
 writeFileSync(FILE, JSON.stringify(many));
@@ -1295,7 +1295,7 @@ await section("and a box open in the list is not taken apart by somebody else's 
   ok(await page.$eval(`${rw} textarea`, t => t.value) === 'half a thought, still typing',
      'a redraw from elsewhere leaves a half-typed rewording alone, box and words');
   // ...and so does a session starting or ending on the space, and a chip
-  // pressed on the band (B1004), as the paging does as a person scrolls to
+  // pressed on the band, as the paging does as a person scrolls to
   // the foot: each drew the whole list past the box's guard.
   const kept = await page.evaluate(() => {
     const nb = getNotebook('alpha'), said = [];
@@ -1352,7 +1352,7 @@ bbRoadmapEarly('info', plainId, '1', 'the select is built in stepRow()');
 ok(read().projects.alpha.find(r => String(r.id) === plainId).steps[0].info
      === 'the select is built in stepRow()',
    '...and to one step of it, numbered the way a human reads it');
-// Attached is added to (B817): a second note goes under the details there,
+// Attached is added to: a second note goes under the details there,
 // and --replace sets them outright; a status note once wiped four items'.
 bbRoadmapEarly('info', plainId, 'status: half landed');
 ok(read().projects.alpha.find(r => String(r.id) === plainId).info
@@ -1383,7 +1383,7 @@ ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="-1"]
    'the panel shows a details fold, closed: the words are the decision, this is the workings');
 // Watched across the click rather than read after it: under a whole run's
 // load the 180 ms tween could finish before a read after the click, and the
-// check failed in a four-worker run and passed alone (B390).
+// check failed in a four-worker run and passed alone.
 const slid = await animatedDuring(page, () =>
   page.click(`#roadmapList .roadmap[data-id="${plainId}"][data-step="-1"] .dtog`));
 ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="-1"] .dinfo`,
@@ -1427,7 +1427,7 @@ await post({ action: 'cross', project: 'alpha', id: Number(plainId), step: 0, on
 bbRoadmapEarly('info', plainId, '');
 bbRoadmapEarly('step', 'info', plainId, '1', '');
 await page.evaluate(() => notebooks.get('alpha').reload());
-// The caret stays (it opens the row's actions, R223); the details go, and
+// The caret stays (it opens the row's actions); the details go, and
 // the caret reads more rather than details.
 await page.waitForFunction(id => !document.querySelector(`#roadmapList .roadmap[data-id="${id}"] .dinfo`)
   && [...document.querySelectorAll(`#roadmapList .roadmap[data-id="${id}"] .dtog`)].every(b => /more/.test(b.textContent)),
@@ -1448,7 +1448,7 @@ await page.fill(`${rw} textarea`, 'a wording nobody asked for');
 await rewordSave(rw);
 await page.waitForFunction(id => document.querySelector(
   `#roadmapList .roadmap[data-id="${id}"][data-step="-1"] .txt`)?.textContent
-  === 'a wording nobody asked for', plainId, { timeout: patience(20000) });   // late under load (B311)
+  === 'a wording nobody asked for', plainId, { timeout: patience(20000) });   // late under load
 await rowOpen(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"]`);
 await page.click(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] .rm`);
 await page.waitForSelector('.dropbox .danger', { timeout: 10000 });
@@ -1604,7 +1604,7 @@ await ultra.waitForFunction(
                            { timeout: 20000 });
 const spread = await ultra.evaluate(() => {
   // the view under the strip: the notebook runs the pane's width for its
-  // view strip alone (the operator, 17 Oct)
+  // view strip alone
   const nb = document.querySelector('.pane .nb'), view = nb.querySelector('.nbview:not([hidden])');
   const pane = nb.closest('.doc').getBoundingClientRect();
   return { nb: Math.round(view.getBoundingClientRect().width),
@@ -1622,8 +1622,8 @@ await closePage(ultra);
 // The two pages are one account, and an account's tabs are one layout: the
 // Library tab the wide page opened could become the active tab here too,
 // and under a whole run's load that landed before the Save below was
-// pressed, with the notebook's footer behind it (B396). The notebook first.
-// Opening it straight away was not enough (B414): this page adopts the
+// pressed, with the notebook's footer behind it. The notebook first.
+// Opening it straight away was not enough: this page adopts the
 // wide page's layout on its next status poll, which could come after the
 // notebook was shown, even in the suite run alone. So first this page holds
 // the layout revision the server has, and only then is the notebook shown.
@@ -1687,7 +1687,7 @@ await page.waitForFunction(() => [...document.querySelectorAll('#roadmapList .ro
   .every(g => g.getAttribute('aria-disabled') === 'true'), null, { timeout: 15000 });
 ok(/no session running/.test(await page.$eval('#roadmapSess', h => h.textContent)),
    'the session going away puts the arrows down, without touching the tab');
-// ...and a dead arrow says why when pressed (B213). It used to be a disabled
+// ...and a dead arrow says why when pressed. It used to be a disabled
 // button, which swallows the press: the reason lived in a hover title a
 // finger never sees and in the line under the whole list.
 // Through the DOM: Playwright itself refuses to click what is aria-disabled.
@@ -1710,7 +1710,7 @@ await phone.evaluate(n => openNotebook(n), 'alpha');
 await nbShown(phone);
 await nbTab(phone, 'roadmap');
 await phone.waitForSelector('#roadmapList .roadmap', { timeout: 20000 });
-// The control row reads the way every view's does (R109): the search and
+// The control row reads the way every view's does: the search and
 // History, then the things that change the list, Add to roadmap last as the
 // primary, its box rolled up under the row until asked for, and the glance
 // under that.
@@ -1727,7 +1727,7 @@ ok(await phone.evaluate(() => {
        && !!(head.compareDocumentPosition(document.getElementById('roadmapHint')) & Node.DOCUMENT_POSITION_FOLLOWING);
    }),
    'the control row holds the search, History, Reorder and Add to roadmap last, the box rolled up until asked for (R119 step 4, R109)');
-// From the keyboard (R286): Enter on Add to roadmap unrolls the box with the
+// From the keyboard: Enter on Add to roadmap unrolls the box with the
 // caret in it, and Escape in the empty box rolls it back with the caret on
 // the press again, where a keyboard's place was lost.
 await section("the add box from the keyboard", async () => {
@@ -2017,7 +2017,7 @@ const clashBox = () => page.$eval('#roadmapClash',
 // With the poll held for the three steps it takes: a redraw between opening
 // the box and pressing its button detaches the button, and the click then
 // fails as "element was detached" or waits out its timeout on a node that is
-// no longer in the document (B99). The window is these three lines, so
+// no longer in the document. The window is these three lines, so
 // nothing else in the block loses its poll.
 const rewordTo = async (text) => {
   await holdPoll(page);
@@ -2119,7 +2119,7 @@ ok(clashText() === 'read again, then written',
 // ...and the panel is told that it went and read, which is the question the
 // operator has after changing something. Being TOLD is #27's channel and
 // lands on the session's next prompt; this is the act of going to look.
-// On the Roadmap's own head row (R222), not over every view.
+// On the Roadmap's own head row, not over every view.
 await refreshUntil(page, () => /read by a session/.test(
   document.getElementById('roadmapRead')?.textContent || ''));
 ok(true, "the Roadmap's status line says when a session here last read it");
@@ -2147,7 +2147,7 @@ await nbShown(page);
 ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb .nbtabs [data-v]').dataset.v),
    '...and a notebook closed and opened again starts on the strip\'s first view');
 
-// B198: a batch its session never closes. Killed mid-way, or the container
+// A batch its session never closes. Killed mid-way, or the container
 // restarted under it, it used to disable Save for every person on the project
 // for good, with no way out that did not need a shell.
 await section("B198: a batch its session never closes", async () => {
@@ -2173,7 +2173,7 @@ await section("B198: a batch its session never closes", async () => {
   ok(!read().batch?.alpha, 'an administrator closes it from the banner, which commits what the session wrote');
 });
 
-// B199: a panel holding unsaved work stops re-reading, which is right, and
+// A panel holding unsaved work stops re-reading, which is right, and
 // used to say nothing while it did.
 await section("B199: a panel holding unsaved work stops re-reading, which is right, and", async () => {
   // Onto the Roadmap first: by this point in the file the notebook has been
@@ -2198,7 +2198,7 @@ await section("B199: a panel holding unsaved work stops re-reading, which is rig
      '...and stops saying it once there is nothing unsaved');
 });
 
-// ---- a target release, and the chips by it (the operator, 21 Oct) --------
+// ---- a target release, and the chips by it --------
 await section("a target release, and the chips by it", async () => {
   const added = [];
   for (const [text, target] of [['ship the first', '0.6.0'], ['ship the second', '0.5.4'], ['ship the third', '']])
@@ -2231,8 +2231,8 @@ await section("a target release, and the chips by it", async () => {
   await page.waitForFunction(s => { const b = document.querySelector(s); return b.getAttribute('aria-busy') !== 'true' && b.disabled; }, save, { timeout: 15000 });
   const bbEps = (...a) => execFileSync(BB, ['roadmap', ...a],
     { env: { ...process.env, BB_ROADMAP_PROJECT: 'ep.silon', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).toString();
-  // The press answers at once and the server writes after it (the
-  // operator, 22 Nov), so the file is asked until it says so.
+  // The press answers at once and the server writes after it,
+  // so the file is asked until it says so.
   let shown = '';
   await until(() => /ship the third\s+\[for 0\.6\.0\]/.test(shown = bbEps('show', 'R' + added[2].item.id)), 10000, 200);
   ok(/ship the third\s+\[for 0\.6\.0\]/.test(shown), `the Reword box sets the target, v dropped, and Save writes it (${shown.trim().split('\n')[0]})`);
@@ -2245,7 +2245,7 @@ await section("a target release, and the chips by it", async () => {
      `aerie roadmap --target lists what is meant for one release (${listed.trim().replace(/\n/g, ' / ')})`);
 });
 
-// ---- a step's own release (R108, the operator, 22 Oct) ------------------
+// ---- a step's own release ------------------
 await section("a step's own release", async () => {
   const bbEps = (...a) => execFileSync(BB, ['roadmap', ...a],
     { env: { ...process.env, BB_ROADMAP_PROJECT: 'ep.silon', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).toString();
@@ -2275,12 +2275,12 @@ await section("a step's own release", async () => {
 
 // A project you may read and not change (an administrator who has not taken
 // it on) still shows what was finished on it: Finished is a read, as History
-// is (B297).
+// is.
 await section("A project you may read and not change", async () => {
   const me = await page.evaluate(async () => (await (await fetch('/api/users')).json()).users.find(u => u.name === 'test')?.projects || []);
   const setMine = ps => page.evaluate(async ps => (await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'edit', name: 'test', projects: ps }) })).status, ps);
-  // By project (R138): the list names alpha's project by its key.
+  // By project: the list names alpha's project by its key.
   await setMine(me.filter(n => n !== projectKey('alpha')));
   const fin = await post({ action: 'finished', project: 'alpha' });
   const seen = page.errors.length;
@@ -2292,7 +2292,7 @@ await section("A project you may read and not change", async () => {
      `a space not taken on still lists its finished items, and stays closed to a change (${fin.status}, add ${add.status})`);
 });
 
-// Steps between items (R168): Move to on a step's row, Split and Fold into
+// Steps between items: Move to on a step's row, Split and Fold into
 // on an item's, each landing at once; a moved step says where it was.
 await section("Steps between items", async () => {
   bbRoadmap('add', 'r168 a plan to cut up', '--step', 'keep this', '--step', 'move this', '--step', 'split this');
@@ -2303,7 +2303,7 @@ await section("Steps between items", async () => {
   // brings these two to the front, whatever chip is on.
   await page.evaluate(() => openNotebook('alpha', 'roadmap'));
   // On the state object, the handle's nb: set on the handle itself the three
-  // did nothing and the list stayed unnarrowed (B911).
+  // did nothing and the list stayed unnarrowed.
   await page.evaluate(() => { const n = getNotebook('alpha').nb; n.roadmapChip = ''; n.roadmapVer = ''; n.roadmapFind = 'r168'; });
   await page.evaluate(() => getNotebook('alpha').reload());
   await page.waitForSelector(`#roadmapList .grp[data-id="${src}"]`, { timeout: 10000 });
@@ -2319,7 +2319,7 @@ await section("Steps between items", async () => {
   await page.waitForFunction(id => document.querySelector(`#roadmapList .roadmap[data-id="${id}"][data-step="1"] .txt`)?.textContent === 'move this',
                              dst, { timeout: 10000 });
   await unfold(dst);
-  // Drawn on the press (the operator, 22 Nov); the file follows it.
+  // Drawn on the press; the file follows it.
   await until(() => read().projects.alpha.find(r => String(r.id) === dst)?.steps?.[1]?.sid, 10000);
   const after = read().projects.alpha;
   const moved = after.find(r => String(r.id) === dst).steps[1];
@@ -2341,7 +2341,7 @@ await section("Steps between items", async () => {
   await page.waitForFunction(() => [...document.querySelectorAll('#roadmapList .roadmap[data-step="-1"] .txt')].some(t => t.textContent === 'r168 the cut-off part'),
                              null, { timeout: 10000 });
   // The new item is drawn on the press, wearing "new" until the answer
-  // brings its number (the operator, 22 Nov); the file follows.
+  // brings its number; the file follows.
   const cut = await until(() => read().projects.alpha.find(r => r.text === 'r168 the cut-off part'), 10000);
   ok(cut && cut.steps.length === 1 && cut.steps[0].text === 'split this' && /Split from R/.test(cut.info || '')
      && read().projects.alpha.find(r => String(r.id) === src).steps.length === 1,

@@ -2,7 +2,7 @@
 // commits, and Send to Claude; what a session may push is the Permissions
 // view's (nb-permissions.js).
 // One classic script beside index.html, the shape tab-*.js has (docs/nodes.md
-// §13): same page, same global scope, one file per notebook view (R60).
+// §13): same page, same global scope, one file per notebook view.
 //
 // A factory rather than a script that runs: makeNotebook calls it per
 // notebook with the notebook's element lookup, its state object and its
@@ -11,28 +11,28 @@
 "use strict";
 // The view's steady sections in their order, by the titles they are drawn
 // under: the view and its placeholder (page-docs.js SKTPLS.git) both read
-// them, so neither falls behind the other (R218, the operator 18 Oct). CI
+// them, so neither falls behind the other. CI
 // and a README come only with what the repository holds.
 const GIT_SECTS = [["changes", "Changes"], ["history", "History"], ["branches", "Branches"]];
 const gitTitle = k => (GIT_SECTS.find(s => s[0] === k) || [k, k])[1];
-// The branches table's columns (R269 step 1), read by the view and by its
+// The branches table's columns, read by the view and by its
 // placeholder (page-docs.js SKTPLS.git), so the wait draws the same table.
 const gitBranchCols = main => [{label: "Branch"}, {label: "Updated", w: "minmax(0,.55fr)"}, {label: `Behind | ahead of ${main}`, w: "9rem"},
                                {label: "Owner", w: "minmax(0,.45fr)"}, {act: true, w: "3rem"}];
 
 function nbGitView({$, nb, project}){
   // ---- git -----------------------------------------------------------------
-  // The repository, read out (roadmap R36 step 1). Fetched on open and on
+  // The repository, read out. Fetched on open and on
   // the git revision (the tree's HEAD log moving) never on the poll: a
   // history is a git call per question. What is open stays open across a
   // redraw: the commit picked and the files unfolded are kept by sha and
   // path, not by position.
   let git = null, gitPick = "", gitOpenFiles = new Set(), gitShutFiles = new Set();
-  // The branch whose comparison with main is on show, its own page (R269
-  // step 2: #/projects/NAME/git/compare/BRANCH), "" for the view itself;
+  // The branch whose comparison with main is on show, its own page
+  // (#/projects/NAME/git/compare/BRANCH), "" for the view itself;
   // and what that page last read, by the two heads it was read at.
   let gitCmp = "", gitCmpData = null, gitGlance = null;
-  // Which branches the table shows (R269 step 1): a chip, Active until one
+  // Which branches the table shows: a chip, Active until one
   // is pressed, and the search typed beside it; a view, never saved.
   let gitBranchChip = "active", gitBranchFind = "";
   // The history a hundred commits at a time (the long-lists rule): how many
@@ -41,7 +41,7 @@ function nbGitView({$, nb, project}){
   const GIT_PAGE = 100;
   const gitWant = () => { const h = $("gitBody"); return GIT_PAGE * Math.max((h && pageState[pageKey(h, "gitlog")]) || 1, 1); };
   let gitGraph = (() => { try{ return localStorage.getItem("bb.gitgraph") === "graph"; }catch(e){ return false; } })();
-  // What an open fold last showed, by what it shows (B833): a redraw draws
+  // What an open fold last showed, by what it shows: a redraw draws
   // the view whole, and every open diff and comparison used to read itself
   // again on each one, a hundred reads in a few minutes on the controller.
   // A file's is kept against its state and stamp, a branch's against its
@@ -85,8 +85,8 @@ function nbGitView({$, nb, project}){
       : args?.branch ? `the branch ${args.branch} (${kind})`
       : args?.sha ? `the commit ${String(args.sha).slice(0, 7)} (${kind})`
       : `the ${kind}`;
-    // With several of your sessions running, which one is the question
-    // (R143); with one, whether to send at all.
+    // With several of your sessions running, which one is the question;
+    // with one, whether to send at all.
     const to = await pickSend(project);
     if (to === null || (!to && !args?.confirmed && !await sendSure(project, what))) return;
     if (btn) busy(btn, "Sending");
@@ -98,12 +98,12 @@ function nbGitView({$, nb, project}){
     }catch(e){ notify("ask: " + failWords(e), true); }
     finally{ if (btn && btn.isConnected) unbusy(btn, btn.dataset.label || btn.textContent); }
   }
-  // The project directory is the owner's working tree (B236): anybody else
+  // The project directory is the owner's working tree: anybody else
   // sees whose it is, a plain account gets nothing that changes it, and an
   // administrator is asked by the server first.
   // Nothing here changes the tree, the branches or what a session may push
   // while the project is locked against this account, or for a role that
-  // reads it and does not write it (B86).
+  // reads it and does not write it.
   const shut = () => !!(state?.projects || []).find(p => p.name === project)?.locked_me || !!projWriteWhy(project);
   const treeOf = () => {
     const owner = git?.owner || "", notMine = !!owner && owner !== state?.me;
@@ -137,14 +137,14 @@ function nbGitView({$, nb, project}){
       const st = git.status || {}, files = st.files || [], commits = git.commits || [];
       const local = (git.branches || []).filter(b => !b.remote);
       const tree = treeOf();
-      // The glance (R109): what is not committed, the branches, and what is to
+      // The glance: what is not committed, the branches, and what is to
       // push and to pull against the upstream, as tiles. A branch with no
-      // commit is not listed by git, so "0 branches" sat beside "on master"
-      // (B456): the honest word, on the line under them, is that nothing is
-      // committed yet. The branch is the picker's to say (R269 step 3); the
+      // commit is not listed by git, so "0 branches" sat beside "on master":
+      // the honest word, on the line under them, is that nothing is
+      // committed yet. The branch is the picker's to say; the
       // words name one only when there is none to pick.
       const host = git.host?.name || "the remote";
-      // Whose token a press would use (R159): yours, somebody else's who is
+      // Whose token a press would use: yours, somebody else's who is
       // signed in, or nobody's, which is what a push would wait on.
       const tk = git.token || {};
       const tokenSaid = !git.remote || !git.push ? ""
@@ -154,7 +154,7 @@ function nbGitView({$, nb, project}){
       const said = [tree.notMine ? `${tree.owner}'s working tree` : "", st.branch ? "" : "on no branch",
         commits.length ? "" : "no commits yet", tokenSaid,
         // Without push rights and without an upstream there is nothing to pull
-        // either, and the line says so rather than offering Pull (B294).
+        // either, and the line says so rather than offering Pull.
         !git.remote ? "" : !git.push
           ? (st.upstream ? "no push rights: fetch and pull only; rights are granted in the clone dialog"
                          : "no push rights and no upstream: fetch only; rights are granted in the clone dialog")
@@ -175,8 +175,8 @@ function nbGitView({$, nb, project}){
         const locked = !!(state?.projects || []).find(p => p.name === project)?.locked_me;
         net.hidden = locked || !git.remote;
         net.inert = false;
-        // A role that only reads the project is shown none of them (the
-        // operator, 21 Oct: what a role does not give is not drawn).
+        // A role that only reads the project is shown none of them
+        // (what a role does not give is not drawn).
         const ro = !!projWriteWhy(project);
         net.querySelector('[data-gitact="fetch"]').hidden = ro;
         net.querySelector('[data-gitact="push"]').hidden = ro;
@@ -200,7 +200,7 @@ function nbGitView({$, nb, project}){
       if (j.error){
         if (j.unmerged && await askYes(`${j.error}.\n\nDelete it anyway?`))
           return gitAct(action, {...args, force: true}, btn, verb);
-        // Two branches with no commit in common (B234): usually the wrong
+        // Two branches with no commit in common: usually the wrong
         // branch, and exactly right for a project that began without a
         // repository, so it is asked.
         if (j.unrelated && await askYes(`${j.error}.\n\nMerging joins them into one history. Join them?`))
@@ -223,7 +223,7 @@ function nbGitView({$, nb, project}){
   $("gitNet")?.querySelectorAll("[data-gitact]").forEach(b => b.onclick = () =>
     gitAct(b.dataset.gitact, {}, gitBusy(b), {fetch: "Fetching", pull: "Pulling", push: "Pushing"}[b.dataset.gitact]));
 
-  // The project's CI as the watch last found it (R117): looked at once a
+  // The project's CI as the watch last found it: looked at once a
   // day and when the project is linked, from the workflows in the tree and,
   // for a project on GitHub, its newest run on the main branch and the
   // notices GitHub wrote on it. Shown only where there are workflows.
@@ -233,13 +233,13 @@ function nbGitView({$, nb, project}){
     const fs = ci.findings || [];
     const red = fs.some(f => f.sev === "bad");
     // A look that found no workflow says so, not "nothing drifting" in
-    // green: there is no CI to drift (B81).
+    // green: there is no CI to drift.
     const none = !!ci.at && !ci.workflows && !fs.length && !ci.run?.id;
     const status = !ci.at ? "not looked at yet" : red ? "failing" : fs.length ? `${fs.length} to look at` : none ? "no workflows" : "nothing drifting";
     const cls = red ? "bad" : fs.length ? "note" : ci.at && !none ? "ok" : "";
     const word = {run: "Check", label: "Runner", action: "Action", notice: "GitHub says"};
-    // A moving label and an action a major behind carry their fix (R117
-    // step 4): Fix writes that one line into the working tree, uncommitted,
+    // A moving label and an action a major behind carry their fix:
+    // Fix writes that one line into the working tree, uncommitted,
     // for Changes to show; nothing is committed or pushed by the press.
     const locked = shut();
     const mayFix = !locked && !treeOf().barred;
@@ -289,7 +289,7 @@ function nbGitView({$, nb, project}){
     const tree = treeOf();
     // A file's fold by its path and its state: the diff is read again when the
     // state moves, and two files in the same state are never one another's
-    // when the list is patched (R244).
+    // when the list is patched.
     const fileKey = f => `${f.path}|${f.state}|${f.staged ? 1 : 0}|${f.at || ""}`;
     // A few changed files open with their diffs; past three they wait shut
     // to be opened, each saying its lines added and removed on its head.
@@ -325,7 +325,7 @@ function nbGitView({$, nb, project}){
     const ago_ = t => t ? ago(t) : "";
     // A commit's branches before its subject, two of them and a count of
     // the rest (each named in its title), held to half the line: eight
-    // pills at one commit filled it and cut the subject away (B918).
+    // pills at one commit filled it and cut the subject away.
     const REFS_SHOWN = 2;
     const refPill = r => `<span class="pill${r.startsWith("HEAD") ? " ok" : ""}">${esc(r.replace(/^HEAD -> /, ""))}</span>`;
     const refsOf = c => !c.refs.length ? "" : `<span class="grefs">${c.refs.slice(0, REFS_SHOWN).map(refPill).join("")}${
@@ -385,8 +385,8 @@ function nbGitView({$, nb, project}){
     const here_ = local.find(x => x.head) || {};
     const whoAttr = b => theirs(b) ? ` data-gitwho="${esc(b.who)}"` : "";
     const whoseLine = b => barred(b) ? `<div class="sub gbwhy">only ${esc(b.who)} merges it</div>` : "";
-    // Branches as a table, as GitHub's branches page lays them out (R269
-    // step 1, the operator 19 Oct: the section had grown huge): a line a
+    // Branches as a table, as GitHub's branches page lays them out
+    // (the section had grown huge): a line a
     // branch, what it is, when it last moved and by whom, how far it stands
     // from main, whose it is, and every verb behind its ⋯. Chips over it
     // narrow it by what there is to do (Active, the default: the tree's
@@ -417,7 +417,7 @@ function nbGitView({$, nb, project}){
          b.head || barred(b) || tree.barred ? "" : `<button type="button" data-gitswitch="${esc(b.name)}" title="put the tree on this branch">Switch to it</button>`,
          // A branch with nothing of its own (0 ahead of main) has nothing to
          // merge or review, and one that is not also behind nothing to
-         // rebase (B80).
+         // rebase.
          ...(b.name === main || !b.main_ahead ? [] : [...(barred(b) ? [] : [["merge", `Ask ${esc(sendAgent(project).name)} to merge it into ${esc(main)}`],
               ...(b.main_behind ? [["rebase", `Ask ${esc(sendAgent(project).name)} to rebase it onto ${esc(main)}`]] : [])]),
               ["review", `Ask ${esc(sendAgent(project).name)} to review it`]].map(([k, w]) => `<button type="button" data-gitaskbranch="${esc(b.name)}" data-gitaskkind="${k}"${
@@ -463,7 +463,7 @@ function nbGitView({$, nb, project}){
         <button type="button" class="primary" data-gitask="conflicts"
           title="hand the merge to the space's session to finish">Resolve with ${esc(sendAgent(project).name)}</button>
       </div>` : "";
-    // Patched (R244): a commit message being typed, a branch being found and
+    // Patched: a commit message being typed, a branch being found and
     // a fold turned stay as they are when a session's work moves the view.
     patch(body, docSection("git", "changes", gitTitle("changes"), files.length ? String(files.length) : "none",
         conflictBar + (files.length ? treeNote : "") + commitBar + (files.length ? fileRows : `<div class="empty">nothing changed since the last commit</div>`))
@@ -485,7 +485,7 @@ function nbGitView({$, nb, project}){
       if (!e.target.closest("button, a, input, select, .more")) gitGoCompare(l.parentElement.dataset.branch);
     });
     body.querySelectorAll("[data-cifix]").forEach(b => b.onclick = () => gitAct("ci-fix", {where: b.dataset.cifix}, b, "Fixing"));
-    // The newest run's log in the dock (R133 step 12), as a job's is.
+    // The newest run's log in the dock, as a job's is.
     body.querySelectorAll("[data-cilog]").forEach(b => b.onclick = () =>
       openLogTab(`log:ci:${project}:${b.dataset.cilog}`, `CI: ${projLabel(project)} #${b.dataset.cilog}`));
     const cl = $("gitCiLook");
@@ -573,7 +573,7 @@ function nbGitView({$, nb, project}){
   }
 
   // The branch the tree is on, in the view's control row as a picker, as
-  // GitHub's (R269 step 3): a press opens the local branches with a box to
+  // GitHub's: a press opens the local branches with a box to
   // find one, a press on one switches the tree to it, and a name nobody has
   // yet offers to create it from the commit the tree is on and switch to it.
   // Where the tree is not the reader's to move (another account's, a
@@ -589,7 +589,7 @@ function nbGitView({$, nb, project}){
     const label = `<span class="gbpickic" aria-hidden="true">${BRANCH_ICON}</span><span class="gbpickname">${esc(cur)}</span>`;
     if (still){ patch(box, `<span class="gbpickb still">${label}</span>`); return; }
     // A redraw while the picker is open (a commit landing from elsewhere)
-    // keeps it open with what was typed, patched into what is there (R244),
+    // keeps it open with what was typed, patched into what is there,
     // so the find box keeps its focus and its caret.
     const old = box.querySelector("#gitPickFind"), was = old?.value || "";
     const open = !!box.querySelector(".gbpickmenu:not([hidden])");
@@ -668,7 +668,7 @@ function nbGitView({$, nb, project}){
     });
   }
 
-  // ---- a branch against main, its own page (R269 step 2) -------------------
+  // ---- a branch against main, its own page -------------------
   // What a pull request page shows before its button: the commits main
   // lacks, the files changed with what each adds and takes away, each
   // file's diff, and Merge at the foot. Its address names the branch, so a
@@ -759,14 +759,14 @@ function nbGitView({$, nb, project}){
       box.hidden = false;
       // Read again in place when it is this commit's already (a poll, a draw
       // of the view): its ask pulldown and a branch's name being typed under
-      // it stay (R244). Another commit starts from the waiting shape.
+      // it stay. Another commit starts from the waiting shape.
       if (box.dataset.sha !== sha || !box.querySelector(".gcommit")){ drawHTML(box, `${skel("lines", 6)}`); box.dataset.sha = sha; }
       try{
         const c = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=show&sha=" + encodeURIComponent(sha));
         if (sha !== gitPick) return;               // moved on meanwhile
         // The box on the page NOW: a redraw while the answer was on its way
         // (a commit landing, the poll) replaced it, and writing into the one
-        // resolved above put the detail into a detached element (B256).
+        // resolved above put the detail into a detached element.
         box = $("gitDetail");
         if (!box) return;
         box.hidden = false;

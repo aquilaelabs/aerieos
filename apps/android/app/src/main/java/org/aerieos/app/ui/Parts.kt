@@ -67,7 +67,7 @@ fun Pill(text: String, color: Color = Dim, modifier: Modifier = Modifier) {
             .padding(horizontal = 7.dp, vertical = 2.dp))
 }
 
-/** A tag: a row's number (R12, B7) in the data voice, dim when the row is
+/** A tag: a row's number in the data voice, dim when the row is
  *  done, so the eye finds the words and the number stays findable. */
 @Composable
 fun Tag(text: String, color: Color = Ink, modifier: Modifier = Modifier) {

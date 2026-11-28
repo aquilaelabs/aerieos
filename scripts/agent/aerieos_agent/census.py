@@ -89,7 +89,7 @@ _VIRTUAL_CARDS = ("Dummy", "Loopback")
 
 
 def _sound():
-    """What sound this machine has (R107): the cards ALSA lists, real and
+    """What sound this machine has: the cards ALSA lists, real and
     virtual apart, and which sound server is installed, which is what an
     emulator's audio and a virtual sink would go through. No /proc/asound at
     all is a kernel with no sound loaded, which is a VM's usual state."""
@@ -111,7 +111,7 @@ def _sound():
 
 def tunnel_now(state):
     """The tunnel this node reaches the controller through, as its enroll
-    script set it up (R161): the kind, the address in it, and whether the
+    script set it up: the kind, the address in it, and whether the
     interface is there now. {} on a node that dials over its own network."""
     t = state.get("tunnel") if isinstance(state.get("tunnel"), dict) else {}
     if not t.get("addr"):
@@ -122,7 +122,7 @@ def tunnel_now(state):
 
 
 def door_now(state):
-    """The door in for SSH this node was provisioned with (R174): its kind,
+    """The door in for SSH this node was provisioned with: its kind,
     its name, whether the client is here and whether it is up now, so the
     row's switch reads the machine and not its own last press. {} on a
     node with none."""
@@ -147,7 +147,7 @@ def door_now(state):
 
 def machine_now():
     """What this machine is, as a fingerprint the controller can hold a
-    node to (R177): the hash of /etc/machine-id (systemd's, kept across
+    node to: the hash of /etc/machine-id (systemd's, kept across
     reboots), else of the board's product uuid, else nothing. The enroll
     script made for a node that has enrolled carries it, and a run on
     another machine is refused on both ends. A hash, so the id itself
@@ -173,7 +173,7 @@ def _store_ro(state):
 # a timeout on it at every check-in otherwise. A "no" is asked again after a
 # minute while the agent is young: its first look is at boot, before the
 # network (and a LAN bridge) is up, and that answer stood for ten minutes on
-# a machine that had it (B770).
+# a machine that had it.
 _NET = {"at": 0.0, "ok": None, "first": 0.0}
 NET_EVERY = 600
 NET_NO_EVERY = 60
@@ -214,7 +214,7 @@ def _docker_gid():
 def _docker_ip():
     """127.0.0.1 where published ports stay on the node: both docker's `ip`
     (the default bridge) and the networks' default bind (every network
-    compose makes), else "" (R190)."""
+    compose makes), else ""."""
     d = read_json("/etc/docker/daemon.json", None)
     if d is None:
         return ""
@@ -223,18 +223,17 @@ def _docker_ip():
     return ip if ip and br.get("com.docker.network.bridge.host_binding_ipv4") == ip else ""
 
 
-# The features bb-sandbox installs and removes (R91), as its FEATURE_IDS
+# The features bb-sandbox installs and removes, as its FEATURE_IDS
 # names them; the configuration plane checks a job's id against this.
 # Every id the helper's table names: a job naming one the agent did not
 # list was refused as 'not a feature verb' before it reached the helper,
-# so IOMMU, Storage, Shares and UPS could not be installed from the page
-# (B641).
+# so IOMMU, Storage, Shares and UPS could not be installed from the page.
 FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
 FEATURES_DIR = ETC + "/features"
 
 
 def _gpuvm_now():
-    """The NVIDIA card marked for a VM (R207 step 3): the marker written by
+    """The NVIDIA card marked for a VM: the marker written by
     the helper with the card's ids, and whether vfio-pci holds every NVIDIA
     device now, which the restart after it decides."""
     marker = os.path.join(FEATURES_DIR, "gpuvm")
@@ -259,7 +258,7 @@ def _gpuvm_now():
 
 
 def features_now():
-    """What this machine has of each feature (R91): installed by AerieOS
+    """What this machine has of each feature: installed by AerieOS
     or not (its marker, or the firewall's own file), and for a VM host what
     decides whether one can run here, read whether it is installed or not:
     /dev/kvm (absent on a VM whose host passes no virtualization through)
@@ -267,7 +266,7 @@ def features_now():
     virsh = shutil.which("virsh")
     kvm = os.path.exists("/dev/kvm")
     # A kernel built without KVM is said apart from a machine without
-    # virtualization (openSUSE's kernel-default-base, R97's walk): the
+    # virtualization (openSUSE's kernel-default-base): the
     # cure is another kernel, not the host's CPU mode.
     nokvm = ""
     if not kvm and not any(os.path.exists(f"/lib/modules/{os.uname().release}/kernel/arch/x86/kvm/{m}")
@@ -280,12 +279,12 @@ def features_now():
                    "virtiofs": bool(vmhw.virtiofsd()),
                    "libvirt": _run([virsh, "--version"], timeout=10) if virsh else ""},
         "firewall": {"installed": os.path.exists(ETC + "/hosting-fw.nft")},
-        # The IOMMU on the kernel's command line (R116 step 4): put there by
+        # The IOMMU on the kernel's command line: put there by
         # AerieOS (its marker), and on in the running kernel (its groups),
         # which a restart and the firmware's VT-d or AMD-Vi decide.
         "iommu": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "iommu")),
                   "on": bool(glob.glob("/sys/kernel/iommu_groups/*"))},
-        # The installed edition's parts (R56 step 2): storage (ZFS and the
+        # The installed edition's parts: storage (ZFS and the
         # array's tools) and shares (Samba and NFS), with whether each tool
         # answers, whichever put it here (the image carries them all).
         "storage": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "storage")),
@@ -294,7 +293,7 @@ def features_now():
         "shares": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "shares")),
                    "smb": bool(shutil.which("smbd")), "nfs": bool(shutil.which("exportfs"))},
         "gpuvm": _gpuvm_now(),
-        # ...and a UPS through NUT (R164 step 3), with whether upsc is here.
+        # ...and a UPS through NUT, with whether upsc is here.
         "ups": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "ups")), "nut": bool(shutil.which("upsc"))},
     }
 
@@ -344,10 +343,10 @@ def census(state):
         # a selector should not have to parse the display string above.
         "system": platform.system().lower(), "arch": platform.machine(),
         "hostname": socket.gethostname(),
-        # The machine's time zone (R161 step 3, R56 step 8): what the
+        # The machine's time zone: what the
         # system keeps, for This machine's Name and time.
         "timezone": timezone_now(),
-        # The disks' spin-down in minutes as kept (R164 step 3), 0 for never, left out where none was set.
+        # The disks' spin-down in minutes as kept, 0 for never, left out where none was set.
         **({"spindown": state.get("spindown")} if isinstance(state.get("spindown"), int) else {}),
         "machine": machine_now(),
         "docker": _run(["docker", "version", "--format", "{{.Server.Version}}"])
@@ -355,7 +354,7 @@ def census(state):
         # git's, because nothing keeps it in step and nothing should: it is
         # installed once at enrollment from whatever the distribution
         # packages, and on a GUEST node the machine is its owner's, so the
-        # controller upgrading it is the one thing R23 says it must not do.
+        # controller upgrading it is the one thing it must not do.
         # What is owed instead is being able to SEE it, and to be told when a
         # node is below the floor the Git view needs (aerie doctor names it).
         "git": _run(["git", "--version"]) if shutil.which("git") else "",
@@ -363,22 +362,22 @@ def census(state):
         # have worn one address apart: a rebuilt sandbox, or a second
         # machine given the old one's IP. It used to read it over ssh with `docker
         # info`, and that reader went when the Docker tab stopped judging an
-        # agent node by the controller's ssh (B111); reported here, the same
+        # agent node by the controller's ssh; reported here, the same
         # value arrives by the route the work already takes.
         "docker_id": _run(["docker", "info", "--format", "{{.ID}}"], timeout=15)
         if shutil.which("docker") else "",
-        # The address published ports bind to by default (daemon.json's ip,
-        # R190): "127.0.0.1" where they stay on the node, "" where docker's
+        # The address published ports bind to by default (daemon.json's ip):
+        # "127.0.0.1" where they stay on the node, "" where docker's
         # own default (every address) holds.
         "docker_ip": _docker_ip(),
-        # The docker group's id (R86), for a compose that runs something as
+        # The docker group's id, for a compose that runs something as
         # a member of it: a session cannot stat the socket for it, since
         # its /var/run/docker.sock is a stand-in that reads root's.
         "docker_gid": _docker_gid(),
-        # Whether this machine reaches the internet (R82), for the row to
+        # Whether this machine reaches the internet, for the row to
         # say before a toolchain install finds out the long way.
         "internet": _internet(),
-        # A toolchain store this node holds but cannot write (R85), so the
+        # A toolchain store this node holds but cannot write, so the
         # Library holds Install with the reason before a job fails.
         "store_ro": _store_ro(state),
         # ...or mounted noexec, so the bb bundle and every terminal from it
@@ -393,24 +392,24 @@ def census(state):
         "sound": _sound(),
         "sshd": _sshd_listening(),
         "tunnel": tunnel_now(state),
-        # The door in for SSH (R174), as the machine has it now.
+        # The door in for SSH, as the machine has it now.
         "door": door_now(state),
-        # The features bb-sandbox installs and removes (R91).
+        # The features bb-sandbox installs and removes.
         "features": features_now(),
-        # ...and the VMs it runs, with the room their disks have (R91).
+        # ...and the VMs it runs, with the room their disks have.
         "vms": vms_now(),
-        # ...and the domains libvirt has that AerieOS did not make (R165 step 1).
+        # ...and the domains libvirt has that AerieOS did not make.
         "vms_other": vms_other(),
         "vm_pool": vm_pool(),
-        # The installer ISOs fetched onto this node (R99).
+        # The installer ISOs fetched onto this node.
         "vm_isos": isos_now(),
-        # What a VM here could be given (R100): CPU threads, USB and PCI devices.
+        # What a VM here could be given: CPU threads, USB and PCI devices.
         "vm_host": vmhw.host_hw() if shutil.which("virsh") else {},
         "stores": _stores(state.get("stores"), used=True),
         "toolchains": tc,
         "store_dirs": store_dirs(state),
-        # Which held recipes need system packages this machine lacks
-        # (roadmap R51): read here, so the Installed page and the row can say so
+        # Which held recipes need system packages this machine lacks:
+        # read here, so the Installed page and the row can say so
         # before a build fails on a missing library.
         "sysdeps": sysdeps_now(state),
         # The android system images the store holds, and the AVDs built on
@@ -432,7 +431,7 @@ def census(state):
         # ...and whether it said an older agent may be put back (older on).
         "older_ok": console_said().get("older_ok") is True,
         "release_unpinned": console_said().get("release_unpinned") is True,
-        # ...and whether its console switched root commands off (R227 step 2).
+        # ...and whether its console switched root commands off.
         "root_off": console_said().get("root_off") is True,
         # ...and whether file work in an account's folder is done as that
         # account here, or refused until a try holds (base.fs_holds).
@@ -444,7 +443,7 @@ def census(state):
         # names a key and the move was not made (the agent's channel_move).
         "channel": channel_now(state),
         # ...and the controller's bundle this node refused and keeps
-        # refusing, with why (bundle(), R267 step 6): named only while one
+        # refusing, with why (bundle): named only while one
         # is, so the controller can say it where a person looks.
         **({"bundle_refused": dict(REFUSED)} if REFUSED.get("digest") else {}),
         # ...and whether this agent may install the machine's own packages
@@ -452,38 +451,38 @@ def census(state):
         # stamp alone said yes for an agent that could not, and the
         # controller queued system packages it was bound to refuse.
         "administers": os.geteuid() == 0 and os.access(SANDBOX_BIN, os.X_OK),
-        # AerieOS on this machine (R160 step 4): the image, its slot and the next boot's; {} elsewhere.
+        # AerieOS on this machine: the image, its slot and the next boot's; {} elsewhere.
         "os_image": os_release(),
         "os_kept": {"versions": kept_list(), "booted": kept_boot()},
-        # ...and a stick boot's (R161 step 10): its system pool, what still
+        # ...and a stick boot's: its system pool, what still
         # lives on the stick and what the stick has been written; {} elsewhere.
         "os_stick": stick_status(),
-        # The machine's disks (R162 step 1): what the Storage page lists
+        # The machine's disks: what the Storage page lists
         # for the controller's own machine before anything is written.
         "disks": disks_now(),
-        # ...and its shares (R162 step 1), as AerieOS's own files say them.
+        # ...and its shares, as AerieOS's own files say them.
         "shares": shares_now(),
-        # ...and its ZFS pools (R162 step 1), as zpool says them.
+        # ...and its ZFS pools, as zpool says them.
         "pools": pools_now(),
-        # ...and the pools on its disks another machine made, not imported here (R163 step 1).
+        # ...and the pools on its disks another machine made, not imported here.
         "pools_importable": importable_now(),
-        # ...and each pool's snapshots (R162 step 5), counted by kind, the newest named.
+        # ...and each pool's snapshots, counted by kind, the newest named.
         "snapshots": snapshots_now(),
-        # ...and its array (R162 step 2): the disks by slot, their room, and
+        # ...and its array: the disks by slot, their room, and
         # when SnapRAID last synced, scrubbed and checked it.
         "array": array_now(),
         "console": console_now(),
         "adopted": {**adopted_now(), **({"apps": apps_now()} if adopted_now() else {})},
-        # ...and its other disks and shares (R162 step 4), as the record the hello left says.
+        # ...and its other disks and shares, as the record the hello left says.
         "ext_mounts": extmounts_now(state),
-        # ...and its backups' last runs (R162 step 5).
+        # ...and its backups' last runs.
         "store_backups": backups_now(state),
-        # ...and its UPS and its own packages' updates (R164 step 3).
+        # ...and its UPS and its own packages' updates.
         "ups": ups_now(),
         "host_updates": host_updates_now(state),
-        # Whether a session here sees only its own project (R35).
+        # Whether a session here sees only its own project.
         "isolation": isolation_now(),
-        # ...and reaches only its own project's containers (R79), as the
+        # ...and reaches only its own project's containers, as the
         # thread that keeps it last found it; absent before it has looked.
         "session_net": dict(SESSNET_STATUS),
         "mounts": mounts_now(),
@@ -493,16 +492,16 @@ def census(state):
         # The same report the controller makes for itself, so one store is
         # not described two ways (roadmap #19).
         "toolchain_versions": sdk_versions(state),
-        # ...and how each was checked when it was installed (R137).
+        # ...and how each was checked when it was installed.
         "toolchain_verified": sdk_verified(state),
-        # ...and what each pinned install left behind: its receipt (R234).
+        # ...and what each pinned install left behind: its receipt.
         "toolchain_receipts": sdk_receipts(state),
         "services": services_now(),
         # The session half (roadmap #24), as this process is holding it.
         "session": session_now(state),
-        # The file explorer's requests, on the screen relay's port (R224).
+        # The file explorer's requests, on the screen relay's port.
         "files": {"port": SCREEN_PORT},
-        # ...and how that port is spoken to (R243): its certificate's sha256
+        # ...and how that port is spoken to: its certificate's sha256
         # where it has one, which the controller pins, and that it takes a
         # signed request once.
         "relay": dict(RELAY),
@@ -531,13 +530,13 @@ def _agent_version(spec, home):
 def session_now(state):
     """Whether this node runs sessions, and what a proxy needs to reach
     them: the ports, the account, whether /workspace is there (the node's
-    synced copy of its projects, R162), and which
+    synced copy of its projects), and which
     Claude the session account has. Empty until the agent has tried once,
     so an old census never claims a node it has not measured."""
     if not SESSION:
         return {}
     out = dict(SESSION)
-    # The node's own directory, which holds its synced copy (R163).
+    # The node's own directory, which holds its synced copy.
     out["workspace"] = os.path.isdir(SHARE)
     out["writable"] = out["workspace"] and os.access(SHARE, os.W_OK)
     home = out.pop("home", "")
@@ -562,7 +561,7 @@ def session_now(state):
                 claude = out_.split("\n")[0][:40] or "installed"
             break
     out["claude"] = claude
-    # The other coding agents the same way (R95 step 2): the pinned copy
+    # The other coding agents the same way: the pinned copy
     # first, then the account's own, each under the census key the
     # controller's agent table names (codex, copilot).
     for spec in AGENT_INSTALLS.values():
@@ -674,8 +673,8 @@ def mounts_now():
                 m["real"] = m.get("source") or ""
     # A mount that is there and answers Stale file handle is worse than one
     # that is missing: every list of mounts calls it fine and every read
-    # fails (roadmap R41; builderbot-dev's up failed on exactly this, 15
-    # Sep). Remounting on this side does not help when the export was
+    # fails (builderbot-dev's up failed on exactly this).
+    # Remounting on this side does not help when the export was
     # re-created under it on the host, so the fix is named as the host's.
     for m in got:
         if m.get("mounted") and str(m.get("path") or "").startswith("/"):
@@ -972,7 +971,7 @@ class Sampler:
 
     # Where Docker keeps its images and build cache, asked once an hour (a
     # heartbeat is too often to run docker for it): with the root
-    # filesystem, the two places a node fills that are no store's (R110).
+    # filesystem, the two places a node fills that are no store's.
     _droot = ("", 0.0)
 
     def _disks(self):
@@ -998,7 +997,7 @@ class Sampler:
 
     @classmethod
     def _fence(cls):
-        """AerieOS's memory fence here (R110 step 4), {max_mb, used_mb},
+        """AerieOS's memory fence here, {max_mb, used_mb},
         or None where there is none: the provisioner's builderbot.slice, or
         the cgroup of that name OpenRC's boot script makes."""
         base = cls.FENCE_DIR
@@ -1024,8 +1023,8 @@ class Sampler:
             load1 = 0.0
         return {"cpu_pct": round(100.0 * (dt - di) / dt, 1) if dt > 0 else 0.0,
                 "load1": round(load1, 2), "mem_mb": tot, "mem_used_mb": used,
-                # The counters the controller's reporting takes rates from
-                # (R164 step 4), and the CPU's temperature.
+                # The counters the controller's reporting takes rates from,
+                # and the CPU's temperature.
                 "net": _net_bytes(), "io": _io_bytes(), "temp_c": _cpu_temp(),
                 "stores": _stores(state.get("stores")), "disks": self._disks(), "fence": self._fence(), "running": running,
                 **({"vm_mem": vm_memory()} if shutil.which("virsh") else {}),

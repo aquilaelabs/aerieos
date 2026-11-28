@@ -1,4 +1,4 @@
-"""A prepared configuration's first boot (R161 step 8): the stick's root
+"""A prepared configuration's first boot: the stick's root
 step takes aerieos/firstboot.json off the ESP, sets the hostname and the
 time zone, hands the rest over under /run and blanks the file in place; the
 controller then makes the owner from a password hash and the people by name
@@ -34,7 +34,7 @@ def wj(p, d):
 
 class Met(unittest.TestCase):
     def test_the_waits_the_machine_has_met_move_to_done(self):
-        # B634: the From the stick section kept saying the array and the
+        # The From the stick section kept saying the array and the
         # shares were waiting after both had landed.
         import firstboot
         waiting = [{"what": "shares", "said": "a share is served once they are adopted", "count": 2},
@@ -103,7 +103,7 @@ class Take(unittest.TestCase):
             self.assertEqual((etc / "timezone").read_text(), "Europe/Berlin\n")
 
     def test_each_shares_places_start_as_the_old_system_had_them(self):
-        # R163 step 3: a share that wrote to a pool and moved later lands on
+        # A share that wrote to a pool and moved later lands on
         # the pool and moves to the array or its second pool; prefer the
         # other way; one kept on a pool stays; the rest land on the array.
         import firstboot
@@ -119,7 +119,7 @@ class Take(unittest.TestCase):
         self.assertEqual(firstboot.mover_cron({"sharing": {"mover": "40 3 * * *; reboot"}}), "")
 
     def test_kernel_arguments_and_features_from_the_machine_it_replaces(self):
-        # R163 step 16: CPUs kept for VMs and devices held for them, as the
+        # CPUs kept for VMs and devices held for them, as the
         # old machine booted, from the next restart; the IOMMU turned on
         # with the node. An argument outside the list is said, not set.
         with tempfile.TemporaryDirectory() as d:
@@ -142,7 +142,7 @@ class Take(unittest.TestCase):
             self.assertIn("iommu, vmhost", handed["features"])
 
     def test_a_static_address_becomes_the_sticks_own_network_settings(self):
-        # R161 step 12: the configuration's network written into the stick's
+        # The configuration's network written into the stick's
         # aerieos.env in its 4 KiB, for every boot's network step, and into
         # this boot's /run file; a stick that names an address keeps its own.
         def boot(net, env_lines=""):
@@ -177,7 +177,7 @@ class Take(unittest.TestCase):
         self.assertIn("is not an address: DHCP stands", said)
 
     def test_the_sticks_mirror_is_handed_over_at_every_boot(self):
-        # R169 step 6: a filled catalog-mirror.bin is copied out for the
+        # A filled catalog-mirror.bin is copied out for the
         # controller, the stick left as it is; a blank one hands nothing.
         with tempfile.TemporaryDirectory() as d:
             esp = Path(d, "esp", "aerieos"); esp.mkdir(parents=True)
@@ -235,7 +235,7 @@ class Apply(unittest.TestCase):
         self.assertEqual(firstboot.view()["waiting"][0]["what"], "shares")
 
     def test_the_old_systems_people_leave_the_controller_fresh_for_a_move(self):
-        # B715: accounts the stick made from the old system's share users (no
+        # Accounts the stick made from the old system's share users (no
         # password, never signed in) are not in use; a move may still land.
         firstboot.apply(str(self.handed))
         self.assertGreater(len(users.all_users()), 1, "the plan's people are made")
@@ -268,7 +268,7 @@ class Apply(unittest.TestCase):
         self.assertEqual(users.load()["users"], {})
         self.assertIn("accounts", [x["what"] for x in r["waiting"]])
         self.assertIsNone(firstboot.apply(self.handed), "once")
-        # B946: its people are kept for this account alone until the owner
+        # Its people are kept for this account alone until the owner
         # is made, then made with their SMB passwords, and the file goes.
         kept = self.tmp / "firstboot-people.json"
         self.assertEqual(oct(kept.stat().st_mode & 0o777), "0o600")

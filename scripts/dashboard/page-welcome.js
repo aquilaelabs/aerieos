@@ -1,7 +1,7 @@
 // The welcome panel: the guide a new person reads, and the changelog that
 // says what moved since they last looked. One classic script beside
 // index.html, like a tab's (docs/nodes.md §13), and the first section to
-// leave the page's own script whole (R75, moved with aerie map sections in
+// leave the page's own script whole (moved with aerie map sections in
 // hand: seven functions, one caller from outside, all covered). Pure
 // declarations: the wiring that runs at load (the About button, the
 // modal's own close, the welcome on the first poll) is page-boot.js's,
@@ -70,7 +70,7 @@ function abShow(which){
 // the node provisioner, the OS image (image/mkosi.conf), the Android app
 // and the official catalog packs put there, which a change to any of those
 // updates. Nothing a person adds through the Library (a third-party pack, a
-// sideloaded app) is credited here (the operator, 28 Oct).
+// sideloaded app) is credited here.
 const AB_CREDITS = [
   ["In the controller's image", [
     ["xterm.js", "every terminal in the dock", "MIT", "https://github.com/xtermjs/xterm.js"],
@@ -157,7 +157,7 @@ function abLoadLog(){
 // asking what changed in the build in front of them, and the file behind it
 // grows for the life of the project.
 // A release the size of a book is one press away from being read, and not
-// the first thing in the way of it (B95). The first bump a project ever does
+// the first thing in the way of it. The first bump a project ever does
 // dates everything ever logged (362 lines here) and this panel opens on an
 // image update, so that was the changelog: one scroll nobody finishes.
 const AB_CAP = 25;
@@ -281,11 +281,11 @@ function drawBuild(img){
 let welcomed = false;
 function welcomeOnce(){
   // Not over the setup page: its steps come first, and the guide waits for
-  // the poll after Finish (B839).
+  // the poll after Finish.
   if (welcomed || !state?.me || !state.welcome || setupNeeded()) return;
   welcomed = true;
   const w = state.welcome, rev = state.image?.rev || "";
-  // An administrator has Home's Getting started for this (R267), and a
+  // An administrator has Home's Getting started for this, and a
   // guide over it would be two at once; a person invited later has none.
   if (!w.seen){ if (!state?.can?.admin) openAbout("guide"); }
   else if (rev && w.image_seen !== rev) updatedShow();

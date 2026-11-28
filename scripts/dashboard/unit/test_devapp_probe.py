@@ -1,4 +1,4 @@
-"""aerie devapp probe (R248): whether an instance answers on its node's
+"""aerie devapp probe: whether an instance answers on its node's
 loopback, from its own published ports only, through the node's agent and
 a program the controller fixes word for word (nodes.PROBE), so a session
 reads it with no root ask and a hosting-only node accepts it and nothing
@@ -80,7 +80,7 @@ class Probe(unittest.TestCase):
         self.assertEqual(out["ports"][0]["http"], 404, "a GET of the path asked, its status said")
 
     def test_the_running_containers_ports_when_the_wiring_names_none(self):
-        # B7: a compose file whose port comes from an env value names none in
+        # A compose file whose port comes from an env value names none in
         # its wiring, while docker has it bound; the probe asks what runs.
         saved = devactions.running_ports
         self.addCleanup(setattr, devactions, "running_ports", saved)
@@ -100,7 +100,7 @@ class Probe(unittest.TestCase):
         self.assertFalse(nodes.host_exec_ok("exec", {"argv": ["curl", "http://127.0.0.1:9090"]}))
 
     def test_a_hosting_node_takes_a_containers_start_on_boot_and_no_other_update(self):
-        # B139: refused, the choice never reached it, asked again at every read.
+        # Refused, the choice never reached it, asked again at every read.
         self.assertTrue(nodes.host_exec_ok("exec", {"argv": ["docker", "update", "--restart", "unless-stopped", "app-1"]}))
         self.assertTrue(nodes.host_exec_ok("exec", {"argv": ["docker", "update", "--restart", "no", "app-1", "db-1"]}))
         self.assertFalse(nodes.host_exec_ok("exec", {"argv": ["docker", "update", "--restart", "always", "app-1"]}))

@@ -1,4 +1,4 @@
-"""The notebook's records, whole, in the form a tool wants (R167): one
+"""The notebook's records, whole, in the form a tool wants: one
 serializer for every kind (a roadmap item with its steps and details, a bug,
 a rule, a wiki page, a design page, a map entry), writing JSON, YAML or
 Markdown, and reading each back in. A document is
@@ -269,8 +269,8 @@ def design_rules(rec):
     named under it: `nostromo/hull` is the Nostromo theme's rule hull, and
     `aerie design show nostromo/hull` reads it. [(name, rule, holder)].
     Here rather than in design.py so a node's aerie design edit, whose
-    bundle carries this module and not that one, finds a rule by its name
-    (B934)."""
+    bundle carries this module and not that one, finds a rule by its name.
+    """
     lang = rec["language"]
     themes = lang["themes"]
     # The default theme's rules are the design's, bare; the others' under

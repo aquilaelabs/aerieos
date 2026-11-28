@@ -1,5 +1,5 @@
-"""A pack kept from the vetted catalog, and the index moving its pin (R169
-step 4): the Library's row for it carries the newer pin, the same address
+"""A pack kept from the vetted catalog, and the index moving its pin:
+the Library's row for it carries the newer pin, the same address
 and folder at another commit, so Catalog update opens the dialog on it with
 what it changes marked; a pack by URL, one from another address or folder,
 one the index withdrew and one at the pinned commit get none."""

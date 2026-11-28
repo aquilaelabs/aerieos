@@ -1,12 +1,12 @@
-// The page's questions: one modal for every one of them (R121, the operator,
-// 23 Oct), in place of the browser's confirm and prompt, whose OK and
+// The page's questions: one modal for every one of them,
+// in place of the browser's confirm and prompt, whose OK and
 // Cancel said yes and no for questions that had other answers ("OK copies
 // it, Cancel leaves it" was the storage move's). The house dialog
 // (a-dialog): `.modal > .box`, its h3 the question, what follows it in
 // `.field` bands, the foot's verbs in words, the primary first and anything
 // destructive last; Escape and a press on the backdrop are Cancel.
 //
-// When one is asked, and how many (R265, the operator, 19 Nov): a press asks
+// When one is asked, and how many: a press asks
 // only when its yes costs something (it deletes or overwrites, cuts off
 // someone's work, or grants more reach), and at most once: what a press
 // needs a yes for is gathered first and listed in one question, as `parts`.
@@ -142,7 +142,7 @@ const ASK_DANGER = new Set(["Delete", "Remove", "Uninstall", "Discard", "Retire"
                             // closing over unsaved changes.
                             "Force", "Leave"]);
 // ...and the ones that interrupt and lose nothing, which wear .caution, in
-// amber (the operator, 19 Nov: red is for what is dangerous; a restart is
+// amber (red is for what is dangerous; a restart is
 // not): what they stop starts again.
 const ASK_CAUTION = new Set(["Restart", "Reboot", "End", "Stop", "Shut", "Disconnect", "Lock", "Take", "Sign"]);
 

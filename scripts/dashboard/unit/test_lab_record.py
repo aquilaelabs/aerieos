@@ -1,5 +1,5 @@
 """The lab writes its own record, and a system's vetted line is read from
-it (R3 step 8; the audit of 13 Nov: the dates beside the systems were typed
+it (the dates beside the systems were typed
 by hand, 13 to 22 Oct, and the provisioner changed in 16 commits since).
 
 A lab suite prints one line for each subject it walked with nothing failed;

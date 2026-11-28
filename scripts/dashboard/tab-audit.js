@@ -1,10 +1,10 @@
-// The Audit page (R158 step 8), Controller's, for an account that reads
+// The Audit page, Controller's, for an account that reads
 // the controller's area: who did what to this install, from the audit
 // trail every mutation lands in (db.audit), newest first, a page at a time
 // (the long-lists rule), narrowed to one person or one machine with the
 // two pickers in the bar. Nothing here changes anything.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Data from
+// Chrome from docSurface; the hard rules are uniform.mjs's. Data from
 // GET /api/audit, read when the page opens, on a filter and for older rows.
 
 "use strict";
@@ -65,7 +65,7 @@ function renderAuditInto(i){
     return;
   }
   const rows = data.rows || [];
-  // One line (R274): what is shown of what is recorded, and since when.
+  // One line: what is shown of what is recorded, and since when.
   patch(d.list, pageHead({line: [{text: `${rows.length} of ${data.total || 0} recorded${
       rows.length ? `, since ${fmtTime(rows[rows.length - 1].at * 1000, {year: "numeric", month: "numeric", day: "numeric"})}` : ""}`}],
       actions: pick("auditPerson", "Person", (data.people || []).map(p => [p, p]), auditPerson)

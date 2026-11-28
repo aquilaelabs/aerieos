@@ -1,7 +1,7 @@
-"""codemap.affected never plans a lab suite (B395): a lab suite needs a real
+"""codemap.affected never plans a lab suite: a lab suite needs a real
 service and is run by name, so whichever road reaches it, the drawn names
 or the covered run, it leaves the plan. A function nearly every suite
-reaches is planned by the suites that run it most (R228 step 20), and a
+reaches is planned by the suites that run it most, and a
 covered run's counts of a suite replace the ones before (coverage_ingest)."""
 import json
 import os

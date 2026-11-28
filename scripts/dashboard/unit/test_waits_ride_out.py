@@ -1,4 +1,4 @@
-"""A verb waiting on an ask rides out a read nothing answered (B1070).
+"""A verb waiting on an ask rides out a read nothing answered.
 
 waits.outcome polls the ask once a second; one read that timed out ended
 the verb with a bare 'The read operation timed out', exit 0, and nothing

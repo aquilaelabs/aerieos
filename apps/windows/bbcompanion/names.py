@@ -1,10 +1,10 @@
 """Windows' rules for a file's name, which a project made on Linux need not
-keep (R270 step 3): a name Windows cannot hold is left out of the copy and
+keep: a name Windows cannot hold is left out of the copy and
 said, rather than failing the sync on every tick.
 
 Windows refuses the device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or
 without an extension), a name ending in a dot or a space, and the characters
-< > : " | ? * and the control characters; and it holds Foo and foo as one
+< >: " | ? * and the control characters; and it holds Foo and foo as one
 file, so of two paths that differ only by case the first (in sorted order)
 is kept and the rest said.
 """

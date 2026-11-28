@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # What an AerieOS boot hands the controller's environment beyond its env
-# file (R161 step 6): the lines of aerieos.env on the ESP, the stick's
+# file: the lines of aerieos.env on the ESP, the stick's
 # plain config partition, which a person edits with the stick in another
 # machine when the dashboard will not come up, and aerieos.debug=1 typed
 # at the GRUB menu for one boot without changing the stick. Written to

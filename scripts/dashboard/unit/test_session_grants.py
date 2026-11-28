@@ -1,6 +1,5 @@
 """A session's helpers run nothing a session wrote outside its view, and an
-account enters only the spaces the controller granted it (R240 steps 3 and
-4; the audit of 13 Nov).
+account enters only the spaces the controller granted it.
 
 bb-session worktree ran git outside every view on a repository a session
 writes, with two configuration keys switched off: laying a worktree's files

@@ -40,7 +40,7 @@ const GEAR = `<svg viewBox="0 0 16 16" aria-hidden="true">
 // a row is wearing reads at a glance without comparing it to its neighbors.
 // A padlock with a wide shackle and a keyhole: at 16px the old narrow
 // shackle over a low body read as another list icon beside the notebook's
-// ticks (R58), and the keyhole is the one mark no list has.
+// ticks, and the keyhole is the one mark no list has.
 const LOCK_BODY = `<rect x="2.9" y="7.2" width="10.2" height="6.4" rx="1.4"/>
   <path d="M8 9.6v1.9"/>`;
 const LOCK = `<svg viewBox="0 0 16 16" aria-hidden="true">${LOCK_BODY}
@@ -51,19 +51,19 @@ const LOCK_OPEN = `<svg viewBox="0 0 16 16" aria-hidden="true">${LOCK_BODY}
 // is one of this person's favorites, an outline while it is not.
 const STAR = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9l1.85 3.85 4.2.55-3.05 2.95.75 4.2L8 11.45l-3.75 2 .75-4.2-3.05-2.95 4.2-.55z"/></svg>`;
 // A box with its lid and a handle, by a project's name on its card: Archive,
-// pressed in where it is archived (R138).
+// pressed in where it is archived.
 const ARCHIVE = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="3" width="11.6" height="3" rx=".8"/>
   <path d="M3.2 6v6.4a1 1 0 0 0 1 1h7.6a1 1 0 0 0 1-1V6"/><path d="M6.5 8.8h3"/></svg>`;
 // An arrow out of a box into another, for moving a repository to another
-// project (R138).
+// project.
 const MOVE = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 3H3.5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3"/>
   <path d="M7 8h6.5M10.8 5.3 13.5 8l-2.7 2.7"/></svg>`;
-// A tag with its hole, for a project's group on its card's back (R138).
+// A tag with its hole, for a project's group on its card's back.
 // The pulldown's chevron, where a field is also a list to pick from.
 const CHEVRON_DOWN = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const TAG = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.6V3.3a.8.8 0 0 1 .8-.8h5.3l5 5a1 1 0 0 1 0 1.4l-4.3 4.3a1 1 0 0 1-1.4 0z"/>
   <circle cx="5.6" cy="5.6" r="1"/></svg>`;
-// A swatch, filled in the project's color where it has one (R138).
+// A swatch, filled in the project's color where it has one.
 const SWATCH = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.2"/></svg>`;
 // A branch: two commits on a line and a third off it, the line bending to
 // meet it, before the branch the tree is on in the Git view's picker.

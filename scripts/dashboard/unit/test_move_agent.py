@@ -1,4 +1,4 @@
-"""A node following its controller to a new home (R90 step 12): the move
+"""A node following its controller to a new home: the move
 off the hello kept in node.json, the knock on the new address with the
 node's own token, the answer checked against the challenge it holds, and
 the controller re-adopted or the knock refused."""
@@ -47,7 +47,7 @@ class Knock(unittest.TestCase):
         self.assertEqual(self.a.hello_at, 0, "a hello to the new home comes next")
 
     def test_a_token_the_new_home_never_saw_is_taken_back_by_an_older_one(self):
-        # B935: a hello after the bundle was packed handed this node a token
+        # A hello after the bundle was packed handed this node a token
         # the new home does not know; it holds the one before among its past.
         self.a.state.update(token="bbn_new", past_tokens=[["bbn_old", 1]])
         calls, answers = [], iter([(401, {"error": "unknown token"}),
@@ -70,7 +70,7 @@ class Knock(unittest.TestCase):
                          "its newest first, then the month's past")
         self.assertEqual(calls[3], ("moved", {"node": "n_1"}, "bbn_fresh"), "knocked again with the token taken back")
         self.assertEqual((self.a.state["token"], self.a.state["past_tokens"][0][0]), ("bbn_fresh", "bbn_new"))
-        # B936: no address in the answer keeps the one knocked at, pinned to
+        # No address in the answer keeps the one knocked at, pinned to
         # the certificate met there.
         self.assertEqual((self.a.state["controller"], self.a.state["pin"]), ("https://new.example", "sha256:seen"))
 
@@ -98,7 +98,7 @@ class Knock(unittest.TestCase):
         self.assertFalse(self.a.knock(), "nothing to knock on")
 
     def test_a_late_node_takes_the_challenge_the_moved_answer_carries(self):
-        # R175 step 2: a node that never heard the move while it was armed
+        # A node that never heard the move while it was armed
         # hears it in the old controller's "moved" answer, and knocks.
         self.a.state.pop("move")
         self.assertFalse(self.a.move_hint({"url": "https://new.example"}), "no challenge, nothing taken")
@@ -110,7 +110,7 @@ class Knock(unittest.TestCase):
         self.assertEqual(self.a.state["controller"], "https://new.example")
 
     def test_follow_by_hand_and_the_state_read_again(self):
-        # R175 step 3: the follow verb's knock with a line's url and
+        # The follow verb's knock with a line's url and
         # challenge, and the running agent re-reading node.json while its
         # controller stays quiet.
         self.a.state.pop("move")

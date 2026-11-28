@@ -44,7 +44,7 @@ run = None
 write_json = None
 STATE = None
 nodes = None          # the node store, once the server has opened it (phase 6)
-agentcode = None      # agentcode.py, set by the server: the coding agents' rows, Claude Code's first (R145, R95 step 2)
+agentcode = None      # agentcode.py, set by the server: the coding agents' rows, Claude Code's first
 
 
 def configure(*, run, write_json, state, project_nodes=None, workspace=None):
@@ -82,7 +82,7 @@ TOOLCHAINS_FILE = HERE.parent.parent / "config" / "toolchains.json"
 
 def load_toolchains(packs=()):
     """The toolchain catalog, or an empty one, with the tool packs a person
-    added (R77, toolpacks.recipes()) among the rows under names of their own.
+    added (toolpacks.recipes) among the rows under names of their own.
 
     Empty rather than an exception: this runs at import, and a missing or
     malformed file must leave a dashboard that says the tab is empty, not one
@@ -94,7 +94,7 @@ def load_toolchains(packs=()):
     except (OSError, ValueError, KeyError, TypeError):
         return []
     # A shipped row whose recipe the catalog holds newer is that one, in
-    # its place (R234 step 4), as the bundle the nodes install from has it.
+    # its place, as the bundle the nodes install from has it.
     rows = catalogrows.merged(rows)
     if isinstance(rows, list) and packs:
         names = {r.get("name") for r in rows if isinstance(r, dict)}
@@ -136,7 +136,7 @@ def load_toolchains(packs=()):
         tool = r.get("tool")
         if isinstance(tool, str) and tool and tool.replace("-", "").isalnum():
             row["tool"] = tool
-        # What installing it is under (the operator, 7 Oct): each license or
+        # What installing it is under: each license or
         # agreement with its link, drawn on the row, an agreement Install
         # accepts (Google's, NVIDIA's, Apple's) marked so the row says so.
         terms = [{"label": str(t["label"])[:120], "url": str(t["url"]), "accept": bool(t.get("accept"))}
@@ -167,7 +167,7 @@ def load_toolchains(packs=()):
         if isinstance(sysd, dict):
             row["system"] = {str(k)[:12]: [str(x)[:80] for x in (v or [])][:64]
                              for k, v in sysd.items() if isinstance(v, list)}
-        # Added by a person rather than shipped (R77): who added it, from
+        # Added by a person rather than shipped: who added it, from
         # where and at which commit, and the verbs aerie tool gives it, for the
         # row to say so and a project's Toolchains group to offer it.
         pk = r.get("pack")
@@ -176,11 +176,11 @@ def load_toolchains(packs=()):
                            "by": str(pk.get("by") or ""), "at": int(pk.get("at") or 0), "here": bool(pk.get("here")),
                            # Its tier and the repository's folder it came
                            # from, for the Library's card and the catalog's
-                           # newer pin (B442).
+                           # newer pin.
                            "tier": str(pk.get("tier") or "url")[:12], "path": str(pk.get("path") or "")[:200],
-                           # Whether it brings a coding agent (R169 step 9).
+                           # Whether it brings a coding agent.
                            "agent": bool(pk.get("agent")),
-                           # ...and an icon of its own (R182).
+                           # ...and an icon of its own.
                            "icon": bool(pk.get("icon")),
                            "verbs": sorted(str(v) for v in (r.get("verbs") or {}))[:40],
                            # What it runs now, for an update to be read as
@@ -506,7 +506,7 @@ def payload():
     # The job as it stood when the rows below are read, taken once: read again
     # after them, a job that ended while they were read said "done" over rows
     # read while it was still removing, and the page, seeing nothing running,
-    # stopped asking and kept a toolchain installed that was gone (B13).
+    # stopped asking and kept a toolchain installed that was gone.
     with _tc_lock:
         busy = _tc_job["running"]
         job = {k: (list(v) if isinstance(v, list) else v)
@@ -569,7 +569,7 @@ def payload():
                       # per recipe, so a row says what installing it adds to
                       # a session and the suite holds two from claiming one.
                       "tool": p.get("tool") or "",
-                      # A tool pack a person added (R77): who, from where, its verbs.
+                      # A tool pack a person added: who, from where, its verbs.
                       "pack": p.get("pack") or None,
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
@@ -643,7 +643,7 @@ def _reason(said, last, cap=400):
     the verb and its exit. Too long, whole lines go from the front, and the
     one left that alone is too long keeps its start and loses its end at a
     word: a cut by characters from the end began mid-word, '3pack · *
-    branch' (B83)."""
+    branch'."""
     lines = [re.sub(r"^\[builderbot\]\s*", "", s.strip()) for s in said]
     # A refusal is its own one sentence, said after the lines that are its
     # detail (what holds a toolchain in use, and its pid): taken alone.
@@ -733,7 +733,7 @@ def _tc_worker():
             verb = ("update" if has and (name in UPDATE_VERBS or name.startswith("android:"))
                     else "install")
             # ...and one installed that cannot install over itself is
-            # removed first (R193), where install alone dies with "already
+            # removed first, where install alone dies with "already
             # installed": a remove that fails leaves the old one as it was.
             if verb == "install" and has and (src.get("fresh_only") or not row.get("updatable")):
                 r = run([BB, "toolchains", "remove", name], timeout=1800, register=_hold_child)
@@ -847,7 +847,7 @@ def abort_job():
 # has from what it was asked to install.
 
 # What a node's last check said, parsed out of that job's log and kept by the
-# job's id (R67). Not a file: a check is a question about this moment, the
+# job's id. Not a file: a check is a question about this moment, the
 # answer ages like a weather report, and a controller restart is a good reason
 # to ask again rather than to show yesterday's.
 _node_checks = {}
@@ -965,7 +965,7 @@ def finished(act, names, here, rep, state):
         return [x for x in names if x not in failed], failed
     # A check changes nothing in the store, so the store says nothing of it:
     # every name it was asked about read as failed, its card red with the
-    # check's own answer as the reason (B1017). Its job's end is its answer.
+    # check's own answer as the reason. Its job's end is its answer.
     if act == "check":
         return (list(names), []) if state == "succeeded" else ([], list(names))
     # An update leaves the toolchain where an install does: in the store.
@@ -1008,7 +1008,7 @@ def store_known(n):
     since store_dirs, an empty listing included). Then a toolchain not in
     the listing is not installed whatever the last check said, and a store
     emptied by hand reads as nothing installed rather than nothing known
-    (B671, the operator, 12 Oct: the store wiped, every row still current)."""
+    (the store wiped, every row still current)."""
     rep = (n or {}).get("reported") or {}
     return bool(((rep.get("stores") or {}).get("toolchains") or {}).get("path")) \
         and isinstance(rep.get("store_dirs"), dict)
@@ -1017,9 +1017,9 @@ def store_known(n):
 def last_check(nid):
     """What the last check on a node said, {name: {installed, latest,
     status}}, and when it ended (0 for never): the tab's state column and
-    the bell's update row read the same answer (the operator, 9 Oct). What
+    the bell's update row read the same answer. What
     the node's own listing no longer holds is absent, whatever the check
-    or an install since it said (B671): the listing comes with every
+    or an install since it said: the listing comes with every
     hello, so a directory deleted by hand is read within one."""
     recent = nodes.jobs_for(node_id=nid, type="toolchain", n=6) if nodes else []
     n = nodes.node(nid) if nodes else None
@@ -1032,7 +1032,7 @@ def last_check(nid):
         # What was installed since that check, by a job that succeeded: the
         # check's "update" or "absent" for it is the answer from before, and
         # the row kept offering an update it had just taken until somebody
-        # checked again (the operator, 6 Oct).
+        # checked again.
         since = {str(x) for k in recent
                  if (k.get("spec") or {}).get("action") == "install" and k.get("state") == "succeeded"
                  and int(k.get("ended") or 0) > int(j.get("ended") or 0)
@@ -1049,7 +1049,7 @@ def attention(project_nodes):
     out: every toolchain its last check found an update for, each as
     {name, label, from, to} (the coding agents' are agent_attention's).
     One shape for all of them, with Open on the Library for that node,
-    which is where each is updated (the operator, 9 Oct). Computed on every
+    which is where each is updated. Computed on every
     poll, so a row leaves the moment its update lands. `project_nodes` is
     {project: node id}."""
     labels = {p["name"]: p["label"] for p in TOOLCHAINS}
@@ -1073,7 +1073,7 @@ def attention(project_nodes):
 
 def agent_attention(project_nodes):
     """Bell rows, one per live agent node with a coding agent behind what is
-    out (R95, the operator 22 Oct: agents have rows of their own), kind
+    out (agents have rows of their own), kind
     agents, in the toolchain rows' shape so the bell keys and dismisses
     them alike, with Open on the Library for that node."""
     out = []
@@ -1098,7 +1098,7 @@ _OWNER = re.compile(r"^u_[0-9a-f]{8}~")
 def claude_running(node_id, project_nodes, agent="claude"):
     """The project of each Claude session running on a node now, one entry
     per session, from its last heartbeat. What an update of Claude Code
-    there ends (B57): the projects bound to the node said 5, 6 or 7 with
+    there ends: the projects bound to the node said 5, 6 or 7 with
     one session running, or none."""
     rows = ((nodes.node_sessions() or {}).get(node_id) or ("", []))[1] if nodes else []
     by_tmux = {tmux_name(p): p for p in project_nodes}
@@ -1111,11 +1111,11 @@ def claude_running(node_id, project_nodes, agent="claude"):
     return out
 
 
-# ---- the versions a node's projects pin (B712) -----------------------------
+# ---- the versions a node's projects pin -----------------------------
 # A store remade at the newest versions only strands a project that pins an
 # older one: Shebang-DevBoard pins NDK 29.0.14206865 and build-tools 36.0.0,
 # the store held NDK 30 and build-tools 37, and Gradle cannot fetch into a
-# store a session cannot write (13 Oct). The pins are read off the project's
+# store a session cannot write. The pins are read off the project's
 # Gradle files here, never by running Gradle, and each one is a row of its
 # own on the node's tab, named for the project, installed or not; the
 # versioned id (android:ndk;29.0.14206865) installs through the same path an
@@ -1131,7 +1131,7 @@ PIN_LABEL = {"ndk": "Android NDK", "build-tools": "Android SDK Build-Tools", "pl
 PIN_SKIP = {"build", ".gradle", ".git", "node_modules", ".idea"}
 
 # What the Android Gradle plugin needs without a line in the project saying
-# so (R215): each release defaults to one build-tools version, and a project
+# so: each release defaults to one build-tools version, and a project
 # with no buildToolsVersion builds with that one, which only the plugin's
 # release notes name. Newest first; the first entry the plugin's version
 # reaches is its default. Read off the notes on 13 Oct 2026: every 9.x is
@@ -1198,7 +1198,7 @@ def agp_build_tools(version):
 
 def gradle_needs(tree):
     """{sdkmanager id: [note, ...]}: what a project's build needs that no line
-    of it pins (R215): the build-tools its Android Gradle plugin defaults to,
+    of it pins: the build-tools its Android Gradle plugin defaults to,
     when no buildToolsVersion says otherwise. The note says which file
     implies it, the way gradle_pins names the file that pins."""
     out = {}
@@ -1215,11 +1215,11 @@ def gradle_needs(tree):
 def levels_needed(nid):
     """{API level: [(project, file), ...]} for the levels the projects on
     `nid` compile against (compileSdk), for the Emulator page to say which
-    level has no image here (R215). An image is the Emulator page's to pick,
+    level has no image here. An image is the Emulator page's to pick,
     not a row on Toolchains: it exists at every level in several flavors,
     under names only Google's index knows (API 37 is android-37.0), and a
     guessed id failed as a job on bb-sandbox beside the build-tools it had
-    been ticked with (B720)."""
+    been ticked with."""
     if project_nodes is None or WORKSPACE is None:
         return {}
     try:
@@ -1319,7 +1319,7 @@ def pin_rows(nid, rep):
 
 
 def receipt_of(nid, rep, name, p, plat=""):
-    """An installed pack's receipt as its row says it (R234): what the node
+    """An installed pack's receipt as its row says it: what the node
     reported (commit, tree, files, bytes, at, and what its steps ran with:
     net, and why where the entry kept the network), with `stale` naming the
     commit kept now when the copy there came from an earlier manifest,
@@ -1379,7 +1379,7 @@ def payload_for_node(nid):
     top = set(((rep.get("store_dirs") or {}).get("top")) or [])
     andr = set(((rep.get("store_dirs") or {}).get("android")) or [])
     # An empty listing from an agent that sends one is an empty store, and
-    # every row is there to install again (B671); only a node that has not
+    # every row is there to install again; only a node that has not
     # listed its store at all is unknown.
     known = store_known(n) or bool(top or andr)
     for p in TOOLCHAINS:
@@ -1411,7 +1411,7 @@ def payload_for_node(nid):
                       # per recipe, so a row says what installing it adds to
                       # a session and the suite holds two from claiming one.
                       "tool": p.get("tool") or "",
-                      # A tool pack a person added (R77): who, from where, its verbs.
+                      # A tool pack a person added: who, from where, its verbs.
                       "pack": p.get("pack") or None,
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
@@ -1431,14 +1431,14 @@ def payload_for_node(nid):
                       "path": "", "version": (have if isinstance(have, str) else "") or "",
                       "size": human_kb(kb) if kb else "",
                       "size_from": "measured the last time it was installed here" if kb else "",
-                      # How its download was checked when it was installed
-                      # (R137): {algo, where}, algo "none" with why; absent
+                      # How its download was checked when it was installed:
+                      # {algo, where}, algo "none" with why; absent
                       # for one installed before that.
                       "verified": ver.get(name) if here else None,
-                      # What a pinned install left behind (R234): its receipt.
+                      # What a pinned install left behind: its receipt.
                       "receipt": receipt_of(nid, rep, name, p, plat) if here else None,
                       "latest": "", "state": ""})
-    # The versions this node's projects pin (B712), beside the catalog's rows.
+    # The versions this node's projects pin, beside the catalog's rows.
     items.extend(pin_rows(nid, rep))
     items.sort(key=lambda x: (not x["installed"], x["label"].lower()))
     # A toolchain that puts something on PATH (or sets a variable) reaches a
@@ -1455,7 +1455,7 @@ def payload_for_node(nid):
     unmet = (rep.get("sysdeps") or {}).get("unmet") or {}
     sysl = {p["name"]: (p.get("system") or {}).get(fam) or [] for p in TOOLCHAINS} if fam else {}
     # A pack that names system packages for other managers alone is not for
-    # this node (R171), said on its row as a platform miss is.
+    # this node, said on its row as a platform miss is.
     recipes = {p["name"]: p for p in TOOLCHAINS}
     for i in items:
         miss = "" if i.get("wrong_platform") else family_miss(recipes.get(i["name"]) or {}, fam)
@@ -1489,8 +1489,7 @@ def payload_for_node(nid):
             # How far through the batch it is, from the name the agent says
             # it is on (step): the ones before it are behind it, the ones
             # after it still to come. Every name sat in the queue for the
-            # whole job, and the tab read "1 of 10" from start to end (the
-            # operator, 12 Oct).
+            # whole job, and the tab read "1 of 10" from start to end.
             cur = j.get("step", "")
             at = names.index(cur) if cur in names else -1
             job = {"running": True, "action": (j.get("spec") or {}).get("action", ""),
@@ -1525,7 +1524,7 @@ def payload_for_node(nid):
                 here |= {r["name"] for r in (driver_row(n), container_row(n)) if r and r["here"]}
                 done, failed = finished(act, names, here, rep, j.get("state"))
                 # Stopped: a toolchain it never reached did not fail, it was
-                # not tried (the operator, 12 Oct: Abort on flutter called the
+                # not tried (Abort on flutter called the
                 # twelve behind it failed). Which were tried is in the log.
                 if j.get("state") == "canceled":
                     tried = _tried(j["id"])
@@ -1570,36 +1569,35 @@ def payload_for_node(nid):
         # The agent's hello at the end of a job lands a moment before the
         # job's result does, so a census from the job's last seconds counts.
         m["settling"] = bool(ended) and int(rep.get("at") or 0) < ended - 5 and time.time() - ended < 120
-    # The coding agents are not here (R95, the operator 22 Oct): they are
+    # The coding agents are not here: they are
     # installed and updated in the Library and removed on the Installed page
     # (agentcode.rows).
     return {"node": nid, "name": n["name"], "live": bool(n.get("live")),
             # What is this machine's rather than the store's: the NVIDIA
-            # driver and the container toolkit, where the node has the card
-            # (R102).
+            # driver and the container toolkit, where the node has the card.
             "machine": machine,
             # Held recipes whose system packages this machine lacks, and
-            # whether the agent may install them there (roadmap R51).
+            # whether the agent may install them there.
             "sysdeps": rep.get("sysdeps") or {}, "sandbox": bool(rep.get("sandbox")),
             # Locked to its console: nothing on it is installed by itself.
             "locked": bool((n.get("config") or {}).get("lock")),
             # Whether the agent there installs system packages itself.
             "administers": bool(rep.get("administers")),
-            # The node's own scope under the store (roadmap R19), where its
+            # The node's own scope under the store, where its
             # toolchains actually are. The share itself where the node has not
             # reported one yet.
             "root": (store.get("path") or "") + ("/" + store["scope"] if store.get("scope") else ""),
             "free_mb": store.get("free_mb"),
             "shared": False, "checked": checked, "sizing": False,
-            # What on the store no node runs from any more (R196).
+            # What on the store no node runs from any more.
             "cleanable": cleanable(nid),
             "items": items, "job": job or {"running": False},
-            # The node's platform (R170 step 9): what the Library judges a card's platforms against.
+            # The node's platform: what the Library judges a card's platforms against.
             "platform": plat,
             # A job that ended and succeeded while the store still reads as
             # before it: the node's census lands a moment after the job's end,
             # and the tab read the store once and stopped, so the rows stayed
-            # unticked until the page was reloaded (the operator, 12 Oct). The
+            # unticked until the page was reloaded. The
             # tab asks again while this says so, two minutes at most.
             "store_settling": _store_settling(job, items)}
 
@@ -1629,7 +1627,7 @@ def _imaged(rep):
 
 
 def driver_row(n):
-    """The NVIDIA driver as a row of the Library and the Installed page (R102), or
+    """The NVIDIA driver as a row of the Library and the Installed page, or
     None where the node reports no NVIDIA card. A row like the store's, with
     a tick box, in the same batch and the same check, but the machine's own:
     built for its kernel, installed as root, taking the card at the next
@@ -1640,7 +1638,7 @@ def driver_row(n):
     card = rep.get("gpu_card")
     gd = rep.get("gpu_driver") if isinstance(rep.get("gpu_driver"), dict) else {}
     # A driver left for a card that has gone keeps its row, so it can be
-    # removed: hidden, its boot-time tries at the card had no way off (B168).
+    # removed: hidden, its boot-time tries at the card had no way off.
     # ...not one the image carries, which no press can take off the machine.
     gone = not card and gd.get("nocard") and gd.get("installed") and not _imaged(rep)
     if not card and not gone:
@@ -1752,7 +1750,7 @@ def _landed_at(nid):
         if sp.get("action") not in ("install", "update") or j.get("state") not in ("succeeded", "failed", "canceled"):
             continue
         # A job that stopped part way still landed what it installed before
-        # it stopped (the operator, 12 Oct: an aborted batch put node and
+        # it stopped (an aborted batch put node and
         # playwright on the store, and no session was told to restart).
         for name in sp.get("names") or []:
             if j.get("state") == "succeeded" or str(name) in here:
@@ -1762,7 +1760,7 @@ def _landed_at(nid):
 
 def cleanable(nid):
     """[{dir, what}] at the top of this node's toolchain store that no node
-    runs from any more (R196): a directory named for a node that is retired
+    runs from any more: a directory named for a node that is retired
     or unknown here (a node enrolled again starts afresh under its new id,
     and leaves its old one behind). Never a live node's, and never anything
     not named for a node: `shared`, and the controller's own <os>-<arch>."""
@@ -1810,7 +1808,7 @@ def _scope_of(n):
 
 def _dir_of(n):
     """The directory a node's toolchain jobs write under the store: its
-    node id (R196), and this controller's own <os>-<arch>."""
+    node id, and this controller's own <os>-<arch>."""
     if nodes and (n or {}).get("id") == nodes.LOCAL:
         return f"{platform.system().lower()}-{platform.machine() or 'unknown'}"
     return _scope_of(n) or str((n or {}).get("id") or "")
@@ -1898,7 +1896,7 @@ def node_whole(n):
 
 def installed_where(name):
     """The names of the nodes whose store holds `name`, by what each last
-    reported: what a tool pack's removal is refused over (B84), since a pack
+    reported: what a tool pack's removal is refused over, since a pack
     gone from the catalog leaves no row to uninstall its files from."""
     if not nodes:
         return []
@@ -1977,7 +1975,7 @@ def supports(tc, plat):
 
 
 def family_miss(tc, fam):
-    """Why a recipe is not for a node of package manager `fam` (R171): it
+    """Why a recipe is not for a node of package manager `fam`: it
     names system packages, but none for that manager. "" when it fits, or
     when the node has not said its family."""
     sysd = tc.get("system") or {}
@@ -2146,7 +2144,7 @@ TOOLKIT = "nvidia-container-toolkit"
 
 def container_row(n):
     """The NVIDIA container toolkit as a row of the Library and the Installed
-    page (R102), or None where the node reports no NVIDIA card or no Docker: what
+    page, or None where the node reports no NVIDIA card or no Docker: what
     lets a container there reserve the card. The machine's own like the
     driver it needs, and from NVIDIA's package source, which its install
     adds and its removal takes away; Docker reloads its configuration for
@@ -2154,7 +2152,7 @@ def container_row(n):
     rep = n.get("reported") or {}
     gc = rep.get("gpu_container") if isinstance(rep.get("gpu_container"), dict) else {}
     inst, cand = gc.get("installed") or "", gc.get("candidate") or ""
-    # Left for a card that has gone, it keeps its row to be removed (B168).
+    # Left for a card that has gone, it keeps its row to be removed.
     gone = not rep.get("gpu_card") and gc.get("nocard") and inst and not _imaged(rep)
     if not rep.get("docker") or not (rep.get("gpu_card") or gone):
         return None
@@ -2303,9 +2301,9 @@ def node_job(principal, nid, action, names, driver=""):
             return {"ok": True, "job": j["id"], "already": True}
     # Two architectures on one store used to be refused here, because a flat
     # store could not hold both. It is scoped by platform now: each machine
-    # installs under <store>/<os>-<arch> (roadmap R19), so a Mac and a Linux
+    # installs under <store>/<os>-<arch>, so a Mac and a Linux
     # box sharing a share is the design, not a mistake.
-    # Two limits (the operator, 12 Oct): each toolchain's step gets an hour,
+    # Two limits: each toolchain's step gets an hour,
     # which the agent enforces and then moves on; the job as a whole gets
     # an hour per toolchain, which is what the controller holds it to. One
     # hour for both marked a nineteen-toolchain batch lost at 65 minutes
@@ -2506,7 +2504,7 @@ def versions_loop():
     import checks
     last = _tc_checked
     while True:
-        # The catalog's cadence (R176): this controller's store, the agents'
+        # The catalog's cadence: this controller's store, the agents'
         # newest versions and the vetted index, weekly unless set.
         if TOOLCHAINS and (not last or checks.due("catalog", last)) and checks.every("catalog") is not None and not _tc_job["running"]:
             if start_job("check", [p["name"] for p in TOOLCHAINS], auto=True):
@@ -2517,14 +2515,14 @@ def versions_loop():
 
 
 def node_check_every(n):
-    """A node's version check cadence (R176): its config's check_versions,
+    """A node's version check cadence: its config's check_versions,
     daily, weekly (the default), monthly or off; seconds, or None for off."""
     v = ((n or {}).get("config") or {}).get("check_versions") or "weekly"
     return {"daily": 86400, "weekly": 7 * 86400, "monthly": 30 * 86400, "off": None}.get(v, 7 * 86400)
 
 
 def node_checks_due(now=None):
-    """Each node's own weekly check (the operator, 6 Oct: a node's tab said
+    """Each node's own weekly check (a node's tab said
     its versions were checked twelve days ago). The loop above checked only
     this controller's store, and a node's answers are its last check job's,
     so they aged until somebody pressed Check. A live node with a toolchain
@@ -2547,7 +2545,7 @@ def node_checks_due(now=None):
                     if (j.get("spec") or {}).get("action") == "check"), default=0)
         # ...or sooner, for a node that has just started (nodes.checks_wanted).
         wanted = n["id"] in getattr(nodes, "checks_wanted", ())
-        # The node's own cadence (R176): its page's setting, weekly unless set.
+        # The node's own cadence: its page's setting, weekly unless set.
         every = node_check_every(n)
         if every is None and not wanted:
             continue
@@ -2557,8 +2555,8 @@ def node_checks_due(now=None):
         if r.get("ok") or r.get("job"):
             queued.append(n["id"])
             getattr(nodes, "checks_wanted", set()).discard(n["id"])
-    # The coding agents on the same clock, Claude Code first (R145, R95 step
-    # 2): each asked once for every node, since what is out is one answer,
+    # The coding agents on the same clock, Claude Code first:
+    # each asked once for every node, since what is out is one answer,
     # when any node was due or a week has passed.
     import checks
     agents_every = checks.every("catalog") or TC_CHECK_EVERY
@@ -2603,19 +2601,19 @@ def verb(action, req, principal):
         if not node:
             return {"error": "no such node"}, 400
         known = {p["name"] for p in TOOLCHAINS}
-        # ...and the versions this node's projects pin (B712), rows the tab
+        # ...and the versions this node's projects pin, rows the tab
         # drew beside the catalog's: a versioned id installs through the
         # path an emulator image takes, and a name not on this node's tab is
         # still refused.
         known |= {r["name"] for r in pin_rows(nid, node.get("reported") or {})}
         # The NVIDIA driver is a name like the others on a node that has
-        # the card (R102); node_job decides whether it may be touched.
+        # the card; node_job decides whether it may be touched.
         if (node.get("reported") or {}).get("gpu_card"):
             known = known | {DRIVER, TOOLKIT}
-        # ...and to remove one left for a card that has gone (B168).
+        # ...and to remove one left for a card that has gone.
         known |= {r["name"] for r in (driver_row(node), container_row(node)) if r and r["state"] == "nocard"}
         want = [str(x) for x in (req.get("names") or [])]
-        # A coding agent is its own verb's (R95, the operator 22 Oct):
+        # A coding agent is its own verb's:
         # named here, it is refused with the way there.
         if any(agents.by_tool(x) for x in want):
             return {"error": "a coding agent is installed and updated in the Library and removed on the Installed page, "
@@ -2624,19 +2622,19 @@ def verb(action, req, principal):
             # Every row, or the ones named: the question a check answers
             # is "is any of this out of date", and an uninstalled row's
             # answer is what it would fetch, which is half the reason to
-            # press it (R67).
+            # press it.
             names = [n for n in (req.get("names") or []) if n in known]
         elif action == "sysdeps":
             # The system packages the held recipes need, installed
-            # without the recipes (roadmap R51): named ones, or every
+            # without the recipes: named ones, or every
             # held one when none are named.
             names = [n for n in (req.get("names") or []) if n in known]
         else:
-            # Every name asked for (B681): this kept the first eight and
+            # Every name asked for: this kept the first eight and
             # dropped the rest without a word, so Install selected with the
             # whole catalog ticked installed eight and their requirements,
-            # twice (the operator, 12 Oct), long after the agent stopped
-            # doing the same (B673).
+            # twice, long after the agent stopped
+            # doing the same.
             names = [n for n in (req.get("names") or []) if n in known]
             if not names:
                 return {"error": "nothing selected"}, 400

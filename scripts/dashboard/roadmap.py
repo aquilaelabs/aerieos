@@ -91,9 +91,9 @@ def configure(*, write_json, state, tell=None, tmux_name=None, settle=None,
 # add. Everything else on a held item is refused by bb with "still waiting".
 _REPLAY = {"add": "add", "info": "set_info", "step-add": "add_step", "edit": "edit",
            "target": "set_target", "target-step": "set_step_target",
-           # A session's split makes items, so it is gated as an add (R168).
+           # A session's split makes items, so it is gated as an add.
            "split": "split",
-           # A session asking for an item back off the shelf (R78): held as a
+           # A session asking for an item back off the shelf: held as a
            # request whatever the gate says, and a person's Approve replays it.
            "unshelve": "shelve"}
 
@@ -213,7 +213,7 @@ def _kinds(got):
 
 def _touch(d, project, kind="roadmap", on=True, who=""):
     # A session's own write (`who` is its seat) leaves the panel's flag as it
-    # was (B56): the flag says the operator has something the sessions were
+    # was: the flag says the operator has something the sessions were
     # not told, and a session needs no telling about what it wrote. Another
     # session hears of it all the same, by the counter below.
     if not (on and who):
@@ -265,12 +265,12 @@ MAX_HISTORY = 300
 def _trim(h):
     """The log kept to its last MAX_HISTORY events, less the finished items:
     an item's done event IS the finished item (its row rides in it), and one
-    trimmed away left the Finished section and aerie roadmap show without it
-    (B768). Kept whatever their age, as an archive is; the rest goes."""
+    trimmed away left the Finished section and aerie roadmap show without it.
+    Kept whatever their age, as an archive is; the rest goes."""
     _tracker.trim(h)
 
 
-# How long a run of moves of one item is one line in the log (R254 step 5):
+# How long a run of moves of one item is one line in the log:
 # a reorder is a move at a time, and a line per press drowned the rest.
 MOVE_FOLD_S = 600
 
@@ -323,8 +323,8 @@ def begin(project, by="claude"):
 # session's batch is minutes of work; one open for half an hour belongs to a
 # session that was killed mid-way or a container that restarted under it, and
 # it used to disable Save for every person on the project for good, with no
-# way out that did not need a shell, which a user account does not have
-# (B198). Lifting the HOLD is safe by the batch's own design: a person's
+# way out that did not need a shell, which a user account does not have.
+# Lifting the HOLD is safe by the batch's own design: a person's
 # change made while one is open goes straight to the history, the session's
 # commit still folds its own events in, and its revert already refuses to
 # roll back over a person's edit.
@@ -480,8 +480,8 @@ def _next_id(rows, d=None, project=None):
     file keeps the high-water mark under `reserved`, and it never comes
     down. It used to be the highest number still ON the list, so ticking
     the newest items off handed their numbers to the next adds: the
-    approval gate was #27 in ten comments and the next item was R27 too
-    (bug B72). A number is the item's own, and "a gap means something was
+    approval gate was #27 in ten comments and the next item was R27 too.
+    A number is the item's own, and "a gap means something was
     removed" only holds if nothing is ever numbered twice.
     """
     return _tracker.next_id(rows, d, project)
@@ -541,7 +541,7 @@ def set_info(project, item_id, text, step=None, by="you", was=None, who=""):
     return _edit(project, item_id, change, by, who, finished=True)
 
 
-# The release an item is meant to ship in (the operator, 21 Oct): the
+# The release an item is meant to ship in: the
 # project's own version, X.Y.Z, as aerie version and the changelog's headings
 # name one. A plan, not a promise: nothing holds a release for it, and what
 # shipped an item is still read off the changelog.
@@ -583,8 +583,8 @@ def set_target(project, item_id, version, by="you", who=""):
 
 
 def set_step_target(project, item_id, step, version, by="you", who=""):
-    """Say which release one step is meant for, or "" for its item's (R108,
-    the operator, 22 Oct): an item split across releases says which part
+    """Say which release one step is meant for, or "" for its item's:
+    an item split across releases says which part
     ships when, and a step with none goes with its item."""
     v, bad = _target(version)
     if bad:
@@ -693,7 +693,7 @@ def add(project, text, by="you", steps=(), who="", number=None, target=""):
 
 
 def _events(d, project):
-    """The history and then the open batch's events (B819): inside a batch
+    """The history and then the open batch's events: inside a batch
     what this session did waits there until commit, so an item a step had
     just closed was neither on the list nor in the history, and read as
     never there."""
@@ -704,8 +704,8 @@ def _events(d, project):
 def _gone(d, project, item_id):
     """Why an item is not on the list, from the loaded file's log, or the
     plain answer: finished (ticked off, or its last step done), dropped, or
-    never there (B737: a step done after the last one closed the item said
-    only 'no such item'). The open batch's events too (B819): inside one the
+    never there (a step done after the last one closed the item said
+    only 'no such item'). The open batch's events too: inside one the
     close waits there until commit, and an item a step had just closed read
     as never there."""
     for e in sorted(_events(d, project), key=lambda e: -e.get("at", 0)):
@@ -795,7 +795,7 @@ def _edit(project, item_id, change, by="you", who="", finished=False):
         rows = d["projects"].get(project) or []
         row = _find(rows, item_id)
         # A finished item stays finished, and its words and details can still
-        # be put right (B766): the change lands on the row its "done" event
+        # be put right: the change lands on the row its "done" event
         # keeps, which is what the Finished section draws. Refused for the
         # verbs about doing the work, which a finished item has none of.
         done = row is None and finished and _finished_row(d, project, item_id)
@@ -842,7 +842,7 @@ def shelve(project, item_id, on=True, by="you", who="", why=""):
     order is the displayed order everywhere else here, and two orders is how
     a rearrangement lands somewhere nobody pointed at.
 
-    A session may shelve, and may ASK for one back (R78): taking an item off
+    A session may shelve, and may ASK for one back: taking an item off
     the shelf reverses a decision it was not told the reason for, so its
     request is held for a person on the project, with its reason, and lands
     when they approve it, whatever the roadmap gate says. That is a
@@ -897,7 +897,7 @@ def tick(project, item_id, by="you", who=""):
     def change(row, rows):
         rows.remove(row)
         # The whole row rides in the log, as a dropped one's does: the Roadmap
-        # tab shows finished items behind a toggle (R78), with their steps and
+        # tab shows finished items behind a toggle, with their steps and
         # details, and the words alone would have been a line with no plan.
         return {"ok": True, "item": row,
                 "log": {"act": "done", "id": row["id"], "text": row["text"],
@@ -910,14 +910,14 @@ def tick(project, item_id, by="you", who=""):
 def finished(project, limit=None):
     """The items ticked off, newest first, each as it was when it went:
     the "done" events in the history that carry the row (a tick since 23
-    Sep, a last step since B767), or the row put back together from the log
+    Sep, a last step), or the row put back together from the log
     (an older one). One entry per item, the newest
     tick of it, and the Roadmap tab shows them below the shelved ones,
     hidden until asked for."""
     # One reopened since is on the list again, not under Finished.
     seen, out = {_int(r.get("id")) for r in items(project)}, []
     log = history(project)
-    # Whether reopen would take it (R254 step 2): never one a released
+    # Whether reopen would take it: never one a released
     # version shipped, so the page offers Reopen only where it will land.
     rel = last_release(project)
     for e in log:
@@ -938,13 +938,13 @@ def finished(project, limit=None):
 # The project's last release, read off its changelog's newest release heading
 # ("## 0.7.0: 2026-09-25"): an item finished on or before that day shipped
 # with that version, and reopening it would rewrite a released version's
-# record (the operator, 15 Oct). (version, epoch of the day's end) or None.
+# record. (version, epoch of the day's end) or None.
 _RELEASE = re.compile(r"^## (\d+\.\d+\.\d+[^:\s]*): (\d{4}-\d{2}-\d{2})\s*$", re.M)
 
 
 def releases(project):
     """Every released version in the project's CHANGELOG, newest first, each
-    with the end of its day (R254 step 4): a thing done before that end and
+    with the end of its day: a thing done before that end and
     after the one before it shipped in that version, and one done after the
     newest is planned for the next. Derived, never typed."""
     try:
@@ -953,7 +953,7 @@ def releases(project):
         return []
     # When each was tagged, where the project's git has its tag: the moment
     # it was made, not the end of its day, so work finished later that day
-    # is the next version's (B165). The day's end where there is no tag.
+    # is the next version's. The day's end where there is no tag.
     tagged = {}
     try:
         p = subprocess.run(["git", "-C", str(Path(os.environ.get("WORKSPACE", "/workspace")) / project), "for-each-ref",
@@ -990,12 +990,12 @@ _LINE_SHAS = re.compile(r"\s*\(\s*[0-9a-f]{7,40}(?:\s*,\s*[0-9a-f]{7,40})*\s*\)\
 def changelog_refs(project, kind="R", linked=None, commits=None):
     """The changelog entries that name a roadmap item (kind R) or a bug (B),
     by its id: {"R12": [{"in": "0.7.0" or "Unreleased", "text": ...}]},
-    newest first, at most ten each (R254 step 4), so an item lists what was
+    newest first, at most ten each, so an item lists what was
     written about it and the release it went out in. `linked` is the lines
     the notebook ties to each ({"B12": [words, ...]}, bugs.link_changelog),
     found by their words: the public file names commits, never the id. Each
     of those carries its words and tied, so the row can untie it. `commits`
-    ({"B12": [sha, ...]}, a bug's fix commits, R255) finds, for a key with no
+    ({"B12": [sha, ...]}, a bug's fix commits) finds, for a key with no
     tied line, the lines naming one of them, marked by: commit."""
     try:
         text = (Path(os.environ.get("WORKSPACE", "/workspace")) / project / "CHANGELOG.md").read_text(errors="replace")
@@ -1036,7 +1036,7 @@ def changelog_refs(project, kind="R", linked=None, commits=None):
 
 
 def unreleased_lines(project):
-    """The Unreleased lines a bug can be tied to (R255): [{words, cat}], in the
+    """The Unreleased lines a bug can be tied to: [{words, cat}], in the
     file's order."""
     try:
         text = (Path(os.environ.get("WORKSPACE", "/workspace")) / project / "CHANGELOG.md").read_text(errors="replace")
@@ -1084,7 +1084,7 @@ def reopen(project, item_id, by="you", who=""):
             return _gone(d, project, item_id)
         # Only the same work, and never across a release: an item a released
         # version shipped stays in that version's record, and more work on it
-        # is a new item (the operator, 15 Oct).
+        # is a new item.
         rel = last_release(project)
         when = max((e.get("at", 0) for e in d.get("history", {}).get(project) or []
                     if _int(e.get("id")) == item_id and e.get("act") == "done" and e.get("step") is None), default=0)
@@ -1246,8 +1246,8 @@ def move(project, item_id, step=None, dir=0, by="you", who=""):
 
 def step_to(project, item_id, step, position, by="you", who=""):
     """One step moved to another place on its own item, `position` 1-based
-    (B1181: five places down took five single moves). Steps that have gone
-    stay where they are and nothing moves past one, as move() keeps them."""
+    (five places down took five single moves). Steps that have gone
+    stay where they are and nothing moves past one, as move keeps them."""
     i, p = _int(step), _int(position)
     if i is None:
         return {"error": "not a step"}
@@ -1266,7 +1266,7 @@ def step_to(project, item_id, step, position, by="you", who=""):
     return _edit(project, item_id, change, by, who=who)
 
 
-# ---- steps that move (R168) ------------------------------------------------
+# ---- steps that move ------------------------------------------------
 # A step has an id of its own, `sid`: the item it was first written on and
 # its number there, [item, n], with n counted up on the item (`nsteps`) and
 # never handed out twice. The number a person reads is still its place in
@@ -1327,7 +1327,7 @@ def _finished_rows(d, project):
 
 
 def resolve(project, item_id, n):
-    """Where step n of R{item_id} is now (R168): the step whose sid that is,
+    """Where step n of R{item_id} is now: the step whose sid that is,
     on whichever item holds it, open or finished; n of 0 is the item itself,
     where it was folded into another. {item, index, where: open|finished,
     moved: bool} or {error}."""
@@ -1379,7 +1379,7 @@ def _step_into(dst, st, position):
 def step_mv(project, item_id, step, to, position=None, by="you", who=""):
     """One step moved to another open item, whole (its words, details, done
     or sent mark, target and sid), leaving a line on the item it left
-    saying where it went (R168)."""
+    saying where it went."""
     item_id, to, i = _int(item_id), _int(to), _int(step)
     if item_id is None or to is None:
         return {"error": "not an item"}
@@ -1430,7 +1430,7 @@ def _new_row(d, project, rows, text, by, who, target="", info=""):
 
 
 def split(project, item_id, groups, by="you", who=""):
-    """An item's steps moved to new items in one change (R168): `groups` is
+    """An item's steps moved to new items in one change: `groups` is
     [{text, steps: [n, ...], target?}], each a new item taking those steps
     (1-based numbers as they stand now) whole, pointing back at the old
     item's details; the old item keeps the rest and says where each went.
@@ -1498,7 +1498,7 @@ def split(project, item_id, groups, by="you", who=""):
 
 
 def fold(project, item_id, into, into_step=None, by="you", who="", why=""):
-    """One item folded into another (R168): a step of it, its own steps
+    """One item folded into another: a step of it, its own steps
     following with their marks, or, with a step named, its words added to
     that step's details and its steps put after it. The old item leaves the
     list with where it went, and restore puts it back."""
@@ -1564,8 +1564,8 @@ _STEP_REF = re.compile(r"\bR(\d+)(?:\.(\d+)|(?:'s)? steps? (\d+))?\b")
 
 
 def refs(project):
-    """Every R reference in the list's own words that no longer finds anything
-    (R168): an item nobody here has heard of, or a step past the ones its item
+    """Every R reference in the list's own words that no longer finds anything:
+    an item nobody here has heard of, or a step past the ones its item
     was ever given. [{where, ref, why}], and a reference to a moved step says
     where it is now."""
     out = []
@@ -1700,7 +1700,7 @@ def step_done(project, item_id, step, by="claude", note="", who=""):
     offering it to send. This is the second mark. Only a session sets it,
     the same rule as ticking off an item; a session that ticked the wrong
     one, or found it not finished after all, takes it back with
-    step_undone (the operator, 17 Oct), as sending it again does.
+    step_undone, as sending it again does.
     """
     if _int(step) is None:
         return {"error": "not a step"}
@@ -1724,7 +1724,7 @@ def step_done(project, item_id, step, by="claude", note="", who=""):
         # off" until somebody typed that.
         if all(st.get("done") for st in steps):
             rows.remove(row)
-            # The whole row, as a tick's carries (B767): finished by its last
+            # The whole row, as a tick's carries: finished by its last
             # step it showed under Finished as the words alone, its plan gone.
             return {"ok": True, "finished": True, "item": row,
                     "log": [ev, {"act": "done", "id": row["id"], "text": row["text"],
@@ -1734,7 +1734,7 @@ def step_done(project, item_id, step, by="claude", note="", who=""):
 
 
 def step_undone(project, item_id, step, by="claude", note="", who=""):
-    """Take back a step's done mark (the operator, 17 Oct: a session that
+    """Take back a step's done mark (a session that
     ticked the wrong step had no way back but a person's Send). The step is
     left to do again, and the log says so, with why where one is given."""
     if _int(step) is None:
@@ -1788,7 +1788,7 @@ def restore(project, item_id, at=None, by="you", who=""):
         row = copy.deepcopy(ev["row"])
         row["id"] = item_id
         row.pop("shelved", None)
-        # One folded into another item (R168) takes its steps back out of
+        # One folded into another item takes its steps back out of
         # it, as they stand now, and its own line there goes with them.
         if ev.get("folded"):
             back = []
@@ -1882,11 +1882,11 @@ def send(project, item_id, step=None, sessions=(), also_told=False, note="", pre
     # sit here typed /model ahead of it, which stopped working the day claude
     # put a confirmation behind that command: the step went into the dialog.
     # The CALLER's session, not the project's bare one. Every session a node
-    # starts is named with the account's prefix (bb-tty's sess()), and the
+    # starts is named with the account's prefix (bb-tty's sess), and the
     # owner's prefix is the empty string, so the bare name is the owner's
     # conversation and nobody else's. Sent without this, a second person's
     # step was typed into the owner's window, or refused as "no session is
-    # running here" while their own sat there running (B194).
+    # running here" while their own sat there running.
     session = running_session(prefix, project, set(sessions), want)
     r = tell(session, line, sessions)
     if r.get("error") or not r.get("sent"):
@@ -2019,7 +2019,7 @@ def mark_seen(project, who, kind=None):
         # to record that nothing had changed.
         d.setdefault("read", {}).setdefault(project, {})[who] = int(time.time())
         # Reading is the act; recording it is a courtesy. A checkout's bb on
-        # a node runs this against a state dir it cannot write (B228), and a
+        # a node runs this against a state dir it cannot write, and a
         # traceback over a list that was printed whole is the wrong answer.
         try:
             save(d)
@@ -2089,7 +2089,7 @@ def announce(project, kinds, sessions=()):
     line = changed_line(kinds if isinstance(kinds, dict) else {kinds: True})
     if not line or tell is None or tmux_name is None:
         return {"ok": True, "sent": False}
-    # Every agent's running session on it is told (R95 step 16).
+    # Every agent's running session on it is told.
     live = [n for n in agent_sessions(project) if n in set(sessions)]
     if not live:
         return {"ok": True, "sent": False}
@@ -2122,7 +2122,7 @@ _AFTER = (
 
 
 def brief(project):
-    """The roadmap's lines in a session's block (R202): how much there is
+    """The roadmap's lines in a session's block: how much there is
     and the verbs, in place of the list. A session read two hundred titles
     cut short on every conversation and used few; the items a prompt names
     arrive on that prompt (preamble.mentioned) and `aerie roadmap show` prints
@@ -2181,17 +2181,17 @@ def panel(name, live, prefix):
     `prefix` is the asking account's session prefix (users.tmux_prefix)."""
     # The session THIS ACCOUNT would be sending into, which is the one the
     # arrows have to answer for: every session a node starts wears the
-    # account's prefix, and the owner's prefix is empty (B194). Read with
+    # account's prefix, and the owner's prefix is empty. Read with
     # the bare name, a second person's arrows said "no Claude session is
     # running here" with their own session open in the next tab.
     session = running_session(prefix, name, set(live))
     return {"items": items(name),
-            # How many are finished, for the toggle's label (R78): the
+            # How many are finished, for the toggle's label: the
             # items themselves come when it is pressed.
             "finished_n": len(finished(name)),
-            # What a time of doing shipped in, for the rows' facts (R254).
+            # What a time of doing shipped in, for the rows' facts.
             "releases": releases(name),
-            # ...and what the changelog says about each item (R254 step 4).
+            # ...and what the changelog says about each item.
             "changelog": changelog_refs(name, "R"),
             # What the poll compares against, handed back with every read
             # AND every write, so this panel's own change never reads as
@@ -2231,7 +2231,7 @@ def verb(name, act, req, me, *, live, prefix):
     who = me.get("uid", "") if me.get("session") else ""
     if act == "batch-close":
         # A batch its session will never close: killed mid-way, or the
-        # container restarted under it (B198). The only way out was a
+        # container restarted under it. The only way out was a
         # shell running `aerie roadmap commit`, which a user account does
         # not have. Committed rather than reverted: what the session
         # wrote is already on the list in front of everybody, and folding
@@ -2260,7 +2260,7 @@ def verb(name, act, req, me, *, live, prefix):
         r = add(name, field(req, "text"), steps=field_list(req, "steps"), who=who,
                 target=field(req, "target"))
     elif act == "target":
-        # A step's own release where one is named (R108), else the item's.
+        # A step's own release where one is named, else the item's.
         r = (set_step_target(name, req.get("id"), req.get("step"), field(req, "target"), who=who)
              if req.get("step") is not None else set_target(name, req.get("id"), field(req, "target"), who=who))
     elif act == "send":
@@ -2280,7 +2280,7 @@ def verb(name, act, req, me, *, live, prefix):
     elif act == "add-step":
         r = add_step(name, req.get("id"), field(req, "text"))
     elif act == "step-mv":
-        # A step to another item (R168): dragged there, or Move to on its row.
+        # A step to another item: dragged there, or Move to on its row.
         r = step_mv(name, req.get("id"), req.get("step"), req.get("to"), position=req.get("position"),
                     by="claude" if me.get("session") else "you", who=who)
     elif act == "split":
@@ -2303,8 +2303,8 @@ def verb(name, act, req, me, *, live, prefix):
     elif act == "reopen":
         r = reopen(name, req.get("id"), who=who)
     elif act == "done":
-        # Ticked off from its row by a person (R254 step 2, the operator,
-        # 16 Oct): the roadmap is theirs, and work finishes outside a
+        # Ticked off from its row by a person:
+        # the roadmap is theirs, and work finishes outside a
         # session or stops mattering. Logged as theirs; Reopen undoes it
         # until a release ships it. A session ticks off through bb as before.
         r = tick(name, req.get("id"), by="claude" if me.get("session") else "you", who=who)
@@ -2318,7 +2318,7 @@ def verb(name, act, req, me, *, live, prefix):
         # so it is theirs. The CLI only ever passed on=True; this door
         # took whatever it was handed.
         # A session asking for one back is held for a person on the
-        # project (R78): roadmap.shelve holds it with its reason.
+        # project: roadmap.shelve holds it with its reason.
         on = bool(req.get("on", True))
         r = shelve(name, req.get("id"), on,
                    by="claude" if me.get("session") else "you", who=who,
@@ -2327,7 +2327,7 @@ def verb(name, act, req, me, *, live, prefix):
             return r | panel(name, live, prefix), 200
     elif act == "finished":
         # The ticked-off items, with their plans, for the Roadmap tab's
-        # toggle (R78): fetched when it is turned on, never in the poll.
+        # toggle: fetched when it is turned on, never in the poll.
         return {"finished": finished(name, limit=req.get("limit"))}, 200
     elif act == "history":
         # Fetched only when the panel is showing it. It rides in no poll:

@@ -1,4 +1,4 @@
-"""A store move holds the node's sessions while it runs (R120 step 7): the
+"""A store move holds the node's sessions while it runs: the
 agent writes the hold where every session's gate reads it before the move,
 says how far it has got as it goes, and takes it away however the move ends,
 from the place it wrote it even when the toolchain store itself moved."""
@@ -89,7 +89,7 @@ class StorageHold(unittest.TestCase):
 
 class StoreOnAMount(unittest.TestCase):
     """A store inside a configured mount goes there only when the mount is
-    there and is the share it names (the operator, 23 Oct)."""
+    there and is the share it names."""
 
     def run_apply(self, mount):
         a = object.__new__(agent.Agent)

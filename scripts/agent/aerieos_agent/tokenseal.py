@@ -1,18 +1,18 @@
-"""The coding agents' sign-ins sealed on a node (R126): one implementation
+"""The coding agents' sign-ins sealed on a node: one implementation
 the node's agent and the controller both load (the controller by path, as
 termws.py loads term.py).
 
 The node seals and never holds what opens a seal. Each account has a key
-pair per node made on the controller from the account's key (R154) and never
+pair per node made on the controller from the account's key and never
 kept: the secret is HMAC(key, "bb agent token v2" | node | account) as an
 X25519 private key, the public its X25519 public, which the node is handed
 as 64 hex characters. The node seals with the public alone: a fresh X25519
 key r, its public R, the seal's key K = HKDF-SHA256(r·A, info = R | A), and
 ChaCha20-Poly1305 under K with the seal's header as its associated data
-(R158 step 3: a vetted library, `cryptography`, in the image and on the
+(a vetted library, `cryptography`, in the image and on the
 nodes). Only the controller can make K again, from R and the secret, and it
 hands K to the node only inside a terminal a signed-in person opened for
-that account (the signed /term open of R133), wrapped to the agent's own
+that account (the signed /term open), wrapped to the agent's own
 X25519 key for this boot so that neither a copy of /config nor a copy of the
 node's disk, with the traffic captured, opens it.
 
@@ -228,7 +228,7 @@ def _exchange(me, pub):
     """The shared secret, or Refused: cryptography raises ValueError for a
     low-order point (an all-zero R a node could report), which no caller
     catches, so one such seal stopped an account opening terminals on that
-    node (B551)."""
+    node."""
     try:
         return me.exchange(pub)
     except ValueError as e:

@@ -1,5 +1,5 @@
 """tools/upgrade-image.sh: the built image started on each release snapshot
-of /config through its own entrypoint (R242; the audit of 13 Nov: the
+of /config through its own entrypoint (the
 upgrade suite starts server.py alone with stand-ins, and nothing started the
 image's own boot on an old volume). Its judgment, with stand-ins for docker
 and curl that answer as the image would: what passes, and each thing that

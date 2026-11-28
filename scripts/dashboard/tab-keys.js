@@ -1,4 +1,4 @@
-// The Keys page (R154), Controller's, an administrator's: the install key
+// The Keys page, Controller's, an administrator's: the install key
 // and everything the install keeps sealed under it. With INSTALL_KEY not
 // set the install made its own key at its first start (lib/boot.sh), which
 // this page shows to save and changes, live: what is kept under it is
@@ -6,7 +6,7 @@
 // shown and changed there. Each account's own key, for its sign-ins on the
 // nodes, is on its Profile (keyMineSection).
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Data from
+// Chrome from docSurface; the hard rules are uniform.mjs's. Data from
 // POST /api/keys, read when the page opens and after each change.
 
 "use strict";
@@ -98,7 +98,7 @@ function renderKeysInto(i){
   }
   const k = keysData.install || {}, rows = keysData.kept || [];
   d.setBar("");
-  // One line (R274): a key not saved yet is news; the rest is Details.
+  // One line: a key not saved yet is news; the rest is Details.
   patch(d.list, pageHead({line: [k.where ? {text: `kept in ${KEYS_WHERE[k.where]}`} : {text: "no install key"},
                                  k.where && k.changeable && !k.saved ? {text: "not saved yet", tone: "warn"} : null], about: true, facts: k.where ? [
       ["Install key", k.fingerprint, {cls: "keyfp"}], ["Kept in", KEYS_WHERE[k.where]],
@@ -118,7 +118,7 @@ function keysGo(r){
   if (where === "user") return openUsersTab();
   if (where === "agents") return arg ? openLibraryOn(arg) : openLibrary();
   // The router's keys on its node's page, the certificate on the Network
-  // page's Connection: both opened nothing (R294 step 9).
+  // page's Connection: both opened nothing.
   if (where === "nodes") return openThing(arg, "service:model-router");
   if (where === "settings") return openNetworkTab();
 }
@@ -176,21 +176,21 @@ function wireKeys(root){
 }
 
 // ---- an account's own key store, on its Profile ---------------------------
-// What is kept under the account's own key (R154): the key, made for it and
+// What is kept under the account's own key: the key, made for it and
 // kept by the controller, which its coding agents' sign-ins on the nodes are
 // sealed with; and each token it gave a repository (a project's settings, a
 // clone, a link to a host), kept here and not in the install's store, with
-// the projects that use it (the operator, 27 Oct). Nothing is added here:
+// the projects that use it. Nothing is added here:
 // a token arrives with the repository it was given for. Never shown and
 // never downloaded: Change makes another key, Remove takes out a token no
 // project uses, and Purge empties the store after a plain confirmation, no
 // password or code asked, since a person who forgot theirs, or fears it
 // stolen, must still be able to.
 //
-// An unlock that gives up less (R158 step 5): a token is opened per use for
+// An unlock that gives up less: a token is opened per use for
 // the window picked here (a quarter of an hour, an hour, eight hours, or
 // while signed in), Lock lets go of everything opened, and the uses are
-// listed under the store. A key of the person's own (R157): Hold the key
+// listed under the store. A key of the person's own: Hold the key
 // yourself moves the store under a passkey's PRF secret or a key they keep,
 // which the controller never holds, so it opens only while they unlock it.
 let keyMine = null;
@@ -300,7 +300,7 @@ async function keyStoreUnlock(said = "Unlock your key store?"){
   return true;
 }
 
-// The move under a key of the person's own (R157 step 1): how it is held,
+// The move under a key of the person's own: how it is held,
 // the projects whose background work runs with a token of theirs, said
 // before they choose, and what it costs.
 async function keyStoreOwn(b){

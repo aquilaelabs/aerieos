@@ -55,13 +55,13 @@ def keep_token(tok):
         project = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode().split("|")[0]
         if not project or "/" in project:
             return "the token names no space"
-        # The account's own folder for the space (B159).
+        # The account's own folder for the space.
         d = scopedir.scope_dir(project)
         os.makedirs(d, mode=0o700, exist_ok=True)
         # A unique temporary name, not a fixed one: the agent refreshes this
-        # file for a session that is idle (R27) while the session's own bb may
+        # file for a session that is idle while the session's own bb may
         # be writing it, and two writers sharing `token.new` is the race that
-        # cost B165 elsewhere in this tree.
+        # has bitten elsewhere in this tree.
         tmp = os.path.join(d, f"token.{os.getpid()}.{secrets.token_hex(4)}.new")
         with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             f.write(tok + "\n")
@@ -141,7 +141,7 @@ def _conn(timeout):
     u = urllib.parse.urlsplit(url())
     # A setting typed by hand with no scheme ("controller.lan:7680") parses
     # with no host at all, and a port that is not a number raises: both used
-    # to escape as a TypeError traceback from every bb verb (B179). As OSError
+    # to escape as a TypeError traceback from every bb verb. As OSError
     # they are what the callers already turn into {"error": ...}, naming it.
     try:
         port = u.port or (443 if u.scheme == "https" else 80)
@@ -160,7 +160,7 @@ def _conn(timeout):
         # it (controller.py's CA). Nothing is pinned: what the node sees is
         # the edge's certificate, which changes. Compared to a digest, as
         # every other pin is, this was refused, and no aerie verb in a
-        # session on such a node reached its controller (R243). With no pin
+        # session on such a node reached its controller. With no pin
         # at all the same: a session is handed the agent's pin and pins
         # nothing on first use itself, so a certificate nobody vouches for
         # is not taken on its word.
@@ -196,7 +196,7 @@ def call(path, body=None, auth="", method="", timeout=30):
     return request(path, body, auth, method, timeout)[1]
 
 
-# How long a call waits for a controller that refuses the connection (R251):
+# How long a call waits for a controller that refuses the connection:
 # it is restarting after an update most of the time, which takes under a
 # minute, and a session that failed there treated the update as a real
 # failure and changed course. Ninety seconds by default; a hook, which runs
@@ -209,7 +209,7 @@ UNREACHED = frozenset({errno.EHOSTUNREACH, errno.ENETUNREACH})
 def _gate_down():
     """Tell the session's gate (bb-gate, the PreToolUse hook) at once that the
     controller did not answer, so the next tool call is held rather than let
-    through by the twenty seconds a fine check is trusted for (R251)."""
+    through by the twenty seconds a fine check is trusted for."""
     project = os.environ.get("BB_PROJECT", "")
     if not project or "/" in project:
         return
@@ -223,16 +223,16 @@ def _gate_down():
 
 
 def request(path, body=None, auth="", method="", timeout=30):
-    """call(), with the HTTP status beside the answer: (status, answer).
+    """call, with the HTTP status beside the answer: (status, answer).
 
     The status is None when nothing answered at all: no connection, a
-    timeout, a pin that did not match. call() cannot say that, because a
+    timeout, a pin that did not match. call cannot say that, because a
     refusal the server words ("not signed in") and a refused connection both
     come back as {"error": sentence}, and telling them apart by the wording
     is how bb-gate came to report an expired token as AerieOS being down.
 
-    A refused connection, or one that found no route to the host (B771),
-    is waited out (R251): the request never reached a server, so asking
+    A refused connection, or one that found no route to the host,
+    is waited out: the request never reached a server, so asking
     again cannot do anything twice. So is a GET the server
     hung up on before answering; a POST it may have read is not sent again."""
     try:
@@ -240,8 +240,8 @@ def request(path, body=None, auth="", method="", timeout=30):
     except ValueError:
         budget = 90
     waited, said = 0, False
-    # The steps, then the last one again until the budget is spent (B772:
-    # they add up to 95s, and a longer BB_CONTROLLER_WAIT was cut there).
+    # The steps, then the last one again until the budget is spent
+    # (they add up to 95s, and a longer BB_CONTROLLER_WAIT was cut there).
     for step in itertools.chain(WAIT_STEPS, itertools.repeat(WAIT_STEPS[-1])):
         st, got, again = _request_once(path, body, auth, method, timeout)
         if not again:
@@ -267,7 +267,7 @@ def request(path, body=None, auth="", method="", timeout=30):
 
 
 # How long a job refused only because its node's agent is behind waits for
-# that agent's update (R253): the controller queues it itself once the node is
+# that agent's update: the controller queues it itself once the node is
 # idle, and it lands in under a minute; the job was refused, so asking again
 # does nothing twice.
 AGENT_WAIT_S = 150
@@ -311,12 +311,12 @@ def _request_once(path, body, auth, method, timeout):
             return None, {"error": str(e)}, True
         # A POST it may have read is not sent again here; the answer says so
         # and carries hung_up, so a verb that can look whether its ask landed
-        # (a rebuild's job) looks and asks again itself (B803).
+        # (a rebuild's job) looks and asks again itself.
         return None, {"error": f"{e}: the controller hung up before answering, so it may or may not "
                                "have done it", "hung_up": True}, False
     except OSError as e:
         # The gap while a controller's container is replaced can answer "no
-        # route to host" rather than a refusal (B771): no server was reached
+        # route to host" rather than a refusal: no server was reached
         # either way, so it is waited out the same.
         if e.errno in UNREACHED:
             return None, {"error": str(e)}, True

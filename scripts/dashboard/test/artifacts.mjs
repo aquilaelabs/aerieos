@@ -38,7 +38,7 @@ import sys, zipfile
 with zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED) as z:
     for f in sys.argv[2:]: z.write(f, f.rsplit('/', 1)[-1])`,
   `${DIR}/ws/alpha/dist/companion-0.2.0.xpi`, `${stage}/manifest.json`, `${stage}/background.js`]);
-// What a session looked with (R96): two reels and two emulator shots, each
+// What a session looked with: two reels and two emulator shots, each
 // with the record aerie capture leaves (who, when); one reel ten days old,
 // which the project's default of seven days sweeps on the tab's first read;
 // one shot with no record at all, which goes by its own time.
@@ -60,7 +60,7 @@ writeFileSync(`${DIR}/ws/alpha/dist/emu/loose.png`, Buffer.from([0x89, 0x50, 0x4
 writeFileSync(`${DIR}/ws/alpha/secret.txt`, 'not yours');
 symlinkSync(`${DIR}/ws/alpha/secret.txt`, `${DIR}/ws/alpha/dist/leak.txt`);
 
-// Five dev builds of one APK and its release (R105): the tab keeps the
+// Five dev builds of one APK and its release: the tab keeps the
 // newest three dev builds and never the release's place.
 await section("Five dev builds of one APK and its release", async () => {
   const t0 = Math.floor(Date.now() / 1000) - 5000;
@@ -71,7 +71,7 @@ await section("Five dev builds of one APK and its release", async () => {
   }
   writeFileSync(`${DIR}/ws/alpha/dist/alpha-1.2.0-debug.apk`, 'release');
   utimesSync(`${DIR}/ws/alpha/dist/alpha-1.2.0-debug.apk`, t0, t0);
-  // A build a sign job delivered (R106 step 4), with the provenance the
+  // A build a sign job delivered, with the provenance the
   // controller writes for it: what signed it and the certificate.
   writeFileSync(`${DIR}/ws/alpha/dist/alpha-1.2.0-signed.apk`, 'signed');
   mkdirSync(`${DIR}/ws/alpha/dist/.provenance`, { recursive: true });
@@ -84,24 +84,24 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
 await page.goto(URL);
 await ready(page);
-const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page (R218 step 3)
+const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page
 await page.evaluate(n => openNotebook(n), 'alpha');
 await page.waitForSelector('#roadmapList, .nb', { timeout: 20000 });
 await nbGo(page, 'artifacts');
 await page.waitForSelector('.artrow', { timeout: 15000 });
 
 // The files are a section of their own, like the rest of the view, and open
-// when the view first shows (the operator, 6 Oct): they were a band under
+// when the view first shows: they were a band under
 // Version, the one part of the tab that did not fold. On a desktop the
-// view's first section is open beside them (the operator, 7 Oct).
+// view's first section is open beside them.
 await section("The files are a section of their own, like the rest of the view, and open", async () => {
   const s = await page.evaluate(() => [...document.querySelectorAll('.nb .nbview[data-view="artifacts"] details.sect')]
     .filter(d => d.checkVisibility() && !d.parentElement.closest('details.sect')).map(d => `${d.dataset.sect}:${d.open ? 'open' : 'shut'}`));
   ok(s.includes('artifacts:files:open') && s.every(x => x.endsWith(':open')),
      `the files are their own section, and every section is open when the view shows (${s.join(' ')})`);
 });
-// ...and on a phone one is open at a time, as on every folded surface
-// (R184, the operator, 11 Oct): the files, the rest shut and a tap away.
+// ...and on a phone one is open at a time, as on every folded surface:
+// the files, the rest shut and a tap away.
 await section("and on a phone one is open at a time, as on every folded surface", async () => {
   const phone = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await phone.goto(URL);
@@ -120,7 +120,7 @@ await section("and on a phone one is open at a time, as on every folded surface"
   await phone.close();
 });
 
-// ---- a signed build (R106 step 4) --------------------------------------------
+// ---- a signed build --------------------------------------------
 await section("a signed build", async () => {
   const r = await page.$eval('.artrow:has(b:text-is("alpha-1.2.0-signed.apk"))', e => ({
     pill: !!e.querySelector('.pill.ok'), text: e.textContent.replace(/\s+/g, ' '),
@@ -177,10 +177,10 @@ await section("alpha-1.2.0-dev.4-abcdef4-debug.apk", async () => {
   ok(dev.join() === ['alpha-1.2.0-dev.3-abcdef3-debug.apk', 'alpha-1.2.0-dev.4-abcdef4-debug.apk', 'alpha-1.2.0-dev.5-abcdef5-debug.apk'].join()
      && names.includes('alpha-1.2.0-debug.apk') && !existsSync(`${DIR}/ws/alpha/dist/alpha-1.2.0-dev.1-abcdef1-debug.apk`),
      `of five dev builds of one APK the newest three are kept and the release beside them stays (${dev.join(', ')})`);
-  // One line, the rest behind its help mark (the operator, 3 Nov).
+  // One line, the rest behind its help mark.
   ok(/newest 3 builds/.test(note) && /a release and anything pinned stay/.test(note),
      `...and the tab says so (${note.replace(/\s+/g, ' ').slice(0, 120)})`);
-  // A pin keeps one whatever comes after it (the operator, 30 Sep): the
+  // A pin keeps one whatever comes after it: the
   // oldest kept is pinned on its row, two newer builds arrive, and it is
   // still there, marked, while the ones beside it went.
   const oldest = 'alpha-1.2.0-dev.3-abcdef3-debug.apk';
@@ -188,7 +188,7 @@ await section("alpha-1.2.0-dev.4-abcdef4-debug.apk", async () => {
     .find(r => r.querySelector('b')?.textContent === n)?.querySelector('[data-artpin]')?.click(), oldest);
   await page.waitForFunction(n => [...document.querySelectorAll('#artList .artrow')]
     .some(r => r.querySelector('b')?.textContent === n && /pinned/.test(r.textContent)), oldest, { timeout: 15000 });
-  // Drawn pinned on the press (the operator, 22 Nov); kept once the server
+  // Drawn pinned on the press; kept once the server
   // has it, asked until it says so.
   await until(() => page.evaluate(async n => (await (await fetch('/api/artifacts?project=alpha')).json()).artifacts
     .some(a => a.name === n && a.pinned), oldest), 15000, 200);
@@ -290,7 +290,7 @@ await section("the captures", async () => {
   await page.click('#artCaptures .artrow:has(b:text-is("loose.png")) [data-artcap]');
   await page.waitForFunction(() => !document.querySelector('#artCaptures .artrow b')
     || ![...document.querySelectorAll('#artCaptures .artrow b')].some(b => b.textContent === 'loose.png'), null, { timeout: 15000 });
-  // Gone from the list on the press (the operator, 22 Nov); the file follows.
+  // Gone from the list on the press; the file follows.
   await until(() => !existsSync(`${DIR}/ws/alpha/dist/emu/loose.png`), 15000);
   ok(!existsSync(`${DIR}/ws/alpha/dist/emu/loose.png`) && await page.$eval('#artCaptures summary', e => /2, kept/.test(e.textContent)),
      'Remove takes one away on the press, and the fold recounts');
@@ -343,7 +343,7 @@ await section("a script is a product, and one people read before they run it", a
        viewable.filter(a => a.view).map(a => a.name).join(', ')})`);
   // Read over the panel, the way a History is, with the file's own line
   // breaks. Nothing here runs it and the tab has no way to.
-  // One section open at a time (the operator, 5 Oct): Captures was opened
+  // One section open at a time: Captures was opened
   // above, so Files is opened again before a file's View is pressed.
   await openFold(page, '.nb [data-sect="artifacts:files"]');
   await page.click('.artrow:has(b:text-is("setup-1.2.sh")) [data-artview]');
@@ -446,13 +446,13 @@ await nbGo(page, 'artifacts', '.pane .stack > .doc.on .nb');
 // Scoped to the pane: alpha's notebook is parked but its own artifacts view
 // is still the active one inside that instance, so an unscoped selector finds
 // the wrong project's rows.
-// ...and by its words, since a list can carry another line (R105's note on
+// ...and by its words, since a list can carry another line (a note on
 // dev builds) before them.
 await page.waitForFunction(() => [...document.querySelectorAll('.pane .nb [data-view="artifacts"] #artList .hint')]
   .some(h => /Nothing in dist\//.test(h.textContent)), null, { timeout: 15000 });
 ok(true, 'a space with no dist/ is told the convention, not shown a blank');
 
-// ---- a build on a branch, in an account's own worktree (B237) -------------
+// ---- a build on a branch, in an account's own worktree -------------
 // A second account's session builds in its worktree and its outputs land in
 // that worktree's dist/, where the tab never looked: its first build showed
 // nothing. Listed apart from dist/, with Download and View carrying the tree.
@@ -505,9 +505,9 @@ await section("a build on a branch, in an account's own worktree", async () => {
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);
-// Put alpha back as it was found. fresh() between files resets state and
+// Put alpha back as it was found. fresh between files resets state and
 // removes stray projects, but it does not reach inside a fixture project, so
-// ---- a build named with no version (the operator, 6 Oct) ----------------------
+// ---- a build named with no version ----------------------
 // Nothing can tell when it is out of date, so the sweep leaves it and its row
 // says so in the warning color, with a Remove that a person presses.
 await section("Put alpha back as it was found", async () => {

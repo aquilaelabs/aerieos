@@ -1,5 +1,5 @@
-"""The agent's version moves with every change to the agent (R241; the audit
-of 13 Nov): tools/agent-version.sh measured from the branch's merge point
+"""The agent's version moves with every change to the agent:
+tools/agent-version.sh measured from the branch's merge point
 with main, so one bump early on a long branch passed every change after it,
 and one commit changed the agent with no bump. It measures from the commit
 that last moved the number now."""

@@ -32,7 +32,7 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } })
 await page.goto(URL);
 await ready(page);
 
-// The listing's name column is as wide as its longest name (B233): the
+// The listing's name column is as wide as its longest name: the
 // shipped no-credentials-in-the-repo ran straight into its own text.
 ok(/ask-do-not-install\s+Never install/.test(bb()),
    'aerie rules pads the name column past its longest name');
@@ -71,7 +71,7 @@ ok(cb.files === 2 && cb.lines === 3 && cb.code_lines === 2
 ok(new RegExp(`${cb.files} file`).test(await page.$eval('#rulesBox .sect', e => e.textContent))
    && /tracked by git/.test(await page.$eval('#rulesBox .sect', e => e.textContent)),
    '...and the section says the files, the lines, and that it is git that decides what counts');
-// One count, head and body (B49): the body restates the head's totals and
+// One count, head and body: the body restates the head's totals and
 // then says how much of them is code, never a code-only number beside them.
 const cbText = await page.$eval('#rulesBox .sect', e => e.textContent.replace(/\s+/g, ' '));
 ok(/2 files and 3 lines tracked by git/.test(cbText) && /2 lines of code in 1 file\b/.test(cbText),
@@ -108,9 +108,9 @@ ok((await page.$eval(`${two} .rlkind`, e => e.textContent)).includes('on its tri
 ok(!await page.$eval('[data-ssave="briefing:rules"]', b => b.disabled),
    'a written rule arms the Your rules section\'s own Save');
 ok(read().length === 0, '...and nothing is on disk until it is pressed');
-// Each section saves its own (the operator, 5 Oct): the rules' edit wakes
+// Each section saves its own: the rules' edit wakes
 // their Save and Revert and nothing else's, and the Briefing view opens on
-// its first section (the operator, 7 Oct).
+// its first section.
 ok(await page.$eval('[data-ssave="briefing:memories"]', b => b.disabled)
    && await page.$eval('[data-srevert="briefing:rules"]', b => !b.disabled),
    '...that section\'s own Save and Revert, and not the Memories section\'s');
@@ -143,7 +143,7 @@ ok(await page.$eval('#rulesBox .rulerow[data-i="1"]', r =>
      && /scripts\/agent/.test(r.querySelector('.rltrig')?.textContent || '')
      && !r.querySelector('textarea, input')),
    'a saved rule is a closed fold with its name on the line and its words behind it, not fields');
-// Found and read in the one call, on a row in the page and laid out (B431):
+// Found and read in the one call, on a row in the page and laid out:
 // the list is drawn again as the save's answer and the poll land, and a row
 // found by one call and read by the next was read off a copy already taken
 // out, where every computed style is an empty string. Read at rest, with
@@ -159,7 +159,7 @@ ok(rowLook.radius === '0px' && rowLook.top === '1px',
 await page.click('#rulesBox .rulerow[data-i="1"] summary');
 await page.waitForFunction(() => document.querySelector('#rulesBox .rulerow[data-i="1"]').open, null, { timeout: 10000 });
 // Pressed again when the field has not come: a redraw landing between the
-// press's down and up takes it (B822, '0 shut, 1 open' under a whole run).
+// press's down and up takes it ('0 shut, 1 open' under a whole run).
 await page.click('#rulesBox .rulerow[data-i="1"] .rlEdit');
 for (let t = 0; t < 3; t++){
   if (await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 4000 }).then(() => true, () => false)) break;
@@ -167,7 +167,7 @@ for (let t = 0; t < 3; t++){
     if (r && !r.querySelector('.rlText')) r.querySelector('.rlEdit')?.click(); });
 }
 await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 10000 }).catch(async e => {
-  // What the panel drew instead, said before the timeout is thrown (B297):
+  // What the panel drew instead, said before the timeout is thrown:
   // each row, open or shut, editing or not, and whether its field exists.
   console.log('[rules] no edit field to see: ' + await page.evaluate(() =>
     [...document.querySelectorAll('#rulesBox .rulerow')].map(r => r.dataset.i
@@ -178,7 +178,7 @@ await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 
 ok(await page.$('#rulesBox .rulerow[data-i="0"] .rlText') === null,
    'Edit opens that rule\'s fields and no other\'s');
 await page.fill('#rulesBox .rulerow[data-i="1"] .rlText', 'typed, then thought better of');
-// Read once the input's handler has run, not in the same instant (B836).
+// Read once the input's handler has run, not in the same instant.
 ok(await page.waitForFunction(() => !document.querySelector('[data-ssave="briefing:rules"]')?.disabled, null, { timeout: 5000 })
      .then(() => true, () => false),
    'typing into a rule arms the panel\'s Save');
@@ -193,7 +193,7 @@ await page.click('#rlAdd');
 await page.waitForFunction(() => document.querySelectorAll('#rulesBox .rulerow').length === 3, null, { timeout: 10000 });
 // Pressed in the page: the row is a details that is still sliding open,
 // and Playwright's actionability wait saw it detach under a repaint and
-// retried into a timeout (B255, B124's family).
+// retried into a timeout.
 await page.$eval('#rulesBox .rulerow[data-i="2"] .rlCancel', b => b.click());
 await page.waitForFunction(() => document.querySelectorAll('#rulesBox .rulerow').length === 2
                                  && !document.querySelector('#rulesBox .rulerow .rlText'), null, { timeout: 10000 });
@@ -232,7 +232,7 @@ ok(!/add, do not change/.test(
           { tool_name: 'Edit', tool_input: { file_path: `${DIR}/ws/alpha/README.md` } })),
    '...and a file it does not cover brings nothing');
 
-// ---- a rule that carries a framework (roadmap R31) --------------------------
+// ---- a rule that carries a framework --------------------------
 // The document that defines it and the command that checks it ride on the
 // rule; the block names both, and `aerie rules check` runs the command in the
 // tree for the rules whose files changed.
@@ -258,7 +258,7 @@ await section("while a new file under its files makes bare check run it", async 
   let out = '';
   try { bb('check', 'design'); } catch (e) { out = String(e.stdout || ''); }
   ok(/FAIL  design/.test(out), 'a failing check fails by name, with a non-zero exit');
-  // B103: run from a git worktree of the project, the check runs in that
+  // Run from a git worktree of the project, the check runs in that
   // worktree (whose .git is a file), not in the main checkout (a directory);
   // from a directory that is no tree of the project, in the project's own.
   {
@@ -277,7 +277,7 @@ await section("while a new file under its files makes bare check run it", async 
   }
   ok(/checked by: false/.test(bb('show', 'design')), 'aerie rules show prints the doc and the check');
 
-  // ---- the Stop hook (R31, step 2): a failing check refuses the stop ------
+  // ---- the Stop hook: a failing check refuses the stop ------
   // Run the way Claude Code runs it: JSON on stdin, JSON on stdout. The
   // design rule's check is `false` and src/new.txt is a changed file under
   // its files, so the stop is refused with the failure; a stop a hook already
@@ -293,11 +293,11 @@ await section("while a new file under its files makes bare check run it", async 
      '...but lets a stop through that a hook already refused once, so it never loops');
   // Rules that cannot be read (the controller restarting, from a node) are a
   // check that did not run, not one that failed: the stop goes, and nothing
-  // is stamped, so the next hand-back checks for real (B412).
+  // is stamped, so the next hand-back checks for real.
   const away = execFileSync('python3', [join(HERE, '..', 'bb-check-relay'), 'alpha', 'u_test'],
     { env: { ...ENV, BB_TREE: `${DIR}/ws/alpha`, XDG_CACHE_HOME: `${DIR}/cache-away`, BUILDERBOT_ROLE: 'node',
              BB_CONTROLLER: 'http://127.0.0.1:9', BB_TOKEN: 'bbs_nothing',
-             // Not ninety seconds of waiting out a restart (bbapi, R251): the
+             // Not ninety seconds of waiting out a restart (bbapi): the
              // answer is the same, nobody answered.
              BB_CONTROLLER_WAIT: '0' },
       input: JSON.stringify({ stop_hook_active: false }) }).toString();
@@ -315,7 +315,7 @@ await section("while a new file under its files makes bare check run it", async 
 ok(/^aerie rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }).toString()),
    'aerie rules -h is its help, as every verb\'s is (B411)');
 await section("B536: every verb's -h is its entries in the reference, exit 0, never", async () => {
-  // B536: every verb's -h is its entries in the reference, exit 0, never
+  // Every verb's -h is its entries in the reference, exit 0, never
   // its usage error: devapp's and container's said "ERROR:" and exited 1.
   const help = v => { try { return [0, execFileSync(BB, [v, '-h'], { env: ENV, stdio: 'pipe' }).toString()]; }
                       catch (e) { return [e.status, String(e.stdout) + String(e.stderr)]; } };
@@ -323,7 +323,7 @@ await section("B536: every verb's -h is its entries in the reference, exit 0, ne
   ok(said.every(([v, st, out]) => st === 0 && new RegExp(`^aerie ${v}\\b`).test(out) && !/ERROR/.test(out)),
      `bb VERB -h prints that verb's entries from the reference and exits 0 (${said.map(([v, st]) => v + ':' + st).join(' ')})`);
   // ...and after a subcommand whose words are never free text: aerie
-  // dashboard test -h looked for a suite called -h (B1185).
+  // dashboard test -h looked for a suite called -h.
   let dt;
   try { dt = [0, execFileSync(BB, ['dashboard', 'test', '-h'], { env: ENV, stdio: 'pipe' }).toString()]; }
   catch (e) { dt = [e.status, String(e.stdout) + String(e.stderr)]; }
@@ -412,7 +412,7 @@ await section("The endpoint, not just the verb", async () => {
      '...and nothing was written');
 });
 
-// ---- global rules (R63): set once on the controller, in every project -----
+// ---- global rules: set once on the controller, in every project -----
 // The drift the block has, these do not: there is no copy anywhere, so a rule
 // the operator sets is the rule every session on the box is handed.
 await section("global rules", async () => {
@@ -451,7 +451,7 @@ await section("global rules", async () => {
   ok(asSession.status === 403, `...and a session's token is refused by the endpoint too (${asSession.status})`);
 });
 
-// B195: the tab writes the WHOLE list, so a list that moved since it was loaded
+// The tab writes the WHOLE list, so a list that moved since it was loaded
 // is somebody else's rule about to be overwritten: one a session added, one an
 // administrator approved from the queue, another person's reword. It used to
 // go through, and the log then blamed the person saving for removing a rule
@@ -480,7 +480,7 @@ await section("B195: the tab writes the WHOLE list, so a list that moved since i
      '...and Use mine writes it, which is then a decision somebody made rather than an accident');
   await call('/api/rules', { project: 'alpha', action: 'save', rules: first.rules || [], force: true });
   // What a project keeps and what a session reads whole are counted
-  // apart (the operator, 29 Sep): a standing rule is read into every
+  // apart: a standing rule is read into every
   // session, a named one costs its name. Forty was the limit on both.
   const named = Array.from({ length: 60 }, (_, i) => ({ name: `named-${i}`, text: `a named rule, number ${i}`, words: [`word${i}`] }));
   const many = await call('/api/rules', { project: 'alpha', action: 'save', rules: named, force: true });
@@ -556,7 +556,7 @@ await section("A project's rules beside the global ones", async () => {
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'notebook'); if (t) hideTab(t.id); });
   await page.evaluate(() => openNotebook('alpha', 'briefing'));
   // The view reads the rules, the global ones and the briefing they make;
-  // under a whole gate's load that ran past forty seconds (B970), its read
+  // under a whole gate's load that ran past forty seconds, its read
   // having gone out before the save above had landed. Asked again each time
   // round, as the loop below asks, until the rows are drawn.
   for (let i = 0; i < 150; i++){

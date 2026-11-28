@@ -1,5 +1,5 @@
-"""The node's relay port over TLS, and a request good once (R243; the audit
-of 13 Nov): terminals, the file explorer's requests and a VM's screen
+"""The node's relay port over TLS, and a request good once:
+terminals, the file explorer's requests and a VM's screen
 crossed the LAN as plain websockets, the opening request signed and good for
 two minutes with nothing remembering which had been used. The TLS layer on
 real sockets, the relay's own listener taking it and refusing a plain
@@ -117,7 +117,7 @@ class Relay(unittest.TestCase):
         self.assertIn("this request was used already", said)
         # Another request is its own.
         self.assertIn("this node's terminals are not up", self.ask(self.term_request(nonce="bb22")))
-        # One with no value of its own could be sent again for its time: refused (R288).
+        # One with no value of its own could be sent again for its time: refused.
         self.assertIn("could be a replay", self.ask(self.term_request()))
         # Not signed by the node's controller: no, whatever value it carries.
         self.assertIn("not signed by this node's controller", self.ask(self.term_request(nonce="cc33", key=screen.screen_key("another"))))
@@ -139,7 +139,7 @@ class Relay(unittest.TestCase):
             self.assertTrue(said.endswith(screen.PLAIN_REFUSED), said)
             self.assertNotIn("terminals are not up", said)
         # ...and over TLS one with no value of its own is refused as a
-        # possible replay (R288), where it was taken.
+        # possible replay, where it was taken.
         self.assertIn("could be a replay", self.ask(self.term_request()))
 
     def test_the_controller_opens_nothing_on_a_node_with_no_certificate(self):
@@ -319,7 +319,7 @@ class Controller(unittest.TestCase):
             self.assertEqual(nodes.relay_of("n_no_openssl"), {"pin": "", "once": True})
             self.assertEqual(nodes.relay_of("n_before"), {"pin": "", "once": False}, "an agent from before: plain and unvalued, as it was")
             self.assertEqual(nodes.relay_of("n_gone"), {"pin": "", "once": False})
-            # ...the words termws.node takes, and whether it takes the derived key apart (R288).
+            # ...the words termws.node takes, and whether it takes the derived key apart.
             self.assertEqual([nodes.relay_derived(n) for n in ("n_new", "n_no_openssl", "n_before", "n_gone")], [True, False, False, False])
 
     def test_a_nodes_report_of_its_relay_is_kept_by_the_controller(self):

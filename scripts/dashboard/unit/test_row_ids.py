@@ -1,5 +1,5 @@
-"""A row whose new id is already in its table goes in under another (R242;
-the audit of 13 Nov): ids are 32 bits, an audit of two hundred thousand rows
+"""A row whose new id is already in its table goes in under another:
+ids are 32 bits, an audit of two hundred thousand rows
 meets one about every twenty thousand inserts, and the row was dropped with
 a line in the log; a job that met one was an error to whoever asked."""
 import os

@@ -53,7 +53,7 @@ from .disks import disks_now
 from .jobs import watched
 
 
-# The journal kept across boots (R185) and kept to a gigabyte: journald's own
+# The journal kept across boots and kept to a gigabyte: journald's own
 # ceiling is a tenth of the filesystem up to 4 GB, which on a small VPS is
 # more than the machine can spare and on a large one more than anyone reads.
 # The same bytes as provision-linux.sh's keep_journal writes.
@@ -107,18 +107,18 @@ class ConfigPlaneMixin:
         "storage-pool": ("_apply_storage_pool", False, "cfg"),
         "storage-snapshot": ("_apply_storage_snapshot", False, "cfg"),
         "storage-array": ("_apply_storage_array", False, "cfg"),
-        # A way in at the console of AerieOS (console.py, R194).
+        # A way in at the console of AerieOS (console.py).
         "console": ("_apply_console", False, "cfg"),
         # Another NAS's array and pools taken as they are (adopt.py).
         "storage-adopt": ("_apply_storage_adopt", False, "cfg"),
         "host-update": ("_apply_host_update", False, "cfg"),
         "storage-backup": ("_apply_storage_backup", False, "cfg"),
         "machine": ("_apply_machine", False, "cfg"),
-        # A stick's system pool (R161 step 10, osimage.py).
+        # A stick's system pool (osimage.py).
         "system-pool": ("_apply_system_pool", False, "cfg"),
-        # An older version kept: boot it once, or remove it (R201).
+        # An older version kept: boot it once, or remove it.
         "os-kept": ("_apply_os_kept", False, "cfg"),
-        # A folder on the machine's disks as the projects folder (R163).
+        # A folder on the machine's disks as the projects folder.
         "projects-folder": ("_apply_projects_folder", False, "cfg"),
         # AerieOS: the next image into the other slot (osimage.py).
         "os-update": ("_apply_os_update", False, "cfg"),
@@ -149,15 +149,15 @@ class ConfigPlaneMixin:
         return getattr(self, method)(job, *handed)
 
     def _apply_gpu_off(self, job):
-        """The emulator off the card (R102): the display's unit stopped,
+        """The emulator off the card: the display's unit stopped,
         the driver left alone; then a hello, as the set-up sends."""
         rc = self._sh(job, [SANDBOX_BIN, "gpu-off"], timeout=120)
         self.hello_again("the GPU was switched off")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def apply_ports_local(self, on):
-        """Published ports bound to 127.0.0.1 by default on this node (R190,
-        the operator, 11 Oct: a port published on a public VPS was open to
+        """Published ports bound to 127.0.0.1 by default on this node
+        (a port published on a public VPS was open to
         the world, not only to its nginx): docker's `ip` in daemon.json, and
         docker restarted once when the file changed (its containers come
         back on their restart policy). Not root: said, and the census says
@@ -191,7 +191,7 @@ class ConfigPlaneMixin:
         self.hello_again("published ports' bind address changed")
 
     def keep_journal(self):
-        """The journal kept across boots (R185), as the provisioner sets it
+        """The journal kept across boots, as the provisioner sets it
         on a fresh enrollment, for a node enrolled before it did: a drop-in,
         journald restarted only when it is new. Root's; once per agent run."""
         if getattr(self, "_journal_kept", False):
@@ -199,7 +199,7 @@ class ConfigPlaneMixin:
         self._journal_kept = True
         f = "/etc/systemd/journald.conf.d/50-builderbot.conf"
         # A managed node only, the way the rest of upkeep tells one: root, and
-        # stamped a sandbox. A guest's journal is its owner's (R23).
+        # stamped a sandbox. A guest's journal is its owner's.
         if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not shutil.which("journalctl"):
             return
         try:
@@ -221,7 +221,7 @@ class ConfigPlaneMixin:
         log("journal: kept across boots from now")
 
     def _apply_door(self, job, cfg):
-        """The door in for SSH on or off (R174): cloudflared's service
+        """The door in for SSH on or off: cloudflared's service
         started or stopped (and kept so across a boot), or the node brought
         up on its tailnet or taken down. Root's, like every system job; the
         census that follows is what the row's switch reads."""
@@ -246,7 +246,7 @@ class ConfigPlaneMixin:
         return "succeeded", 0
 
     def _apply_feature(self, job, cfg):
-        """A feature installed or removed (R91): bb-sandbox's own feature
+        """A feature installed or removed: bb-sandbox's own feature
         install, the one the provisioner's flag runs at enrollment, so the
         two ways cannot drift. The id and the verb are checked against the
         helper's table here as well, so nothing else reaches its argv."""
@@ -260,7 +260,7 @@ class ConfigPlaneMixin:
 
     def _apply_controller_update(self, job, cfg):
         """The controller this machine carries, updated by its own node's
-        root agent (R90 step 5): the installed release's own installer run
+        root agent: the installed release's own installer run
         with --update, which fetches the release's bundle and verifies it,
         holds the state to its gate, switches the link, and rolls back by
         itself when the new build does not answer. Only on a machine that
@@ -274,7 +274,7 @@ class ConfigPlaneMixin:
         tag = str(cfg.get("release") or "")
         # A pre-release's tag too (vX.Y.Z-dev.N), as the controller sends
         # and the installer verifies it: with no stable release yet, every
-        # update a bare-metal controller was offered was refused here (B1164).
+        # update a bare-metal controller was offered was refused here.
         if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
             job.say("refused: a release is named by its tag, vX.Y.Z or vX.Y.Z-dev.N\n")
             return "failed", 64
@@ -285,7 +285,7 @@ class ConfigPlaneMixin:
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def _apply_lockdown(self, job):
-        """Lock down (R92): every container here stopped and kept from
+        """Lock down: every container here stopped and kept from
         starting again at a boot (AerieOS's nginx among them), and the
         door in shut. The controller retires this node when this ends, so
         its credential goes with it; a part that fails is said and the rest
@@ -314,7 +314,7 @@ class ConfigPlaneMixin:
 
     def _apply_gpu(self, job):
         """The NVIDIA driver and a headless X server on the card, for the
-        emulator's -gpu host (R20): bb-sandbox gpu does it and says whether
+        emulator's -gpu host: bb-sandbox gpu does it and says whether
         a reboot has to follow; then a hello, so the row reads the display's
         state now rather than at the next census."""
         rc = self._sh(job, [SANDBOX_BIN, "gpu"], timeout=1800)
@@ -322,7 +322,7 @@ class ConfigPlaneMixin:
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def _apply_machine(self, job, cfg):
-        """The machine's name and time zone (R161 step 3, R56 step 8), set
+        """The machine's name and time zone, set
         through systemd's own tools, each checked to its shape first: a
         hostname is a label of letters, digits and hyphens, a time zone a
         name under /usr/share/zoneinfo. Root's, as every system job is."""
@@ -359,7 +359,7 @@ class ConfigPlaneMixin:
                 return "failed", 78
             bad += self._sh(job, [tool, "set-timezone", tz], timeout=30) != 0
         if spin is not None and not bad:
-            # The disks spun down when idle (R164 step 3): hdparm -S on every
+            # The disks spun down when idle: hdparm -S on every
             # spinning disk but the system's, kept in node.json and put back
             # after a boot by the minute pass (spindown_pass).
             self.state["spindown"] = spin
@@ -414,7 +414,7 @@ class ConfigPlaneMixin:
                     f"machine, sudo {'reboot' if what == 'reboot' else 'poweroff'}\n")
             return "failed", 77
         # Every session here ended first, as End does, and said to the
-        # controller before the machine goes (the operator, 26 Oct): cut off
+        # controller before the machine goes: cut off
         # by the power-off they were left open on the record, and a Restart
         # after the boot met one that was not there.
         names = [str((r or {}).get("name") or "") for r in (self.sessions_now() or [])]
@@ -453,13 +453,13 @@ class ConfigPlaneMixin:
         copy and gets none."""
         if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN):
             return
-        # The bundle fetched first (B163): nothing else in a system job does,
+        # The bundle fetched first: nothing else in a system job does,
         # so root's copy was whatever some other job or a session had last
         # pulled, and a job pressed right after a controller update ran the
         # helper from before it. A fetch of an unchanged bundle is one
         # download checked by digest. Not on a hosting-only node, which the
         # controller refuses the bundle (403 at the head of every system
-        # job's log, R97's walk): its helper is the one Enroll again writes.
+        # job's log): its helper is the one Enroll again writes.
         if tc_root(self.state) and not self.state.get("host_only"):
             try:
                 who = self.as_user({}, self.state.get("user") or "")
@@ -488,7 +488,7 @@ class ConfigPlaneMixin:
         job.say(f"{SANDBOX_BIN} refreshed from the bundle\n")
 
     def quiet_distro_ttyd(self, run=_run):
-        """The distribution's own ttyd switched off, on a managed node (B167).
+        """The distribution's own ttyd switched off, on a managed node.
 
         Debian's package enables ttyd.service: root, on lo:7681, serving a
         login prompt, which nothing here asked for and which every session on
@@ -496,7 +496,7 @@ class ConfigPlaneMixin:
         only when it runs, so a node provisioned before that fix kept it until
         somebody re-provisioned. This is the process that is already on every
         node, so it asks each time it does its upkeep and says so when it acts.
-        Not on a guest: that machine's services are its owner's (R23). The
+        Not on a guest: that machine's services are its owner's. The
         agent's own ttyds are processes it started, not this unit."""
         if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not shutil.which("systemctl"):
             return False
@@ -510,9 +510,9 @@ class ConfigPlaneMixin:
         return True
 
     def keep_sessions_through_restart(self, run=_run):
-        """The sessions outlive a stop of this unit, on a managed node (B538).
+        """The sessions outlive a stop of this unit, on a managed node.
 
-        The provisioner writes the unit with KillMode=process (B107), but only
+        The provisioner writes the unit with KillMode=process, but only
         when it installs it, and it installs it only when it is not already
         running, so a node enrolled before then kept systemd's default, which
         takes every process in the cgroup on a stop: the tmux servers and
@@ -522,13 +522,13 @@ class ConfigPlaneMixin:
         and tells needrestart to leave it alone: an upgraded library is
         picked up at the next agent update or reboot, not mid-conversation.
 
-        And OOMPolicy=continue (R271): systemd's default stops a unit when the
+        And OOMPolicy=continue: systemd's default stops a unit when the
         kernel kills any process in it for memory, and everything a session
         starts (a build, a suite, the emulator) is in this unit, so a node out
         of memory killing one build stopped the agent and restarted it,
-        canceling its jobs and dropping every terminal (the dev VM, 22 Nov).
+        canceling its jobs and dropping every terminal (the dev VM).
         The build is what goes; the agent and the sessions stay.
-        Not on a guest, whose services are its owner's (R23)."""
+        Not on a guest, whose services are its owner's."""
         if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not shutil.which("systemctl"):
             return []
         did = []
@@ -568,7 +568,7 @@ class ConfigPlaneMixin:
         return did
 
     def refresh_session_tool(self):
-        """The session's view kept installed (R35): bb-session from the bundle,
+        """The session's view kept installed: bb-session from the bundle,
         its layout file, and the session account's sudo rule, on a node set up
         as a sandbox whose agent is root and which runs sessions. Written when
         they differ and said when they change. A sudo rule is checked with
@@ -590,7 +590,7 @@ class ConfigPlaneMixin:
                 tool = f.read()
         except OSError:
             return
-        # Accounts as their own users (R125), once the agent has made the
+        # Accounts as their own users, once the agent has made the
         # group and bb-session is there to hold each to its own account.
         ready = getattr(self, "account_users_ready", None)
         accounts = {"controller": self.ctl.url, "pin": self.state.get("pin", ""),
@@ -604,7 +604,7 @@ class ConfigPlaneMixin:
 
     def refresh_netcut_tool(self):
         """The helper that cuts the network for a declared pack's install
-        steps kept installed (R234): bb-netcut from root's own copy of the
+        steps kept installed: bb-netcut from root's own copy of the
         bundle and the job account's sudo rule for it, on a node set up as a
         sandbox whose agent is root and whose jobs run as an account of their
         own. The installer reaches for it only where that account cannot make
@@ -628,7 +628,7 @@ class ConfigPlaneMixin:
     def refresh_virtiofsd_wrap(self):
         """AerieOS's virtiofsd wrapper kept as the bundle's provisioner writes
         it, where the VM host feature put one: it checks a shared folder at
-        every start (R247 step 5), and a node that turned the feature on
+        every start, and a node that turned the feature on
         before would otherwise keep the old one until the feature was
         applied again by hand."""
         from .vmhw import VIRTIOFSD_WRAP
@@ -704,7 +704,7 @@ class ConfigPlaneMixin:
             if st != "succeeded":
                 job.say(f"the runner {slot} could not be deregistered (exit {code}); it stays listed on its forge\n")
         argv = [SANDBOX_BIN, "uninstall", "--yes"]
-        # The rings asked for (the operator, 11 Oct): the stores on the
+        # The rings asked for: the stores on the
         # disk, what was configured from the dashboard, a hosting node's
         # doors and proxy. Without them the machine keeps those.
         for ring in ("stores", "configured", "doors"):
@@ -714,8 +714,8 @@ class ConfigPlaneMixin:
         # systemd machine, so the uninstall outlives the unit it removes;
         # anywhere else (the harness, a machine without systemd) a detached
         # process, which the removal of this one does not take with it.
-        # Started, then WATCHED for a few seconds before this job reports
-        # (B132): an uninstall that fails at once (a bb-sandbox without the
+        # Started, then WATCHED for a few seconds before this job reports:
+        # an uninstall that fails at once (a bb-sandbox without the
         # verb, a refusal) must fail this job, or the controller retires a
         # node whose machine is untouched and whose credential is then dead.
         started = False
@@ -787,7 +787,7 @@ class ConfigPlaneMixin:
         if stopped:
             job.say("stopped\n")
             return 130
-        # A slow step says how slow (B243): an apply that took a minute to
+        # A slow step says how slow: an apply that took a minute to
         # change nothing gave no way to tell which command took it.
         took = time.monotonic() - began
         if took >= 3:
@@ -795,7 +795,7 @@ class ConfigPlaneMixin:
         return 124 if killed else rc
 
     def _apply_root(self, job, cfg):
-        """One command as root, that a person allowed (roadmap R38). The
+        """One command as root, that a person allowed. The
         controller queues this only after an administrator read the reason
         and the exact command and pressed Allow; the job's log opens with
         both and who it was, so the Jobs page is the record. Nothing about
@@ -806,7 +806,7 @@ class ConfigPlaneMixin:
         if not argv:
             job.say("refused: nothing to run\n")
             return "failed", 64
-        # This machine's own word first (R227 step 2), read from the file
+        # This machine's own word first, read from the file
         # its console writes: the allowing was done on the controller, and
         # whoever holds the controller can say a person allowed anything.
         if console_said().get("root_off") is True:
@@ -845,7 +845,7 @@ class ConfigPlaneMixin:
         """The console shell's PATH line, from where the toolchain store IS.
         The provisioner writes this file once, naming the store it was
         given; a Storage apply that moves the store left it naming the old
-        one, so a shell as the session account had no bb (B135). Rewritten
+        one, so a shell as the session account had no bb. Rewritten
         from the agent's own record after every apply, root only, and left
         alone where the file was never written (a guest node)."""
         if os.geteuid() != 0 or not os.path.isfile(self.SESSION_PROFILE):
@@ -934,7 +934,7 @@ class ConfigPlaneMixin:
                 job.say(f"refused the mount at {path}: {why}\n")
                 bad += 1
                 continue
-            # Already there as wanted: said, and nothing run (B243). Every
+            # Already there as wanted: said, and nothing run. Every
             # mount used to be applied again on every apply, which cost a
             # node with four shares over a minute to change nothing.
             h = have.get(path) or {}
@@ -947,8 +947,8 @@ class ConfigPlaneMixin:
             if self._sh(job, [SANDBOX_BIN, verb, f"{src}:{path}" + (":ro" if ro else "")]) != 0:
                 bad += 1
         stores = cfg.get("stores") if isinstance(cfg.get("stores"), dict) else {}
-        # A store that moves holds the node's sessions while it does (R120
-        # step 7): written where every session's gate reads it, and taken
+        # A store that moves holds the node's sessions while it does:
+        # written where every session's gate reads it, and taken
         # away however this ends.
         was_at = dict(self.state.get("stores") or {})
         moving = sorted(r for r, p in stores.items() if r in DEFAULT_STORES and r != "cache"
@@ -1014,7 +1014,7 @@ class ConfigPlaneMixin:
             # What this agent created for each store, so a move can take
             # back exactly that and nothing else.
             marks = dict(self.state.get("store_made") or {})
-            # The stores asked to move without their data (R120).
+            # The stores asked to move without their data.
             keep = {str(r) for r in (cfg.get("keep") or []) if isinstance(r, str)}
             for role, path in stores.items():
                 if role not in DEFAULT_STORES:
@@ -1044,7 +1044,7 @@ class ConfigPlaneMixin:
                             f"local.\n")
                     bad += 1
                     continue
-                # ...nor one mounted wrong (the operator, 23 Oct: a store on
+                # ...nor one mounted wrong (a store on
                 # a configured share must be on that share, mounted, or the
                 # apply fails): a stale handle, or another export than the
                 # one configured, is not the share it names.
@@ -1059,7 +1059,7 @@ class ConfigPlaneMixin:
                     continue
                 # A target that already is this node's store is used as it
                 # is, whether or not the setting was saved with it in the
-                # keep list (B661): the marker, this node's own toolchain
+                # keep list: the marker, this node's own toolchain
                 # folder, or the folder this agent made for the store before
                 # says so, and what the store itself put there is not "files
                 # a copy would mix with". Asked before make_store, which
@@ -1136,7 +1136,7 @@ class ConfigPlaneMixin:
         if not os.path.isdir(old):
             job.say(f"{role}: nothing at {old} to bring across\n")
             return True
-        # Never a merge (R120): copied into a folder that already holds
+        # Never a merge: copied into a folder that already holds
         # files, the old store's would overwrite theirs by name. The page
         # puts a store that is pointed at one in a folder named for the
         # node inside it; anything else asking for this is refused.
@@ -1211,7 +1211,7 @@ class ConfigPlaneMixin:
             job.say(f"refused: could not read {old}: {e}\n")
             return False
         # How far it has got, said in the hold every session on the node
-        # reads (R120 step 7), so a held session can say more than "wait".
+        # reads, so a held session can say more than "wait".
         stop = threading.Event()
 
         def tick():
@@ -1295,7 +1295,7 @@ class ConfigPlaneMixin:
         if any(not NET_IP.fullmatch(x) for x in ([gw] if gw else []) + dns):
             job.say("refused: a gateway and a resolver are each an address\n")
             return "failed", 65
-        # Static routes (the operator, 7 Oct), in either mode: a network
+        # Static routes, in either mode: a network
         # beyond this one and the router that reaches it.
         routes = [{"to": str(r.get("to") or ""), "via": str(r.get("via") or "")}
                   for r in (net.get("routes") or []) if isinstance(r, dict)]

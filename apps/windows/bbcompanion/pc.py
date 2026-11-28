@@ -1,4 +1,4 @@
-"""This PC lent to a project (R270 steps 6 and 7): the verbs its person set
+"""This PC lent to a project: the verbs its person set
 up here, run when a session on the project asks with `aerie pc VERB`, under the
 project's Claude may: Use a lent PC.
 

@@ -1,9 +1,9 @@
-"""The files a release must carry, checked on the forge when its CI ends
-(R190 step 4, R206 step 6): a project lists them in `.release-files` at its
+"""The files a release must carry, checked on the forge when its CI ends:
+a project lists them in `.release-files` at its
 root, one name a line with @VER@ for the release's version, and a release
 whose page is short of one is a red row on the bell naming the file and
 why; one that has them all is said complete. The 0.9.0 dev release went out
-with no APK and nothing said so until somebody looked (the operator, 30 Oct).
+with no APK and nothing said so until somebody looked.
 
 The list is read at the release's own tag, so a later commit changing it
 does not change what an older release is held to. `*` matches as a shell
@@ -22,7 +22,7 @@ host, which ends its watch.
     expect(project, tag)   a release's tag just pushed: check it as CI ends
     check(project)         check the expected releases that are due
     attention(projects)    the bell's rows
-    start()                the loop
+    start                the loop
 """
 import fnmatch
 import hashlib
@@ -247,7 +247,7 @@ def check(project, now=None):
             if rec.get("url"):
                 # Read before, and not there now: deleted on the git host,
                 # on purpose. Not a release short of a file: its watch ends,
-                # and its row with it (B780).
+                # and its row with it.
                 rec.update(checked=now, done=now, deleted=True, gone=[], error="")
             elif not late:
                 # The run that makes the release failed before it did.
@@ -258,7 +258,7 @@ def check(project, now=None):
                 rec.update(checked=now, error=str(e))
         if not rec.get("gone") and not rec.get("error") and not rec.get("done"):
             rec["done"] = now
-            # Complete, and said so once (R206 step 6): how many files, and
+            # Complete, and said so once: how many files, and
             # whether it is out or waits for its owner to read it.
             n = len(wanted(project, tag))
             draft = _is_draft(project, tag)

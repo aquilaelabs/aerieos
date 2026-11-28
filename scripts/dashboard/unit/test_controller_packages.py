@@ -1,4 +1,4 @@
-"""The controller's one package list (R90 step 2): config/controller-packages.tsv,
+"""The controller's one package list: config/controller-packages.tsv,
 read by the Dockerfile and by a bare-metal install through the same reader,
 so the image and the installer cannot drift. Every family the provisioner
 has is a column; what the controller cannot run without names a package

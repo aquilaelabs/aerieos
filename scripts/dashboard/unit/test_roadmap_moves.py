@@ -1,4 +1,4 @@
-"""Steps that move between items (R168): a step keeps an id of its own, so
+"""Steps that move between items: a step keeps an id of its own, so
 one moved, split away or left behind by a drop of one before it is still the
 one its first number named; an item folded into another becomes a step of it;
 and the list's own references are checked."""
@@ -46,7 +46,7 @@ class Moves(unittest.TestCase):
         self.assertIn("never had a step 9", roadmap.resolve("p", a, 9)["error"])
 
     def test_a_step_goes_to_a_place_on_its_own_item_in_one_move(self):
-        # B1181: five places took five single moves.
+        # Five places took five single moves.
         a = roadmap.add("p", "A", steps=["one", "two", "three", "four", "five"])["item"]["id"]
         r = roadmap.step_to("p", a, 4, 1)
         self.assertEqual((r.get("ok"), r.get("step")), (True, 0), r)

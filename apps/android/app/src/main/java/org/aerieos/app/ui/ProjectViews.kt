@@ -491,7 +491,7 @@ fun LogRow(api: Api, row: JSONObject, showProject: Boolean) {
     Column(Modifier.fillMaxWidth().padding(16.dp, 8.dp)) {
         Text(row.str("first").ifBlank { "a conversation with no first line" }, color = Ink, maxLines = 2,
              overflow = TextOverflow.Ellipsis)
-        // Which agent it was with (R95), named where it is not Claude.
+        // Which agent it was with, named where it is not Claude.
         val with = org.aerieos.app.Agents.byId(row.str("agent"))
         Dim(listOf(if (showProject) project else "", if (with != null && with.id != "claude") with.name else "",
                    whenAt(row.optLong("at")), sized(row.optLong("bytes")) + " as written")

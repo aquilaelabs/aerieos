@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# The controller's boot, as steps (R90 step 3).
+# The controller's boot, as steps.
 #
 # Two things start a controller: scripts/entrypoint.sh in the container, under
 # tini, and scripts/host-boot.sh on a machine installed bare metal, under
@@ -39,22 +39,22 @@ BB_RUN_DIR="${BB_RUN_DIR:-/run/builderbot}"
 # The publishing tokens a shell on the controller uses; a git token is a
 # project's own, and a runner's is typed on the Nodes tab.
 # INSTALL_KEY seals at rest what the install keeps that would open something
-# (R135; R111 began it with the signing keys): handed to the dashboard as a
+# (the signing keys first among them): handed to the dashboard as a
 # file of its own in /run below, never kept in /config. SIGNING_SECRET, its
-# name before 0.8.0, is read no more and refused by name (R295), so an
+# name before 0.8.0, is read no more and refused by name, so an
 # install still setting it alone is never handed a new key over its seals.
 SECRET_VARS=(NPM_TOKEN UV_PUBLISH_TOKEN INSTALL_KEY INSTALL_KEY_PREVIOUS SIGNING_SECRET)
 # ...named for the hooks, which run with them: the one that starts the
-# dashboard starts it without them (B389).
+# dashboard starts it without them.
 export BB_SHIELDED="${SECRET_VARS[*]}"
 
 # The one secret the dashboard itself needs, the install key, as a file only
 # the controller's account reads, in /run (never the state, so a copy of the
 # state holds nothing that opens what is sealed there), written fresh each
-# start. On a bare-metal install it is among what the wall covers (R90).
+# start. On a bare-metal install it is among what the wall covers.
 # Where the install key's file and the one before it are, kept for root in
 # its own run folder: the deploy-key helper seals the deploy keys under the
-# same key (R243), and is run through sudo, which hands it none of this
+# same key, and is run through sudo, which hands it none of this
 # environment. Two lines, the key's path and the previous key's; no file
 # where the install seals nothing.
 install_key_where() {
@@ -84,7 +84,7 @@ install_key_file() {
     chown "$BB_ACCOUNT" "$f" 2>/dev/null || true
     # The key before it, while a rotation keeps it: the coding agents'
     # sign-ins sealed on the nodes under it are opened with it once more and
-    # sealed again under the new one (R126), after which it can go.
+    # sealed again under the new one, after which it can go.
     rm -f "$f-previous"
     local prev="${INSTALL_KEY_PREVIOUS:-}"
     if [ "${#prev}" -ge 16 ]; then
@@ -95,7 +95,7 @@ install_key_file() {
     install_key_adopt "$key" "$prev"
 }
 
-# A key set in the environment copied into the key folder (R154), so it can
+# A key set in the environment copied into the key folder, so it can
 # be taken out of the secrets folder and the install carries on with the
 # very same key, changed from the page after that. Only into the secrets
 # folder: a copy beside the state would sit with what it seals. Says what
@@ -144,7 +144,7 @@ secrets_enterable() {
 # empty and read only (usr/lib/aerieos-os/system-pool) until it is.
 secrets_held() { [ -e "$BB_SECRETS_DIR/.aerieos-held" ]; }
 
-# With no INSTALL_KEY set, the install makes its own (R154) and the page
+# With no INSTALL_KEY set, the install makes its own and the page
 # changes it: a key folder only the controller's account reads, in the
 # secrets folder when root may write there, else beside the state, which
 # the page warns of since a copy of /config then carries the key. One kept
@@ -205,7 +205,7 @@ as_account() {
 # One *.env file of the secrets folder read as words, never run. This start
 # is root, and the file used to be sourced whole: a line that set PATH left
 # the controller in a restart loop ('chmod: command not found'), and any
-# command in one ran as root (B779). A line is NAME=value, with or without
+# command in one ran as root. A line is NAME=value, with or without
 # export, the value bare, in single quotes, or in double quotes with nothing
 # in it that a shell would expand; it is exported as it stands. Anything else
 # is said and left out, and so is a name the start itself runs by.
@@ -487,11 +487,11 @@ seed_home() {
     chmod 700 "$BUILDER_HOME/.ssh"
 
     # Recursed only when the top of the tree is not already the account's:
-    # a home of gigabytes was walked on every start (B283). That check is
+    # a home of gigabytes was walked on every start. That check is
     # the whole switch; the CHOWN_HOME variable that also skipped it is gone.
     # A share that will not let root change owners (NFS squashing root, some
     # NAS shares) is said and survived: under set -e this chown restarted
-    # the container forever with nothing in the log saying why (B122).
+    # the container forever with nothing in the log saying why.
     if [ "$(stat -c %u:%g "$BUILDER_HOME" 2>/dev/null)" != "$PUID:$PGID" ]; then
         chown -R "$PUID:$PGID" "$BUILDER_HOME" 2>/dev/null \
             || warn "$BUILDER_HOME could not be made ${PUID}:${PGID}: chown the folder mounted there on the host"
@@ -499,7 +499,7 @@ seed_home() {
     # ...and what this function made itself, always: a home already the
     # account's (a folder chowned as the install says, whose owner is the
     # image's own 1000:1000) skipped the recursion, and these stayed root's,
-    # so no hook could write ~/.ssh or ~/.cache on a first start (B120).
+    # so no hook could write ~/.ssh or ~/.cache on a first start.
     chown "$PUID:$PGID" "$BUILDER_HOME/.claude" "$BUILDER_HOME/.npm-global" \
         "$BUILDER_HOME/.local" "$BUILDER_HOME/.local/bin" "$BUILDER_HOME/.ssh" \
         "$BUILDER_HOME/.cache" 2>/dev/null || true
@@ -508,7 +508,7 @@ seed_home() {
     done
     # /config is AerieOS's own state, never a share: one Docker made for a
     # missing host path, or a new named volume, is root's, and the dashboard,
-    # which runs as the account, could keep nothing in it (B120). Only its
+    # which runs as the account, could keep nothing in it. Only its
     # top: what root keeps in it on purpose (runner tokens, signing keys,
     # git credentials) stays root's.
     local state="${DASHBOARD_STATE:-/config}"
@@ -651,7 +651,7 @@ run_hooks() {
                 continue
             fi
             # A root hook in the state's own folder runs only as an
-            # administrator approved it (B1166): the dashboard's account can
+            # administrator approved it: the dashboard's account can
             # write that folder, and anything else that writes there (another
             # container sharing the user id, a network share) could otherwise
             # put a script here for the next start to run as root. The image's
@@ -694,7 +694,7 @@ boot_ready() {
     fi
 }
 
-# The state's version, before anything writes to it (R79): a state a newer
+# The state's version, before anything writes to it: a state a newer
 # build wrote, or one older than this build migrates from, stops the boot
 # here with the one sentence saying what to do, and the logs it would rotate
 # are left as they are. The dashboard asks again.
@@ -705,7 +705,7 @@ state_gate() {
 
 # The deploy keys made or pasted in a space's settings, into the agent
 # setup_ssh_agent started: after install_key_file, since they are sealed
-# under the install key (R243) and the helper is told where that is by
+# under the install key and the helper is told where that is by
 # install_key_file. Loaded from setup_ssh_agent, which runs first, a new
 # container found no key to open them with and loaded none: seen on the dev
 # instance the first time the helper's words reached the log. What the

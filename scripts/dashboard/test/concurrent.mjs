@@ -45,7 +45,7 @@ d["users"]["${name}"] = {"uid": uid, "role": "${role}", "projects": ["alpha"],
 u._save(d); print(uid)`);
 const owner = usersPy('print(next(r["uid"] for r in u.load()["users"].values() if r.get("role") == "owner"))');
 const people = { owner, admin: make('cc.admin', 'admin'), user1: make('cc.user1', 'user'), user2: make('cc.user2', 'user') };
-// What a plain account did before R152, given as a role (lib.mjs member).
+// What a plain account does, given as a role (lib.mjs member).
 await member('cc.user1', 'cc.user2');
 const tok = uid => usersPy(`print(u.mint_session("alpha", uid=${JSON.stringify(uid)}))`);
 // Six sessions: one each, and two more conversations for two of them.

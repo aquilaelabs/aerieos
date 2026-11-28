@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The official packs (R169 step 1): every shipped toolchain
+"""The official packs: every shipped toolchain
 (config/toolchains.json), every coding agent (agents.py's table) and every
 service AerieOS deploys (the model router, nginx, the scanners) written
 as a pack in bbtool.json's format under packs/, tagged official, and
@@ -21,7 +21,7 @@ script's --check holds the two to each other in aerie lint.
     tools/packs-export.py --catalog DIR --drop-older N
                                                  drop every older pin written in pack format N; with --index or
                                                  --entry too, after they wrote
-The catalog (R170 step 6, the operator: the shipped toolchains and agents live
+The catalog (the operator: the shipped toolchains and agents live
 in the catalog repository): every official pack is a folder of that repository,
 and its index entry pins the catalog's own commit, the folder as `path`, and
 the sha256 of `git archive --format=tar COMMIT PATH`. Two commits, since an
@@ -86,11 +86,11 @@ def agent_packs():
              # ...with how it is told a command needs no asking, where the
              # table says a way (agents.allow_plan).
              "agent": {k: getattr(a, k) for k in toolpacks.AGENT_FIELDS} | ({"allow": a.allow} if a.allow else {})
-                      # ...and how it is installed (R169 step 13): the recipe
+                      # ...and how it is installed: the recipe
                       # the controller hands a node, which the catalog's copy
                       # replaces when its rev is higher.
                       | ({"install": a.install} if a.install else {})
-                      # ...and how it signs in (R234 step 6), in the words a
+                      # ...and how it signs in, in the words a
                       # pack's agent says its own: the one driver runs both.
                       | ({"signin": a.signin} if a.signin else {})}
         # A recipe that holds what it fetches (its downloads declared, its
@@ -104,7 +104,7 @@ def agent_packs():
 
 
 def service_packs():
-    """[(path, manifest)] for every deployed thing of AerieOS's that is a pack (R172)."""
+    """[(path, manifest)] for every deployed thing of AerieOS's that is a pack."""
     import services
     return [(os.path.join(PACKS, "services", m["name"], "bbtool.json"), m) for m in services.packs()]
 

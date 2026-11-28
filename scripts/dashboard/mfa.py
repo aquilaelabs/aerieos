@@ -1,4 +1,4 @@
-"""Two-factor sign-in (R127): an authenticator app's codes, passkeys and
+"""Two-factor sign-in: an authenticator app's codes, passkeys and
 recovery codes, per account.
 
 The store is two-factor.json in the state directory, 0600, keyed by the
@@ -54,7 +54,7 @@ def _file():
 
 
 def load():
-    d = statefile.read_json(_file())          # read once while it is the same file (R228 step 1)
+    d = statefile.read_json(_file())          # read once while it is the same file
     return d if isinstance(d, dict) else {}
 
 
@@ -137,7 +137,7 @@ def _secret_of(t):
 def seal_all(again=False):
     """Each account's authenticator secret sealed under today's install key:
     one kept plain once there is a key, and with `again`, after the key
-    changed (R154), one sealed under the key before it. Returns how many."""
+    changed, one sealed under the key before it. Returns how many."""
     if not (seal and sealing and sealing()):
         return 0
     n = 0
@@ -336,8 +336,8 @@ def ecdsa_p256_verify(x, y, msg, sig):
     """Whether `sig` (ASN.1 DER) is an ES256 signature over `msg` by the
     P-256 key (x, y): the cryptography library's check, which also holds
     the point to the curve and reads the signature's encoding. The curve
-    arithmetic and the DER reader that stood here were written by hand
-    (R243). Where the library is not on the machine nothing verifies: a
+    arithmetic and the DER reader that stood here were written by hand.
+    Where the library is not on the machine nothing verifies: a
     passkey is then refused, never checked by other code."""
     try:
         from cryptography.exceptions import InvalidSignature                  # noqa: PLC0415
@@ -405,7 +405,7 @@ def passkey_add(uid, origin, name, client_b64, att_b64, prf=False):
         keys.append({"id": pid, "x": format(x, "x"), "y": format(y, "x"), "name": nm, "rp": b64u(auth[:32]),
                      "count": int.from_bytes(auth[33:37], "big"), "added": int(time.time()), "used": 0,
                      # Whether it answers the PRF extension, which is what
-                     # lets it hold a key of the person's own (R157).
+                     # lets it hold a key of the person's own.
                      "prf": bool(prf)})
         r["passkeys"] = keys[-20:]
         return {"ok": True, "id": pid, "name": nm}

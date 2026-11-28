@@ -1,4 +1,4 @@
-"""Who is signed in right now (R159): every browser sign-in as a row of its
+"""Who is signed in right now: every browser sign-in as a row of its
 own, made when the cookie is, touched as the cookie is used and dropped
 when its browser signs out or it runs out; a device signed in as the
 account (devices.py) counts the same way. The question it answers is
@@ -11,7 +11,7 @@ is stateless (server.make_token) and this only knows which of them were
 handed out and still answer. Lost, every browser is signed out once, as a
 cookie from before accounts was.
 
-A sign-in is bound to the browser it was made in (R158 step 8): the row
+A sign-in is bound to the browser it was made in: the row
 keeps a digest of that browser's User-Agent, and a cookie presented from
 another is refused (seen answers False), so a cookie copied off one device
 opens nothing on another; the row also says what browser and from which
@@ -52,7 +52,7 @@ def _file():
 
 def _load():
     # Every request with a cookie asks (seen): read once while it is the
-    # same file (statefile.read_json, R228 step 1), its own copy each.
+    # same file (statefile.read_json), its own copy each.
     d = statefile.read_json(_file())
     return d if isinstance(d, dict) else {}
 
@@ -96,7 +96,7 @@ def _ua_digest(ua):
     """The browser a User-Agent names, digested; "" for none, so a sign-in
     made with no User-Agent at all (a script, a socket) binds to nothing and
     the first browser to present it is the one it is held to. The browser
-    alone (Safari, Chrome, Firefox), never its version or its system (B447):
+    alone (Safari, Chrome, Firefox), never its version or its system:
     a browser's update, and a phone's switch to its desktop site, change the
     rest of the string and are the same browser."""
     return family_digest(browser_family(ua)) if ua else ""
@@ -153,7 +153,7 @@ def mint(uid, where="", ua="", ip=""):
 def seen(uid, lid, ua=None, ip=""):
     """The sign-in used just now, from browser `ua`: True while it is the
     browser the sign-in was made in and the row is still there; False for
-    a cookie presented from another browser (R158 step 8) or one whose
+    a cookie presented from another browser or one whose
     sign-in was ended from Profile. Written at most every few minutes."""
     if not (uid and lid):
         return False
@@ -165,7 +165,7 @@ def seen(uid, lid, ua=None, ip=""):
             return False
         # A request with no User-Agent at all names no browser: a sign-in
         # already bound to one is not given to it, or a stolen cookie sent
-        # bare passed the check (R288); one not bound yet has nothing to
+        # bare passed the check; one not bound yet has nothing to
         # hold it to. Every browser sends one, its sockets included.
         if not ua and r.get("ua"):
             return False

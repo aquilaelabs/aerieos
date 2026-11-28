@@ -16,7 +16,7 @@ FAMILY_NEED="pacman"
 # upgrades whole (a partial upgrade breaks it), but not the kernel under a
 # running system: pacman replaces the running kernel's modules with the new
 # one's, and every nft call (Docker's bridge, the session firewall) then
-# fails until a reboot (R97's walk, Arch, 21 Oct). The kernel moves on with
+# fails until a reboot (Arch). The kernel moves on with
 # the machine's own next upgrade and reboot.
 pkg_refresh() {
     local held

@@ -1,4 +1,4 @@
-"""A synced node's Claude conversations (B613): the controller's
+"""A synced node's Claude conversations: the controller's
 claudesync.py and the agent's mirror, end to end in one process, over a
 connection that hands each call to the controller's module the way
 channel.py would."""

@@ -1,4 +1,4 @@
-"""A stick written rarely (R161 step 10): on a stick boot the initramfs puts
+"""A stick written rarely: on a stick boot the initramfs puts
 the logs and the journal in memory and holds docker, containerd and libvirt
 until a system pool is named; the system-pool tool says the stick's state
 and refuses a pool it cannot take; the agent reports it and runs the move
@@ -77,7 +77,7 @@ class TheImage(unittest.TestCase):
             self.assertEqual(json.loads(self.tool(d, "status", stick=False).stdout), {"stick": False})
 
     def test_set_moves_nothing_through_a_bind_that_will_not_go(self):
-        # B613 (B476's hazard): a place still a mount after the umount (two
+        # A place still a mount after the umount (two
         # binds stacked) would carry the copy and the delete through to the
         # old pool. Fakes stand in for findmnt and umount: the place reads
         # as mounted as many times as the counter says, and umount counts
@@ -119,7 +119,7 @@ class TheImage(unittest.TestCase):
                 self.assertFalse(os.path.exists(f"{d}/docker/x"))
 
     def test_another_installs_data_on_a_pool_is_never_taken(self):
-        # The operator, 6 Nov: a reinstall over an old system never takes its
+        # A reinstall over an old system never takes its
         # data (containers, VMs, spaces, the accounts' homes with their
         # sign-ins); that comes over only through a move token.
         with tempfile.TemporaryDirectory() as d:
@@ -145,7 +145,7 @@ class TheImage(unittest.TestCase):
                     self.assertIn("move token", r.stderr)
                     self.assertEqual(json.loads(self.tool(d, "status").stdout)["pool"], "", "the pool is not named")
                 self.assertEqual(read(d, "pool", "aerieos-system", ".aerieos-install"), "someone-else", "nothing on it touched")
-                # B939: the pool a restored configuration names as its own (its
+                # The pool a restored configuration names as its own (its
                 # stick died; this one has another id) is taken back as it is,
                 # and its id becomes this stick's; another id never is.
                 os.makedirs(f"{d}/pool5/aerieos-system/home/bb")
@@ -169,7 +169,7 @@ class TheImage(unittest.TestCase):
                 self.assertEqual(read(d, "pool2", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
                 # ...and set again by the same install, holding its own data now.
                 self.assertEqual(self.tool(d, "set", f"{d}/pool2").returncode, 0)
-                # Set aside when asked (the operator, 8 Nov): renamed beside it,
+                # Set aside when asked: renamed beside it,
                 # .old then .old-2, nothing in it read or deleted, and the pool
                 # taken on an empty folder.
                 for n, was in ((1, "aerieos-system.old"), (2, "aerieos-system.old-2")):
@@ -185,7 +185,7 @@ class TheImage(unittest.TestCase):
                     with open(f"{d}/pool4/aerieos-system/.aerieos-install", "w") as f:
                         f.write("x")
                 self.assertTrue(os.path.isdir(f"{d}/pool4/aerieos-system.old/home"))
-                # A pool in memory (the stick's own root, a tmpfs) is never one (B719).
+                # A pool in memory (the stick's own root, a tmpfs) is never one.
                 os.makedirs(f"{d}/pool3")
                 for fst in ("tmpfs", "overlay"):
                     with mock.patch.dict(os.environ, {"BB_SP_FSTYPE": fst}):
@@ -195,7 +195,7 @@ class TheImage(unittest.TestCase):
                     self.assertFalse(os.path.exists(f"{d}/pool3/aerieos-system"), "nothing moved")
 
     def test_the_projects_are_held_until_they_have_a_place_on_the_disks(self):
-        # The operator, 1 Nov: never on the stick, on any stick.
+        # Never on the stick, on any stick.
         with tempfile.TemporaryDirectory() as d:
             with mock.patch.dict(os.environ, {"BB_SP_NO_MOUNT": "1"}):
                 r = self.tool(d, "apply")
@@ -207,7 +207,7 @@ class TheImage(unittest.TestCase):
                 self.assertNotIn("held", self.tool(d, "apply").stdout)
 
     def test_a_home_on_the_stick_moves_to_the_pool_through_the_images_mount(self):
-        # B669: /home and /workspace are bound from the data partition, so they
+        # /home and /workspace are bound from the data partition, so they
         # read as mounted and must still move, and nothing is left behind.
         with tempfile.TemporaryDirectory() as d:
             os.makedirs(f"{d}/home/ada"); open(f"{d}/home/ada/.signin", "w").close()
@@ -234,7 +234,7 @@ class TheImage(unittest.TestCase):
         return {"BB_SP_NO_MOUNT": "1", "BB_SP_MOUNTED": "1", "PATH": fakes + ":" + os.environ["PATH"]}
 
     def test_the_secrets_go_to_the_pool_and_off_the_stick(self):
-        # The operator, 7 Nov: the stick alone opens nothing the controller
+        # The stick alone opens nothing the controller
         # sealed, so the install key and the secrets live on the pool.
         with tempfile.TemporaryDirectory() as d:
             os.makedirs(f"{d}/secrets/install-key")
@@ -249,7 +249,7 @@ class TheImage(unittest.TestCase):
             self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o067, 0, "nobody else's to read, list or write")
 
     def test_the_controller_keeps_its_way_to_its_key_when_the_pool_is_placed(self):
-        # B777: a controller's start opens the secrets folder to its account
+        # A controller's start opens the secrets folder to its account
         # for the key folder alone (0710). Placing the pool shut the pool's
         # copy outright, so the running controller lost its key until its
         # next start, and a move landing right after was refused at the key
@@ -290,7 +290,7 @@ class TheImage(unittest.TestCase):
                 self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
 
     def test_a_folder_on_the_disks_is_named_the_projects_folder_and_let_go(self):
-        # R163 (the operator, 1 Nov): a controller moved here without its
+        # A controller moved here without its
         # repositories takes the folder another system kept them in.
         with tempfile.TemporaryDirectory() as d:
             share = f"{d}/mnt/user/projects"
@@ -318,8 +318,8 @@ class TheImage(unittest.TestCase):
             self.assertEqual(got["projects"], share)
             self.assertNotIn("projects", got["on_stick"], "the named folder is no longer the stick's to hold")
             self.assertIn(f"the spaces are {share}", run("apply").stdout)
-            # Who had it is kept on the disks, and Let it go gives it back
-            # (B665); the second naming writes nothing over the first's record.
+            # Who had it is kept on the disks, and Let it go gives it back;
+            # the second naming writes nothing over the first's record.
             back = f"{share}/.aerieos-give-back.sh"
             with open(back) as f:
                 said = f.read()
@@ -328,7 +328,7 @@ class TheImage(unittest.TestCase):
             self.assertIn(back, run("projects", share).stdout)
             os.chmod(share, 0o750)
             # The folder's copy is its files' owner's to change: what is
-            # added there never runs as root (B719).
+            # added there never runs as root.
             with open(back, "a") as f:
                 f.write(f"touch {d}/ran-as-root\n")
             r = run("projects", "--release")
@@ -468,7 +468,7 @@ class TheController(unittest.TestCase):
         self.assertEqual(nodes.node_projects_folder("user:t", "n_nothere", "/mnt/user/projects").get("error"), "no such node")
 
     def test_the_install_id_is_kept_and_sent_with_the_system_pool(self):
-        # B939: a ready stick's id kept in the state, and named to the
+        # A ready stick's id kept in the state, and named to the
         # system-pool step, which takes back a pool marked with it.
         import nodes
         got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "install_id": "c" * 32}})

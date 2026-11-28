@@ -1,4 +1,4 @@
-"""AerieOS's own scanners on each node (R145, scanners.py): the record
+"""AerieOS's own scanners on each node (scanners.py): the record
 and the compose file with each scanner the image its entry names by
 digest, Deploy and Update as compose jobs, a run as a scan job over the
 projects whose node it is, the schedule firing from the timer, a report
@@ -167,7 +167,7 @@ class Scanners(unittest.TestCase):
         self.assertEqual([(f["project"], f["path"]) for f in got["reports"][0]["findings"]], [("web", "a.py")])
         self.assertGreater(findings.reports_mtime(), 0)
         self.assertEqual(findings.reports_ages()[0]["name"], "n1/semgrep.sarif")
-        # A node retired takes its record and its reports with it (B433):
+        # A node retired takes its record and its reports with it:
         # the findings no longer read a node nobody has.
         scanners.forget_node("n1")
         self.assertEqual(scanners.record("n1"), {})

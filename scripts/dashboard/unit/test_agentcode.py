@@ -1,5 +1,5 @@
 """The coding agents as a node's rows in the Library and on the
-Installed page (R95 step 2): the census's version against the registry's latest, each install its
+Installed page: the census's version against the registry's latest, each install its
 own job, Claude Code one of them in its own words, and the node agent's
 half run against a stub installer, never a vendor's."""
 import contextlib
@@ -154,7 +154,7 @@ class Controller(unittest.TestCase):
         ns = self.use(node())
         r = agentcode.update("user:admin", "n1", "codex")
         self.assertTrue(r["ok"])
-        # ...with how it is installed, the table's own where no catalog says otherwise (R169 step 13).
+        # ...with how it is installed, the table's own where no catalog says otherwise.
         self.assertEqual(ns.added, [("codex-update", {"timeout": 900, "to": "0.163.0", "ended": [],
                                                       "recipe": agents.get("codex").install, "recipe_from": "release"})])
 
@@ -504,7 +504,7 @@ class NodeAgent(unittest.TestCase):
         self.home = os.path.join(self.tmp.name, "home")
         os.makedirs(self.home)
         # The node's own agents folder is read first: on a node that carries
-        # a real Codex the census found that one and not the stub (B251).
+        # a real Codex the census found that one and not the stub.
         self.mod.AGENTS_DIR = os.path.join(self.tmp.name, "agents")
         self.stub = os.path.join(self.tmp.name, "installer.sh")
         with open(self.stub, "w") as f:
@@ -592,7 +592,7 @@ class NodeAgent(unittest.TestCase):
         fake.held_cut_env = self.mod.Agent.held_cut_env
         fake.session_renew = lambda: None
         fake.hello_again = lambda why: None
-        # The one install path every agent's job goes through (R95 step 18).
+        # The one install path every agent's job goes through.
         fake.agent_install = lambda job, spec, how: self.mod.Agent.agent_install(fake, job, spec, how)
         fake.agent_recipe = lambda job, spec, row: self.mod.Agent.agent_recipe(fake, job, spec, row)
         # A held recipe is run by this checkout's held-run.sh, as a node
@@ -892,7 +892,7 @@ class NodeAgent(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.home, ".local", "bin", "codex")))
 
     def test_opencode_is_found_where_its_installer_puts_it(self):
-        # B772: OpenCode's own script installs into ~/.opencode/bin whatever
+        # OpenCode's own script installs into ~/.opencode/bin whatever
         # it is told, so the update ran and then found no program at
         # ~/.local/bin. The stub does what the script does; the row names
         # that place, asks the script not to write the shell's files, and a
@@ -991,7 +991,7 @@ class NodeAgent(unittest.TestCase):
             self.assertEqual(base._recipe_name(name), packformat.env_name_ok(name), name)
 
     def test_the_recipe_the_controller_hands_over_is_what_runs(self):
-        # R169 step 13: where the program lands is the recipe's word, not
+        # Where the program lands is the recipe's word, not
         # the node's table's. The stub is an installer that moved its
         # program; the recipe sent says where, and the job finds it there.
         stub = os.path.join(self.tmp.name, "moved-installer.sh")

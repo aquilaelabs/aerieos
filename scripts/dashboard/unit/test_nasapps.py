@@ -1,4 +1,4 @@
-"""Apps a NAS runs (R164 step 2, R238): none is shipped, each kept from
+"""Apps a NAS runs: none is shipped, each kept from
 the catalog or added by a person; a compose file is held to the
 catalog's rules before it is kept; an app from before pack format 4 asks
 for the folders of the six blanks its compose reads, and one of format 4
@@ -253,13 +253,13 @@ class Fields(unittest.TestCase):
 
     def test_an_about_past_the_cards_200_is_said_to_its_author(self):
         # The card keeps 200 characters; past that it was cut mid-word with
-        # nothing said to the catalog's author (B932).
+        # nothing said to the catalog's author.
         self.assertNotIn("error", nasapps.check_app({"about": "a word " * 28}, COMPOSE))
         self.assertIn("about says", nasapps.check_app({"about": "a word " * 29}, COMPOSE)["error"])
 
 
 class NoneShipped(unittest.TestCase):
-    """No app is shipped (R238 step 1): one is offered because the catalog's
+    """No app is shipped: one is offered because the catalog's
     signed index lists it, or because a person added it, and for no other
     reason."""
 
@@ -417,7 +417,7 @@ class Another(unittest.TestCase):
 
 
 class Sideloaded(unittest.TestCase):
-    """An app of a person's own (R170 step 3): checked before it is kept,
+    """An app of a person's own: checked before it is kept,
     kept at tier sideloaded, rendered as the catalog's are."""
     def setUp(self):
         self.d = tempfile.TemporaryDirectory()

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Web dashboard: the page, its API and the browser terminals, all on
-# DASHBOARD_PORT. The terminals are AerieOS's own (R133), websockets on
+# DASHBOARD_PORT. The terminals are AerieOS's own, websockets on
 # that port, so there is one port and one sign-in.
 #
 # Numbered 15 so it starts BEFORE the slow hooks rather than after them. It
@@ -72,11 +72,11 @@ fi
 log "dashboard: http://<host>:${PORT}"
 
 # Started only where nothing listens yet: the supervisor runs this hook again
-# when the dashboard has died (B282).
+# when the dashboard has died.
 listening() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -q ":$1\$"; }
 
 # Without the shielded secrets: the hooks run with them, and the dashboard
-# and every controller terminal it opens would carry them (B389).
+# and every controller terminal it opens would carry them.
 unset_args=()
 for v in ${BB_SHIELDED:-}; do unset_args+=(-u "$v"); done
 

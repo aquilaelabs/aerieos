@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""docs/api.md, written from server.py (R91 step 7): every /api/ path in the
+"""docs/api.md, written from server.py: every /api/ path in the
 route record, its method and how it is matched, the first sentence of
 its handler's docstring, and the permissions the handler refuses on. Read
 with ast rather than by running the server, so a route that is added and

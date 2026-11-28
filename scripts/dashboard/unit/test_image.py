@@ -1,4 +1,4 @@
-"""The appliance image (R160 step 1): image/ holds one definition the
+"""The appliance image: image/ holds one definition the
 installed editions are made from, and its parts share their numbers through
 image/partitions.sh. What can be held without building the image is held
 here: the partition UUIDs agree across the build, the initramfs, fstab and
@@ -52,7 +52,7 @@ class Partitions(unittest.TestCase):
         self.assertIn(f"by-partuuid/{self.p['BB_PART_DATA']}", script)
 
     def test_a_live_boot_waits_for_no_disk_of_ours(self):
-        # B766: the ISO boots the same initrd live, on a machine with no
+        # The ISO boots the same initrd live, on a machine with no
         # AerieOS disk yet. The script leaves before it looks for the data
         # partition, and takes the installed disk's boot partition out of the
         # live root's fstab; run here as sh, with the boot's own names stood in.
@@ -82,7 +82,7 @@ class Partitions(unittest.TestCase):
                     self.assertIn("the data partition", r.stdout)
 
     def test_the_projects_under_srv_are_kept_on_the_data_partition(self):
-        # B437: the staged WORKSPACE is /srv/aerieos/projects, and the
+        # The staged WORKSPACE is /srv/aerieos/projects, and the
         # root is a tmpfs overlay, so /srv is bound from /var.
         script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
         self.assertIn('mount --bind "${rootmnt}/var/lib/aerieos-os/srv" "${rootmnt}/srv"', script)
@@ -124,7 +124,7 @@ class Packages(unittest.TestCase):
         self.assertEqual(want - self.packages(), set())
 
     def test_the_image_carries_every_tool_lay_disk_asks_for(self):
-        # B446: the installer runs the image's own lay-disk on the ISO, so each
+        # The installer runs the image's own lay-disk on the ISO, so each
         # tool it checks for has to come with a package the image lists.
         lay = read(IMG, "lay-disk")
         tools = set(re.search(r"for t in ([^;]+); do command -v", lay).group(1).split())
@@ -183,7 +183,7 @@ class SlotTool(unittest.TestCase):
 
 
     def test_a_machines_own_kernel_arguments_are_set_by_name_and_the_images_refused(self):
-        # R163 step 16: what passthrough and CPU isolation need on the
+        # What passthrough and CPU isolation need on the
         # kernel's line, kept in aerie_args, which every entry ends with.
         with tempfile.TemporaryDirectory() as d:
             esp = os.path.join(d, "esp")
@@ -221,7 +221,7 @@ class Installer(unittest.TestCase):
         self.assertIn('OWN_MARK="$ETC/own-node"', inst)
         self.assertIn('ETC="$P/etc/aerieos-controller"', inst)
         # Enabled by the post-install script, not a link in the extra tree
-        # (a symlink does not travel with the tree, B417).
+        # (a symlink does not travel with the tree).
         post = read(IMG, "mkosi.postinst")
         self.assertIn("systemctl enable aerieos-os-firstboot.service aerieos-os-installer.service aerieos-os-health.service", post)
         self.assertFalse(os.path.exists(os.path.join(EXTRA, "etc", "systemd", "system", "multi-user.target.wants")))
@@ -280,7 +280,7 @@ class Workflow(unittest.TestCase):
         self.assertRegex(snap, r"^\d{8}T\d{6}Z$")
 
     def test_the_vm_disks_are_the_same_disk_converted(self):
-        # R160 step 3: qcow2 and an OVA from the raw disk, never a fourth
+        # qcow2 and an OVA from the raw disk, never a fourth
         # layout; the descriptor's marks are the ones the build fills, and
         # the workflow installs what converts them.
         b = read(IMG, "build.sh")
@@ -295,7 +295,7 @@ class Workflow(unittest.TestCase):
         self.assertIn("qemu-utils", workflows())
 
     def test_the_disk_is_laid_out_by_one_script_the_image_carries(self):
-        # R160 step 2: build.sh lays the image's disk out with lay-disk and
+        # build.sh lays the image's disk out with lay-disk and
         # puts lay-disk, the numbers and GRUB's menu into the image, where
         # the installer runs the same script on a person's disk.
         b = read(IMG, "build.sh")
@@ -315,7 +315,7 @@ class Workflow(unittest.TestCase):
         self.assertIn("TTYPath=/dev/tty1", unit)
 
     def test_the_installer_asks_nothing_only_where_the_line_names_the_disk(self):
-        # B766: the build installs its own ISO onto a blank disk and boots the
+        # The build installs its own ISO onto a blank disk and boots the
         # result. The word is the kernel line's alone, never the menu's, and
         # the disk named must still be one the installer would offer.
         inst = read(EXTRA, "usr", "lib", "aerieos-os", "installer")
@@ -334,8 +334,8 @@ class Workflow(unittest.TestCase):
         g = read(IMG, "iso-grub.cfg")
         self.assertIn("boot=live components", g)
         self.assertIn("/live/vmlinuz", g)
-        # The ISO is what a running machine updates from and not an installer
-        # (the operator, 11 Nov): its menu starts nothing by itself and no
+        # The ISO is what a running machine updates from and not an installer:
+        # its menu starts nothing by itself and no
         # entry of it starts the console installer, which stays in the image
         # for the build's check (bbinstaller=1 on the kernel's line).
         self.assertNotIn("bbinstaller", "".join(ln for ln in g.splitlines(True) if not ln.lstrip().startswith("#")))
@@ -356,14 +356,14 @@ class Workflow(unittest.TestCase):
         self.assertIn("vmhost|firewall|iommu) OS_FEATURES+=(--feature", inst)
 
     def test_nothing_is_published_before_the_image_boots(self):
-        # R160 step 5: the publish job waits on the boot job, which waits
+        # The publish job waits on the boot job, which waits
         # on the build; step 6: the weekly schedule builds with the day's
         # snapshot and keeps the package diff.
         wf = workflows()
         self.assertRegex(wf, r"appliance-boot:\n    needs: appliance\n")
-        # ...and, with the boot, on the checks a tag is held to (R206).
+        # ...and, with the boot, on the checks a tag is held to.
         # The run's last job, which makes the release with every file, needs
-        # all of them (R206 step 1).
+        # all of them.
         self.assertRegex(wf, r"\n  release:\n(    #[^\n]*\n)*    needs: \[place, lint, suites, signature, build, upgrade, sign-image, bundle, apps, android, appliance\]\n")
         self.assertIn("uses: ./.github/workflows/os-image.yml", wf)
         self.assertIn("hostfwd=tcp:127.0.0.1:7680-:7680", wf)
@@ -372,7 +372,7 @@ class Workflow(unittest.TestCase):
         self.assertIn('"$OUT/$NAME.packages"', read(IMG, "build.sh"))
 
     def test_a_stick_loads_the_slot_into_memory_when_grub_says_so(self):
-        # R161 step 1: aerie_toram=1 in grubenv turns root= into the copy in
+        # aerie_toram=1 in grubenv turns root= into the copy in
         # memory and names the slot's partition; the initramfs script and
         # hook do the copy, and the slot tool reads and sets the switch.
         p = shell_vars(os.path.join(IMG, "partitions.sh"))
@@ -396,7 +396,7 @@ class Workflow(unittest.TestCase):
             self.assertEqual(sh(f"bash {tool} ram", {"BB_CMDLINE": c, "BB_ESP": os.path.join(d, "esp")}).stdout.strip(), "off")
 
     def test_a_trial_slot_is_counted_by_grub_and_marked_good_by_the_health_check(self):
-        # R161 step 2: GRUB counts the boots of a slot on trial and goes
+        # GRUB counts the boots of a slot on trial and goes
         # back after two without the health check's word; Safe mode boots
         # the slot held; the slot tool sets and ends a trial in GRUB's
         # environment, which grub-editenv reads back.
@@ -410,16 +410,16 @@ class Workflow(unittest.TestCase):
         self.assertIn("ConditionKernelCommandLine=aerieslot", unit)
         self.assertIn("ExecStart=/usr/lib/aerieos-os/health", unit)
         self.assertIn('bash "$SLOT" good', read(EXTRA, "usr", "lib", "aerieos-os", "health"))
-        # B471: a slot that panics or never gets healthy comes back by itself.
+        # A slot that panics or never gets healthy comes back by itself.
         self.assertEqual(g.count("panic=15 console="), 4)
-        # R194: Rescue, a root shell at the screen with nothing started.
+        # Rescue, a root shell at the screen with nothing started.
         self.assertIn('menuentry "Rescue', g)
         self.assertIn("systemd.unit=rescue.target systemd.setenv=SYSTEMD_SULOGIN_FORCE=1", g)
         self.assertIn('set fallback="slot-${aerie_prev}"', g)
         health = read(EXTRA, "usr", "lib", "aerieos-os", "health")
         self.assertIn("systemctl reboot", health)
         self.assertNotIn('"$code" != "000"', health)
-        # B621: a boot that is not healthy says where to look and the way in.
+        # A boot that is not healthy says where to look and the way in.
         self.assertIn("journalctl -u aerieos-controller", health)
         self.assertIn("Rescue entry", health)
         if not shutil.which("grub-editenv"):
@@ -438,7 +438,7 @@ class Workflow(unittest.TestCase):
             st = sh(f"bash {tool} status", env).stdout
             self.assertIn("trial: slot b, 0 boot(s) so far, back to slot a", st)
             envf = f"{esp}/grub/grubenv"
-            # B471: the slot running now is healthy while b waits to boot for
+            # The slot running now is healthy while b waits to boot for
             # the first time: b's trial stands.
             self.assertEqual(sh(f"bash {tool} good", env).returncode, 0)
             self.assertIn("aerie_trial=1", sh(f"grub-editenv {envf} list", env).stdout)
@@ -459,7 +459,7 @@ class Workflow(unittest.TestCase):
             got = sh(f"grub-editenv {envf} list", env).stdout
             self.assertIn("aerie_slot=b", got)
             self.assertIn("aerie_trial=0", got)
-            # B470: hold points the next boot back at the running slot.
+            # Hold points the next boot back at the running slot.
             self.assertEqual(sh(f"bash {tool} hold", env).returncode, 0)
             self.assertIn("aerie_slot=b", sh(f"grub-editenv {envf} list", env).stdout)
             # A healthy boot with nothing to change leaves GRUB's file alone.
@@ -472,7 +472,7 @@ class Workflow(unittest.TestCase):
             self.assertEqual(sh(f"bash {tool} fell-back", env).stdout.strip(), "no", "read once, then cleared")
 
     def test_a_slot_fallen_back_to_gets_the_configuration_it_reads(self):
-        # B472: the newer slot migrated the configuration and failed; the
+        # The newer slot migrated the configuration and failed; the
         # slot before refuses it, so the copy the update took is put back,
         # what it held moved aside with the logs kept.
         import tarfile
@@ -513,7 +513,7 @@ class Workflow(unittest.TestCase):
             self.assertEqual(sh(f"bash {tool}", env).stdout, "", "a boot that did not fall back says nothing")
 
     def test_the_boots_own_settings_reach_the_controller_from_the_esp_and_the_command_line(self):
-        # R161 step 6: aerieos.env on the ESP and aerieos.debug=1 on
+        # aerieos.env on the ESP and aerieos.debug=1 on
         # the command line land in /run/aerieos-os/env, a short list of
         # names only, which the controller's unit reads if it is there.
         tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "env")
@@ -539,15 +539,15 @@ class Workflow(unittest.TestCase):
             sh(f"bash {tool}", {"BB_ESP": esp, "BB_OS_RUN": run, "BB_CMDLINE": c})
             self.assertEqual(open(os.path.join(run, "env")).read(), "", "off at a start that did not ask")
         # ...and the stick is laid with the file at its fixed 4 KiB behind
-        # the marker the stick maker writes --set into (R161 step 12).
+        # the marker the stick maker writes --set into.
         lay = read(IMG, "lay-disk")
         self.assertIn('"$MNT/aerieos.env"', lay)
         self.assertIn("# aerieos.env AERIE-STICK-ENV-1", lay)
-        # ...and the prepared configuration's 64 KiB (R161 step 8), taken off
+        # ...and the prepared configuration's 64 KiB, taken off
         # the stick by a root step before the controller starts.
         self.assertIn('"$MNT/aerieos/firstboot.json"', lay)
         self.assertIn("AERIE-FIRSTBOOT-1", lay)
-        # ...and the catalog's mirror's 64 MiB (R169 step 6).
+        # ...and the catalog's mirror's 64 MiB.
         self.assertIn('"$MNT/aerieos/catalog-mirror.bin"', lay)
         self.assertIn("BB-MIRROR-1", lay)
         self.assertIn("ExecStart=-/usr/lib/aerieos-os/firstboot-take",
@@ -560,7 +560,7 @@ class Workflow(unittest.TestCase):
         self.assertIn("EnvironmentFile=-/run/aerieos-os/env", read(ROOT, "nodes", "install-controller.sh"))
 
     def test_the_sticks_network_settings_write_a_network_file_before_dhcps(self):
-        # R161 step 12: BB_NET_ADDRESS and its mask, gateway and DNS become a
+        # BB_NET_ADDRESS and its mask, gateway and DNS become a
         # runtime .network file that sorts before the image's 80-dhcp one;
         # anything that is not an address leaves DHCP standing.
         tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "net")
@@ -608,7 +608,7 @@ class Workflow(unittest.TestCase):
         self.assertLess(tool.index('part="${part#/root}"'), tool.index('[ -b "$part" ]'))
 
     def test_the_data_partition_grows_to_its_disk_up_to_the_cap(self):
-        # R161 step 13: a stick bigger than the image has its data partition,
+        # A stick bigger than the image has its data partition,
         # the last, grown to the disk's end at boot, no further than
         # BB_DATA_MAX, and never shrunk; a last partition that is not the
         # data partition is left as it is.
@@ -654,7 +654,7 @@ class Workflow(unittest.TestCase):
             self.assertEqual(mib, 16)
 
     def test_the_console_welcomes_with_the_logo_the_release_and_the_address(self):
-        # R185: AerieOS's logo, plain characters a serial console draws and
+        # AerieOS's logo, plain characters a serial console draws and
         # no backslash (an escape in an issue file), opens the installer and
         # sits over every boot's login prompt with the release, the slot and
         # the dashboard's address, the getty's own \\4 standing for this
@@ -683,7 +683,7 @@ class Workflow(unittest.TestCase):
             self.assertIn("A E R I E O S", issue)
             self.assertIn("AerieOS 0.9.0, slot a", issue)
             self.assertIn("Open http://\\4:8443/ in a browser on this network.", issue)
-            # B621: the way in when the dashboard is what does not answer, on
+            # The way in when the dashboard is what does not answer, on
             # the screen itself (the console password needs the dashboard).
             self.assertIn("set a console password on the Nodes page", issue)
             marked = os.path.join(d, "open"); open(marked, "w").close()
@@ -698,7 +698,7 @@ class Workflow(unittest.TestCase):
             self.assertIn("http://\\4:7680/", open(os.path.join(out, "10-aerieos.issue")).read(), "the default port without an env file")
 
     def test_the_disk_is_xz_and_the_stick_variant_runs_from_memory(self):
-        # R161 step 5: xz, which the stick maker opens with Python's own
+        # Xz, which the stick maker opens with Python's own
         # library; the stick's disk is the same with aerie_toram=1 set.
         b = read(IMG, "build.sh")
         self.assertIn('xz -q -T0 -6 "$RAW"', b)
@@ -713,7 +713,7 @@ class Workflow(unittest.TestCase):
 
 
 class WhatAMachineKeeps(unittest.TestCase):
-    """A real first boot and reboot in a VM found these (the operator, 4 Nov):
+    """A real first boot and reboot in a VM found these:
     what makes the machine its own node has to last, and the way in at the
     screen has to exist. CI boots an image once, so only this holds them."""
 

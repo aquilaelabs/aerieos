@@ -1,4 +1,4 @@
-"""A written container renamed while down (the operator, 11 Oct): the node
+"""A written container renamed while down: the node
 carries its volumes and data directory under one job, the records, the
 compose directory and the env follow when it has, and a rename is refused
 while it is up, while a job runs on it, or under a name in use."""
@@ -90,7 +90,7 @@ class Rename(unittest.TestCase):
                       "a space's container is renamed with its instance named")
 
     def test_a_projects_container_takes_a_name_of_its_own(self):
-        """The operator, 11 Oct: a project's container is named whatever its
+        """A project's container is named whatever its
         owner wants, not after the project. The record carries the name, the
         instance keeps its key (its worktree, jobs and aerie devapp --instance
         stay), and the node carries the volumes and data under the new one."""
@@ -176,7 +176,7 @@ exit 0
         self.assertFalse((self.root / "aquilaelabs-dev").exists())
 
     def test_a_failure_on_one_volume_removes_no_old_one(self):
-        # B554: one at a time, a failure on b left a copied and removed, the
+        # One at a time, a failure on b left a copied and removed, the
         # instance coming back on an empty a.
         r = self.run_script(VOLS="aquilaelabs_a aquilaelabs_b", FAILON="aquilaelabs_b")
         self.assertNotEqual(r.returncode, 0)

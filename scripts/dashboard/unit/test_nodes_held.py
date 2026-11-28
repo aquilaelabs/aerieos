@@ -1,5 +1,5 @@
-"""nodes.held(): inside one block each node row is read from the store once
-(the operator, 17 Oct: the status read asked for the same rows dozens of
+"""nodes.held: inside one block each node row is read from the store once
+(the status read asked for the same rows dozens of
 times, each ask queued on the store's one lock), handed out as a copy, and
 read fresh again once the block ends."""
 import os

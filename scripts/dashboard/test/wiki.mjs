@@ -1,4 +1,4 @@
-// The notebook's Wiki view (wiki.py, nb-wiki.js, R112): pages as rows that
+// The notebook's Wiki view (wiki.py, nb-wiki.js): pages as rows that
 // open to be read, New page at the top, Edit on a row, written through with
 // no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
@@ -32,7 +32,7 @@ ok(!(await page.$(`${NB} .nbview[data-view="wiki"] .sectbar`))
 ok(/github\.com\/owner\/alpha/.test(await page.$eval(`${NB} #wkNetState`, e => e.textContent))
    && await page.$eval(`${NB} #wkPush`, e => !e.hidden && e.disabled),
    'with push rights the head row names the forge\'s wiki, and Push waits for a page');
-// Why Push is off is said in the muted voice of every reason, never red (B292).
+// Why Push is off is said in the muted voice of every reason, never red.
 ok(await page.$eval(`${NB} #wkWhy`, e => { const h = document.createElement('div'); h.className = 'hint'; e.parentNode.append(h);
      const same = getComputedStyle(e).color === getComputedStyle(h).color; h.remove(); return same; }),
    'the line saying why Push is off wears a hint\'s color, not the alarm\'s');
@@ -45,12 +45,12 @@ const html = await page.$eval(`${NB} .wkarticle[data-name="Home"] .wkpage`, e =>
 ok(/<h3 id="wk-welcome">Welcome<\/h3>/.test(html) && /<strong>this<\/strong>/.test(html) && /<li>one<\/li>/.test(html)
    && /class="wklink[^"]*" data-page="Build and test"/.test(html) && !/<script>/.test(html) && /&lt;script&gt;/.test(html),
    `the page opens drawn from its Markdown, a [[link]] a link, and markup in it shown as text (${html.slice(0, 160)})`);
-// A link to a page the wiki does not have yet is drawn as one (B46).
+// A link to a page the wiki does not have yet is drawn as one.
 ok(await page.$eval(`${NB} .wkpage .wklink[data-page="Build and test"]`, a => a.classList.contains('wkmissing')
      && getComputedStyle(a).color !== getComputedStyle(document.querySelector('.nb .wknav .wklink')).color),
    'a link to a page that is not there is drawn apart from a live one');
 ok(/1 page/.test(await page.$eval(`${NB} #wkHint`, e => e.textContent.replace(/\s+/g, ' '))), 'a tile counts it');
-// Read like an encyclopedia (the operator, 2 Oct): the title over a rule,
+// Read like an encyclopedia: the title over a rule,
 // said once though the page opens with it, a Contents box for its
 // sections, and the pages listed beside the article.
 const art = await page.$eval(`${NB} .wkarticle`, a => ({
@@ -62,7 +62,7 @@ ok(art.title === 'Home' && art.h1s === 2 && art.toc.join('|') === 'Welcome|Insta
    `an article: its title once, its sections in a Contents box, Read on, set in the serif (${JSON.stringify(art)})`);
 ok(await page.$eval(`${NB} .wknav`, n => /Home/.test(n.textContent) && getComputedStyle(n).display !== 'none'),
    'the pages are listed beside it on a desktop');
-// Its sections are drawn, and Contents goes to one (the operator, 4 Oct): a
+// Its sections are drawn, and Contents goes to one: a
 // rule hiding every h3 in the notebook hid each ## section, and the links
 // pointed at headings nobody could see.
 ok(await page.$$eval(`${NB} .wkpage h3`, hs => hs.length === 2 && hs.every(h => h.checkVisibility() && h.getBoundingClientRect().height > 0)),
@@ -82,7 +82,7 @@ await page.fill(`${NB} #wkText`, '# Welcome back');
 await page.click(`${NB} #wkSave`);
 await page.waitForFunction(() => /Welcome back/.test(document.querySelector('.nb .wkarticle[data-name="Home"] .wkpage')?.textContent || ''),
   null, { timeout: 15000 });
-// The page reads as typed on the press (the operator, 22 Nov); the wiki
+// The page reads as typed on the press; the wiki
 // follows.
 ok(await until(async () => /Welcome back/.test((await api(`/api/wiki?project=${P}&page=Home`)).text || ''), 15000),
    'the Edit tab swaps the editor in, Save reads the page as typed on the press and writes it');
@@ -119,7 +119,7 @@ await page.waitForSelector(`${NB} .wkarticle[data-name="Build-and-test"] .wkpage
 ok(/How to build/.test(await page.$eval(`${NB} .wkarticle .wkpage`, e => e.textContent)), 'a page in the list opens in place');
 // At a desk the list is a column beside the article and the picker is not
 // drawn: drawn, it took the article's column and pushed the article under
-// the list, 200px wide (B856, the operator 19 Oct).
+// the list, 200px wide.
 ok(await page.$eval(`${NB} .wkreader`, r => { const nav = r.querySelector('.wknav').getBoundingClientRect(), art = r.querySelector('.wkarticle').getBoundingClientRect();
      return getComputedStyle(r.querySelector('.wkpick')).display === 'none' && art.left >= nav.right && art.width > 400; }),
    'at a desk the pages are a column beside the article, the picker not drawn');
@@ -128,14 +128,14 @@ await page.setViewportSize({ width: 393, height: 851 });
 ok(await page.$eval(`${NB} .wknav`, n => getComputedStyle(n).display === 'none')
    && await page.$eval(`${NB} .wkpick`, n => getComputedStyle(n).display !== 'none'),
    'on a phone the pages are a picker over the article');
-// The reader is Help's as well (the operator, 19 Oct: one reader, so the two
+// The reader is Help's as well (one reader, so the two
 // cannot drift): its picker's word beside it, on the field gap.
 ok(await page.$eval(`${NB} .wkpick`, l => { const w = l.querySelector(':scope > .pickw'), s = l.querySelector(':scope > select');
      return !!w && !!s && w.getBoundingClientRect().right <= s.getBoundingClientRect().left && w.textContent === 'Page'; }),
    "...the reader's own picker, its word beside it as Help's is");
 await page.setViewportSize({ width: 1280, height: 1000 });
-// Rename asks in a box under the article's tabs, not the browser's prompt
-// (R256 step 4): the name to change in it, Enter to rename, Escape to leave.
+// Rename asks in a box under the article's tabs, not the browser's prompt:
+// the name to change in it, Enter to rename, Escape to leave.
 await section("Rename asks in a box under the article's tabs, not the browser's prompt", async () => {
   // Home links to the page about to be renamed: the rename moves the link.
   const h = await api(`/api/wiki?project=${P}&page=Home`);

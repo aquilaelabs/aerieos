@@ -1,4 +1,4 @@
-// The notebook's Wiki (R112), on a phone: the dashboard's reader in the
+// The notebook's Wiki, on a phone: the dashboard's reader in the
 // shape a phone has room for. The pages as chips over one article, the
 // article's title over a rule, its Markdown drawn line by line (headings,
 // lists, quotes, code and paragraphs), and the pages it links to with

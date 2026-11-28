@@ -1,7 +1,7 @@
-"""The controller's half of the coding agents' sealed sign-ins (R126).
+"""The controller's half of the coding agents' sealed sign-ins.
 
 Each account's key pair on each node is made here from the account's own
-key (R154, accountkeys.py; from the install key, R135, before that) and
+key (accountkeys.py) and
 kept nowhere: the node is handed the public half to seal with
 (public), and the key that opens one of its seals is made only for a
 terminal a person opened for their own account (wrapped_for), wrapped to
@@ -59,8 +59,8 @@ def keys():
 
 
 def _pub(k, node, uid, old=False):
-    """The public half of the account's key pair on this node: X25519's
-    (R158 step 3), or with `old` the format before's, which made_under
+    """The public half of the account's key pair on this node: X25519's,
+    or with `old` the format before's, which made_under
     reads for a seal a node made in it and still holds."""
     cache = (k, node, uid, old)
     if cache not in _pub_cache:
@@ -80,7 +80,7 @@ def public(node, uid):
     """The account's public key on this node, hex, made from its own key,
     or "" with no install key: an install with none has nothing to seal
     with, and keeps its sign-ins as plain files. For an account whose store
-    is under a key of its own and shut (R157), the half remembered from
+    is under a key of its own and shut, the half remembered from
     when it was open: a public half is nothing secret, and the node needs
     it to seal a login made while the person works."""
     k = accountkeys.key_of(uid)
@@ -144,7 +144,7 @@ def wrapped_for(node, uid, tokseal):
         R = str((v or {}).get("R") or "")
         # The key the seal names, as the node's first try when it is today's
         # own and as |prev otherwise, which the node opens and then seals
-        # again under the account's public key (R154). One naming none is
+        # again under the account's public key. One naming none is
         # from before K: today's own key, then the install key as |prev.
         k = made_under(node, uid, v)
         # A seal of the format before under today's own key is |prev too:

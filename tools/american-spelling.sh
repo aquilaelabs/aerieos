@@ -1,6 +1,6 @@
 #!/bin/sh
 # American spelling, everywhere in this repository: the house rule
-# `spelling` (the operator's, 29 Sep). This is its check.
+# `spelling` (the operator's). This is its check.
 #
 # Two modes, as tools/no-em-dash.sh has them:
 #
@@ -26,7 +26,7 @@ mode="${1:-}"
 
 # An identifier somebody else spells is theirs: aria-labelledby is the ARIA
 # attribute's own name (two l's in the spec), and the British-looking
-# "labeledby" is no attribute at all, which is what B499 was.
+# "labeledby" is no attribute at all.
 l=l
 # ...and GitHub's word for a run or a job stopped short, two l's in its API
 # and in a workflow's own expressions: its status function, the value in

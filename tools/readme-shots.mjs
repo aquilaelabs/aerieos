@@ -57,10 +57,10 @@ const scrub = page => page.evaluate(() => {
 });
 const open = async (opts, view) => {
   const ctx = await browser.newContext(opts);
-  // No first-use tour (R94) in any picture.
+  // No first-use tour in any picture.
   await ctx.addInitScript(() => { window.BB_NO_TOUR = true; });
   // Marked as this account's own choice, or the page adopts the account's
-  // saved scheme over it (adoptTheme, B491).
+  // saved scheme over it (adoptTheme).
   await ctx.addInitScript(who => { try { localStorage.setItem('bb.theme', 'default'); localStorage.setItem('bb.theme.who', who); } catch (e) {} }, USER);
   const page = await ctx.newPage();
   // Every project the instance has, as the status read names them: what
@@ -129,7 +129,7 @@ const open = async (opts, view) => {
   for (let i = 0; i < 3; i++){ const c = await page.$('.modal:not([hidden]) button:has-text("Close")'); if (!c) break; await c.click(); await page.waitForTimeout(300); }
   // A phone has one page area and the dock under it: Home is what it opens
   // on, and a terminal is the dock pulled up.
-  // A shell this run opens is its own to end (B1149): the layout is never
+  // A shell this run opens is its own to end: the layout is never
   // saved, so one left running was another found the next run.
   const opened = view === 'terminal' && await page.evaluate(() => {
     const none = !tabs.some(t => t.kind === 'term');
@@ -192,14 +192,14 @@ const desk = { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 };
 { const { ctx, page } = await open(desk);
   await tab(page, 'openLibrary()', 7000); await shoot(page, 'library.png'); await ctx.close(); }
 // The Installed page: what one node holds, each coding agent's version and
-// each person's sign-in there (R172; the scrub rewrites the accounts' addresses).
+// each person's sign-in there (the scrub rewrites the accounts' addresses).
 { const { ctx, page } = await open(desk);
   await tab(page, 'openInstalledTab()', 7000); await shoot(page, 'installed.png'); await ctx.close(); }
 { const { ctx, page } = await open(desk);
   await tab(page, 'openDocker()', 7000); await shoot(page, 'containers.png'); await ctx.close(); }
 { const { ctx, page } = await open(desk);
   await tab(page, 'openVmsTab()', 5000); await shoot(page, 'vms.png'); await ctx.close(); }
-// A VM's Screen in the dock (R99): README_SHOT_SCREEN names the VM, as
+// A VM's Screen in the dock: README_SHOT_SCREEN names the VM, as
 // PROJECT/NAME, whose installer or desktop the picture shows.
 if (process.env.README_SHOT_SCREEN){
   const { ctx, page } = await open(desk);

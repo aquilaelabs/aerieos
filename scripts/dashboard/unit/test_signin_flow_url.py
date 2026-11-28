@@ -1,5 +1,5 @@
 """A sign-in's link and code as the page offers them, read from a job's log:
-the node's driver's lines (one each, R234 step 6), never the program's own
+the node's driver's lines (one each), never the program's own
 screen, which the driver reads on the node. The screens are the programs'
 own, as each printed them on 12 Nov (Codex CLI 0.164.0, Copilot CLI, Grok
 Build)."""

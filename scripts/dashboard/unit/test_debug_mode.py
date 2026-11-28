@@ -1,8 +1,8 @@
 """The debug and dev options exist only on a controller started with
-DEBUG_MODE=1 (the operator, 12 Oct): without it they read off, cannot be
+DEBUG_MODE=1: without it they read off, cannot be
 turned on, and at a start every one that was on is put back off, the
-projects' Debug grants with them. Debug mode itself is the environment's
-(the operator, 26 Oct): on exactly while DEBUG_MODE=1, never saved."""
+projects' Debug grants with them. Debug mode itself is the environment's:
+on exactly while DEBUG_MODE=1, never saved."""
 import json
 import os
 import shutil
@@ -63,7 +63,7 @@ class DebugMode(unittest.TestCase):
 
 
     def test_a_boot_that_asks_for_the_dev_channel_gets_it(self):
-        # R161 step 12: a stick's aerieos.env says BB_RELEASE_CHANNEL=dev.
+        # A stick's aerieos.env says BB_RELEASE_CHANNEL=dev.
         was = os.environ.get("BB_RELEASE_CHANNEL")
         self.addCleanup(lambda: os.environ.pop("BB_RELEASE_CHANNEL", None) if was is None else os.environ.__setitem__("BB_RELEASE_CHANNEL", was))
         os.environ["BB_RELEASE_CHANNEL"] = "dev"
@@ -73,7 +73,7 @@ class DebugMode(unittest.TestCase):
         self.assertFalse(settings.boot_channel(), "the next start finds it so and writes nothing")
 
     def test_any_install_picks_the_channel_and_keeps_it(self):
-        # The operator, 2 Nov: the dev channel is for anyone, and a start
+        # The dev channel is for anyone, and a start
         # without debug mode leaves it where it was.
         os.environ.pop("DEBUG_MODE", None)
         self.assertEqual(settings.channel_picked(), "")

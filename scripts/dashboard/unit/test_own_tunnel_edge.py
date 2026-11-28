@@ -1,4 +1,4 @@
-"""What came through the controller's own Cloudflare tunnel (B137): its
+"""What came through the controller's own Cloudflare tunnel: its
 Cf-Ray from the loopback its cloudflared asks from, never any request
 Cloudflare proxied, which a dashboard put behind Cloudflare is."""
 import os

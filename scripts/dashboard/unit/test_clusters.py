@@ -1,5 +1,5 @@
-"""The Kubernetes clusters (R281 step 2): a kubeconfig's current context
-read, a cloud CLI's sign-in refused with the way out (the operator, 25 Nov),
+"""The Kubernetes clusters: a kubeconfig's current context
+read, a cloud CLI's sign-in refused with the way out,
 paths where data belongs refused, and a cluster added, asked again, renamed
 and forgotten against a stub API server, its credential never in what the
 page reads."""

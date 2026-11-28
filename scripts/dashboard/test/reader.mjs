@@ -1,12 +1,12 @@
 // An account whose only role on a project gives Projects Read, found
 // walking the dev pair on 20 Oct: every control on the project's page that
 // would change it is dead, with the server's own reason written under it in
-// red, rather than live and refused at the press (B86).
-// Also: Start Claude says why it is dead (B88); New project and the trash
+// red, rather than live and refused at the press.
+// Also: Start Claude says why it is dead; New project and the trash
 // are dead for an account without them, and the trash never reads a
-// refusal as an empty bin (B87); the settings page does not ask for what
-// the role cannot read (B89); the Profile's Password says what is wrong
-// under the field it is about (B90).
+// refusal as an empty bin; the settings page does not ask for what
+// the role cannot read; the Profile's Password says what is wrong
+// under the field it is about.
 import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick, OWNER as owner, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -49,11 +49,11 @@ const row = await page.evaluate(() => (state.projects || []).find(p => p.name ==
 ok(/no Spaces Write on alpha/.test(row.write_why || '') && !!row.trash_why && !!row.settings_why,
    `the row carries why alpha is not this account's to change, delete or set up (${row.write_why})`);
 
-// ---- the Projects page (B86, B87, B88) -----------------------------------
+// ---- the Projects page -----------------------------------
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.pgrid .pcard[data-row="alpha"]', { timeout: 15000 });
-// What a role does not give is not drawn, and nothing says why (the
-// operator, 21 Oct: a role somebody lacks is not advertised to them).
+// What a role does not give is not drawn, and nothing says why
+// (a role somebody lacks is not advertised to them).
 const bar = await page.evaluate(() => ({ np: document.querySelector('.doc.on #bNewProjTab')?.checkVisibility(),
   bin: document.querySelector('.doc.on #bTrashTab')?.checkVisibility(),
   why: [...document.querySelectorAll('.doc.on .deadwhy, .doc.on .notice.bad')].map(e => e.textContent) }));
@@ -73,7 +73,7 @@ const card = await page.evaluate(() => {
 ok(!card.start && !card.note, `the card has no Start Claude and no line saying why (${card.note})`);
 ok(!card.del && card.mark === 'read-only', `the card offers no Delete, and its name is marked read-only (${card.mark})`);
 
-// ---- the project's page (B86) ---------------------------------------------
+// ---- the project's page ---------------------------------------------
 const view = async (v, sel) => {
   await page.evaluate(([p, w]) => openNotebook(p, w), ['alpha', v]);
   await nbShown(page);
@@ -132,7 +132,7 @@ else {
   ok(gt.verbs === 0, `...and no branch carries Merge, Ask Claude, Switch or Delete (${gt.verbs})`);
 }
 
-// Settings: no Delete project, and nothing asked to be refused (B89).
+// Settings: no Delete project, and nothing asked to be refused.
 const before = asked.length;
 await view('settings', '#rnDelete');
 // The window in which the view would have asked for what the role cannot read.
@@ -145,7 +145,7 @@ const refusedAsks = asked.slice(before).filter(u => /\/api\/(snapshots|project-s
 ok(refusedAsks.length === 0, `...and Snapshots and Running sessions are not asked for (${refusedAsks.join(', ') || 'none'})`);
 ok(!st.snap && !st.sess, '...nor drawn');
 
-// ---- Tests, Wiki, Design, Artifacts and Pending (B101) --------------------
+// ---- Tests, Wiki, Design, Artifacts and Pending --------------------
 // What each has to show, made by the owner: a test run ingested, a wiki
 // page, a build in dist/.
 await section("Tests, Wiki, Design, Artifacts and Pending", async () => {
@@ -231,7 +231,7 @@ await page.evaluate(() => { $("pendModal").hidden = true; pendFor = null; });
 
 // What is left of the reason under a dead control is a feature the install
 // switched off (FEATURES_OFF): in the warning's yellow, never the failure's
-// red (the operator, 21 Oct).
+// red.
 const tone = await page.evaluate(() => {
   const c = v => { const d = document.createElement('i'); d.style.color = `var(${v})`; document.body.append(d);
     const x = getComputedStyle(d).color; d.remove(); return x; };
@@ -241,7 +241,7 @@ const tone = await page.evaluate(() => {
 });
 ok(tone.got === tone.warn && tone.got !== tone.bad, `a switched-off feature's reason is yellow, not red (${tone.got})`);
 
-// ---- the Profile's Password (B90) -----------------------------------------
+// ---- the Profile's Password -----------------------------------------
 await page.evaluate(() => openProfileTab());
 await page.waitForSelector('#pfPasswd', { state: 'attached', timeout: 15000 });
 await splitPick(page, 'password');

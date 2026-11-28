@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GRUB's menu on the ESP put in step with the image running (R201): an update
+# GRUB's menu on the ESP put in step with the image running: an update
 # writes a slot and its kernel, never the menu, so a disk laid by an older
 # image kept its menu for good. Never on a visit to a kept older version, whose
 # older menu would take Older versions away. Written whole, then moved over.

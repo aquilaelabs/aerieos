@@ -41,7 +41,7 @@ def configure(*, run, on_node=None, node_tell=None):
 # Long enough for the TUI to repaint after send-keys, short enough that the
 # request it happens inside does not feel stuck. Eight looks, two seconds at
 # most: two left the bell's Resume unsent in an idle session that took a
-# second to draw the line (B774), and the first look that sees it sends.
+# second to draw the line, and the first look that sees it sends.
 SETTLE = 0.25
 LOOKS = 8
 
@@ -125,7 +125,7 @@ def tell(session, text, sessions=(), who="dashboard"):
     # Counted once the screen is still: a pane still drawing the last
     # send's output (a shell's "command not found" repeats the line) put a
     # copy on screen after the count, which read as this line's echo, and
-    # Enter went to a box that never took it (B389). At most a second.
+    # Enter went to a box that never took it. At most a second.
     screen = _capture(session)
     for _ in range(4):
         time.sleep(SETTLE)

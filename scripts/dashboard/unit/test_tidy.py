@@ -1,4 +1,4 @@
-"""aerie tidy gives back what a task left holding (the operator, 6 Oct): this
+"""aerie tidy gives back what a task left holding: this
 session's own emulator, its processes on the card, its build daemons, the
 browsers a finished test left, and its files in /tmp; never what it runs
 inside of, a running test's browsers, Claude Code's own folder, a socket,
@@ -68,7 +68,7 @@ class Tidy(unittest.TestCase):
         proc(r, 50, "python3", "python3 /tmp/bb-suite.x1/scripts/dashboard/server.py", ppid=1, fds=["socket:[5001]"])
         proc(r, 9, "claude", "claude")
         proc(r, 60, "node", "node vite.js --port 5173", ppid=9, fds=["socket:[5003]"])
-        # A background tool call's own server, still running (B840): the call's
+        # A background tool call's own server, still running: the call's
         # shell, aerie run's, then the server, under Claude Code.
         proc(r, 70, "bash", "bash -c aerie run -- python3 server.py", ppid=9)
         proc(r, 71, "bash", "bash /opt/aerieos/scripts/aerie run -- python3 server.py", ppid=70)
@@ -95,7 +95,7 @@ class Tidy(unittest.TestCase):
         self.assertEqual(tidy.processes(root=r, uid=UID, spare=set()), [])
 
     def test_a_run_its_launcher_left_holds_no_lock_but_a_kept_one_does(self):
-        # B926: a gate ended by its own pid leaves the harness under the
+        # A gate ended by its own pid leaves the harness under the
         # first process, holding the lock; that run is ended, not spared.
         # A kept fixture is started detached and is spared.
         r, t = self.root, Path(self.root, "tmp", "dashboard-test.d")
@@ -134,7 +134,7 @@ class Tidy(unittest.TestCase):
 
 class Phones(unittest.TestCase):
     """The project's idle phones give back their quick-boot snapshot after a
-    week, and one that is not the default is named after two (R129); the
+    week, and one that is not the default is named after two; the
     phone in use and every phone's data stay."""
 
     def setUp(self):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A finger's path through points, for a glide (R127): aerie emu touch glide
+"""A finger's path through points, for a glide: aerie emu touch glide
 and aerie phone touch glide play what this makes, so a keyboard under test
 meets a stroke shaped like a person's rather than a ruler's.
 
@@ -9,8 +9,8 @@ A person's stroke bows between letters, speeds up between them and slows
 over them, passes a letter and comes back, lingers on it, and wobbles all
 the way. A glide keyboard decodes a word partly from that shape, so the
 straight, even stroke the injectors drew (five letters at 150 ms each, in
-straight lines) tested it against input nobody produces (the operator,
-5 Oct, watching one). The dials, each with the hand's own value unless
+straight lines) tested it against input nobody produces
+(watching one). The dials, each with the hand's own value unless
 named:
 
   --curve F       how far the path bows between two points, as a share of

@@ -1,9 +1,9 @@
 "use strict";
-// ---- the VMs page (R91) ----------------------------------------------------
+// ---- the VMs page ----------------------------------------------------
 // A project's VMs, on the nodes whose VM host feature is installed: the
 // Containers page's pieces (a card per project with its heading in the
 // project's color, a row per VM with its state as a pill, the action bar and
-// ⋯), so the two read as one manager (the operator, 21 Oct). Everything it
+// ⋯), so the two read as one manager. Everything it
 // shows is /api/vms: the records, the node's census laid over them.
 
 let vmsData = null;             // the last /api/vms answer, null before the first
@@ -18,7 +18,7 @@ const VM_COLS = [{label: "VM"}, {label: "State", w: "8.5rem"}, {label: "Node", w
                  {label: "System", w: "minmax(0,.8fr)"}, {label: "Address", w: "minmax(0,.9fr)"}];
 // When this page asked each VM (PROJECT/NAME) to shut down: a system that
 // ignores the request stays up with its job a success, and the row says so
-// rather than leaving Stop looking broken (B308).
+// rather than leaving Stop looking broken.
 const vmStopAsked = {};
 
 function openVmsTab(){
@@ -34,7 +34,7 @@ function loadVms(){
   });
 }
 // A console tab is the account's and outlives the page, so one whose VM was
-// removed while no page watched it stayed in the dock onto nothing (B172):
+// removed while no page watched it stayed in the dock onto nothing:
 // dropped once the records are read and the VM is not among them.
 const vmConsoleTab = t => t.kind === "term" && /^(vm|screen):/.test(String(t.arg));
 // ...and read once for a page that opens with one, since the first poll's
@@ -70,17 +70,17 @@ function vmRow(v){
   const size = `${v.vcpus} vCPU · ${v.mem_mb >= 1024 ? `${+(v.mem_mb / 1024).toFixed(1)} GB` : `${v.mem_mb} MB`} · ${
     disks.length > 1 ? `disks of ${disks.join(", ")} GB` : `${v.disk_gb} GB disk`}`;
   const origin = [esc(v.os_name || v.os || ""), esc(v.node_name || ""), esc(size)].filter(Boolean).join(`<span class="sep"></span>`);
-  // From an installer (R99): its ISO in the drive until ejected, and no
+  // From an installer: its ISO in the drive until ejected, and no
   // account of AerieOS's to ssh in as.
   const reach = up && v.iso ? `installing from ${esc(v.iso)}: its Screen shows the installer`
     : up && v.ip && v.os !== "installer" ? `ssh ${esc(v.user || "builder")}@${esc(v.ip)}`
     : up && v.ip ? `at ${esc(v.ip)}`
-    // On the LAN (R100) its address is the LAN's DHCP's, which only QEMU's
+    // On the LAN its address is the LAN's DHCP's, which only QEMU's
     // guest agent inside it tells the node.
     : up && v.hw?.net === "lan" && !v.node_id ? "on the LAN: its address shows once QEMU's guest agent runs inside it"
     : up ? "taking its address" : "";
-  // What its guest agent says of it (R110 step 8, the operator, 22 Oct:
-  // like VMware Tools): its own name, system and kernel, who is signed in,
+  // What its guest agent says of it
+  // (like VMware Tools): its own name, system and kernel, who is signed in,
   // and its addresses when it has more than the one the reach line says.
   const g = up ? v.guest || {} : {};
   const more = (g.ips || []).filter(ip => ip !== v.ip);
@@ -89,7 +89,7 @@ function vmRow(v){
   // Made a node (step 14): its row on the Nodes page.
   const asNode = v.node_id ? `<div class="sub dmorigin">a node too: ${pageLink("nodes", "on the Nodes page", `#/machines/nodes/${encodeURIComponent(v.node_id)}`)}</div>` : "";
   const snaps = v.snapshots || [];
-  // Who else is on it now (the operator, 21 Oct): a Screen is shared, one
+  // Who else is on it now: a Screen is shared, one
   // keyboard among them; a Console is one person's at a time.
   const me = vmsData?.me || "";
   const who = list => list.map(w => w.uid && w.uid === me ? "you" : w.name);
@@ -106,7 +106,7 @@ function vmRow(v){
     ? `<div class="sub dmstate warn">asked to shut down ${Math.max(1, Math.round((Date.now() - asked) / 60000))} min ago and still running: its system may not answer the power button, and Force stop under More ends it at once</div>` : "";
   // Being made or removed, it takes nothing else (vms.act refuses it): its
   // presses are drawn dead and the row says why, never left out, so the
-  // bar does not change shape under the person (the operator, 22 Nov).
+  // bar does not change shape under the person.
   const held = busy ? " disabled" : "";
   const waitLine = v.state === "making" ? `<div class="sub dim vmwait">Its presses wait until it is made.</div>`
     : v.state === "removing" ? `<div class="sub dim vmwait">It is being removed: nothing else runs on it.</div>` : "";
@@ -152,12 +152,12 @@ function vmRow(v){
     <div class="dmbody">${inner}</div></details>`;
 }
 
-// Domains on a node's libvirt that AerieOS did not make (R165 step 1):
+// Domains on a node's libvirt that AerieOS did not make:
 // an administrator reads them by name, state and size, and nothing on the
 // page acts on one; libvirt's own tools do, on the machine.
 function vmOthersHtml(rows){
   const size = v => [v.vcpus ? `${v.vcpus} vCPU` : "", v.mem_mb ? (v.mem_mb >= 1024 ? `${+(v.mem_mb / 1024).toFixed(1)} GB` : `${v.mem_mb} MB`) : ""].filter(Boolean).join(" · ");
-  // Clone into a space (R163 step 12): its disks copied, the original left
+  // Clone into a space: its disks copied, the original left
   // as it is; offered once it is shut off, its reason on the row otherwise.
   const off = v => ["stopped", "shut off", "crashed"].includes(v.state);
   return `<section class="dmcard vmothers"><div class="field dmgroup"><b>Not AerieOS's</b><span class="sub"> · on a node's libvirt, made outside AerieOS: read here; Clone makes a copy one of a space's, the original left as it is</span></div>
@@ -178,12 +178,12 @@ async function vmCloneAsk(nodeId, from){
   if (!j.error) loadVms();
 }
 
-// A VM whose repository is gone is in no project (the operator, 26 Oct),
+// A VM whose repository is gone is in no project,
 // grouped and chipped as No project.
-// ...and the machine's own (R165 step 3): the NAS's apps and desktops, no
+// ...and the machine's own: the NAS's apps and desktops, no
 // project's, grouped and chipped as such.
 // A VM is kept by its repository and stands in the group of the space that
-// repository is in, never a repository's own (the operator, 24 Nov), as a
+// repository is in, never a repository's own, as a
 // container does (dmSpaceOf); every one in no space is one group.
 const vmKey = v => v.project === "machine" ? "machine" : (vmsData?.unowned || []).includes(v.project) ? "none" : dmSpaceOf(v.project);
 const vmOwner = k => k === "machine" ? "This machine's own" : k === "none" ? "No space" : dmSpaceLabel(k);
@@ -198,7 +198,7 @@ function vmGroupsHtml(rows){
       esc(vmOwner(k))}</b></div>${group(k)}</section>`).join("");
 }
 
-// The bar, as Containers' is (the operator, 26 Oct): the node switcher, every
+// The bar, as Containers' is: the node switcher, every
 // VM host and Every node first, the search, Cards and List, and New VM.
 function vmBar(ghost){
   const dead = ghost ? " disabled" : "";
@@ -267,11 +267,11 @@ function renderVmsInto(i){
     : !rows.length ? `<div class="empty">No VM matches “${esc(vmsSearch)}”.</div>` : "";
   const head = off || vmsErr || !onNode.length ? "" : vmTiles(onNode, chips.length) + chipBar(chips, vmsChip, "data-vmchip");
   // Written only when it says something new, and then patched into what is
-  // there (R244), as the Containers page is: a read bringing the same VMs
+  // there, as the Containers page is: a read bringing the same VMs
   // leaves the page alone, and one bringing news keeps the search box being
   // typed in, its caret, and a fold or a menu that is open.
-  // The domains a node's libvirt has that AerieOS did not make (R165
-  // step 1): read here by an administrator, under the node picked, with no
+  // The domains a node's libvirt has that AerieOS did not make:
+  // read here by an administrator, under the node picked, with no
   // button on them; not counted in the tiles or the chips, which are
   // AerieOS's own VMs.
   const others = off ? [] : (vmsData.others || []).filter(v => !vmsNode || v.node === vmsNode)
@@ -287,7 +287,7 @@ function wireVms(el){
   el.querySelectorAll("[data-vmclone]").forEach(b => b.onclick = () => pressing(b, () => vmCloneAsk(b.dataset.vmclone, b.dataset.vmfrom)));
   const s = el.querySelector("#vmSearch");
   // The patch keeps the box, its focus and its caret; a word an input
-  // method is still composing is filtered on once it is chosen (R244 step 4).
+  // method is still composing is filtered on once it is chosen.
   if (s){
     onTyping(s, () => { vmsSearch = s.value; drawPanes(); });
   }
@@ -298,8 +298,8 @@ function wireVms(el){
   el.querySelectorAll("[data-vmview]").forEach(b => b.onclick = () => {
     vmView = b.dataset.vmview === "list" ? "list" : "cards";
     try{ localStorage.setItem("bb.vmview", vmView); }catch(e){ /* private mode */ }
-    // Each VM's box tweening to its new size as its drawing fades through
-    // (the operator, 24 Nov), as the Containers page's switch does.
+    // Each VM's box tweening to its new size as its drawing fades through,
+    // as the Containers page's switch does.
     morphThrough(".pane .doc.on .vmtab [data-vm-key]", () => drawPanes(), e => e.dataset.vmKey);
   });
   const nb = el.querySelector("#bVmNew");
@@ -308,7 +308,7 @@ function wireVms(el){
     const v = (vmsData?.vms || []).find(x => x.key === row.dataset.vmKey);
     if (!v) return;
     row.querySelectorAll("[data-vmcon]").forEach(b => b.onclick = async () => {
-      // One person's at a time (the operator, 21 Oct): somebody else's is
+      // One person's at a time: somebody else's is
       // refused, but for the project's owner and the administrators, who
       // may take it over, asked first, and the person is told.
       const held = (v.on?.console || []).filter(w => !w.uid || w.uid !== vmsData?.me).map(w => w.name);
@@ -385,7 +385,7 @@ function openNewVm(forProject = ""){
   const projects = Object.entries(vmsData?.can || {}).filter(([, l]) => l === "write").map(([p]) => p).sort();
   const imgs = (vmsData?.images || []).filter(i => !i.person);
   const hosts = vmsData?.hosts || [];
-  // What a VM is made from (R99): a catalog image, or an installer's ISO
+  // What a VM is made from: a catalog image, or an installer's ISO
   // already on the picked node, or one to fetch there first.
   const fromOptions = nid => {
     const isos = (hosts.find(h => h.id === nid)?.isos || []);
@@ -440,7 +440,7 @@ function openNewVm(forProject = ""){
   // More opens as every fold here does, slid rather than snapped.
   $m(".vmmore > summary").onclick = e => { e.preventDefault(); const d = e.currentTarget.parentElement; slideDetails(d, !foldOpen(d)); };
   // Brought into view when said: at the dialog's foot, under More, it sat
-  // behind the footer and a refused press looked like nothing (B304).
+  // behind the footer and a refused press looked like nothing.
   const say = t => { $m("#vmWhy").textContent = t; $m("#vmWhyF").hidden = !t;
     if (t) $m("#vmWhyF").scrollIntoView({block: "nearest"}); };
   const from = () => {
@@ -503,7 +503,7 @@ function openNewVm(forProject = ""){
   from();
 }
 
-// ---- a VM's hardware beyond size (R100) -----------------------------------
+// ---- a VM's hardware beyond size -----------------------------------
 // One set of fields for New VM's More and the Hardware dialog of a stopped VM:
 // CPU threads in their core pairs (as a hypervisor's form draws them), a memory ceiling it
 // may balloon to, its network, a TPM, a folder of the project shared in, and
@@ -515,7 +515,7 @@ function vmHwLine(v){
   if (hw.net === "lan" && !v.node_id) bits.push("on the LAN");
   if (hw.tpm) bits.push("TPM 2.0");
   if (hw.share?.path) bits.push(`sees ${hw.share.path.replace(/^\/workspace\//, "")}${hw.share.ro ? " read-only" : ""} as "${hw.share.tag}"`);
-  // The USB devices it was given from its node's page, by name (R116);
+  // The USB devices it was given from its node's page, by name;
   // the rest of what is passed through, counted.
   const usb = v.usb || [];
   if (usb.length) bits.push(`USB: ${usb.map(u => u.name || `${u.vendor.slice(2)}:${u.product.slice(2)}`).join(", ")}`);
@@ -531,8 +531,8 @@ function vmHwFields(host, hw, admin){
   const devs = admin ? [
     ...(host?.hw?.usb || []).map(u => `<label class="ndcap"><input type="checkbox" data-usb="${esc(u.vendor)}:${esc(u.product)}"${
       (hw?.devices || []).some(d => d.type === "usb" && d.vendor === u.vendor && d.product === u.product) ? " checked" : ""}> USB: ${esc(u.name)}</label>`),
-    // A display card the host's own driver holds is this machine's (R207
-    // step 3): the node's Features section marks it for a VM, which binds
+    // A display card the host's own driver holds is this machine's:
+    // the node's Features section marks it for a VM, which binds
     // it to vfio-pci from the next boot; only then is it offered.
     ...(host?.hw?.pci || []).map(p => { const mine = p.class.startsWith("0x03") && /^(nvidia|nouveau|amdgpu)$/.test(p.driver || "");
       return `<label class="ndcap"><input type="checkbox" data-pci="${esc(p.addr)}"${
@@ -558,7 +558,7 @@ function vmHwFields(host, hw, admin){
       `${admin ? `<div class="fcell fwide">${lbl("vmHwDevs", "Devices passed through", "the host's own, given to this VM alone while it runs; a PCI device needs the IOMMU on")}
       <div id="vmHwDevs">${devs.join("") || `<span class="sub">none on this node</span>`}${host?.hw?.iommu ? "" : `<div class="sub warn">The IOMMU is off on this node, so no PCI device can be passed through.</div>`}</div></div>` : ""}`]})}</div>`;
 }
-// ---- a VM's network: source, model, MAC (R219 step 4) ----
+// ---- a VM's network: source, model, MAC ----
 // The source is its space's own network, the LAN (the host's br0 on AerieOS,
 // the card itself elsewhere), any other bridge on the host, or a libvirt
 // network, grouped as the old system's form groups them; the model is

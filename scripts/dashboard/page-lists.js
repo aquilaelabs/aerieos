@@ -1,4 +1,4 @@
-// Long lists, more as the reader gets there (the operator, 16 Oct: in place
+// Long lists, more as the reader gets there (in place
 // of Previous and Next): the first page of rows on screen, and the next one
 // shown when the foot of the list comes into view, until all of it is. The
 // foot says how much is on screen of the whole, "50 of 80 bugs", and keeps a
@@ -26,8 +26,8 @@ function pageKey(host, name){
   return (nb ? nb + ":" : "") + (name || host.id);
 }
 
-// How many of a long list's rows to build: the pages shown so far (the
-// operator, 17 Oct: a list of 795 bugs built every row on each press and
+// How many of a long list's rows to build: the pages shown so far
+// (a list of 795 bugs built every row on each press and
 // hid all but 25, three seconds on a phone). The caller builds that many
 // and hands paginate `total` and `more`, which builds the next page.
 function pageLimit(host, name, total, size = PAGE){
@@ -52,7 +52,7 @@ function paginate(host, rowSel, opts = {}){
   // a patch steps over it, and a redraw that made the list's element into
   // another (the Library's grid into a card, its chip changed) carried the
   // foot inside that one, out of this list's reach, saying "6 of 61" of a
-  // list of six (the operator, 23 Nov).
+  // list of six.
   document.querySelectorAll(".pagemore").forEach(old => {
     if (old.dataset.pagekey === key || old.parentElement === host){ old.__io?.disconnect(); old.remove(); }
   });
@@ -65,7 +65,7 @@ function paginate(host, rowSel, opts = {}){
     const bar = document.createElement("div");
     bar.className = "pagemore";
     bar.dataset.pagekey = key;
-    bar.setAttribute("data-own", "");      // the list's code's: a patch steps over it (R244)
+    bar.setAttribute("data-own", "");      // the list's code's: a patch steps over it
     drawHTML(bar, `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
       <button type="button" class="next">Show more</button>`);
     const more = () => {

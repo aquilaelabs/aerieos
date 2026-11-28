@@ -44,7 +44,7 @@ def gles():
 
 
 def prefs():
-    """The repository's node: its project's (R138), as the server's overlay
+    """The repository's node: its project's, as the server's overlay
     reads it, the repository's own record where it is in no project."""
     st = os.environ["DASHBOARD_STATE"]
     try:
@@ -78,7 +78,7 @@ def identity():
     elif n:
         # Not a warning: an account without one is told on its own Claude
         # buttons and Profile, and the operator's card is not where
-        # somebody else's missing email belongs (the operator, 28 Sep).
+        # somebody else's missing email belongs.
         # Nothing here is theirs to fix.
         print(f"  [ok]   commit identity on {n} of {m} accounts")
         print("         an account without one is told on its own Claude buttons and Profile, not here")
@@ -113,7 +113,7 @@ def node():
 
 
 def wall(nodes, n):
-    """The controller's own machine as a node (R90): whether the wall
+    """The controller's own machine as a node: whether the wall
     between its sessions and this controller holds, as its bb-session last
     told it (the census's isolation, `bb-session check`). Said in red when it
     does not, since no session starts there until it does."""

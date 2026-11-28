@@ -1,4 +1,4 @@
-"""The agent's half of shipping an image between two nodes (R166): an
+"""The agent's half of shipping an image between two nodes: an
 upload step sends a file of its job's compose directory to the controller's
 image verb and removes it here; a fetch step brings one into that
 directory; nothing outside the directory and no other verb is touched."""

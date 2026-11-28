@@ -48,8 +48,8 @@ const tcInstall = async (names, node) => {
 };
 
 const sb = (await api('/api/v1/nodes')).nodes.find(n => n.name === 'sandbox');
-// The Library on the sandbox node, narrowed to one kind's every card (R256:
-// it opens on shelves of eight), the toolchains unless a section says.
+// The Library on the sandbox node, narrowed to one kind's every card
+// (it opens on shelves of eight), the toolchains unless a section says.
 const toLibrary = async (kind = 'toolchain') => {
   await page.evaluate(id => openLibraryOn(id), sb.id);
   await page.waitForFunction(id => libNode === id && lib && Array.isArray(lib.rows)
@@ -76,7 +76,7 @@ ok(String(tc.root || '').includes(`${DIR}/sdk`), `the store says which root thin
 const pw = catalog.toolchains.find(p => p.name === 'playwright');
 const lt = catalog.toolchains.find(p => p.name === 'lint-tools');
 ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm ci --offline/.test(pw?.source?.run?.join(' '))
-   // ...and its command on PATH (B534): which playwright found nothing, and
+   // ...and its command on PATH: which playwright found nothing, and
    // a session hard-coded the module's path into its own scripts.
    && pw?.layout?.bin?.includes('node_modules/.bin')
    && lt?.layout?.bin?.includes('bin')
@@ -115,11 +115,11 @@ await section("A recipe that gives a session commands says under which name", as
 // A card's Details says which tool installing it adds to a session, and
 // what installing it is under: an agreement Install accepts (Google's
 // Android SDK terms, linked: the acceptance is the operator's, not a
-// script's), else the licenses (the operator, 7 Oct).
+// script's), else the licenses.
 await section("the Library's toolchain cards, on the sandbox node", async () => {
   const said = await page.evaluate(() => {
     const keys = lib.rows.filter(r => r.kind === 'toolchain' && !r.machine && !r.wrong_platform).map(r => `toolchain:${r.name}`);
-    // What each entry's page says (R183), from the same libDetail.
+    // What each entry's page says, from the same libDetail.
     const out = keys.map(k => {
       const r = lib.rows.find(x => `toolchain:${x.name}` === k);
       const c = document.createElement('div');
@@ -176,7 +176,7 @@ await section("One word and an ellipsis for the whole of a job", async () => {
   d = await card('flutter', { installed: false, unknown: false, update: false, latest: '' });
   ok(d.state === '' && d.acts.includes('Install') && !d.pills.some(p => /warn/.test(p)),
      '...and one not installed offers Install and says nothing amber');
-  // B31: a tool the census calls "present" has no version to show.
+  // A tool the census calls "present" has no version to show.
   d = await card('flutter', { installed: true, unknown: false, version: 'present', update: false });
   ok(d.state === 'installed' && !d.pills.includes('present'),
      `a toolchain the census calls "present" reads installed, with no "present" pill (B31) (${d.pills.join(', ')})`);
@@ -233,7 +233,7 @@ await section("One operation at a time", async () => {
   ok(g.check && g.abort && g.install,
      `while a job runs, Check for updates and every card's Install stay live, a press queueing behind it, and no Abort stands beside them (${
        Object.entries(g).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'all'})`);
-  // A card queued behind it says behind what (the operator, 22 Nov), and so
+  // A card queued behind it says behind what, and so
   // does the press's toast, from the same words (tcBehind).
   const q = await page.evaluate(() => {
     const was = lib.job;
@@ -248,7 +248,7 @@ await section("One operation at a time", async () => {
   ok(/^queued behind the install of \S/.test(q.said) && q.said.endsWith(q.behind) && q.check === 'the check for updates' && q.idle === '',
      `...and a card queued behind it says behind what, as its toast does (${q.said}; ${q.check})`);
   // A check the operator did not start still has to reach the page, and the
-  // button says which job is in the way; the head keeps to the store (B31).
+  // button says which job is in the way; the head keeps to the store.
   const c = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: true, action: 'check' };
@@ -264,7 +264,7 @@ await section("One operation at a time", async () => {
   ok(await page.$eval('.doc .librarytab [data-libcheck]', b => !b.disabled),
      '...and the bar is live again when it finishes');
   // ...and the press itself wears it at once, before the server has answered
-  // (the operator, 22 Nov: Check on the band stayed dead with no ring for
+  // (Check on the band stayed dead with no ring for
   // seconds, the filter band's buttons kept from wearing one).
   {
     let let_go; const held = new Promise(r => { let_go = r; });
@@ -291,7 +291,7 @@ await section("One operation at a time", async () => {
   });
   ok(!when.none && when.some, 'the head says when versions were last checked, and nothing while they never were');
 });
-// A retired node's directory on the store is offered with Remove (R196).
+// A retired node's directory on the store is offered with Remove.
 await section("A retired node's directory on the store is offered with Remove", async () => {
   const seen = await page.evaluate(() => {
     const was = lib.cleanable;
@@ -301,7 +301,7 @@ await section("A retired node's directory on the store is offered with Remove", 
     lib.cleanable = was; readMoved('library'); drawPanes();
     return out;
   });
-  // What it takes is said in Remove's own question (R274), where the head said it.
+  // What it takes is said in Remove's own question, where the head said it.
   ok(!/Remove takes/.test(seen.head) && seen.rm,
      `a retired node's directory on the store is offered with Remove in the bar, the head saying nothing of it (R196) (${seen.head.slice(-70)})`);
   // Pressed in the same turn it is drawn in, so no read lands between.
@@ -491,8 +491,8 @@ await section("what needs what", async () => {
 
 // ---- Remove on the Installed page --------------------------------------------
 // The sandbox's store is what its census says it holds; a toolchain there is
-// an Installed row with Remove, which asks first by the name its row shows
-// (B65), runs the job on the node, and says under the row what the job said
+// an Installed row with Remove, which asks first by the name its row shows,
+// runs the job on the node, and says under the row what the job said
 // failed (the stub fails every toolchain job).
 await section("Remove on the Installed page", async () => {
   const { writeFileSync, rmSync } = await import('node:fs');
@@ -516,7 +516,7 @@ await section("Remove on the Installed page", async () => {
   rmSync(`${DIR}/sandboxdata/census-extra.json`, { force: true });
 });
 
-// ---- the two meanings of SDK_ROOT (B89) ----------------------------------
+// ---- the two meanings of SDK_ROOT ----------------------------------
 // On the controller SDK_ROOT is the STORE and bb appends this machine's
 // scope to it. On a node the agent exports it as the scope directory
 // already, because that is also what BUILDER_HOME and ANDROID_HOME are made
@@ -549,11 +549,11 @@ await section("the two meanings of SDK_ROOT", async () => {
   ok(sh(`${odd}/${scope}`) === `${odd}/${scope} ${odd}/${scope}/${scope}`,
      '...while a store whose own name is the scope keeps it, since it holds one');
 
-  // ---- what a build here can use (R100) ------------------------------------
+  // ---- what a build here can use ------------------------------------
   // The newest platform is the compileSdk ceiling and the Gradle cache is
   // what a build has without fetching: read from the directories, said in
   // one block, so a session does not list platforms/ and ~/.gradle by hand
-  // (Shebang-DevBoard, 30 Sep).
+  // (Shebang-DevBoard).
   const sdk = `${store}/${scope}/android`, gh = mkdtempSync(`${tmpdir()}/bbgradle-`);
   for (const d of ['platforms/android-35', 'platforms/android-36', 'build-tools/36.0.0']) mkdirSync(`${sdk}/${d}`, { recursive: true });
   for (const d of ['wrapper/dists/gradle-9.7.1-bin', 'caches/modules-2/files-2.1/com.android.tools.build/gradle/9.4.1',
@@ -573,7 +573,7 @@ await section("the two meanings of SDK_ROOT", async () => {
   ok(/platforms\s+none: nothing compiles here until the operator adds one from the Library/.test(bare)
      && /modules\s+none cached yet: the first build fetches them/.test(bare),
      '...and an empty store and an empty cache are said as such rather than as a blank');
-  // The NVIDIA driver's line (R102), read from this machine's sysfs and
+  // The NVIDIA driver's line, read from this machine's sysfs and
   // modinfo: none without a card, and each of the states the row has.
   const sysr = mkdtempSync(`${tmpdir()}/bbsys-`), fbin = mkdtempSync(`${tmpdir()}/bbbin-`);
   const devd = `${sysr}/bus/pci/devices/0000:04:00.0`;
@@ -614,7 +614,7 @@ await section("the two meanings of SDK_ROOT", async () => {
   ok(nv('', '', '') === '' && kit() === '', '...and nothing at all on a machine with no NVIDIA card');
 });
 
-// ---- the versions a project pins are cards on its node's Library (B712) ------
+// ---- the versions a project pins are cards on its node's Library ------
 // A store remade at the newest versions only stranded a project pinning
 // NDK 29 and build-tools 36: nothing to install. The pins are read off the
 // project's Gradle files, each a row named for the project, the store's own
@@ -666,7 +666,7 @@ await section("the versions a project pins are cards on its node's Library", asy
   await api('/api/prefs', { project: 'alpha', node: '' });
 });
 
-// ---- tool packs (R77) ------------------------------------------------------
+// ---- tool packs ------------------------------------------------------
 // An administrator looks at a pack by its repository, reads what it would
 // download and run, adds it at that commit, finds it among the Library's
 // cards as sideloaded, and removes it. The repository is on disk, which the
@@ -722,10 +722,10 @@ await section("tool packs (R77)", async () => {
   });
   ok(hcard.pills.includes('sideloaded') && /From .*packrepo at [0-9a-f]{12}, added by .*A session has aerie tool hexkit/.test(hcard.detail),
      `its card wears sideloaded with Edit, its Details saying where it came from and what a session gets (${hcard.detail.slice(0, 120)})`);
-  // A project's Toolchains group (R77 step 5): the pack is offered switched
+  // A project's Toolchains group: the pack is offered switched
   // off, since adding a pack hands it to no project, and switched on and
   // saved it is among the packs the project's sessions use.
-  // The space's toolchains are set on its own dialog (R223).
+  // The space's toolchains are set on its own dialog.
   await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForSelector('#rnTools input[data-pack][value="hexkit"]', { timeout: 20000 });
   ok(!await page.$eval('#rnTools input[data-pack][value="hexkit"]', i => i.checked),
@@ -736,7 +736,7 @@ await section("tool packs (R77)", async () => {
   ok(!saveErr && packsOn.join() === 'hexkit', `...and switched on and saved, the space's sessions may use it (${saveErr || packsOn.join() || 'none kept'})`);
   await page.evaluate(() => closeRename());
   await api('/api/prefs', { project: 'alpha', packs_on: '' });
-  // An update (R77 step 6): the repository moves on, and Edit looks for a
+  // An update: the repository moves on, and Edit looks for a
   // newer commit as it opens and shows what it changes, verb by verb,
   // before Update keeps it.
   writeFileSync(`${repo}/bbtool.json`, JSON.stringify({ name: 'hexkit', label: 'Hex kit', about: 'Looks inside binaries.',
@@ -755,11 +755,11 @@ await section("tool packs (R77)", async () => {
   await page.click('#tpmodal [data-tpadd]');
   await page.waitForFunction(c => (toolchains?.items || []).find(i => i.name === 'hexkit')?.pack?.commit === c, newer, { timeout: 20000 });
   ok(true, '...and Update keeps the pack at the newer commit');
-  // From the vetted catalog (R169 step 4): a pack kept at the index's pin
-  // wears vetted, a sha256 the index does not pin is refused (B440), and
+  // From the vetted catalog: a pack kept at the index's pin
+  // wears vetted, a sha256 the index does not pin is refused, and
   // when the index pins a newer commit the card offers Manifest update, in the look of any update: the
   // dialog on that pin with what it changes marked, Update keeping it there
-  // with its tier (B442). The catalog's address is a dead one here, so each
+  // with its tier. The catalog's address is a dead one here, so each
   // read falls back to the index kept in the state.
   {
     const { createHash } = await import('node:crypto');
@@ -789,7 +789,7 @@ await section("tool packs (R77)", async () => {
     const vcard = await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .lcard[data-lrow="pack:hexkit"] .lcmeta .pill')].map(p => p.textContent.trim()));
     ok(vcard.includes('vetted'), `the kept pack's card wears vetted (${vcard.join(', ')})`);
     // A newer pin is an update, drawn as every other and named apart from a
-    // program's (the operator, 13 Nov): Manifest update in the accent, the
+    // program's: Manifest update in the accent, the
     // card's one verb, its state in the warning voice saying which update
     // it is, and counted under Updates.
     const offer = await page.evaluate(sel => { const b = document.querySelector(sel), c = b.closest('.lcard');
@@ -835,7 +835,7 @@ await section("tool packs (R77)", async () => {
       await page.click('#tpmodal [data-tpcancel]');
       await toLibrary('pack');
     }
-    // Its own icon (R182): named in its manifest, read at the commit it is
+    // Its own icon: named in its manifest, read at the commit it is
     // kept at, drawn on its card as an image, and served as one alone: an SVG
     // that carries a script is still a picture, its address sandboxed.
     writeFileSync(`${repo}/icon.svg`, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><script>parent.iconRan = 1</script><rect width="16" height="16" fill="#2a7"/></svg>');
@@ -858,8 +858,8 @@ await section("tool packs (R77)", async () => {
     ok(served.src.includes(iconAt.slice(0, 12)) && served.w > 0 && served.type === 'image/svg+xml' && /sandbox/.test(served.csp)
        && /default-src 'none'/.test(served.csp) && served.sniff === 'nosniff' && !served.ran,
        `its card draws the icon from the pack's own address at its pin, served as an image with no script run (${JSON.stringify(served)})`);
-    // An entry this AerieOS does not take is not shown at all (the operator,
-    // 12 Nov): one written in a pack format this build has not met (R234),
+    // An entry this AerieOS does not take is not shown at all:
+    // one written in a pack format this build has not met,
     // and one whose manifest names other release lines than this one. The
     // page's head counts them, and Add refuses the first without fetching it.
     writeFileSync(`${DIR}/state/catalog-index.json`, JSON.stringify({ fetched_at: 0, formats: { 99: '9.9.0' }, packs: [
@@ -876,8 +876,8 @@ await section("tool packs (R77)", async () => {
       rows: null,
       head: [...document.querySelectorAll('.doc.on .librarytab .pghead dt, .doc.on .librarytab .facts dt')].map(d => `${d.textContent.trim()}=${d.nextElementSibling?.textContent.trim()}`)
         .find(x => /^Not for this AerieOS/.test(x)) || '' }));
-    // An entry this build does not take never reaches a look at the Library
-    // (R256): the whole list says which.
+    // An entry this build does not take never reaches a look at the Library:
+    // the whole list says which.
     later.rows = (await page.evaluate(async () => (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || []))
       .filter(r => r.too_new).map(r => r.name).sort().join();
     // (A build with no version, as the suite's is, judges no entry by its release lines: only the format counts here.)
@@ -892,7 +892,7 @@ await section("tool packs (R77)", async () => {
   }
   const bad = await api('/api/toolpacks', { action: 'preview', url: `file://${DIR}/nowhere` });
   ok(/could not fetch/.test(bad.error || ''), `a repository that is not there is said so (${bad.error})`);
-  // B84: installed on a node, Remove is refused on the form, saying where,
+  // Installed on a node, Remove is refused on the form, saying where,
   // before anything is asked: its files would stay in that store with no
   // row left to uninstall them from, and the pack added back would read
   // installed.
@@ -922,10 +922,10 @@ await section("tool packs (R77)", async () => {
   await page.evaluate(() => loadLibrary());
   await page.waitForFunction(() => lib && !lib.rows.some(r => r.kind === 'pack' && r.name === 'hexkit'), null, { timeout: 20000 });
   ok(!await page.$('.doc .librarytab .lcard[data-lrow="pack:hexkit"]'), '...Remove takes it out of the catalog, and its card goes');
-  // B85: a project that had switched it on opens its Toolchains group
+  // A project that had switched it on opens its Toolchains group
   // unchanged: the saved list still names the pack, which the form cannot
   // draw.
-  // The space's toolchains are set on its own dialog (R223).
+  // The space's toolchains are set on its own dialog.
   await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForFunction(() => rnToolsList !== null, null, { timeout: 20000 });
   const group = await page.evaluate(() => ({ dirty: !document.querySelector('.rnbar[data-rnbar="tools"] [data-rnsave]')?.disabled,

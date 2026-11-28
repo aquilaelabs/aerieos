@@ -1,4 +1,4 @@
-"""One nginx per node (nginxproxy.py, R171): the routes kept here become
+"""One nginx per node (nginxproxy.py): the routes kept here become
 nginx's config and a compose file with everything inline; a certificate is
 checked as nginx would load it, kept 0600, and never shown back."""
 import contextlib
@@ -39,7 +39,7 @@ class Routes(unittest.TestCase):
         self.assertEqual(npx.container_name("n1"), "nginx-vps-box")
 
     def test_a_route_from_a_row_takes_a_hostname_the_pair_covers(self):
-        # The Docker row's Add route with a hostname (the operator, 13 Oct):
+        # The Docker row's Add route with a hostname:
         # a subdomain under the pair's domain, refused outside it, and the
         # name joins the shared Hostnames list.
         was = npx.apply
@@ -56,7 +56,7 @@ class Routes(unittest.TestCase):
         self.assertEqual((plain["route"]["host"], plain["route"]["tls"]), ("plain.example.org", False), "a name with no pair is 80 alone")
         none = npx.add_route("n1", 8082, "example.com", None, None, None)
         self.assertEqual(none["route"]["host"], "example.com", "no hostname typed: the pair's own domain, as before")
-        # A port routed already takes another hostname (B729: the site at
+        # A port routed already takes another hostname (the site at
         # its domain and at www, one port); the same name and port again is
         # the refusal.
         www = npx.add_route("n1", 8082, "example.com", None, None, None, host="www.example.com")
@@ -141,8 +141,8 @@ class Certificate(unittest.TestCase):
     def test_two_domains_pairs_stand_side_by_side_and_a_default_from_before_is_read_in(self):
         """A pair is kept under the domain its names say, so two domains'
         pairs stand side by side and the same names again are a renewal
-        (B657: turinglens.com's pair went when another was saved as the
-        default); a default from before R188 is made a listed pair (0042)."""
+        (turinglens.com's pair went when another was saved as the
+        default); a default kept the older way is made a listed pair (0042)."""
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
                         "-subj", "/CN=*.aquilae.test", "-addext", "subjectAltName=DNS:*.aquilae.test,DNS:aquilae.test",
                         "-keyout", f"{self.tmp}/k2.pem", "-out", f"{self.tmp}/c2.pem"],
@@ -174,7 +174,7 @@ class Certificate(unittest.TestCase):
         npx.drop_cert("n1", host="www.example.com"); npx.drop_cert("n1", host="aquilae.test")
 
     def test_a_domains_certificate_covers_its_subdomains(self):
-        """One pair per domain (the operator, 11 Oct): saved under
+        """One pair per domain: saved under
         example.com it serves a.example.com and b.example.com, and another
         domain's pair its own; a hostname's own still wins over its domain's."""
         npx.save_routes("n1", [{"host": "a.example.com", "path": "/", "port": 8080},
@@ -196,7 +196,7 @@ class Certificate(unittest.TestCase):
         npx.drop_cert("n1", host="example.com")
 
     def test_a_hostname_may_have_its_own_named_by_hand(self):
-        """One pair per hostname (R175), filed under a name typed rather
+        """One pair per hostname, filed under a name typed rather
         than the one its names say: a site on another domain behind the
         same nginx gets its own, the rest answer on 80 alone."""
         npx.save_routes("n1", [{"host": "www.example.com", "path": "/", "port": 8080},
@@ -262,7 +262,7 @@ class FakeDevactions:
 
 
 class WideNames(unittest.TestCase):
-    """A pair on a public box (R93): the names it answers for beyond the
+    """A pair on a public box: the names it answers for beyond the
     node's own routes, a wildcard always among them."""
     def test_a_wildcard_and_an_unrouted_name_are_wide(self):
         rec = {"routes": [{"host": "app.example.com"}],
@@ -277,7 +277,7 @@ class WideNames(unittest.TestCase):
 
 
 class Image(unittest.TestCase):
-    """The image a node runs (R192): the one nginx's entry names by its tag
+    """The image a node runs: the one nginx's entry names by its tag
     and its digest, a node pinned to it when deployed or updated, and
     behind when the entry names another. No registry is asked."""
 
@@ -368,7 +368,7 @@ class Image(unittest.TestCase):
                 self.written[name] = node
                 return {"ok": True}
         # n2 "box" was uninstalled with its nginx still recorded; n3 is the
-        # machine enrolled again under the same name (B204).
+        # machine enrolled again under the same name.
         self.nodes[1]["state"] = "retired"
         self.nodes.append({"id": "n3", "name": "box", "kind": "agent", "state": "online"})
         npx.node_name = lambda nid: {"n1": "vps", "n2": "box", "n3": "box"}.get(nid, nid)
@@ -381,7 +381,7 @@ class Image(unittest.TestCase):
 
 
 class DaemonMemo(unittest.TestCase):
-    """The two daemon reads per row are kept DAEMON_TTL seconds (B717): a
+    """The two daemon reads per row are kept DAEMON_TTL seconds: a
     tab polling every few seconds paid a probe job per node per poll."""
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -421,7 +421,7 @@ class DaemonMemo(unittest.TestCase):
 
     def test_the_nodes_are_read_at_once(self):
         """Two nodes whose daemons each take half a second: the view waits
-        for the slower, not for both (the operator, 18 Oct)."""
+        for the slower, not for both."""
         import time
         npx.configure(state=self.tmp, write_json=write_json,
                       node_list=lambda: [{"id": "n1", "name": "vps", "kind": "agent", "state": "online"},

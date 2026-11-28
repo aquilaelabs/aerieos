@@ -1,6 +1,6 @@
-# The lab (roadmap R54): a real Gitea and Forgejo for `aerie tests lab`, a
+# The lab: a real Gitea and Forgejo for `aerie tests lab`, a
 # stack of its own beside AerieOS's dev instance, never a service in
-# AerieOS's docker-compose.yml (the operator, 17 Oct): the dev instance is
+# AerieOS's docker-compose.yml: the dev instance is
 # the one container built from the tree, rebuilt and pinned to a branch with
 # it, and the lab is neither. Images only, nothing built from the tree, so it
 # is made as any container beside a project is:
@@ -62,7 +62,7 @@ services:
         --email lab@example.invalid --must-change-password=false
         2>&1 | grep -v 'already exists' || true;
         echo 'lab seeded: labadmin/labpassword'
-  # ...and a real Forgejo beside it (the operator, 13 Oct: vet it as a git
+  # ...and a real Forgejo beside it (vet it as a git
   # host), the same shape one port along: it answers Gitea's API, which is
   # what the catalog's entry claims and what lab-forge.mjs proves against
   # it with BB_LAB_FORGE=forgejo. Its seed is the same administrator.

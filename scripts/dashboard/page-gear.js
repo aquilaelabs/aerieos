@@ -21,7 +21,7 @@ const THEME_IDS = new Set(THEMES.map(t => t[0]));
 // cookie, userTZ), with its own Apply.
 let tzDraft = null;
 
-// The scheme's other half (R216): each has a dark and a light palette, and
+// The scheme's other half: each has a dark and a light palette, and
 // which is on is this switch: dark, light, or the device's own setting,
 // followed as it changes. Kept exactly as the scheme is: in localStorage
 // for the paint path and on the account for a browser that has none.
@@ -115,7 +115,7 @@ function applyTheme(id){
   if (use === "default") delete root.dataset.theme;
   else root.dataset.theme = use;
   applyMode(currentMode(), {save: false});
-  // ...with whose it is (B491): a browser's choice wins for the account
+  // ...with whose it is: a browser's choice wins for the account
   // that made it, and another account signing in here gets its own.
   try{ localStorage.setItem("bb.theme", use); localStorage.setItem("bb.theme.who", state?.me || ""); }catch(e){ /* private mode */ }
   themeSaved = use;
@@ -145,7 +145,7 @@ function adoptTheme(t, who){
   }catch(e){ return; }              // no storage: leave the default alone
   // The browser's own choice stands for the account that made it. Another
   // account signing in here takes its own scheme, the default for one that
-  // never picked (B491: a new account inherited the first one's colors).
+  // never picked (a new account inherited the first one's colors).
   const same = !who || !had || (whose || "") === who;
   if (had && same) return;
   const use = t && /^[a-z]{2,12}$/.test(t) ? t : "default";
@@ -214,13 +214,13 @@ function drawUiMenu(){
     b.onclick = () => applyTheme(b.dataset.theme));
   el.querySelectorAll("[data-mode]").forEach(b =>
     b.onclick = () => applyMode(b.dataset.mode));
-  // Less motion beside the scheme's half (the operator, 19 Oct): the
+  // Less motion beside the scheme's half: the
   // account's own, kept as the scheme is (page-motion.js applyMotion).
   el.querySelector("#uiMotion").onchange = e => applyMotion(e.target.checked);
   // The graduation (docs/nodes.md §13): the gear keeps what is this
   // BROWSER's and everything the controller owns lives on the Controller
   // page, where it has room to say what it costs.
-  // The time zone is this browser's, beside its scheme (R218 step 31): a
+  // The time zone is this browser's, beside its scheme: a
   // pick, then Apply, as any setting (the settings rule's one exception is
   // the scheme, which is looked at rather than decided).
   const tz = el.querySelector("#uiTZ"), tzApply = el.querySelector("#uiTZApply");
@@ -243,7 +243,7 @@ function drawUiMenu(){
   el.querySelector("#uiProfile").onclick = () => { toggleUiMenu(false);
     openProfileTab(); };
   // On a narrow phone the header's bug and sign-out live here, so the search
-  // beside the logo keeps room to be typed into (B744).
+  // beside the logo keeps room to be typed into.
   el.querySelector("#uiReport").onclick = () => { toggleUiMenu(false); openReport(""); };
   el.querySelector("#uiOut").onclick = () => askSignOut();
 }
@@ -335,7 +335,7 @@ function toggleUiMenu(open){
   if (uiMenuOpen){
     // A close still playing is stopped, and its end hides only a menu still
     // meant to be shut: pressed again inside its 120ms, the menu opened and
-    // was then hidden by the close's own finish (B855).
+    // was then hidden by the close's own finish.
     el.getAnimations().forEach(a => a.cancel());
     el.hidden = false;
     drawUiMenu();

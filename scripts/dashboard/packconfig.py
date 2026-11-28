@@ -1,4 +1,4 @@
-"""What a pack is configured with on each node (R172): the answers to the
+"""What a pack is configured with on each node: the answers to the
 fields its manifest's config block asks for, kept here per node and pack,
 a secret sealed under the install key and never read back by the page
 (only replaced), the rest plain. A node is handed its own in the hello
@@ -8,7 +8,7 @@ that pack's verbs. The model router is not kept here: its service keeps
 its own record (router.py), and the Library sends its Configure there.
   STATE/packconfig.json   {nid: {pack: {field: value | "sealed:..." | [rows] | bool | [projects]}}}
   STATE/packconfig-people.json  {nid: {pack: {uid: {field: ...}}}}: the
-                          fields a manifest scopes to a person (R172 step 5),
+                          fields a manifest scopes to a person,
                           each account's own on that node, a secret sealed
                           under the account's own key (accountkeys), so it
                           opens only as that account's sign-ins do. The hello
@@ -113,7 +113,7 @@ def _open_for(uid, v):
 
 def set_mine(nid, pack, fields, values, uid):
     """Keep a person's own answers to a pack's person-scoped fields on a
-    node (R172 step 5): {ok, values} or {error}. A secret is sealed under
+    node: {ok, values} or {error}. A secret is sealed under
     the account's own key, refused while that key is locked."""
     fields = person_fields(fields)
     if not fields:

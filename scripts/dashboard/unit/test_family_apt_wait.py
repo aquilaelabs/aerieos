@@ -1,4 +1,4 @@
-"""The Debian family's apt waits for another apt to let go of its lock (B320):
+"""The Debian family's apt waits for another apt to let go of its lock:
 a machine just booted from a cloud image runs its own apt-get for a few
 minutes, and an install begun as soon as ssh answered failed on the lock.
 apt_waiting runs the command again while it fails on the lock, and passes

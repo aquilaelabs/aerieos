@@ -14,7 +14,7 @@
 # secrets are (lib/sealfile.py, dashboard/signing.py): NAME.sealed beside
 # NAME.pub, opened only into the agent. It was a plain key file with no
 # passphrase, guarded by its mode alone, so a copy of /config taken as root
-# carried every deploy key ready to use (R243). A plain one from before is
+# carried every deploy key ready to use. A plain one from before is
 # sealed the first time this loads the keys, at the next start. Where the
 # install has no install key, or no way to seal, a key is kept plain as it
 # was and that is said.
@@ -180,7 +180,7 @@ case "$kind" in
         done
         echo "$n" ;;
     --take)
-        # A move's landing (B966): the keys the old controller kept, sealed
+        # A move's landing: the keys the old controller kept, sealed
         # under its install key, which came with the move when ticked. Each
         # file a regular one of a key's name, never a link, never over one
         # kept here; loaded now where the key opens them, else at the next start.

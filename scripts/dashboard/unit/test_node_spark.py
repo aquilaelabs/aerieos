@@ -1,4 +1,4 @@
-"""A node's last hour for its charts (R218 step 9): the controller keeps each
+"""A node's last hour for its charts: the controller keeps each
 heartbeat's sample, and each running container's use the agent sends once a
 minute, in rings held by time, not by count, since the poll's interval is a
 setting; what a node sends about its containers is whitelisted like
@@ -61,7 +61,7 @@ class Spark(unittest.TestCase):
         self.assertEqual(nodes.ctr_spark(self.nid)["web-1"], [[t0 + 3700, 5.0, 10.0]])
 
     def test_numbers_alone_move_only_the_samples_token(self):
-        # R218 step 10: the registry's token moved with every sample, and
+        # The registry's token moved with every sample, and
         # every page with a node picker re-read the list and the status poll.
         self.beat(4_000_000, {"cpu_pct": 1, "mem_mb": 2000, "mem_used_mb": 100,
                               "sessions": [{"name": "s1", "attached": False, "cwd": "/w", "title": "x"}]})

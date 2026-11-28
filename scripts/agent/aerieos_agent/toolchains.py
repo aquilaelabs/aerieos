@@ -1,4 +1,4 @@
-"""The toolchain store, scoped by platform (roadmap R19): what is installed, who uses it, and what a session's environment gets from it."""
+"""The toolchain store, scoped by platform: what is installed, who uses it, and what a session's environment gets from it."""
 import contextlib
 import json
 import os
@@ -45,11 +45,11 @@ UPDATE_VERBS = ("flutter", "dotnet", "swift", "playwright")
 def tc_verbs(store, name, entry, action):
     """The aerie toolchains verbs a job runs for one name, in order. An install
     of a toolchain that is there already is an update: `update` for a recipe
-    that verb knows, and for the rest a remove and then the install (R193,
-    the operator, 11 Oct: "have it uninstall and reinstall automatically"),
+    that verb knows, and for the rest a remove and then the install
+    ("have it uninstall and reinstall automatically"),
     where aerie toolchains install alone dies with "already installed" on a
     fresh_only recipe. Swift is updatable and fresh_only both, and this
-    sent it to `install` on a node, which refused it every time (12 Oct).
+    sent it to `install` on a node, which refused it every time.
     Not installed, or any other action: the one verb."""
     src = (entry or {}).get("source") or {}
     if action != "install" or src.get("versioned") or not tc_dir(store, name, entry, action):
@@ -67,7 +67,7 @@ def tc_users(path, limit=8):
     {pid, what, project}, the project from the BB_PROJECT a session's
     processes carry. Read from /proc, which an agent that is root sees
     whole; one that is not sees its own account's, and says no more than it
-    can (the operator, 6 Oct: an update under a running build is refused,
+    can (an update under a running build is refused,
     naming whose it is)."""
     root = os.path.realpath(path).rstrip("/") + "/"
     inside = lambda p: (p or "").startswith(root) or (p or "") + "/" == root  # noqa: E731
@@ -237,7 +237,7 @@ def root_catalog(into):
 
 def read_catalog(into):
     """The catalog the bundle carries, or {} when it cannot be read, with the
-    tool packs a person added (R77, config/toolpacks.json beside it) among
+    tool packs a person added (config/toolpacks.json beside it) among
     its toolchains. Where the bundle carries the vetted catalog's newer
     rows (config/toolchains.catalog.json, the shipped rows with those in
     their places), that file is the one read: the shipped one goes as its
@@ -324,7 +324,7 @@ def pkg_available(fam, name):
 # The most system packages one recipe may name: a bound on what a catalog
 # can make a machine install, not a guess at what any needs. It was 64, and
 # Playwright with WebKit's libraries is 76 on apt; what was past it was
-# dropped without a word, and WebKit installed and could not launch (B836).
+# dropped without a word, and WebKit installed and could not launch.
 SYSDEPS_MAX = 160
 
 
@@ -383,7 +383,7 @@ def held_recipes(state, cat):
         # android:* recipe shares the directory `android`, so the directory
         # existing said the emulator was held on a node that had installed
         # only the command-line tools, and the page asked for the
-        # emulator's libraries on every such node (B139).
+        # emulator's libraries on every such node.
         tool = e.get("tool")
         if tool:
             held = os.path.exists(_lay_path(store, e, tool))
@@ -395,7 +395,7 @@ def held_recipes(state, cat):
 
 
 def sysdeps_now(state):
-    """The census's answer (roadmap R51): {family, unmet: {recipe: [pkg]}},
+    """The census's answer: {family, unmet: {recipe: [pkg]}},
     from the bundle the store already holds; nothing until one is there."""
     store = tc_root(state)
     into = os.path.join(store, ".bb", "current") if store else ""
@@ -501,7 +501,7 @@ def sdk_env(state, who=None, layout_env=True):
         env.update({"SDK_ROOT": store, "BUILDER_HOME": store, "BB_NODE_TOOLCHAINS": "1",
                     # The scope bb scopes by (common.sh sdk_scope), so a aerie run
                     # here installs into and reads this node's own directory
-                    # (R196) rather than the platform's shared one.
+                    # rather than the platform's shared one.
                     "BB_SDK_SCOPE": tc_scope(),
                     "ANDROID_HOME": android, "ANDROID_SDK_ROOT": android})
         front = []
@@ -512,7 +512,7 @@ def sdk_env(state, who=None, layout_env=True):
                     front.append(d)
             for k, v in (entry.get("env") or {}).items() if layout_env else ():
                 # `=VALUE` is the value itself, not a path: what a toolchain
-                # needs set beside where it is (B548: Playwright told not to
+                # needs set beside where it is (Playwright told not to
                 # sweep browsers another install of it did not ask for).
                 # Where that toolchain is installed here and nowhere else: a
                 # pack's reaches no job on a node that does not hold it.
@@ -536,7 +536,7 @@ def sdk_env(state, who=None, layout_env=True):
     # _apply_runner) names the same path, so the archive and the reader
     # agree without either being configured by hand.
     env["BB_CI_LOG_DIR"] = ci_log_dir(state)
-    # How many workers a test run here may use (R81): the node's setting,
+    # How many workers a test run here may use: the node's setting,
     # else its cores. A project's test command reads it as it likes;
     # AerieOS's own harness shards its suites across it.
     env["BB_TEST_WORKERS"] = str(state.get("test_workers") or os.cpu_count() or 1)
@@ -554,15 +554,15 @@ def runner_env_text(state):
     PATH was the bare system's, with no node, no Playwright and no store, while a
     session or a bb job on the same machine had the toolchain. The browser
     suite then skipped with exit 0 and every 'dashboard tests' run on
-    bb-sandbox was green without running a test (bug B74). Sorted, so the
+    bb-sandbox was green without running a test. Sorted, so the
     text is stable and runner_sync can compare it byte for byte.
     """
     return "".join(f"{k}={v}\n" for k, v in sorted(sdk_env(state).items()))
 
 
 def sdk_verified(state):
-    """How each toolchain in the store was checked when it was installed
-    (R137): {name: {algo, where}}, algo "none" with why where its publisher
+    """How each toolchain in the store was checked when it was installed:
+    {name: {algo, where}}, algo "none" with why where its publisher
     states nothing; a toolchain installed before this has no record and is
     left out."""
     store = tc_root(state)
@@ -589,7 +589,7 @@ def sdk_verified(state):
 
 def netcut_sudoers(user, tool):
     """The sudo rule that lets the account a node's jobs run as cut the
-    network for a declared pack's install steps (R234): the one command, which
+    network for a declared pack's install steps: the one command, which
     runs what it is handed as that account again and never as root."""
     return (f"# Written by the AerieOS agent (R234): the one command {user}, the account this\n"
             f"# node's jobs run as, may run as root for a tool pack's install. It runs what it\n"
@@ -599,7 +599,7 @@ def netcut_sudoers(user, tool):
 
 
 def sdk_receipts(state):
-    """What each pinned install left behind (R234): {name: {commit, tree,
+    """What each pinned install left behind: {name: {commit, tree,
     files, bytes, at, before, net, and why where net is online}} from the
     first line of its .bb-receipt, which the installer writes (sdkmeta.py
     receipt). `tree` is one sha256 over every file's, `before` the tree the

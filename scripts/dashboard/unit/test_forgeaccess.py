@@ -1,4 +1,4 @@
-"""What an agent may do on a project's git host (R188): the token measured
+"""What an agent may do on a project's git host: the token measured
 against a recorded host without changing anything, the project's Allow or
 Deny over it, the briefing's lines, and aerie forge's verbs in each host's
 dialect."""
@@ -48,7 +48,7 @@ class Base(unittest.TestCase):
                               target=lambda project: self.t, prefs_get=lambda project: {"forgepol": self.pol})
         self.was = forgeaccess._call
         self.addCleanup(setattr, forgeaccess, "_call", self.was)
-        # The git door's answer (B462): none unless a test says.
+        # The git door's answer: none unless a test says.
         self.addCleanup(setattr, forgeaccess, "_receive_pack_probe", forgeaccess._receive_pack_probe)
         forgeaccess._receive_pack_probe = lambda t, r: None
 
@@ -109,7 +109,7 @@ class Measure(Base):
         self.assertEqual(forgeaccess.kept("app")["has"], has, "the measure is kept")
 
     def test_the_git_door_has_the_last_word_on_push(self):
-        # B462: an organization's fine-grained token not approved yet passed
+        # An organization's fine-grained token not approved yet passed
         # every API probe and was refused at the push itself with 403.
         github(self)
         forgeaccess._receive_pack_probe = lambda t, r: False
@@ -254,7 +254,7 @@ class Dialects(Base):
 
 
 class DispatchFields(unittest.TestCase):
-    """aerie forge run dispatch --field NAME=VALUE (B1062): read as one plain
+    """aerie forge run dispatch --field NAME=VALUE: read as one plain
     flag, its value was taken a character at a time and the '=' refused."""
 
     def test_a_field_given_alone_is_one_field(self):
@@ -274,7 +274,7 @@ if __name__ == "__main__":
 
 class IssueList(Base):
     def test_issues_behind_a_page_of_pull_requests_are_found(self):
-        # B562: GitHub lists pull requests among its issues; thirty asked for
+        # GitHub lists pull requests among its issues; thirty asked for
         # were thirty pull requests and no issue said.
         prs = [{"number": n, "title": "pr", "state": "open", "pull_request": {"url": "x"}} for n in range(100)]
         issues = [{"number": 200 + n, "title": "bug", "state": "open"} for n in range(5)]
@@ -291,7 +291,7 @@ class IssueList(Base):
 
 
 class Rehearsed(Base):
-    """Whether a rehearsal passed on a commit (R190 step 6): the workflow's
+    """Whether a rehearsal passed on a commit: the workflow's
     runs on that commit, asked of the host with the space's token."""
     def test_a_passed_run_on_the_commit_is_a_yes(self):
         sha = "a" * 40
@@ -313,7 +313,7 @@ class Rehearsed(Base):
 
 class RunLog(Base):
     def test_a_failure_past_the_first_page_is_the_log_shown(self):
-        # B563: fifty jobs were asked for, and with no failure among them the
+        # Fifty jobs were asked for, and with no failure among them the
         # first jobs' passing logs were shown as the answer.
         ok = [{"id": n, "conclusion": "success"} for n in range(100)]
         pages = {1: {"jobs": ok}, 2: {"jobs": [{"id": 163, "conclusion": "failure"}]}}
@@ -329,7 +329,7 @@ class RunLog(Base):
 
 class Governed(Base):
     def test_an_ability_another_setting_governs_has_no_switch(self):
-        # B559: a deny on Push, Read the code or Publish and edit releases was
+        # A deny on Push, Read the code or Publish and edit releases was
         # told to sessions and enforced nowhere; it is fixed at allow, with
         # where it is set, and Change CI workflow files keeps its switch.
         self.pol = {"push": "deny", "releases_write": "deny", "code_read": "deny", "workflows": "deny"}

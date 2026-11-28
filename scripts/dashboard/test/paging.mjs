@@ -41,14 +41,14 @@ const state = () => page.evaluate(() => {
 });
 
 let st = await state();
-// Built a page at a time, not built whole and hidden (the operator, 17 Oct:
-// 795 bugs built on every press of a chip took seconds on a phone).
+// Built a page at a time, not built whole and hidden
+// (795 bugs built on every press of a chip took seconds on a phone).
 ok(st.total === 25 && st.shown === 25,
    `a list past the threshold builds its first page alone, not every row (${st.total} built)`);
 ok(/25 of 40 reports/.test(st.text) && st.bars === 1 && /Show more/.test(st.text),
    '...with one quiet foot saying how much of it is on screen, and a Show more');
 
-// More as the reader gets there (the operator, 16 Oct): the foot scrolled
+// More as the reader gets there: the foot scrolled
 // into view brings the rest under the rows already there, with no press.
 const top = await page.$eval('#bugList:visible .bug:nth-of-type(1)', e => e.getBoundingClientRect().top);
 await page.$eval('#bugList:visible .pagemore', e => e.scrollIntoView({ block: 'end' }));
@@ -100,12 +100,12 @@ ok(await page.evaluate(() => {
 // silently (nothing to hide, so no footer), which is worth pinning. Read from
 // the file rather than the DOM: exact, instead of a guess about what
 // innerHTML happens to contain. The page and every notebook view file, since
-// a view's renderer lives in its own nb-*.js now (R60).
+// a view's renderer lives in its own nb-*.js now.
 const src = ['../index.html', ...readdirSync(new globalThis.URL('..', import.meta.url))
     .filter(f => /^(nb|page|tab)-.*\.js$/.test(f)).map(f => '../' + f)]
   .map(f => readFileSync(new globalThis.URL(f, import.meta.url), 'utf8')).join('\n');
 for (const [what, call] of [
-  // Less what the list's band leaves out (R254 step 1), so a page holds
+  // Less what the list's band leaves out, so a page holds
   // what is shown.
   ['the roadmap', 'paginate($("roadmapList"), ":scope > .grp", {key: "roadmapList", noun: "items", total: vis.length'],
   ['memory', 'paginate($("memList"), ":scope > .mem"'],
@@ -146,7 +146,7 @@ await section("one bucket per notebook, not one for all of them", async () => {
   await page.evaluate(() => { openNotebook('alpha'); openNotebook('beta'); });
   await page.waitForSelector('.nb[data-project="beta"]', { timeout: 20000 });
   await page.evaluate(() => { for (const p of ['alpha', 'beta']) getNotebook(p)?.view('artifacts'); });
-  // A page of rows built and the rest offered (R228 step 13: the rows past
+  // A page of rows built and the rest offered (the rows past
   // a page are not built until they are asked for).
   await page.waitForFunction(() => document.querySelector(
     '.nb[data-project="alpha"] .nbview[data-view="artifacts"] .pagemore .next'),

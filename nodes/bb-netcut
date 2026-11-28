@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""bb-netcut: run a command as the caller with no network (R234).
+"""bb-netcut: run a command as the caller with no network.
 
 A tool pack that declares its downloads has them fetched and held to their
 sha256 by AerieOS, and its install steps then run with the network cut, so

@@ -22,7 +22,7 @@ const profileDraft = {};
 // by that name, which some browsers leave out of their own list. `browser`:
 // the gear's pick, where nothing is the person's own zone when they set one
 // and "device" this device's; `person`: Profile's, where nothing is the
-// controller's clock (R294 step 8).
+// controller's clock.
 function tzOptions(cur, {browser = false, person = false} = {}){
   const own = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   let zones = [];
@@ -71,12 +71,12 @@ const PROFILE_SAYS = {
   devices: "your browsers and apps, to sign out",
   reach: "email, a webhook, ntfy, Gotify, Pushover, Telegram, Discord or Slack, each with what it takes and a quiet window",
 };
-// The apps signed in as this account on its own machines (R272 step 1), the
-// last of Profile's sections (the operator, 19 Oct): a table, a line a device (its name,
+// The apps signed in as this account on its own machines, the
+// last of Profile's sections: a table, a line a device (its name,
 // what it is, when it last called) with Disconnect at its end, which signs
 // that one out.
 const PF_DEVICE_COLS = [{label: "Device"}, {label: "Kind", w: "6rem"}, {label: "Last call", w: "minmax(0,.6fr)"}, {act: true, w: "8rem"}];
-// ...and the browsers signed in as the account (R158 step 8), each bound
+// ...and the browsers signed in as the account, each bound
 // to the browser it was made in, this one first; Sign out ends one, and a
 // cookie copied elsewhere already opens nothing.
 const PF_SIGNIN_COLS = [{label: "Browser"}, {label: "From", w: "minmax(0,.7fr)"}, {label: "Last used", w: "minmax(0,.6fr)"}, {act: true, w: "8rem"}];
@@ -88,8 +88,8 @@ function profileSignins(rows){
     `<button type="button"${r.mine ? "" : ' class="caution"'} data-pfsignout="${esc(r.id)}">Sign out</button>`])}</div>`).join(""), "pfsignins");
 }
 const PF_DEVICE_KIND = {pc: "PC", phone: "Phone", editor: "Editor"};
-// `of` names the account when an administrator reads it on the Users page
-// (R272 step 8), whose Disconnect asks for that account.
+// `of` names the account when an administrator reads it on the Users page,
+// whose Disconnect asks for that account.
 function profileDevices(rows, of = ""){
   if (!rows.length) return of ? `<div class="hint">No device is signed in as ${esc(of)}.</div>`
     : `<div class="empty">No device yet. The Windows companion signs in here with your name and password, and is listed for you to disconnect.</div>`;
@@ -102,15 +102,15 @@ function renderProfileInto(i){
   const d = docSurface(i, "profile");
   if (!d) return;
   if (!profile){
-    // Its template (R218 step 16): every heading and field label here is the
+    // Its template: every heading and field label here is the
     // page's own; what is yours to fill them is on its way.
     // A page of settings as it lands (skSplit): the sections listed, Who
     // you are picked beside them with its fields.
     const fld = label => skField(label, 18);
     d.setBar("");
     splitOff(d.list);                   // drawn before: its grid is the template's to bring
-    // Every section the page always has, so none arrives after (the
-    // operator, 7 Nov: settings popping in on a page that never changes);
+    // Every section the page always has, so none arrives after
+    // (settings popping in on a page that never changes);
     // Your shares, a machine install's alone, comes with its answer.
     drawHTML(d.list, skTpl(skSplit([["Who you are", PROFILE_SAYS.you], ["What you may do", PROFILE_SAYS.may],
       ["Password", PROFILE_SAYS.password], ["Two-factor sign-in", PROFILE_SAYS.twofactor], ["Your key store", PROFILE_SAYS.mykey],
@@ -123,19 +123,19 @@ function renderProfileInto(i){
   const val = k => profileDraft[k] ?? p[k] ?? "";
   const dirty = [...PROFILE_FIELDS.map(([k]) => k), "tz"].some(k => (profileDraft[k] ?? p[k] ?? "") !== (p[k] ?? ""));
   const wm = profile.what_may || {roles: [], may: []};
-  // Who this is, as a node's head says what it is (the operator, 25 Oct:
-  // a run-on mono line could not be read): the name, the roles as facts,
+  // Who this is, as a node's head says what it is
+  // (a run-on mono line could not be read): the name, the roles as facts,
   // the projects owned on a line of their own, each agent's account its own.
   d.setBar("");
   const owns = wm.roles.filter(r => /^Owner of /.test(r)).map(r => r.slice(9));
   const held = wm.roles.filter(r => !/^Owner of /.test(r));
   const by = {...(profile.claude ? {claude: profile.claude} : {}), ...(profile.agents || {})};
-  // Who they are on the line (R274): their roles and what they own; the
+  // Who they are on the line: their roles and what they own; the
   // accounts each agent is signed in as are its own section's.
   const head = pageHead({title: profile.name, line: [
     {text: held.length ? held.join(", ") : "no role"},
     owns.length ? {text: `owner of ${owns.join(", ")}`} : null]});
-  // A page of settings (page-docs.js splitSects, the operator, 16 Oct):
+  // A page of settings (page-docs.js splitSects):
   // each block a section, the sections a list beside the one picked; who
   // you are first, since that is what is changed here most.
   const sec = (id, title, inner) => docSection("profile", id, title, "",
@@ -179,7 +179,7 @@ function renderProfileInto(i){
   wireProfileAgents(d.el);
 }
 
-// Your coding agents (R294 step 6): each agent with a sign-in of its own on
+// Your coding agents: each agent with a sign-in of its own on
 // each node this person may sign in on, a person's own connection and so on
 // their Profile (the connections rule), where the Installed page has it one
 // node at a time. Which rows there are is the profile read's (scoped as a
@@ -225,7 +225,7 @@ function wireProfileAgents(root){
   });
 }
 
-// Your shares (R164 step 1): the SMB shares on the controller's own machine
+// Your shares: the SMB shares on the controller's own machine
 // this account may reach (named on them, or everybody as a guest), each
 // with the address to map it by on Windows and on a Mac, and the SMB
 // password, set here and never shown: the machine keeps what Samba keeps.
@@ -235,7 +235,7 @@ function profileShares(sm){
       <div class="name">${esc(r.name)}${r.ro ? ` <span class="pill">read-only</span>` : ""}${r.guest ? ` <span class="pill">everybody</span>` : ""}${r.tm ? ` <span class="pill">Time Machine</span>` : ""}</div>
       <div class="sub"><code>\\${esc(host)}\${esc(r.name)}</code> on Windows, <code>smb://${esc(host)}/${esc(r.name)}</code> on a Mac${addr ? `, or by the address ${esc(addr)}` : ""}</div>
     </div></div>`).join("");
-  // Kept only while a share names you (R243): made from your password as you next sign in.
+  // Kept only while a share names you: made from your password as you next sign in.
   const when = sm.follows ? "your shares use your sign-in password" : sm.at ? `a separate password, set ${esc(ago(sm.at))}`
     : sm.named ? "none yet: sign in again and your shares use your sign-in password" : "nothing is kept for shares while none names you";
   return `<div class="row stack2"><div class="grow">
@@ -273,7 +273,7 @@ function wireShares(root){
   };
 }
 
-// Your terminal (R133 step 10): its text size, cursor and colors, yours in
+// Your terminal: its text size, cursor and colors, yours in
 // every tab of AerieOS's own terminal, applied as picked as the gear's
 // appearance is. A project's own colors, in your settings for it, win there.
 const PF_TERM = [
@@ -286,8 +286,8 @@ const PF_TERM = [
 function profileTerminal(){
   const look = state?.term_look || {}, scheme = look.scheme || "default";
   const mine = (look.colors || {})[scheme] || {}, pal = termPalette(scheme, mine);
-  // Under the preset, each of its colors with its own swatch (the operator,
-  // 25 Oct): a change is this person's to that preset, Reset takes it away.
+  // Under the preset, each of its colors with its own swatch:
+  // a change is this person's to that preset, Reset takes it away.
   const swatch = ([k, name]) => `<label class="tcolor${k in mine ? " mine" : ""}">
       <input type="color" data-pftcolor="${k}" value="${esc(pal[k] || "#000000")}" aria-label="${esc(name)}">
       <span>${esc(name)}</span></label>`;
@@ -348,7 +348,7 @@ function wireTerminalLook(root){
 // Disconnect: asked, then that device signed out; the app finds its token
 // refused on its next call and says to sign in again. One of another
 // account's, on the Users page, is an administrator's to cut off for them.
-// Where the bell reaches you (R149, reach.py): each destination a row
+// Where the bell reaches you (reach.py): each destination a row
 // with its kind, name, what it takes and its quiet window, Test and Remove;
 // Add opens the form for one kind, its fields the channel's own. A secret
 // field (a token, a webhook address) says only that it is set.
@@ -365,7 +365,7 @@ function loadReach(){
 }
 
 
-// One block per channel kind (R173, the operator, 28 Oct: the Add pulldown
+// One block per channel kind (the Add pulldown
 // hid that several can be on): each a row with its switch, its destinations
 // under it and Add for another of that kind, the form opening in place.
 function profileReach(){
@@ -394,7 +394,7 @@ function profileReach(){
 function profileReachForm(f, ch, kinds){
   const c = ch[f.kind] || {label: f.kind, fields: []};
   const was = (pfReach?.dest || []).find(d => d.id === f.id) || {};
-  // One form (R301): what it is, its name and the channel's own fields, what
+  // One form: what it is, its name and the channel's own fields, what
   // it takes, and the quiet window, Cancel and Save at the foot.
   return `<div class="reachform" data-reachform="${esc(f.kind)}">${formBox({fields: [
     `<div class="fcell fwide"><div class="hint">${esc(c.label)}${f.kind === "email" && !pfReach?.mail ? ": no mail server is set yet (Controller settings, Mail), so nothing is sent until one is" : ""}</div></div>`,
@@ -451,8 +451,8 @@ function wireReach(root){
     loadReach();
   });
 }
-// A destination's switch or its removal, drawn on the press (the operator,
-// 22 Nov: a press must never look as if nothing happened): `to` is the list
+// A destination's switch or its removal, drawn on the press
+// (a press must never look as if nothing happened): `to` is the list
 // as it will be. drawNow's first half; what it gives back puts it back.
 function pfReachNow(to){
   const was = pfReach;
@@ -461,12 +461,12 @@ function pfReachNow(to){
   return () => { pfReach = was; readMoved("profile"); drawPanes(); };
 }
 
-// A browser signed out or a device disconnected leaves its table on the press
-// (the operator, 22 Nov), and comes back saying why on a refusal; the list
+// A browser signed out or a device disconnected leaves its table on the press,
+// and comes back saying why on a refusal; the list
 // is read again after.
 function wireDeviceOut(root){
   root.querySelectorAll("[data-pfsignout]").forEach(b => b.onclick = async () => {
-    // Signing a browser out asks nothing (R265): it signs in again.
+    // Signing a browser out asks nothing: it signs in again.
     const id = b.dataset.pfsignout;
     const j = await drawNow(() => pfGone("signins", id), () => postJSON("/api/profile", {action: "signin-out", id}));
     // This very browser signed out: a sign-out, so the next sign-in here
@@ -499,7 +499,7 @@ function pfDeviceGone(of, id){
   return () => { usersList = was; readMoved("users"); drawPanes(); };
 }
 
-// A conversation read here (R83): its turns as the reader route gives them,
+// A conversation read here: its turns as the reader route gives them,
 // the newest part of a long one, with the commands folded under Claude's.
 async function openConversation(project, id){
   const m = $("cvModal"), body = $("cvBody");
@@ -511,7 +511,7 @@ async function openConversation(project, id){
   const tz = userTZ() || Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   const j = await getJSON(`/api/transcript?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}&as=turns&tz=${encodeURIComponent(tz)}`);
   if (j.error){ drawHTML(body, `<div class="notice bad">${esc(j.error)}</div>`); return; }
-  // The agent the conversation is with (R95): Claude, or the one it names.
+  // The agent the conversation is with: Claude, or the one it names.
   const WHO = {you: "You", claude: j.agent_name || "Claude", system: "System"};
   drawHTML(body, (j.turns || []).map(t => `<div class="cvturn ${esc(t.who)}">
       <div class="cvwho">${esc(WHO[t.who] || t.who)}${t.at ? ` · ${esc(t.at)}` : ""}</div>
@@ -576,7 +576,7 @@ function wireProfile(root){
   // Change password wakes once the current one is typed and the new one is
   // 8 or more, typed the same twice; what is wrong is said under the field
   // it is about as it is typed, and the server's refusal lands there too,
-  // never only in a toast (B90, Add user's B37).
+  // never only in a toast.
   const pw = root.querySelector("#pfPasswd");
   const fld = id => root.querySelector("#" + id);
   const sayAt = (id, t) => { setText(fld(id + "Why"), t); setHidden(fld(id + "Why"), !t); };
@@ -606,7 +606,7 @@ function wireProfile(root){
   };
 }
 
-// ---- two-factor sign-in (R127) ----
+// ---- two-factor sign-in ----
 // Profile's section: the authenticator app (added by its QR and a first
 // code), passkeys by name, the recovery codes left and new ones, and the
 // browsers remembered for 30 days. What is set up here is asked at every
@@ -668,7 +668,7 @@ function wireTwoFactor(root){
   root.querySelectorAll("[data-tf]").forEach(b => b.onclick = async () => {
     const what = b.dataset.tf;
     // Adding to a sign-in that has a factor already takes it first, as a
-    // removal does (R288): a browser left signed in adds none of its own.
+    // removal does: a browser left signed in adds none of its own.
     const proof = async () => profile?.two_factor?.on ? await pfFresh() : {};
     if (what === "totp-add"){
       const fresh = await proof();
@@ -692,7 +692,7 @@ function wireTwoFactor(root){
         if (!fresh) return;
         const o = await pfTf({action: "2fa-passkey-begin", ...fresh});
         if (o.error){ notify(o.error, true); return; }
-        // The PRF extension asked for at creation (R157): an authenticator
+        // The PRF extension asked for at creation: an authenticator
         // that answers it can hold a key of the person's own.
         const c = await navigator.credentials.create({publicKey: {challenge: pfU8(o.challenge), rp: {name: "AerieOS", id: location.hostname},
           user: {id: pfU8(o.user), name: o.name, displayName: o.name}, pubKeyCredParams: [{type: "public-key", alg: -7}],

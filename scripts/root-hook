@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Root-only helper that keeps which root startup hooks an administrator has
-# approved (B1166). A hook in the state's startup.d named *.root.sh runs as
+# approved. A hook in the state's startup.d named *.root.sh runs as
 # root at every start, and the dashboard's own account can write that folder,
 # so such a hook runs only once an administrator approved that exact file:
 # its name and sha256 kept here, in a folder and a file only root writes. A

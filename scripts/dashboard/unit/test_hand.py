@@ -1,4 +1,4 @@
-"""hand.py, the finger's path a glide plays (R127): what every hand keeps
+"""hand.py, the finger's path a glide plays: what every hand keeps
 (the ends, the sample rate, repeatability) and what tells the hands apart
 (a ruler is straight and even; a shaky hand bows, overshoots and wobbles
 more than a steady one)."""

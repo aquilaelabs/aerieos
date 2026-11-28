@@ -1,4 +1,4 @@
-"""The refusals every module says alike (R287 step 2, the operator's words
+"""The refusals every module says alike (the operator's words
 pass of 25 Nov): one sentence for each situation, so a person reads one
 wording for one thing wherever it is met, and unit/test_refusals.py holds
 every module to it. A missing space was said three ways (not a space,

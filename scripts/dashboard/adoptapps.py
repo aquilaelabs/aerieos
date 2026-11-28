@@ -1,5 +1,5 @@
-"""The containers another system ran, as compose files to import (the
-operator, 10 Nov: a zip of their compose files, each imported from New
+"""The containers another system ran, as compose files to import
+(a zip of their compose files, each imported from New
 container, rather than containers made here on a press).
 
 Each is written from what the old Docker's image file says it ran: its

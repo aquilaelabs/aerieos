@@ -1,4 +1,4 @@
-"""The list of the files a release ships in the bundle (R267 step 6), and
+"""The list of the files a release ships in the bundle, and
 the bundle the controller packs around it.
 
 scripts/lib/bundleparts.py says which files those are and lists them one

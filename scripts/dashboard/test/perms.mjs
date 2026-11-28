@@ -1,8 +1,7 @@
-// The Roles tab (R152, the operator, 7 Oct): owner and admin built in and
+// The Roles tab: owner and admin built in and
 // read only, a role added from the page's bar, its scope and Read and Write
 // per area, Write needing Read. An account's Global roles, its projects and
-// the roles it holds on each are picked in its settings on the Users page
-// (the operator, 17 Oct).
+// the roles it holds on each are picked in its settings on the Users page.
 // Honored by the gate where they hold and nowhere else; a project's owner
 // gives roles on the projects they own and nothing Global.
 import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey, asUser, call as api, section, REPO, kubeApi } from './lib.mjs';
@@ -18,9 +17,9 @@ await ready(page);
 for (const n of ['deployer', 'installer']) await api('/api/roles', { action: 'remove', name: n });
 await page.evaluate(() => openRolesTab());
 await page.waitForSelector('.rolestab [data-rpick]', { timeout: 15000 });
-// The roles a list beside the one picked (R255 step 9): each row its name,
+// The roles a list beside the one picked: each row its name,
 // its kind and who holds it, one list with nobody's account in it and no
-// field halfway down (the operator, 17 Oct).
+// field halfway down.
 const names = await page.$$eval('.rolestab [data-rpick]', rs => rs.map(r => `${r.querySelector('.name').textContent.trim()} (${r.querySelector('.pill').textContent.trim()})`));
 ok(names.includes("AerieOS's owner (built in)") && names.includes('Administrator (built in)') && !names.some(n => /^user\b/i.test(n)),
    `owner and admin are built in, and there is no user role (${names.join(', ')})`);
@@ -84,13 +83,13 @@ await page.evaluate(() => openUsersTab());
 await page.waitForSelector('.userstab [data-upick="dep"]', { timeout: 15000 });
 await page.click('.userstab [data-upick="dep"]');
 await page.waitForSelector('.userstab #ueAccess .setrow', { timeout: 15000 });
-// Holding a role on a project is being on it (R155): no separate box, and
+// Holding a role on a project is being on it: no separate box, and
 // a project role is not offered among the Everywhere ones.
 ok(!(await page.$$('[data-ron]')).length && !(await page.$$('[data-rglobal="deployer"]')).length,
    'a space role is given on a space alone, and there is no separate "on it" box');
 // Only the projects an account is on are listed; Add to project puts it on
-// one with a role there (R255 step 9).
-// By the project's key (R138): a role is given on a project, not on one of
+// one with a role there.
+// By the project's key: a role is given on a project, not on one of
 // its repositories.
 ok(!(await page.$$('.userstab [data-rproject]')).length && await page.$eval('#rolesAddProj', (s, k) => [...s.options].some(o => o.value === k), projectKey('alpha')),
    'an account on no space lists none, and Add to space offers them');
@@ -106,7 +105,7 @@ await page.click('.userstab #ueSave');
 await page.waitForFunction(k => rolesData?.people?.find(p => p.name === 'dep')?.project_roles?.[k], AK, { timeout: 10000 });
 const onAlpha = await api('/api/version', { project: 'alpha', action: 'nothing-much' }, depAuth);
 const onBeta = await api('/api/version', { project: 'beta', action: 'nothing-much' }, depAuth);
-// beta is no project of dep's at all now (R155: on a project is holding a
+// beta is no project of dep's at all now (on a project is holding a
 // role there), so it reads as absent rather than refused.
 ok(onAlpha.status !== 403 && (onBeta.status === 403 || (onBeta.status === 400 && /not a space/.test(onBeta.body.error || ''))),
    `People gives the role on alpha and the gate holds it there alone (alpha ${onAlpha.status}, beta ${onBeta.status})`);
@@ -124,7 +123,7 @@ ok((await api('/api/rename', { name: 'alpha', to: 'alpha2' }, depAuth)).status =
    '...and nothing the role did not say');
 
 // A project's owner who is not an administrator: alpha's owner gives roles
-// on alpha and nothing else, and no Global role (R152 (c)).
+// on alpha and nothing else, and no Global role.
 await api('/api/members', { action: 'set', project: 'alpha', owner: 'dep' });
 const asOwner = await api('/api/roles', undefined, depAuth);
 ok(asOwner.status === 200 && JSON.stringify(asOwner.body.projects) === JSON.stringify([AK]) && !asOwner.body.admin,
@@ -140,9 +139,9 @@ const ownerRole = (await api('/api/roles')).body.people.find(p => p.name === 'de
 ok(ownerRole.includes('alpha_owner'), `the account that owns alpha holds alpha_owner on it (${ownerRole.join(', ')})`);
 await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
 
-// Making projects on one node (the operator, 7 Oct): New projects is its
+// Making projects on one node: New projects is its
 // own area, and an Everywhere role holds a node area node by node, the
-// area's row opened on the nodes, Read and Write on each (R260, 16 Oct).
+// area's row opened on the nodes, Read and Write on each.
 await section("Making projects on one node", async () => {
   const sandbox = (await api('/api/v1/nodes')).body.nodes.find(n => n.kind !== 'local');
   // A second node, so one ticked of two is not every node.
@@ -204,7 +203,7 @@ await section("Making projects on one node", async () => {
   await api('/api/v1/nodes', { action: 'retire', id: other.id });
 });
 
-// An area without Read is refused and hidden (R152 step 3): a role that
+// An area without Read is refused and hidden: a role that
 // reads Install alone sees that tab and none of the others.
 await section("An area without Read is refused and hidden", async () => {
   await api('/api/roles', { action: 'set', name: 'tc-viewer', scope: 'global', perms: { install: 'read' } });
@@ -217,7 +216,7 @@ await section("An area without Read is refused and hidden", async () => {
   ok(nd.status === 200 && (nd.body.nodes || []).length === 0,
      `...and without Nodes Read the nodes answer only for its own spaces, here none (${(nd.body.nodes || []).length})`);
   const st = (await api('/api/status', undefined, depAuth)).body.areas || {};
-  // Toolchains is the Install area since R174, its old name an alias.
+  // Toolchains is the Install area its old name an alias.
   ok(st.install === 'read' && st.nodes === '' && st.jobs === '', `the status carries each area's level (${JSON.stringify(st)})`);
   const dp = await newPage(browser, { viewport: { width: 1280, height: 900 },
     httpCredentials: { username: 'dep', password: 'deppass11' },
@@ -229,8 +228,8 @@ await section("An area without Read is refused and hidden", async () => {
     jobsRail: !!document.querySelector('#rail [data-rail="jobs"]') }));
   ok(shown.toolchains && !shown.jobs && !shown.nodes && !shown.settings && !shown.users && !shown.roles && !shown.people && !shown.jobsRail,
      `its rail offers Toolchains and leaves out the pages it may not read (${JSON.stringify(shown)})`);
-  // Settings is the account's own Profile, open to anybody (the operator,
-  // 19 Oct: Controller settings went to Machines, first; 22 Oct: and then
+  // Settings is the account's own Profile, open to anybody
+  // (Controller settings went to Machines, first; 22 Oct: and then
   // beside Home).
   // A new account is shown the guide on its first poll; it is put away, as
   // the person would, before the rail is pressed under it.
@@ -246,7 +245,7 @@ await section("An area without Read is refused and hidden", async () => {
   await api('/api/roles', { action: 'remove', name: 'tc-viewer' });
 });
 
-// Controller is a rail group of its own (the operator, 22 Oct), after
+// Controller is a rail group of its own, after
 // Containers so a phone's bar keeps its four, and an address from before
 // either move still finds it.
 await section("Controller is a rail group of its own", async () => {
@@ -275,7 +274,7 @@ await api('/api/roles', { action: 'remove', name: 'deployer' });
 ok((await api('/api/version', { project: 'alpha', action: 'nothing-much' }, depAuth)).status === 403,
    'the role removed, what it gave goes with it');
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
-// Clusters asked cluster by cluster (R281), as Nodes is node by node: a
+// Clusters asked cluster by cluster, as Nodes is node by node: a
 // role holding it on one cluster reads that one alone and changes it by its
 // own level there, and a new cluster is a role's on every one.
 await section("Clusters asked cluster by cluster", async () => {

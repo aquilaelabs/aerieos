@@ -1,4 +1,4 @@
-"""releasesign.py (R106): a release's APK built unsigned in CI and signed on
+"""releasesign.py: a release's APK built unsigned in CI and signed on
 the project's node with its sideload key. Against a stand-in for
 GitHub's API, its artifact storage and its upload host on a local port: the
 run's bb-release-apk-TAG artifact is fetched (its storage never handed the
@@ -44,12 +44,12 @@ import signnode  # noqa: E402
 SEEN = []
 REL = {}
 # What the stand-in says of runs beyond its four: a tag's own run, still
-# going or ended, with the APK it handed over (R206 step 1).
+# going or ended, with the APK it handed over.
 MORE = []
 # The artifacts each run handed over, by run; the commit each tag names, and
 # the tags that are annotated (their ref names a tag object, which names it).
 ARTS = {}
-# A run's environment approvals, by run id (B1167).
+# A run's environment approvals, by run id.
 APPROVALS = {}
 TAGS = {}
 ANNOTATED = set()
@@ -239,8 +239,8 @@ class Base(unittest.TestCase):
         signing.configure(state=self.tmp / "state", project_name=re.compile(r"[A-Za-z0-9._-]+"))
         # The token the look asks GitHub with, named here rather than read
         # through gitcreds, whose state another module in the tier leaves
-        # pointed elsewhere: without it check() ends before the overdue
-        # expectation is marked, and attention() had no row (B642).
+        # pointed elsewhere: without it check ends before the overdue
+        # expectation is marked, and attention had no row.
         from unittest import mock
         tok = mock.patch.object(cilogs, "_token", lambda project, uid=None: "tok")
         tok.start()
@@ -309,7 +309,7 @@ class Signs(Base):
         self.assertEqual(len([p for m, p, a in SEEN if "/runs/20/artifacts" in p]), asked)
 
     def test_a_run_that_only_just_ended_is_asked_about_again(self):
-        # GitHub can list a run as ended before it lists its artifact (B467).
+        # GitHub can list a run as ended before it lists its artifact.
         releasesign.check("app")
         asked = len([p for m, p, a in SEEN if "/runs/22/artifacts" in p])
         releasesign.check("app")
@@ -347,9 +347,9 @@ class Signs(Base):
         self.assertFalse(releasesign.status("app")["looking"])
 
     def test_a_release_whose_apk_never_came_is_said(self):
-        # The look expect() starts on a thread of its own is the test's here,
+        # The look expect starts on a thread of its own is the test's here,
         # as OneRun's are: run beside the test it saved the file over the
-        # backdated expectation, and nothing was due (B921).
+        # backdated expectation, and nothing was due.
         self.addCleanup(setattr, releasesign, "check_soon", releasesign.check_soon)
         releasesign.check_soon = lambda *a, **k: False
         releasesign.expect("app", "v0.9.0")
@@ -595,14 +595,14 @@ class Own(Base):
                      ".github/workflows/android.yml, .github/workflows/release.yml")
 
     def test_a_tag_that_is_not_a_releases_is_refused(self):
-        # B1167: a branch's workflow could upload for any tag a person pushed,
+        # A branch's workflow could upload for any tag a person pushed,
         # one no ruleset covers; only a release's tag is signed for.
         TAGS["nightly"] = C7
         self.other(tag="nightly")
         self.refused("nightly is not a release's tag", tag="nightly")
 
     def test_a_gated_run_is_signed_only_once_a_person_approved_it(self):
-        # B1167: where the handing workflows gate a job on an environment,
+        # Where the handing workflows gate a job on an environment,
         # the run's own approval is asked of GitHub.
         flow = self.tmp / "ws" / "app" / ".github" / "workflows" / "android.yml"
         flow.write_text(flow.read_text().replace("    runs-on: ubuntu-24.04\n", "    runs-on: ubuntu-24.04\n    environment: release\n", 1))
@@ -733,7 +733,7 @@ class Own(Base):
                       "refused, since it ran on main, not on the tag v0.7.0", bad[0]["why"])
 
     def test_a_tag_whose_push_started_no_run_says_withdraw_and_release_again(self):
-        """B1158: v0.8.0's push started nothing (GitHub dropped the event);
+        """v0.8.0's push started nothing (GitHub dropped the event);
         a run by hand is never its own, so twenty minutes on the bell says
         the way out, and a run of its own that starts after all still signs
         it and takes the row away."""
@@ -768,7 +768,7 @@ class Own(Base):
 
 class OneRun(Base):
     """The tag's own run hands the APK over and makes the release as its
-    last job (R206 step 1): the artifact is there hours before the release,
+    last job: the artifact is there hours before the release,
     and the run is not over until the release is whole."""
 
     def setUp(self):
@@ -825,7 +825,7 @@ class OneRun(Base):
         self.assertEqual(sorted(a["name"] for a in was["assets"]), ["app-0.7.0.apk", "app-0.7.0.apk.sha256"])
         self.assertFalse(releasesign.due("app") and "v0.8.0" in json.loads(
             (self.tmp / "release-signing.json").read_text())["app"]["expect"], "no longer expected once signed")
-        # The draft is said back a draft, with its tag (B590, B696).
+        # The draft is said back a draft, with its tag.
         patch = [b for m, p, b in SEEN if m == "PATCH" and p.endswith("/releases/8")][-1]
         self.assertEqual((patch["draft"], patch["tag_name"]), (True, "v0.8.0"))
         # Signed once: the run going on, and then ended, signs nothing again.

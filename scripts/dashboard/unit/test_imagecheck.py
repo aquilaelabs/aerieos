@@ -1,4 +1,4 @@
-"""Registry images kept up to date (imagecheck.py, R195): an image reference
+"""Registry images kept up to date (imagecheck.py): an image reference
 read into its registry, repository and tag; a node's pulled digest compared
 with what the registry serves; a container behind until Update pulls it."""
 import contextlib
@@ -117,7 +117,7 @@ class ImageCheck(unittest.TestCase):
 
 class OwnImage(unittest.TestCase):
     """AerieOS's own image, followed by a tag, is held to the digest the
-    newest signed release names (R199): said by that digest where the tag
+    newest signed release names: said by that digest where the tag
     serves it, and said plainly where the tag serves another."""
     OWN = "ghcr.io/aquilaelabs/aerieos"
 

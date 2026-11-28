@@ -1,5 +1,4 @@
-"""The root agent's file work in an account's folder, as root for real
-(R240 steps 1 and 2; the audit of 13 Nov).
+"""The root agent's file work in an account's folder, as root for real.
 
 Each test plants what a job or a session could: a link, at the name root is
 about to open, to a file that is root's alone or into a folder only root
@@ -215,7 +214,7 @@ if __name__ == "__main__":
 
 class Runners(unittest.TestCase):
     """A CI runner's folder is the jobs account's, and so is all a CI job
-    leaves in it (R247 step 5): root wrote, read and pruned there through
+    leaves in it: root wrote, read and pruned there through
     whatever was at the name."""
     runners = AGENT.module("runners")
     WHO_KW = {"user": UID, "group": GID}

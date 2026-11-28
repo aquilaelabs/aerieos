@@ -51,14 +51,14 @@ const colorAttrs = name => {
   const tone = colorTone(name);
   return tone ? {cls: " pc", style: ` data-style="--pc:${tone}"`} : {cls: "", style: ""};
 };
-// This account's color for a project (the operator, 18 Oct: a person's own,
+// This account's color for a project (a person's own,
 // set from its card), or "", by its project's key or any of its repositories.
 const projectColor = name => state?.repos?.[name]?.color
   ?? (state?.projects || []).find(x => x.name === name)?.color ?? "";
-// The name a project is shown under (R154): its directory is `name` and the
+// The name a project is shown under: its directory is `name` and the
 // key everywhere, and what a person reads is the registry's `label`. A name
 // not in the poll (a project since deleted) is shown as it is. A project's
-// own key (R138) reads as the project's name.
+// own key reads as the project's name.
 const projLabel = name =>
   (state?.projects || []).find(x => x.name === name)?.label || state?.repos?.[name]?.name || String(name ?? "");
 // The project a tab is about, for its color: a notebook's, the project whose
@@ -81,7 +81,7 @@ const tabProject = t => {
 const GATE_MODES = [["auto", "auto"], ["ask", "ask me"], ["deny", "deny"]];
 // A dial's choices beyond those three, by the kind it gates: the wiki may
 // also be hidden, kept from a session altogether, reading included
-// (prefs.GATE_EXTRA; the operator, 2 Oct).
+// (prefs.GATE_EXTRA).
 const GATE_EXTRA = {wiki: [["hidden", "hidden"]]};
 const gateChoices = k => [...GATE_MODES, ...(GATE_EXTRA[k] || [])];
 const GATE_IDS = {roadmap: "rnGateRoadmap", bugs: "rnGateBugs", rules: "rnGateRules", settings: "rnGateSettings",
@@ -90,7 +90,7 @@ const rnGateNow = () => Object.fromEntries(
   Object.entries(GATE_IDS).map(([k, id]) => [k, $(id).value || "auto"]));
 const gateKey = g => Object.keys(GATE_IDS).map(k => g?.[k] || "auto").join(",");
 
-// How the form holds a dial (R208 step 6): on the project's own door its
+// How the form holds a dial: on the project's own door its
 // defaults; in a repository's notebook that repository's override, or "as
 // the project" where it sets none, which is what a new repository starts
 // on; on a repository in no project, and on a project with no repository,
@@ -99,7 +99,7 @@ const rnDialMode = p => rnMode === "project" ? "project"
   : p?.project && p.project !== p.name && p?.prefs?.project_dials ? "inherit" : "plain";
 // A dial made of parts is named DIAL.PART: a gate ("gate.roadmap"), how a
 // repository pushes ("gitpol.main"), an ability on the git host
-// ("forgepol.workflows"), each part a repository may set apart (R294 step 4).
+// ("forgepol.workflows"), each part a repository may set apart.
 const RN_DICT_DIALS = ["gate", "gitpol", "forgepol"];
 function rnDialPart(f){
   const [d, part] = f.split(".");
@@ -160,7 +160,7 @@ function rnFillPrefs(p){
   // drawn with its choices in rnFillPrefsRest. A select with no value of
   // its own reads as its first option, and the form collects every field
   // whichever section is saved: set on every open, so saving another
-  // section never takes the sessions cap down to 1 (R143).
+  // section never takes the sessions cap down to 1.
   for (const f of RN_SIMPLE) if (!f.dial) $(f.id).value = rnPrefWas[f.k];
   // Said where it is typed: the Profile is the default, this is the exception,
   // and a commit needs both halves from somewhere.
@@ -182,7 +182,7 @@ function rnFillPrefs(p){
 }
 
 // The project's own sections, read only for an account whose roles do not
-// hold Project settings (B19): every control in them dead, and why said on
+// hold Project settings: every control in them dead, and why said on
 // each in red, not in a tooltip. Just for you stays live, being the
 // account's own; Snapshots and Running sessions say their own reasons.
 const RN_LOCKED_SAID = "Read only for you: changing these needs a role that holds Space settings on this space.";
@@ -191,7 +191,7 @@ function rnLockSettings(p){
   document.querySelectorAll("details.rngroup").forEach(d => {
     const k = (d.dataset.sect || "").replace(/^rn:/, "");
     // Repository is each person's own token and its owner's link, each
-    // gated where it is drawn (R275), not Space settings'.
+    // gated where it is drawn, not Space settings'.
     if (["yours", "snapshots", "sessions", "repo"].includes(k)) return;
     const body = d.querySelector(":scope > .body");
     if (!body) return;
@@ -223,10 +223,10 @@ function rnFillNode(){
     // where that list is from before the removal, by the project rows' (the
     // server marks a row whose node was removed).
     const removed = new Set((state?.projects || []).filter(p => p.node_removed).map(p => p.prefs?.node).filter(Boolean));
-    // A disabled node is kept but not offered (the operator, 11 Oct), unless
+    // A disabled node is kept but not offered, unless
     // it is this project's already, which the row then says.
-    // ...and a hosting-only node is not offered as the primary (the operator,
-    // 14 Oct): it holds no code and runs no session, so it is a row under
+    // ...and a hosting-only node is not offered as the primary:
+    // it holds no code and runs no session, so it is a row under
     // Also works on, marked Hosting only, and nothing else.
     const pick = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired"
       && (n.state !== "disabled" || n.id === rnPrefWas.node) && !removed.has(n.id) && !n.config?.host_only);
@@ -236,7 +236,7 @@ function rnFillNode(){
     }
     // Hidden with the rest of the project's own settings when this dialog was
     wrap.hidden = !pick.length;
-    // Shown to everybody on the project and changed by grant (R137 step 4):
+    // Shown to everybody on the project and changed by grant:
     // a node is shared, so the picker is read-only without `node`.
     sel.disabled = state?.can?.node === false;
     // The places a session is shown are places on a node, so the field is
@@ -247,7 +247,7 @@ function rnFillNode(){
     const tools = n => Object.keys(n.reported?.toolchains || {});
     // The node this project was on, when it has since been un-enrolled: kept,
     // selected and marked "(removed)" in italics, so the person sees where it
-    // used to run (the operator, 5 Oct). Offered on this project's picker
+    // used to run. Offered on this project's picker
     // only, never on another's.
     const row = (state?.projects || []).find(p => p.name === rnFor);
     const gone = row?.node_removed && rnPrefWas.node && !pick.some(n => n.id === rnPrefWas.node)
@@ -275,7 +275,7 @@ function rnHostIds(){
   return new Set([...marked, ...was.filter(id => !(nodesList || []).some(n => n.id === id && !n.config?.host_only))]);
 }
 
-// Also reaches (the operator, 7 Oct): addresses a session here may still
+// Also reaches: addresses a session here may still
 // reach where its node filters, each on the project's nodes ticked in its
 // form, every one when the project is on one node. All ticked is stored as
 // none named, which also covers a node added later.
@@ -290,7 +290,7 @@ function rnReachNodes(){
   return ids.map(id => (nodesList || []).find(n => n.id === id) || {id, name: id});
 }
 
-// Also reaches as records (the record-lists rule; the operator, 17 Nov: a
+// Also reaches as records (the record-lists rule: a
 // record's Save writes it at once): an address a row with the nodes it is
 // on, read-only with Edit at its right, Edit opening it in place (its
 // address, its nodes where the space works on several, Delete, Cancel and
@@ -300,7 +300,7 @@ const REACH_COLS = [{label: "Address"}, {label: "On", w: "minmax(0,1fr)"}, {act:
 let rnReachEdit = null;           // {i, form: {addr, nodes}}: the row open, i -1 for a new one
 function rnDrawReach(focus){
   const box = $("rnReachRows");
-  // Nodes Write, as the server asks (R255 step 3), not the administrator
+  // Nodes Write, as the server asks, not the administrator
   // role: a role of anybody's may give it. A repository's view draws the
   // space's dead (rnSpaceRelock, after each draw).
   const ns = rnReachNodes(), ro = state?.areas ? state.areas.nodes !== "write" : !state?.admin;
@@ -351,12 +351,12 @@ function rnDrawReach(focus){
     rnReachSave(rnReachDraft.filter((_, j) => j !== rnReachEdit.i).map(e => ({addr: e.addr, nodes: [...e.nodes]}))));
   if (focus) box.querySelector(".rnreach.open [data-reachf]")?.focus();
   rnSpaceRelock();
-  // Every node keeps each session to its own project's network (R146).
+  // Every node keeps each session to its own project's network.
   $("rnReachHint").textContent = !ns.length ? "" : "An address for the whole machine, or address:port for one service.";
 }
 // A record's Save: the space's list with that one changed, written now;
-// running sessions take it at once. The list is drawn as saved on the press
-// (the operator, 22 Nov), and a refusal opens the record again as it was
+// running sessions take it at once. The list is drawn as saved on the press,
+// and a refusal opens the record again as it was
 // typed, saying why.
 function rnReachSave(list){
   const was = {draft: rnReachDraft, edit: rnReachEdit, saved: rnPrefWas.reaches};
@@ -379,9 +379,9 @@ function rnReachNow(){
 const lrow = (value, name, sub, on) => `<label class="lrow"><input type="checkbox" value="${esc(value)}"${
     on ? " checked" : ""}><span>${esc(name)}</span>${sub ? `<span class="lsub">${esc(sub)}</span>` : ""}</label>`;
 
-// The rest of the set (R82) and the hosting-only nodes (prefs.hosts) in one
-// list (the operator, 13 Oct), as records (the record-lists rule; the
-// operator, 17 Nov: a record's Save writes it at once): a node a row with
+// The rest of the set and the hosting-only nodes (prefs.hosts) in one
+// list, as records (the record-lists rule: a
+// record's Save writes it at once): a node a row with
 // what it takes (sessions and containers, or containers alone for one marked
 // Hosting only) and its bin, nothing on it to edit, as Hostnames' rows; Add
 // a node over the table, a pick of the ones not on it. Each written at once,
@@ -397,7 +397,7 @@ function rnFillNodesMore(){
   if (!box) return;
   const primary = $("rnNode").value;
   // Read from what is saved on a fresh open, whether or not the node list
-  // has arrived (B796: a draw before it marked a saved second node gone).
+  // has arrived (a draw before it marked a saved second node gone).
   if (!box.dataset.drawn || rnMore === null)
     rnMore = new Set([...rnPrefWas.nodes.split(","), ...rnPrefWas.hosts.split(",")].filter(Boolean).filter(id => id !== rnPrefWas.node));
   // Without a primary there is nothing for a session to also work on, but
@@ -406,7 +406,7 @@ function rnFillNodesMore(){
                                             && (primary || n.config?.host_only));
   const ids = rnMoreIds();
   box.parentElement.hidden = box.hidden = hint.hidden = label.hidden = !(others.length || ids.length);
-  // Without the `node` grant the list is read alone (R137 step 4); a
+  // Without the `node` grant the list is read alone; a
   // repository's view draws it dead (rnSpaceRelock, at the end).
   const ro = state?.can?.node === false;
   const node = id => (nodesList || []).find(n => n.id === id);
@@ -430,7 +430,7 @@ function rnFillNodesMore(){
     const keep = new Set(rnMore || []); keep.delete(b.dataset.morerm);
     return rnMoreSave(keep);
   });
-  // Drawn from what is saved until a draw has had nodes to draw (B796).
+  // Drawn from what is saved until a draw has had nodes to draw.
   if (nodesList !== null) box.dataset.drawn = "1";
   rnSpaceRelock();
   // Also reaches ticks among these, so it is drawn after them.
@@ -438,7 +438,7 @@ function rnFillNodesMore(){
 }
 // A record's Save: the set written now, with the primary as it is saved; a
 // session running keeps what it started with until it starts again. The row
-// is added or taken off on the press (the operator, 22 Nov), and put back
+// is added or taken off on the press, and put back
 // saying why on a refusal.
 async function rnMoreSave(set){
   const primary = rnPrefWas.node;
@@ -458,7 +458,7 @@ async function rnMoreSave(set){
   if (!j.error && myLiveSession(name)) notify(`${projLabel(name)} saved; its running session keeps the nodes it started with until it starts again`);
 }
 
-// ---- Releases: what each of a release's files is for (R255) ---------------
+// ---- Releases: what each of a release's files is for ---------------
 // A list of records (the record-lists rule): a file's name and what it is
 // for, each row's Edit opening it in place and its Save writing the whole
 // list at once; Add a file over the table.
@@ -495,7 +495,7 @@ function rnDrawRelFiles(){
     return rnSaveRelFiles(next, {name, what});
   });
 }
-// The list drawn as saved on the press (the operator, 22 Nov); a refusal
+// The list drawn as saved on the press; a refusal
 // opens the row again with what was `typed` in it, saying why.
 function rnSaveRelFiles(files, typed = null){
   const was = {files: rnRelFiles, edit: rnRelEdit};
@@ -515,7 +515,7 @@ function rnSaveRelFiles(files, typed = null){
 // The projects a session here may read: every other project this account
 // sees, a listbox row each, ticked from the settings. Read-only there by
 // construction (users.with_reads), so the hint under it can say so plainly.
-// ---- the Toolchains group (R77) -------------------------------------------
+// ---- the Toolchains group -------------------------------------------
 // The toolchains installed on the project's node, as the Installed page
 // lists them, and every tool pack: a row each, ticked when its sessions may
 // use it. Fetched when the settings open; null until it has arrived.
@@ -550,7 +550,7 @@ function rnFillTools(){
 // A list setting read off the Toolchains rows, in its saved order. A saved
 // name with no row (a pack since removed, a toolchain gone from the node)
 // stays as saved: the form cannot draw it, and not drawing it is no change
-// (B85: the group opened marked unsaved). A drawn one stays while its row
+// (the group opened marked unsaved). A drawn one stays while its row
 // still says so, and one newly said goes on the end.
 function rnRowsList(saved, inputs, says){
   const rows = [...inputs], drawn = new Set(rows.map(i => i.value)), now = rows.filter(says).map(i => i.value);
@@ -558,7 +558,7 @@ function rnRowsList(saved, inputs, says){
   return [...was.filter(n => !drawn.has(n) || now.includes(n)), ...now.filter(n => !was.includes(n))].join(",");
 }
 
-// The coding agents beside Claude a session here may run (R95), each a
+// The coding agents beside Claude a session here may run, each a
 // row to tick, from the agent table; ticked is allowed.
 function rnFillAgents(off = rnPrefWas.agents_off, dflt = rnPrefWas.agent_default){
   const box = $("rnAgents");
@@ -566,10 +566,10 @@ function rnFillAgents(off = rnPrefWas.agents_off, dflt = rnPrefWas.agent_default
   const was = new Set(String(off || "").split(",").filter(Boolean));
   drawHTML(box, agentsLive().filter(a => a.id !== "claude")
     .map(a => lrow(a.id, a.name, a.product, !was.has(a.id))).join(""));
-  // Which guards hold for which agent (R95 step 6), said rather than implied.
+  // Which guards hold for which agent, said rather than implied.
   const g = $("rnAgentGuards");
   if (g) drawHTML(g, agentsLive().map(a => `<div><b>${esc(a.name)}</b>: ${esc(AGENT_GUARDS[a.id] || "")}</div>`).join(""));
-  // The one Start opens (R95 step 4): an agent left ticked, Claude first.
+  // The one Start opens: an agent left ticked, Claude first.
   const sel = $("rnAgentDefault");
   const offer = () => {
     const off2 = new Set([...box.querySelectorAll("input:not(:checked)")].map(i => i.value));
@@ -587,7 +587,7 @@ function rnFillAgents(off = rnPrefWas.agents_off, dflt = rnPrefWas.agent_default
 function rnFillReads(){
   const box = $("rnReads"), wrap = $("rnReadsField");
   if (!box) return;
-  // What it reads is projects (R138): every other one, by its name, the
+  // What it reads is projects: every other one, by its name, the
   // value its key, which is what a read names; a read written as one of its
   // repositories ticks it too.
   const was = new Set(rnPrefWas.reads.split(",").filter(Boolean).map(r => reposOf(r) || r));
@@ -597,7 +597,7 @@ function rnFillReads(){
   drawHTML(box, others.map(c => lrow(c.key, c.name,
     c.rows.length === 1 ? (c.rows[0].git ? `git: ${c.rows[0].git}` : "no git") : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
     was.has(c.key))).join(""));
-  // AerieOS's owner's alone (the operator, 6 Oct): shown to everybody,
+  // AerieOS's owner's alone: shown to everybody,
   // changed by the owner, and why not said on the row (not a tooltip).
   const mine = state?.can?.reads !== false;
   box.querySelectorAll("input").forEach(i => { i.disabled = !mine; });
@@ -605,7 +605,7 @@ function rnFillReads(){
 }
 
 // On the space's own door, under a dial, each repository that sets it apart
-// and what it holds (R223, the operator, 7 Nov: the space's settings are the
+// and what it holds (the space's settings are the
 // whole picture); nothing elsewhere.
 function rnDialApart(el, p, f, modes){
   // Under the dial, in its cell.
@@ -623,7 +623,7 @@ function rnDialApart(el, p, f, modes){
   line.textContent = `Set apart: ${apart.join("; ")}`;
 }
 
-// The test node picker (R151): the session's own node, then each of the
+// The test node picker: the session's own node, then each of the
 // project's nodes by name as the Node picker names them; the field is
 // drawn only when the project has a node to pick.
 function rnFillTestNode(p){
@@ -636,9 +636,9 @@ function rnFillTestNode(p){
   // the saved value otherwise.
   const picked = sel.dataset.proj === `${rnMode}:${p?.name || ""}` && sel.options.length ? sel.value : null;
   // Named off the Node picker's options, else off the nodes list, else by
-  // id (B418: a dialog opened before the picker was drawn listed ids).
+  // id (a dialog opened before the picker was drawn listed ids).
   const named = id => names.get(id) || (nodesList || []).find(n => n.id === id)?.name || id;
-  // A repository may set its own apart from its space's, as a dial (R223).
+  // A repository may set its own apart from its space's, as a dial.
   const inh = rnDialMode(p) === "inherit", sv = p?.prefs?.project_dials?.test_node || "";
   drawHTML(sel, (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
     + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join(""));
@@ -648,7 +648,7 @@ function rnFillTestNode(p){
     : saved === "inherit" || ids.includes(saved) ? saved : "";
   f.hidden = true;
 }
-// Tests run, one choice (R223): the test node (the space's, as the space,
+// Tests run, one choice: the test node (the space's, as the space,
 // or the session's own) and, where the repository has a dev instance whose
 // image may carry the tests, whether they run in it first or only there.
 // The two pickers it sets stay the values' holders.
@@ -669,7 +669,7 @@ function rnFillTests(canDev){
     dev.dispatchEvent(new Event("change", {bubbles: true}));
   };
 }
-// The model routers that allow this space (R294 step 10), read-only: each
+// The model routers that allow this space, read-only: each
 // a link to the router's page on its node, where it is granted.
 function rnFillRouter(p){
   const el = $("rnRouterSaid");
@@ -692,7 +692,7 @@ function rnFillPrefsRest(p){
   $("rnDevTest").value = p?.prefs?.tests_in || "node";
   rnFillTestNode(p);
   rnFillTests(canDevTest);
-  // The test-run pick inherits too (R208 step 6): its "as the project"
+  // The test-run pick inherits too: its "as the project"
   // option is drawn here, the two words being the markup's own.
   {
     const el = $("rnTestChange"), inh = rnDialMode(p) === "inherit", opt = el.querySelector('option[value="inherit"]');
@@ -722,7 +722,7 @@ function rnFillPrefsRest(p){
     el.dataset.inherit = choices[0]?.[0] === "inherit" ? (choices[0][1].match(/\(([^)]*)\)/) || [])[1] || "" : "";
     return el;
   };
-  // Each dial (R208 step 6): the project's default on its own door, this
+  // Each dial: the project's default on its own door, this
   // repository's override or "as the project" in its notebook.
   const dial = (id, f, modes, dflt) => {
     const el = pick(id, rnDialChoices(p, f, modes, dflt), rnDialVal(p, f, dflt));
@@ -741,19 +741,19 @@ function rnFillPrefsRest(p){
   fieldDial("sign", GATE_MODES);
   fieldDial("release", GATE_MODES);
   fieldDial("keys", GATE_MODES);
-  // A lent PC (R270 step 6): deny by default, it is somebody's own machine.
+  // A lent PC: deny by default, it is somebody's own machine.
   fieldDial("pc", GATE_MODES);
   pick("rnGateVersion", Object.entries(POLICY_LABEL), p?.version_policy || "locked");
-  // docker-write's to change (the grant, R137 step 4), so not offered otherwise.
+  // docker-write's to change (the grant), so not offered otherwise.
   fieldDial("devbuild", GATE_MODES).closest(".fcell").hidden = state?.can?.["docker-write"] === false;
-  // ...and its VMs' (R91), the VMs area's to change, deny unless set.
+  // ...and its VMs', the VMs area's to change, deny unless set.
   fieldDial("makevms", GATE_MODES).closest(".fcell").hidden = state?.can?.["vms-write"] === false;
-  // ...and its deploys (R281 step 6), Deploy Write's to hand a session.
+  // ...and its deploys, Deploy Write's to hand a session.
   fieldDial("kube", GATE_MODES).closest(".fcell").hidden = state?.can?.deploy === false;
   fieldDial("discord", GATE_MODES);
   fieldDial("installpacks", GATE_MODES).closest(".fcell").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
-  // What its VMs may hold, only where it may make VMs at all (R223).
+  // What its VMs may hold, only where it may make VMs at all.
   // ...sliding in and out as the dial moves, and put where it belongs as
   // the settings are drawn.
   const vmsCaps = (slide = true) => {
@@ -766,7 +766,7 @@ function rnFillPrefsRest(p){
   rnDrawPrefs();
 }
 
-// The project's VM limits (R91 step 7), as one string so the dirty check
+// The project's VM limits, as one string so the dirty check
 // compares it as it does every other field; memory shown in GB.
 function rnVmCapsOf(p){
   const c = p?.prefs?.vm_caps || {count: 4, vcpus: 8, mem_mb: 16384, disk_gb: 200};
@@ -785,9 +785,8 @@ function rnVmCapsSet(s){
 function rnDrawPrefs(){
   const p = (state?.projects || []).find(x => x.name === rnFor);
   // Ghosted where no session can start: a project locked against this
-  // account (R119). The model and effort are not here any more: a session
-  // starts on the ones picked in the agent's menu each time (the operator,
-  // 12 Oct).
+  // account. The model and effort are not here any more: a session
+  // starts on the ones picked in the agent's menu each time.
   const shut = !!p?.locked_me;
   $("rnReply").disabled = $("rnAsks").disabled = shut;
   $("rnPrefHint").textContent = shut
@@ -797,7 +796,7 @@ function rnDrawPrefs(){
 
 // ---- the dialog's forms, drawn at load ----------------------------------
 
-// Seven sections of the dialog are forms (R301), written here rather than in
+// Seven sections of the dialog are forms, written here rather than in
 // index.html so each is formBox: its Save bar is the form's foot (rnBars puts
 // its verbs there) and ends where its fields end, as a row of a field's own
 // buttons does (no .ctlrow cap in a form). Drawn once by bootMarkup, before
@@ -818,9 +817,9 @@ function rnDrawForms(){
       formField("rnName", "Name", `<input id="rnName" maxlength="100" autocomplete="off" spellcheck="false"><div class="hint" id="rnHint"></div><div class="hint" id="rnPreview" hidden></div>`,
         {attrs: `id="rnNameField"`})]}),
     // Agents may: everything a session may or may not do on this space, in one
-    // place (the operator, 25 Sep), each dial on its own, asking first, or not
-    // at all, in the groups a person looks for it under (the operator, 22 Oct:
-    // one grid of fifteen read as a heap). What a session ENTERS into the
+    // place, each dial on its own, asking first, or not
+    // at all, in the groups a person looks for it under
+    // (one grid of fifteen read as a heap). What a session ENTERS into the
     // notebook is creation only: what is already on a list a session may still
     // tick, note and reword (roadmap #27). A code-less door has no notebook,
     // no shipping and no test runs (data-rncode). Lent to the Permissions view
@@ -834,14 +833,14 @@ function rnDrawForms(){
         rnGate("rnGateDesign", "Add to the design", "the design language and pages saved from a session"),
         rnGate("rnGateWiki", "Write the wiki", "wiki pages written or removed by a session")]},
       // The space's container (devbuild: rebuild it, change its env, create it
-      // where there is none, remove it), its VMs (R91), its Kubernetes
-      // environments (R281 step 6; one marked production asks a person
-      // whatever this says), its Discord server (R293; a removal, a permission
+      // where there is none, remove it), its VMs, its Kubernetes
+      // environments (one marked production asks a person
+      // whatever this says), its Discord server (a removal, a permission
       // changed or members reached asks a person whatever this says): deny by
-      // default. A tool on a session's node (R169 step 5) asks by default: a
+      // default. A tool on a session's node asks by default: a
       // toolchain goes into a node's store and a pack joins every node's
       // catalog, so a person who may curate it answers. A person's lent
-      // Windows PC (R270 step 6) is somebody's own machine: deny by default,
+      // Windows PC is somebody's own machine: deny by default,
       // and Ask puts each use in front of the person at it.
       {head: "Building and running", fields: [
         rnGate("rnGateSettings", "Fill in build and test", "the build, test and outputs fields from a session", "data-rncode"),
@@ -851,7 +850,7 @@ function rnDrawForms(){
         rnGate("rnGateDiscord", "Manage Discord", "applying this space's Discord layout to its server, from a session"),
         rnGate("rnGatePacks", "Install a tool pack", "installing a toolchain, or a tool pack from the vetted catalog, on a session's node, from a session"),
         rnGate("rnGatePc", "Use a lent PC", "asking a person's Windows PC to run its lent verbs, from a session")]},
-      // What its VMs may hold in all, whoever makes them (R91 step 7), shown
+      // What its VMs may hold in all, whoever makes them, shown
       // where it may make VMs at all (rnVmCapsShown).
       {head: "Its VMs may hold", says: "In all, whoever makes them: a VM that would pass one is refused with the limit named. Each node also keeps 2 GB of memory and 10 GB of disk for itself.",
        attrs: `id="rnVmCapsRow" data-own-show`, fields: [
@@ -860,13 +859,13 @@ function rnDrawForms(){
         formField("rnVmMem", "Memory, GB", `<input id="rnVmMem" type="number" min="0" max="1024" step="1" inputmode="numeric">`, {short: true}),
         formField("rnVmDisk", "Disk, GB", `<input id="rnVmDisk" type="number" min="0" max="16384" step="1" inputmode="numeric">`, {short: true})]},
       // Signing with the space's keys, which the session never receives
-      // (aerie sign, R106), a new key or an app mapped to one (R106 step 6: a
+      // (aerie sign), a new key or an app mapped to one (a
       // new sideload key is an app's identity for good), the tag and the
-      // forge's release (aerie version release, R138), each asking by default
+      // forge's release (aerie version release), each asking by default
       // and waiting for the space's owner; and who may move the version,
       // version.py's policy, the same setting the Artifacts tab's version row
       // writes (an owner who set every dial here to auto still found the
-      // version locked, report #48, 3 Oct), in its own words, since a policy
+      // version locked, report #48), in its own words, since a policy
       // says how far, not whether to ask.
       {head: "Shipping", attrs: "data-rncode", fields: [
         rnGate("rnGateSign", "Sign a build", "signing an APK or bundle with this space's keys, from a session"),
@@ -881,11 +880,11 @@ function rnDrawForms(){
         formField("rnTestChange", "A change asked for", `<select id="rnTestChange">
           <option value="wait">waits: the ask in hand is finished and tested first</option>
           <option value="restart">interrupts any test run for the new ask</option></select>`, {wide: true})]},
-      // The coding agents beside Claude its sessions may run (R95), each
+      // The coding agents beside Claude its sessions may run, each
       // installed and signed in on a node, ticked here to be offered; what
-      // each part is for said where it is (the operator, 31 Oct: "confused
+      // each part is for said where it is ("confused
       // what any of this is for"); how many sessions of one agent each person
-      // may run here at once (R143), each its own tree and branch; and how
+      // may run here at once, each its own tree and branch; and how
       // each is guarded, reference rather than a setting, folded. The space's
       // own, lent dead to a repository's view (RN_SPACE_PARTS).
       {head: "Coding agents", says: "Besides Claude, which always may: one left unticked does not start here.", attrs: `id="rnAgentsField"`, fields: [
@@ -914,20 +913,20 @@ function rnDrawForms(){
     // its card opens this section. Unlink is at the foot's left, apart from
     // Save: the remote and its stored token go, the commits stay.
     repo: formBox({state: RN_STATE, foot: [`<button type="button" id="rnUnlink" class="danger lead" hidden>Unlink</button>`], fields: [
-      // What its remote is, and Link to a git host where it has none (B813).
+      // What its remote is, and Link to a git host where it has none.
       `<div class="fcell fwide" id="rnRepoSum" hidden><div class="setrow ctlrow"><span class="hint grow" id="rnRepoSay"></span>
         <button type="button" id="rnRepoGo"></button></div></div>`,
       `<div class="fcell fwide" id="rnGitNone" hidden><div class="hint"></div></div>`,
       // A stored token is not shown and not typed over: Clear is the way in,
       // staged like the rest. What to give it for is the git hosts page, in a
-      // tab of its own (R188); the person's own key store's entries for this
-      // host are under it (R154).
+      // tab of its own; the person's own key store's entries for this
+      // host are under it.
       formField("rnToken", "Your access token", `<input id="rnToken" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_… or github_pat_…">
         <a class="link whichperms" href="/#/help/git-hosts" target="_blank" rel="noopener">Which permissions?</a>
         <button type="button" id="rnTokenClear" class="link" hidden></button>
         <div class="hint" id="rnTokenHint"></div><div id="rnStore" hidden></div>`,
         {help: "yours alone: your pushes and pulls here use it; leave it empty to keep the one you gave", wide: true, hidden: true, attrs: `id="rnTokenField"`}),
-      // Its own deploy key, made or pasted here (the operator, 12 Oct): acts
+      // Its own deploy key, made or pasted here: acts
       // at the press, the private half to the root-only helper and never shown
       // again, the public half shown to add on the host.
       formField("rnKeyPaste", "Deploy key", `<div id="rnKeyPub" tabindex="0" aria-label="the deploy key's public half" hidden></div><textarea id="rnKeyPaste" rows="4" autocomplete="off" spellcheck="false" data-bwignore hidden placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
@@ -946,7 +945,7 @@ function rnDrawForms(){
           <button id="rnAuthKey" type="button">Deploy key</button>
           <button id="rnAuthToken" type="button">Each person's token</button></div>
         <div class="hint" id="rnAuthHint"></div></div>`,
-      // Test (the operator, 7 Oct): whether it can read and push, what it is
+      // Test: whether it can read and push, what it is
       // missing said under the button; a token typed and not saved is tested.
       `<div class="fcell fwide" id="rnTestField" hidden><div class="logdays setrow ctlrow"><span class="hint grow" id="rnTestHint">Test tries a read and a dry-run push with this, which sends nothing.</span>
         <button type="button" id="rnTest">Test</button></div><div class="hint" id="rnTestOut" hidden></div></div>`,
@@ -959,8 +958,8 @@ function rnDrawForms(){
     // (docs/nodes.md §13), the rest of the set and the hosting-only nodes in
     // one list (rnFillNodesMore), and the card. Its first group is the space's
     // own, lent dead to a repository's view (RN_SPACE_PARTS); the second is
-    // the repository's: its hosting nodes narrowed (R223), where its tests
-    // run in its dev instance (R68 step 6) and its test node (R151).
+    // the repository's: its hosting nodes narrowed, where its tests
+    // run in its dev instance and its test node.
     runs: formBox({state: RN_STATE, attrs: `id="rnNodeField" hidden`, groups: [
       {attrs: `id="rnNodeSpace"`, fields: [
         formField("rnNode", "Node", `<select id="rnNode"></select><div class="hint" id="rnNodeHint">Builds, tests, CI, containers and the emulator run here.</div>`,
@@ -984,9 +983,9 @@ function rnDrawForms(){
           {help: "where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the space's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain",
            attrs: `id="rnTestNodeF"`})]}]}),
     // What aerie build and aerie test run and what a build leaves, each with
-    // its own label; where its tests run (R223, one choice) and where a
-    // Gradle build writes (B439); and how long what a session leaves is kept,
-    // three counts across (R96 captures, R165 snapshots, dev builds).
+    // its own label; where its tests run (one choice) and where a
+    // Gradle build writes; and how long what a session leaves is kept,
+    // three counts across (captures, snapshots, dev builds).
     build: formBox({state: RN_STATE, groups: [
       {fields: [
         formField("rnBuildCmd", "Build command", `<input id="rnBuildCmd" autocomplete="off" spellcheck="false" placeholder="e.g. ./gradlew assembleDebug">`,
@@ -1035,9 +1034,9 @@ function rnDrawForms(){
     // (prefs.sees: a share mounted on the node is out of a session's view
     // unless it is named here) are the form. Under its foot, the addresses
     // a session may still reach outside its space's network (prefs.reaches,
-    // the operator, 7 Oct: records, each saved on its own press, applied
-    // without a restart), and the model router it may use (R294 step 10:
-    // granted where the router lives, said here).
+    // as records, each saved on its own press, applied
+    // without a restart), and the model router it may use
+    // (granted where the router lives, said here).
     sees: formBox({state: RN_STATE, fields: [
       `<div class="fcell fwide" id="rnReadsField" hidden>
         <label id="rnReadsLabel">Reads<span class="help" data-help="other spaces a session here may read, code and notebook alike, and never change" tabindex="0">?</span></label>
@@ -1055,7 +1054,7 @@ function rnDrawForms(){
       <div class="field" id="rnRouterField">
         <label id="rnRouterLabel">Model router<span class="help" data-help="the router its Any model sessions call providers through, and the models it offers them; granted where the router lives, on its node's page, never here" tabindex="0">?</span></label>
         <div id="rnRouterSaid" class="sub"></div></div>`,
-    // Which toolchains a session here may use (R77): every one installed on
+    // Which toolchains a session here may use: every one installed on
     // the space's node, shipped ones on and tool packs off until ticked. One
     // left off is not on a session's PATH or in its view of the store, and
     // aerie refuses it by this setting's name. Filled by rnFillTools.
@@ -1064,8 +1063,8 @@ function rnDrawForms(){
         <label id="rnToolsLabel">Its sessions use<span class="help" data-help="what a session here has on its PATH and in its view of the toolchain store; one left off is not there for it, and aerie says this setting is why. A session started after the save takes it" tabindex="0">?</span></label>
         <div class="lbox" id="rnTools" role="group" aria-labelledby="rnToolsLabel"></div>
         <div class="hint" id="rnToolsHint">Shipped toolchains start on and tool packs off: a pack an administrator adds reaches no space until it is ticked here.</div></div>`]}),
-    // The space's tree over FTPS from outside AerieOS (R151, ftp.py), and
-    // in an editor through this controller (R159): on, how long, the port,
+    // The space's tree over FTPS from outside AerieOS (ftp.py), and
+    // in an editor through this controller: on, how long, the port,
     // and each account's access, staged until Save. Set by an account with
     // the ftp grant (the owner, until a role names it); anybody else sees
     // whether it is on and where. Filled by rnDrawFtp.
@@ -1118,11 +1117,11 @@ async function unlinkProject(name){
 // rather than hides: the alternative is a project whose roadmap silently
 // stayed behind under a name nothing points at any more.
 let rnFor = null;                        // the project the dialog is open on
-let rnMode = "all";                      // "all" in a notebook's Settings view, "project" from a card (R208)
+let rnMode = "all";                      // "all" in a notebook's Settings view, "project" from a card
 let rnOpens = 0;                         // which opening of the dialog this is
 
-// The form shown in a notebook's Settings view instead of the dialog (R119
-// step 3): one form, moved to where it is wanted. `rnHost` is the view's
+// The form shown in a notebook's Settings view instead of the dialog:
+// one form, moved to where it is wanted. `rnHost` is the view's
 // .modal.inline while the form is there, else null and the form is the
 // dialog's.
 let rnHost = null;
@@ -1137,8 +1136,8 @@ function settingsOut(){
 function settingsInto(name, host){
   if (!host) return;
   // Already here for this project: nothing to move, and redoing it would
-  // put every field back and hide People until its read lands again (the
-  // operator, 16 Oct: People there one time and not the next).
+  // put every field back and hide People until its read lands again
+  // (People there one time and not the next).
   if (rnHost === host && rnFor === name && host.querySelector(":scope > .box")){
     // ...but what others may have changed is read again, in place: the
     // days kept, who is on it, the sessions running.
@@ -1159,7 +1158,7 @@ function settingsInto(name, host){
   const box = $("rnmodal").querySelector(":scope > .box");
   // The scroll hints mark a dialog's box that can scroll, and the class
   // came along with the box into the view, where nothing scrolls and the
-  // hint's rule re-drew the dialog's drop shadow around the form (B702).
+  // hint's rule re-drew the dialog's drop shadow around the form.
   if (box) box.classList.remove("scrollup", "scrolldown");
   if (box) host.appendChild(box);
   // A view, never a dialog to shut: whatever hid it is undone here.
@@ -1178,7 +1177,7 @@ function settingsInto(name, host){
 }
 
 // ---- the Settings view: the sections as a list beside the one picked ----
-// The operator, 16 Oct: twelve sections open one under another were hard to
+// Twelve sections open one under another were hard to
 // find a setting in. In the notebook they are a page of settings
 // (page-docs.js splitSects): a list of them, each with what is in it,
 // beside the one picked; on a phone the list, then the section with Back.
@@ -1197,7 +1196,7 @@ const RN_LIST = {
 };
 
 function rnSplit(box, name){
-  // Agents may is the Permissions view's (the operator, 22 Oct), and not
+  // Agents may is the Permissions view's, and not
   // listed here; the dialog still carries it under its jump bar.
   splitSects(box, "rn:" + name, {says: RN_LIST, sel: ':scope > details.rngroup:not([data-sect="rn:claude"])', back: "Settings",
     marks: k => RN_SECTS.includes(k) && rnSectChanges(k).said.length > 0});
@@ -1211,7 +1210,7 @@ function openProjectSettings(name, sect = ""){
   openNotebook(name, "settings");
 }
 // ...and the space's own settings, the dialog its card's Settings opens, at
-// one of its sections (a node's Spaces opens Nodes: R294 step 12), which
+// one of its sections (a node's Spaces opens Nodes), which
 // the dialog shows open under its jump bar as a jump does. `name` is any
 // repository of the space, or the space's own key.
 function openSpaceSettings(name, sect = ""){
@@ -1242,7 +1241,7 @@ function renameProject(name, mode = "all"){
   rnMode = mode;
   rnOpens++;
   const p = (state?.projects || []).find(x => x.name === name);
-  // A card's door (R208): what is the project's as a whole, in a dialog.
+  // A card's door: what is the project's as a whole, in a dialog.
   // The repository's own sections (Repository, Build and test, File access,
   // Snapshots) are each notebook's Settings view's and are not drawn; on a
   // project with no repository the dials that need code are not either.
@@ -1272,7 +1271,7 @@ function renameProject(name, mode = "all"){
   $("rnErrWrap").hidden = true;
   $("rnPreview").hidden = true;
   $("rnName").classList.remove("bad");
-  // Where the project is on disk and its id (R154), said from the start.
+  // Where the project is on disk and its id, said from the start.
   $("rnHint").textContent = rnFolderLine(name);
   // Offered where a token would mean something: a project that already has
   // one, and a project that may push but pushes with a deploy key; that
@@ -1282,7 +1281,7 @@ function renameProject(name, mode = "all"){
   // Still hidden for a read-only clone and for a local repo: a credential
   // there has nothing to authenticate against, and offering one would imply
   // it grants something. Push rights are granted once, at clone. Drawn in
-  // the Repository section itself (the operator, 23 Nov: it was one line and
+  // the Repository section itself (it was one line and
   // a button to a dialog, over an empty page).
   const how = p?.push_how || "";
   const linked = !proj && !!p?.linked;
@@ -1295,7 +1294,7 @@ function renameProject(name, mode = "all"){
   // helper about an ssh remote), and a hint that stopped saying so the moment
   // a token existed would be wrong exactly when it mattered. One line each,
   // per the site-text rule: the reasoning lives here and in the README.
-  // The field is the asker's own (R159; the operator, 23 Nov).
+  // The field is the asker's own.
   $("rnTokenHint").textContent = how === "key"
     ? "This space pushes with a deploy key, so a token here does nothing "
       + "until the switch below says to use each person's."
@@ -1308,7 +1307,7 @@ function renameProject(name, mode = "all"){
     $("rnGitNone").firstElementChild.textContent =
       `${projLabel(name)} has a remote it can only read, so there is no credential to set here.`;
   // What the remote is heads the section, and one not linked yet has Link
-  // to a git host there, the section's one thing to do (B813).
+  // to a git host there, the section's one thing to do.
   const sum = $("rnRepoSum");
   sum.hidden = proj || !p?.git_ok;
   if (!sum.hidden){
@@ -1326,11 +1325,11 @@ function renameProject(name, mode = "all"){
   $("rnUnlink").hidden = !linked || !gitMay;
   unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`);
   // The bin, on the repository's settings and not the space's door.
-  // Not drawn for a role that does not give it (the operator, 21 Oct).
+  // Not drawn for a role that does not give it.
   $("rnDelete").hidden = proj || !p || !!p?.trash_why;
   $("rnKeyOut").hidden = true; $("rnKeyPaste").hidden = true; $("rnKeyPaste").value = "";
   rnLoadAuth(name);
-  // A project with no repository (R208) has no snapshots and no files over
+  // A project with no repository has no snapshots and no files over
   // FTP: the server refuses both, so neither is asked for.
   if (!p?.work) rnLoadSnapshots(name);
   rnLoadPeople(name);
@@ -1343,7 +1342,7 @@ function renameProject(name, mode = "all"){
   // The sessions at the foot, an administrator's.
   $("rnSessField").hidden = true;
   // Asked of the server, which answers by the account's areas on this
-  // project (R255 steps 3 and 4), and its refusal said under the section.
+  // project, and its refusal said under the section.
   rnSessionsLoad(name);
   $("rnmodal").hidden = false;
   rnFolds();
@@ -1352,8 +1351,8 @@ function renameProject(name, mode = "all"){
   rnBars();
 }
 
-// What every repository of a space shares, on one repository's view (R223,
-// the operator, 7 Nov): one value, the space's (prefs.GROUP_FIELDS), which
+// What every repository of a space shares, on one repository's view:
+// one value, the space's (prefs.GROUP_FIELDS), which
 // the repository's view used to edit as its own. Drawn as the space's, its
 // controls dead, with one press to the space's own dialog; the repository's
 // own settings beside them stay live. A section wholly the space's, and the
@@ -1367,7 +1366,7 @@ let rnVmCapsShown = () => {};
 const RN_GROUP = new Set(["node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "agents_off", "agent_default",
                           "agent_slots", "gpu", "vm_caps"]);
 // The space's hosting nodes, each a tick: unticked keeps this repository's
-// containers off it (R223). Drawn on a repository's view alone.
+// containers off it. Drawn on a repository's view alone.
 function rnFillHostsOwn(p){
   const f = $("rnHostsOwn"), box = $("rnHostsOwnBox");
   if (!f || !box) return;
@@ -1416,8 +1415,8 @@ function rnSpaceMarks(name, door){
   rnSpaceRelock();
 }
 
-// Sections, every one open unless this person shut it here (the operator,
-// 8 Oct: too much was hidden in folds), with the jump bar over them.
+// Sections, every one open unless this person shut it here
+// (too much was hidden in folds), with the jump bar over them.
 function rnFolds(){
   const all = [...document.querySelectorAll("details.rngroup")];
   // Moved by a door, not by a hand: the press mark comes off first, so the
@@ -1459,7 +1458,7 @@ function rnLoadPeople(name, keep = false){
 
 function rnDrawPeople(){
   // The chain's door is the remote's alone, and a load the gear's door
-  // started can land after it opens (B539).
+  // started can land after it opens.
   if (!rnPeople) return;
   const v = rnPeople, d = rnPeopleDraft;
   const owner = d.owner ?? v.owner, only = d.invite_only ?? v.invite_only;
@@ -1491,15 +1490,15 @@ function rnDrawPeople(){
       foot: [`<button type="button" id="rnInviteGo">Invite</button>`]})
       : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`);
   if (v.may_manage) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
-  // What each person holds (R152): a name opens their roles, which a
-  // project's owner gives on the projects they own (the operator, 17 Oct:
-  // the Roles page lists roles alone).
+  // What each person holds: a name opens their roles, which a
+  // project's owner gives on the projects they own
+  // (the Roles page lists roles alone).
   const pn = rnFor;
   $("rnPeople").querySelectorAll("[data-rnaccess]").forEach(x => x.onclick = () =>
     rolesAccessOpen(x.dataset.rnaccess, () => rnLoadPeople(pn, true)));
   if (v.may_manage) io.onchange = () => { d.invite_only = io.checked; rnDrawPeople(); };
-  // An invitation is listed, and a withdrawn one gone, on the press (the
-  // operator, 22 Nov): `to` is the list as it will be. A refusal puts it back
+  // An invitation is listed, and a withdrawn one gone, on the press:
+  // `to` is the list as it will be. A refusal puts it back
   // and says why; the answer is the list as the server has it.
   const act = (body, to) => {
     const was = rnPeople;
@@ -1535,7 +1534,7 @@ async function rnSavePeople(name){
   return j.error || "";
 }
 
-// ---- file access over FTP (R151) and in an editor (R159) ----
+// ---- file access over FTP and in an editor ----
 // The project's tree over FTPS on its node, and in a person's editor through
 // the controller (AerieOS for VS Code), each its own switch, for the
 // accounts given read or read and write (ftp.py). Who may set it is the ftp
@@ -1569,7 +1568,7 @@ function rnDrawFtp(){
     cells[3].hidden = !peopleOn;
   };
   cells[2].hidden = true;
-  // Switched off on this install (R81): the sentence, and nothing to set.
+  // Switched off on this install: the sentence, and nothing to set.
   if (featureOff("ftp")){
     $("rnFtpField").hidden = false;
     drawHTML(box, deadWhy(featureOff("ftp")));
@@ -1600,7 +1599,7 @@ function rnDrawFtp(){
   $("rnFtpSpan").textContent = `and the ${v.span - 1} after it`;
   const help = $("rnFtpPortF").querySelector(".help");
   if (help) help.dataset.help = `the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart`;
-  // Said as soon as it is ticked, before anything is tried (the operator, 7 Oct).
+  // Said as soon as it is ticked, before anything is tried.
   const status = on && !v.on && v.missing ? `<div class="hint bad">${esc(v.missing)}</div>`
     : !v.on ? ""
     : st.up ? `<div class="hint">Running at ${esc(where)}. Use FTPS (FTP over explicit TLS, not SFTP) and
@@ -1630,7 +1629,7 @@ function rnFtpChange(){
   if (d.on !== undefined && d.on !== v.on) out.on = d.on;
   if (d.editor !== undefined && d.editor !== v.editor) out.editor = d.editor;
   if (d.port !== undefined && String(d.port) !== String(v.port)) out.port = d.port;
-  // How long it stays on (R196): sent when picked, counted from the Save.
+  // How long it stays on: sent when picked, counted from the Save.
   if (d.for !== undefined && d.for !== "" && (out.on ?? v.on)) out.for = Number(d.for);
   // A port shown for a project turned on now is its offer, and is sent.
   if (out.on && out.port === undefined) out.port = v.port;
@@ -1647,19 +1646,19 @@ async function rnSaveFtp(name, change){
 
 // ---- what this account may not do here ----
 // Why this account may not read or change the project's settings, sessions
-// and snapshots, from its row, or "" (B89).
+// and snapshots, from its row, or "".
 const rnSettingsWhy = name => (state?.projects || []).find(p => p.name === name)?.settings_why || "";
 // A section this account may not use, shown with why under it, the
-// server's own words naming the area and level that would open it (R255
-// step 4), not hidden as if there were nothing there. Muted, as everything
-// a role does not give is said (B1097): a refusal is no failure, and red is
+// server's own words naming the area and level that would open it,
+// not hidden as if there were nothing there. Muted, as everything
+// a role does not give is said: a refusal is no failure, and red is
 // for what went wrong.
 function rnWhyOff(field, body, why){
   drawHTML(body, `<div class="sub dim">${esc(why)}</div>`);
   field.hidden = false;
 }
 
-// The project's daily snapshots (R165): each day kept, with Restore for the
+// The project's daily snapshots: each day kept, with Restore for the
 // whole tree and a box to restore one file. An administrator's, and acted on
 // at the press after a confirmation, not staged with Save: a restore is the
 // thing done when something went wrong, and it first snapshots the tree as
@@ -1669,8 +1668,8 @@ let rnSnap = null;
 // `keep`: read again in place, the section left as it is until the answer.
 function rnLoadSnapshots(name, keep = false){
   if (!keep){ rnSnap = null; $("rnSnapField").hidden = true; }
-  // Not asked for where the row already says it would be refused (B89), and
-  // not drawn: what a role does not give is not shown (the operator, 21 Oct).
+  // Not asked for where the row already says it would be refused, and
+  // not drawn: what a role does not give is not shown.
   if (rnSettingsWhy(name)) return;
   return reading("rn.snapshots", async () => {
     const j = await getJSON("/api/snapshots?project=" + encodeURIComponent(name));
@@ -1730,7 +1729,7 @@ function rnDrawSnapshots(){
       rnLoadSnapshots(name, true);
     });
   };
-  // A pin, or its letting go, is drawn on the press (the operator, 22 Nov),
+  // A pin, or its letting go, is drawn on the press,
   // and put back saying why on a refusal.
   const pinNow = (day, action) => {
     const was = rnSnap;
@@ -1754,7 +1753,7 @@ function rnDrawSnapshots(){
       `Put all of ${name} back as it was on ${day}?\n\nFiles changed since are written back and files added since are removed, on the controller and then every node. The tree as it is now is snapshotted first.`);
     const pin = row.querySelector("[data-snappin]");
     pin.onclick = () => pinNow(day, pin.dataset.snappin);
-    // Restore file wakes once a file is typed (the operator, 18 Oct).
+    // Restore file wakes once a file is typed.
     const one = row.querySelector("[data-snapone]"), file = row.querySelector("[data-snapfile]");
     file.oninput = () => { one.disabled = !file.value.trim(); };
     one.onclick = e => {
@@ -1818,10 +1817,10 @@ function rnLoadAuth(name){
     .catch(() => {});                          // the rename itself still works
 }
 
-// The project's own deploy key (the operator, 12 Oct): made or pasted here,
+// The project's own deploy key: made or pasted here,
 // shown by its public half with where the host takes it, forgotten here.
 // Shown wherever the token is: a project that may push.
-// The person's own key store, for this remote's host (R154): a token they
+// The person's own key store, for this remote's host: a token they
 // gave another repository can be this one's too, and the project says whose
 // store its token is in. Acts at the press.
 function rnDrawStore(name){
@@ -1831,18 +1830,18 @@ function rnDrawStore(name){
   let host = "";
   try{ host = new URL(String(o.url || "").replace(/^git@([^:]+):/, "https://$1/")).host.toLowerCase(); }catch(e){ host = ""; }
   const mine = (o.store || []).filter(f => f.host === host);
-  // Who has given the project a token (R159): each a person, their token
+  // Who has given the project a token: each a person, their token
   // used for their own work while they are signed in; yours removable.
   const givers = o.givers || [], me = givers.find(g => g.mine);
   // Each person's own row: their pushes and pulls run with it, everyone's
-  // at the same time (R159; the operator, 23 Nov: one row reading as the
+  // at the same time (one row reading as the
   // space's one token said only one could push).
   const who = givers.map(g => `<div class="logdays setrow ctlrow"><span class="grow">${g.mine ? "Your" : esc(g.name) + "'s"} ${
     esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}: ${g.mine ? "your" : "their"} pushes and pulls here use it${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
     g.mine ? `<button type="button" data-rnunlink="1">Take it back</button>` : ""}</div>`).join("");
   // Pushes are off while Authentication is Off, whatever is given: said
-  // first, where a token and a passing Test read as all well (the operator,
-  // 23 Nov: a space set to Disabled could not push, and nothing near the
+  // first, where a token and a passing Test read as all well
+  // (a space set to Disabled could not push, and nothing near the
   // token said why).
   const off = rnAuthNow === "none" && (givers.length || rnAuthOpts?.token)
     ? `<div class="notice warn rnauthoff">${rnLinkMine()
@@ -1853,7 +1852,7 @@ function rnDrawStore(name){
         me ? "" : "; yours wait until you give one"}.</div>`
     : `<div class="hint">Nobody has given this space a token: each person's pushes and pulls wait until they give their own.</div>`;
   // Your other tokens for this host, each told apart by when it was saved;
-  // never the one this space already uses (B1122: it was offered again, the two
+  // never the one this space already uses (it was offered again, the two
   // rows reading the same).
   const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="logdays setrow ctlrow"><span class="grow">Your ${me ? "other " : ""}${
     esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}${f.at ? `, saved ${esc(fmtTime(f.at * 1000, {day: "numeric", month: "short"}))}` : ""}</span>
@@ -1881,7 +1880,7 @@ function rnDrawStore(name){
 }
 
 // Where a repository links, how it pushes and its deploy key are its
-// owner's (the operator, 23 Nov); anybody else reads them here and gives
+// owner's; anybody else reads them here and gives
 // or takes back their own token.
 const rnLinkMine = () => rnAuthOpts?.owner?.me !== false;
 const rnLinkOwner = () => rnAuthOpts?.owner?.name || "its owner";
@@ -1948,7 +1947,7 @@ function rnDrawAuth(){
   const canToken = stored || typed;
   const canKey = rnAuthOpts.ssh;
 
-  // The field is the asker's own token (the operator, 23 Nov): typed, it
+  // The field is the asker's own token: typed, it
   // replaces theirs; their row below takes it back. A token kept as the
   // space's own, from before each person gave their own, is its owner's to
   // clear.
@@ -2003,7 +2002,7 @@ function rnDrawAuth(){
         : "Switching keeps every credential it has; nothing is removed either way.");
 }
 
-// Test (the operator, 7 Oct): a read and a dry-run push with what the
+// Test: a read and a dry-run push with what the
 // project authenticates with, or with the token typed above and not saved
 // yet, and what it is missing in red under the button (projects.auth_test).
 async function rnTestAuth(){
@@ -2035,19 +2034,19 @@ async function rnTestAuth(){
 
 const rnAuthSet = m => { if (rnAuthPick === m) return; rnAuthPick = m; rnDrawAuth(); };
 
-// A rename is the name shown and nothing else (R154): the directory, the
+// A rename is the name shown and nothing else: the directory, the
 // notebook, the sessions and the containers stay where they are, so nothing
 // has to be closed first.
-// Where the project is on disk, and its id, under the name (the operator,
-// 8 Oct): the name shown is a label, the folder is the project's for good.
+// Where the project is on disk, and its id, under the name:
+// the name shown is a label, the folder is the project's for good.
 function rnFolderLine(name){
   const pid = (state?.projects || []).find(p => p.name === name)?.pid;
   return `Folder: /workspace/${name}${pid ? ` · space #${pid}` : ""}. Renaming changes the name shown, never the folder.`;
 }
 
 // A shown name by GitHub's rules for a repository's, as the server keeps it
-// (registry.clean_name): letters, digits, - _ and . only, each run of
-// anything else one -, at most 100 (the operator, 9 Oct).
+// (registry.clean_name): letters, digits, - _ and. only, each run of
+// anything else one -, at most 100.
 function ghName(raw){
   const s = String(raw || "").trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
     .slice(0, 100).replace(/-+$/, "");
@@ -2085,13 +2084,13 @@ function closeRename(){
   $("rnmodal").hidden = true; rnFor = null;
 }
 
-// ---- each section's own Save and Revert (the operator, 10 Oct) ---------------
+// ---- each section's own Save and Revert ---------------
 // Every section that holds a setting carries its own Save and Revert at its
 // foot, as the notebook's other views do (nb-core.js sectBar), and they write
 // or put back that section's fields and nothing else. One Save at the foot of
 // eleven sections was a long way from the field it saved, and its first press
 // with a session running only asked a question: a person who pressed it once
-// and moved on had saved nothing (Reads on AerieOS, 10 Oct). Where the
+// and moved on had saved nothing (Reads on AerieOS). Where the
 // section holds something a running session takes only when it starts, its
 // bar offers both answers at once: Save, keep it running and Save and end it.
 const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "releases", "claude", "yours"];
@@ -2131,8 +2130,7 @@ const RN_FIELDS = [
    of: p => p?.prefs?.build || "", read: el => el.value.trim()},
   {k: "test", id: "rnTestCmd", sect: "build", label: "Test",
    of: p => p?.prefs?.test || "", read: el => el.value.trim()},
-  // Stored as a yes or no (B439), picked as where the build folders go: a
-  // setting that had no control until R294 step 14.
+  // Stored as a yes or no, picked as where the build folders go.
   {k: "build_local", id: "rnBuildLocal", sect: "build", label: "Gradle builds into",
    of: p => p?.prefs?.build_local === false ? "off" : "on", read: el => el.value || "on", out: v => v !== "off"},
   // Typed as one line, stored as a list.
@@ -2203,7 +2201,7 @@ function rnEnc(){
           // prefs.nodes: one list on screen, two settings underneath.
           hosts: !drawn ? rnPrefWas.hosts : rnMoreIds().filter(id => rnHostIds().has(id)).join(","),
           // The space's hosting nodes this repository keeps its containers
-          // off (R223): the rows unticked.
+          // off: the rows unticked.
           hosts_off: $("rnHostsOwn")?.hidden !== false ? rnPrefWas.hosts_off
             : [...$("rnHostsOwnBox").querySelectorAll("input:not(:checked)")].map(i => i.value).join(","),
           reads: [...$("rnReads").querySelectorAll("input:checked")].map(i => i.value).join(","),
@@ -2286,7 +2284,7 @@ function rnBars(){
       }
     }
     // A remote it can only read has nothing here to save (rnGitNone), nor
-    // has one not linked yet, whose one press is Link (rnRepoSum, B813).
+    // has one not linked yet, whose one press is Link (rnRepoSum).
     const wrap = bar.classList.contains("ffoot") ? bar : bar.parentElement;
     wrap.hidden = sect === "repo" && (!$("rnGitNone").hidden
       || ["rnTokenField", "rnAuthField", "rnAddrField"].every(id => $(id).hidden));
@@ -2390,7 +2388,7 @@ async function rnSubmit(sect, end = false){
   const mine = Object.keys(RN_WAS).filter(k => RN_WAS[k][0] === sect);
   // What this section holds that somebody else saved since these settings
   // were opened (another person, another window): refused once, naming it,
-  // so their change is not written over unseen (the operator, 17 Oct); a
+  // so their change is not written over unseen; a
   // second press writes this one's over it. Read against the project as it
   // is now, the poll asked first.
   await refresh().catch(() => {});
@@ -2439,16 +2437,16 @@ async function rnSubmit(sect, end = false){
   const stop = m => { delete bar.dataset.busy; unbusy(pressed, word); rnBars(); return fail(m); };
   try{
     if (prefsChanged){
-      // This section's own fields alone (the operator, 17 Oct): every field
+      // This section's own fields alone: every field
       // went with every save, the others as this window last read them, so a
       // save here put back what somebody had changed in another section.
       // ...and from a repository's view never the space's: they are drawn
       // there dead, and the repository's narrowed hosting list sent as the
-      // space's would have cut the space's own (R223).
+      // space's would have cut the space's own.
       const only = new Set(mine.filter(k => !(rnSpaceOn && RN_GROUP.has(k))));
       const pick = o => Object.fromEntries(Object.entries(o).filter(([k]) => only.has(k)));
       const j = await postJSON("/api/prefs", {project: name, restart: restartNow,
-                              // The project's own door writes the project's defaults (R208 step 6);
+                              // The project's own door writes the project's defaults;
                               // a notebook writes this repository's overrides.
                               scope: rnMode === "project" ? "project" : "repository",
                               ...pick({node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
@@ -2517,8 +2515,8 @@ async function rnSubmit(sect, end = false){
 // touched at all. Putting one back is a mv. Friction proportionate to a
 // reversible act, and the dialog names the path so the reversal is obvious.
 async function deleteProject(name){
-  // What keeps running with no project while it is in the trash (the
-  // operator, 26 Oct), said before it is asked.
+  // What keeps running with no project while it is in the trash,
+  // said before it is asked.
   const own = await postJSON("/api/repos", {action: "owned", name});
   const left = [own.containers?.length ? `Its container${own.containers.length === 1 ? "" : "s"} ${own.containers.join(", ")} keep${own.containers.length === 1 ? "s" : ""} running, given to no space until it is put back.` : "",
                 own.vms?.length ? `Its VM${own.vms.length === 1 ? "" : "s"} ${own.vms.join(", ")} keep${own.vms.length === 1 ? "s" : ""} running under No space, an administrator's to act on.` : ""].filter(Boolean).join(" ");

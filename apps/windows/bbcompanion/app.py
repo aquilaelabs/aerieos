@@ -1,5 +1,5 @@
-"""The companion app's window (R270 step 4): sign this machine in, see every
-project its account is on (R104), pick a folder for the ones to keep, and
+"""The companion app's window: sign this machine in, see every
+project its account is on, pick a folder for the ones to keep, and
 watch them: in step,
 copying, waiting to send, or what went wrong; what Windows could not hold;
 the conflict copies. Plain tkinter, so the app needs nothing but Python.
@@ -28,7 +28,7 @@ class App(tk.Tk):
         # The projects the account is on, as the controller last said: read
         # on a thread of its own so the window never waits on the network.
         self.mine, self.mine_said = {}, ""
-        # A lent verb asked under Ask (R270 step 6): the worker waits while
+        # A lent verb asked under Ask: the worker waits while
         # the window, on its own thread, puts the question to its person.
         self.asks = queue.Queue()
         self.show()
@@ -111,7 +111,7 @@ class App(tk.Tk):
     def read_mine(self):
         """Every half minute, the projects this account is on and what it
         may do in each, for the list; a project added to it shows up on its
-        own (R104)."""
+        own."""
         while creds.load().get("token"):
             c = creds.load()
             try:
@@ -148,7 +148,7 @@ class App(tk.Tk):
         self.tree.delete(*self.tree.get_children())
         left = 0
         keep = self.selected()
-        # An archived project is out of sight on the dashboard (R119): one
+        # An archived project is out of sight on the dashboard: one
         # not synced here goes to the foot of the list, and says so.
         def row(n):
             return self.mine.get(n) or {}
@@ -168,7 +168,7 @@ class App(tk.Tk):
                 word, access = "not synced", (self.mine.get(name) or {}).get("access")
             if access == "r":
                 word += ", read-only"
-            # Its lock (R119): one that holds this account out keeps the
+            # Its lock: one that holds this account out keeps the
             # copy read-only, and the note under the list says whose it is.
             word += core.lock_word(row(name))
             if row(name).get("archived"):

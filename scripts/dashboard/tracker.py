@@ -87,7 +87,7 @@ class Tracker:
                     d.setdefault(k, {})
                 return d
             # There and not what this wrote: kept, as one that is not JSON
-            # is, before the next save writes the empty one over it (B1082).
+            # is, before the next save writes the empty one over it.
             statefile.keep_unreadable(self.file(), f"not a {self.noun} file")
         except OSError:
             pass

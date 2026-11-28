@@ -1,9 +1,9 @@
-"""The dashboard's own TLS (R158 step 2): the mode read from the settings,
+"""The dashboard's own TLS: the mode read from the settings,
 a self-signed pair made for the names and kept with its key sealed, one
 socket serving https and http by the first byte, and the status the
 Connection section and the Doctor read.
 
-And what a node's channel is pinned to (R267 step 15): the install's own
+And what a node's channel is pinned to: the install's own
 certificate is there and loaded in every mode, http among them, with what a
 browser at http:// gets unchanged; its key is kept when the certificate is
 remade, so the key's pin outlives every renewal; in the acme mode the
@@ -45,7 +45,7 @@ class Mode(unittest.TestCase):
 
 
 class Hsts(unittest.TestCase):
-    # R290 step 2 (the operator, 26 Nov): HSTS for the Let's Encrypt name
+    # HSTS for the Let's Encrypt name
     # alone, never over the install's own certificate, which a browser
     # under HSTS could not click past.
     def test_hsts_goes_to_the_lets_encrypt_name_alone(self):
@@ -150,7 +150,7 @@ class Pair(unittest.TestCase):
         from cryptography.hazmat.primitives import hashes
         got = ":".join(f"{b:02X}" for b in x509.load_der_x509_certificate(der).fingerprint(hashes.SHA256()))
         self.assertEqual(got, tls.fingerprint())
-        # A connection that sends nothing holds nobody else up (R228 step 3):
+        # A connection that sends nothing holds nobody else up:
         # its first byte is waited for on its own thread, not the accept one.
         with socket.create_connection(("127.0.0.1", port), timeout=5):
             t0 = time.monotonic()
@@ -525,7 +525,7 @@ class Own(unittest.TestCase):
 
 
 class DroppedConnection(unittest.TestCase):
-    """A connection its peer dropped writes nothing to the log (B1191);
+    """A connection its peer dropped writes nothing to the log;
     anything else is still socketserver's traceback."""
 
     def test_only_a_dropped_connection_is_quiet(self):

@@ -1,4 +1,4 @@
-"""The image holds every file of the bundle a checkout lists (R267 step 6):
+"""The image holds every file of the bundle a checkout lists:
 a release signs the list of the bundle's files as the tree holds them
 (tools/sign-agent.py, scripts/lib/bundleparts.py), the controller packs the
 bundle from the image's own, and a node that pinned the release key refuses

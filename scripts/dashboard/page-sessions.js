@@ -47,7 +47,7 @@ function sessionProject(name){
   return m ? m[1] : "";
 }
 
-// The Sessions page (R250 step 1, the design's tables rule): every terminal
+// The Sessions page (the design's tables rule): every terminal
 // and Claude session of this account, here and on the nodes, one row each.
 // The name opens its tab; Open puts a tab back, Minimize takes a shell's off
 // the strip (it keeps running), and End stops one, which closing a tab never
@@ -69,7 +69,7 @@ function renderSessionsInto(i){
   }
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name))), claudes = agentSs.length;
   // Its counts on its status line, in the page's head as every page's is
-  // (R274; the operator, 24 Nov: a line drawn bare on some pages and in a
+  // (a line drawn bare on some pages and in a
   // card on others was all over the place).
   d.setBar("");
   const glance = pageHead({line: [{label: ss.length === 1 ? "session" : "sessions", value: ss.length},
@@ -114,7 +114,7 @@ function renderSessionsInto(i){
   d.list.querySelectorAll("[data-go]").forEach(n => n.onclick = e => goTo(e, n.dataset.go));
   // The session's tab as it is at the press: one drawn into the row before
   // the tab was made again named an id nothing held, and the press did
-  // nothing (B825).
+  // nothing.
   d.list.querySelectorAll("[data-min]").forEach(b => b.onclick = () => {
     const t = tabs.find(x => sessionOf(x.arg) === b.dataset.min);
     if (t) hideTab(t.id);
@@ -127,7 +127,7 @@ function renderSessionsInto(i){
 // while a session was still open on it, and the row knows which it meant.
 async function killSession(name, node = ""){
   const ag = agentOfSession(tmuxBase(name)), claude = !!ag;
-  // Named as its row and its tab are, never by its tmux name (B58).
+  // Named as its row and its tab are, never by its tmux name.
   const proj = sessionProject(name);
   const said = claude ? `the ${ag.agent.name} session on ${proj ? projLabel(proj) : name}`
     : `the session "${sessionLabels().get(name) || name}"`;
@@ -143,14 +143,14 @@ async function killSession(name, node = ""){
   notify(`ended ${said}`);
   await refresh();
   sessEndRead(name);
-  // Nowhere near another End (B54): with focus left on the list, a keyboard
+  // Nowhere near another End: with focus left on the list, a keyboard
   // Enter after the redraw could end a second session.
   const a = document.activeElement;
   if (a?.matches?.("[data-k], .consend")) a.blur();
 }
 
-// A session ended by a press is gone from the page on the press (the
-// operator, 22 Nov: a press must never look as if nothing happened): its
+// A session ended by a press is gone from the page on the press
+// (a press must never look as if nothing happened): its
 // tab closed and its row on the Sessions page held out of every read until
 // a read no longer lists it, or half a minute has passed, since a node's
 // census of its sessions can come a while after the answer. drawNow's first
@@ -208,8 +208,8 @@ const withMe = p => (state?.claude_with || {})[tmuxName(p)] || (state?.claude_wi
 // The others, for the places that are about somebody else being here.
 const othersOn = p => withMe(p).filter(n => n !== state?.me);
 // Who has a conversation open here, one line each with a dot in front:
-// bright while that session is working on a prompt, dim while it waits (the
-// operator, 24 Sep, in place of one sentence naming them all). AerieOS
+// bright while that session is working on a prompt, dim while it waits
+// (in place of one sentence naming them all). AerieOS
 // account names, not the Anthropic logins behind them: whose session it is
 // on this box is the question somebody looking at the row is asking. Your
 // own is last and says so, so the other people, the part that is news, come
@@ -217,7 +217,7 @@ const othersOn = p => withMe(p).filter(n => n !== state?.me);
 // The two maps behind those rows, fetched on their own when the revs token
 // `live` moves: a session starting, ending or turning to work shows within
 // a few seconds, where the status poll runs git for every project and
-// stays at fifteen (the operator, 25 Sep).
+// stays at fifteen.
 function liveRefresh(){
   return reading("live", async () => {
     let j;
@@ -226,7 +226,7 @@ function liveRefresh(){
     // Your own sessions starting or ending are what the cards' Manage agent,
     // a project's header and its settings read off the status read's session
     // list, which this light read does not carry and keeps putting off: so a
-    // change in yours reads it at once (the operator, 17 Oct: Start agent
+    // change in yours reads it at once (Start agent
     // stayed until a reload).
     const yours = w => Object.entries(w || {}).filter(([, ns]) => (ns || []).includes(state.me)).map(([k]) => k).sort().join(",");
     const moved = yours(j.claude_with) !== yours(state.claude_with);
@@ -248,10 +248,10 @@ function sessionRows(proj){
   // tab and the Sessions card wear (stateDot's rule): working pulses in
   // the note color, waiting is the warn color. The row had a dot of its
   // own in other colors, and the same state read differently in each
-  // place (the operator, 29 Sep).
+  // place.
   // One line per account per node, the node in brackets, so a person with
   // a session on two machines is two lines and each says whether it is
-  // working there (the operator, 30 Sep). Where the payload has no node
+  // working there. Where the payload has no node
   // rows (a session on this container), one line per account, as before.
   const where = (state?.claude_where || {})[tmuxName(proj)] || (state?.claude_where || {})[proj] || [];
   // ...and only while it names the same people as the map beside it, which
@@ -262,9 +262,9 @@ function sessionRows(proj){
     ? [...where].sort((a, b) => (a.who === state?.me) - (b.who === state?.me) || a.node.localeCompare(b.node))
     : names.map(n => ({who: n, node: "", working: busy.has(n), asking: asks.has(n)}));
   // What changed since a session started that it does not see until it is
-  // started again, said under it with what for (the operator, 12 Oct): a
+  // started again, said under it with what for: a
   // toolchain put on its node's PATH, AerieOS updated.
-  // On Claude Code's permission prompt it is asking, whoever's it is (B104).
+  // On Claude Code's permission prompt it is asking, whoever's it is.
   return rows.map(r => `<div class="sessone"><span class="st ${r.asking ? "asking" : r.working ? "working" : "waiting"}" title="${
     r.asking ? "asking to approve something in its terminal" : r.working ? "working on a prompt" : "waiting for a prompt"}"></span>${esc(r.who)}${
     r.who === state?.me ? " (you)" : ""}${r.node ? ` <span class="dim">(${esc(r.node)})</span>` : ""}</div>${

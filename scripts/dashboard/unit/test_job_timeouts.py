@@ -1,5 +1,5 @@
-"""A job's timeout is a clock, and it ends what the job started (R246; the
-audit of 13 Nov): jobs.stream looked at its deadline only when a line
+"""A job's timeout is a clock, and it ends what the job started:
+jobs.stream looked at its deadline only when a line
 arrived, so a child that printed nothing was never ended, and a timed-out
 command was killed alone and then waited on, for as long as anything it had
 started held its pipe."""

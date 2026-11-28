@@ -4,7 +4,7 @@
     tools/release-notes.py TAG
 
 The changelog's own section for TAG's version when it has one: a pre-release
-of any name is cut with its section written (aerie version release, R217).
+of any name is cut with its section written (aerie version release).
 Before that, the changelog's Unreleased section at TAG, less the lines it
 already held at the last published release before it, under their headings. Unreleased only
 grows between two stable releases, so the section whole repeated every earlier

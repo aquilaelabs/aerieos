@@ -1,4 +1,4 @@
-"""What a container is using now (R216): `docker stats` read once per ask
+"""What a container is using now: `docker stats` read once per ask
 into numbers the row can sum, sizes as bytes and percentages as floats."""
 import os
 import sys

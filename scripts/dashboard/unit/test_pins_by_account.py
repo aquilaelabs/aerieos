@@ -1,4 +1,4 @@
-"""Migration 0040 (R205): an account made before 7 Oct that never pinned
+"""Migration 0040: an account made before 7 Oct that never pinned
 read every space (or the old "*" default) as pinned; it is given that set as
 its own list once, so no entry means nothing pinned for everybody. Each
 account's pinned spaces read as projects.load_project_pins with

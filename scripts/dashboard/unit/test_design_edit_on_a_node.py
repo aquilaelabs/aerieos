@@ -1,6 +1,6 @@
 """aerie design edit runs on the machine the session is on, and a node's
 bundle carries scripts/lib and a few of scripts/dashboard's modules, not
-design.py (B934: it ended in No module named 'design'). Every module the
+design.py (it ended in No module named 'design'). Every module the
 design verbs import from beside the dashboard is one the bundle carries, and
 the names a rule is found by read the same from records.py as design.py
 gives them."""

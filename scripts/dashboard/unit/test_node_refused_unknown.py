@@ -1,4 +1,4 @@
-"""A hello with a token this controller has no record of (B652): the row
+"""A hello with a token this controller has no record of: the row
 of the node it names says it is turned away, only when that node is quiet
 anyway, so a stranger naming a live node cannot paint it refused."""
 import os

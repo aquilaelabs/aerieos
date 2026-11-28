@@ -31,8 +31,8 @@ def sources(src_dir):
 # end, so the line costs nothing, and the file runs as a program again. The
 # provisioner runs it as "$AGENT enroll" and the unit as "$AGENT run", both
 # written when the agent was one script, and a zip with no first line made
-# both "Exec format error": a new node could not enroll (the operator,
-# 11 Oct), and a node that took the zip would not have started after a
+# both "Exec format error": a new node could not enroll,
+# and a node that took the zip would not have started after a
 # reboot, the agent's own restarts going through sys.executable.
 SHEBANG = b"#!/usr/bin/env python3\n"
 

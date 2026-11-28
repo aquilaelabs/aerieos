@@ -1,5 +1,5 @@
 """aerie lint sorts every tracked file by its first line in one process
-(embedded.py shebangs, R228 step 22), where it read each file's first line
+(embedded.py shebangs), where it read each file's first line
 twice, three processes a read: the same lists, a shell or python named on a
 first line within its first 64 bytes, as `head -c 64 | head -1 | grep -E`
 read it."""

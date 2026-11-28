@@ -25,22 +25,22 @@ bugs.configure(write_json=statefile.write_json, state=state)
 prefs.configure(write_json=statefile.write_json, state=state)
 # The design too: the briefing says whether the notebook holds one, and
 # unconfigured the store read no file, so every session started on a
-# designed project was told its Design view was empty (B355).
+# designed project was told its Design view was empty.
 design.configure(workspace=os.environ.get("WORKSPACE", "/workspace"), state=state,
                  write_json=statefile.write_json)
 preamble.configure(rules_mod=rules, roadmap_mod=roadmap, bugs_mod=bugs, prefs_mod=prefs)
-# The name each project is shown under (B1): without it a session was told
+# The name each project is shown under: without it a session was told
 # only directories, while the person names projects as the dashboard does.
 registry.configure(state=state, workspace=os.environ.get("WORKSPACE", "/workspace"),
                    write_json=statefile.write_json)
 preamble.label_of = registry.label
 preamble.id_of = registry.pid
-# ...and the project each repository is in (R138), as the server has it:
+# ...and the project each repository is in, as the server has it:
 # without it a session was briefed on its first repository alone, by that
 # repository's own name and id, its settings read where the project's are
 # kept (what it reads, its node), and never told the others are its own.
 repos.configure(state=state, write_json=statefile.write_json, registry=registry, workspace=os.environ.get("WORKSPACE") or "/workspace")
-preamble.work_of = repos.is_work          # a project with no repository (R208)
+preamble.work_of = repos.is_work          # a project with no repository
 prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos, keys=registry.repos_keys)
 preamble.repos_fn = lambda p: ((registry.label(k), registry.pid(k), [(m, registry.label(m)) for m in repos.members(k)])
                                if (k := repos.project_of(p)) and len(repos.members(k)) > 1 else None)
@@ -57,7 +57,7 @@ preamble.version_policy = _version_policy
 
 
 def _packs():
-    """The tool packs added here (R77), from the controller's own file."""
+    """The tool packs added here, from the controller's own file."""
     try:
         with open(os.path.join(state, "toolpacks.json")) as f:
             packs = json.load(f).get("packs") or {}
@@ -71,7 +71,7 @@ preamble.packs_of = _packs
 
 
 def node_gpu(project):
-    """Whether the project's node reports an NVIDIA card (R102), read from
+    """Whether the project's node reports an NVIDIA card, read from
     the node store as it stands, read-only: what decides the briefing's GPU
     section. No store, no node or no answer is no card."""
     nid = (prefs.get(project) or {}).get("node") or ""
@@ -103,7 +103,7 @@ if op == "--topics":
     sys.exit(0)
 p = preamble.payload(proj, reply=mine.get("reply") or "", asks=mine.get("asks") or "",
                      uid=os.environ.get("BB_UID", ""), agent=os.environ.get("BB_AGENT", ""))
-# Which coding agent it is for (R95 step 5), where it matters: a session of
+# Which coding agent it is for, where it matters: a session of
 # an agent other than Claude is told what it is and that the briefing holds
 # for it as for Claude, ahead of the rest. bb-tty names it (BB_AGENT).
 p["text"] = preamble.for_agent(os.environ.get("BB_AGENT", ""), p["text"])

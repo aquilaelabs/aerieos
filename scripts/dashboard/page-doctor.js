@@ -1,5 +1,5 @@
 // The doctor: aerie doctor's verdict, run by the server on a slow loop and on
-// the ↻ button, behind a dot in the top bar after the bell (R218 step 3).
+// the ↻ button, behind a dot in the top bar after the bell.
 // The dot wears the worst check's color; its panel is the verdict compact,
 // each failure and warning a line and the passing ones counted, with
 // Controller settings at its foot, whose Controller section holds every
@@ -61,7 +61,7 @@ function doctorChecks(d, compact = false){
     `<div class="probs">${probs.map(c =>
        `<div class="sub ${c.level === "FAIL" ? "bad" : "warn"}" title="${esc(tip(c))}">${esc(said(c))}${
           compact ? "" : c.detail ? `<span class="why">${esc(c.detail)}</span>` : ""}${
-          // Where the fix is, when the server knows (B71): a link, which
+          // Where the fix is, when the server knows: a link, which
           // closes the panel as any press elsewhere does.
           !compact && c.href ? `<a class="pagelink" href="${esc(c.href)}">${esc(c.act || "Open")}</a>` : ""}</div>`
      ).join("")}</div>` +
@@ -77,7 +77,7 @@ function doctorChecks(d, compact = false){
 
 // Run the doctor now, from the panel's ↻ or the card's Run again: both
 // presses rest while it runs, wearing the ring in their word's place on the
-// click (the operator, 22 Nov: Run again went dead with nothing else said
+// click (Run again went dead with nothing else said
 // until the run came back), both places say it is running at once, and
 // both draw what it found.
 const DOC_RUNNING = "Running the doctor";

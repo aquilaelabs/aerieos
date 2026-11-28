@@ -1,6 +1,6 @@
-"""The coding agents' sign-ins sealed on a node (R126).
+"""The coding agents' sign-ins sealed on a node.
 
-With the node's switch on (token_seal, after R125's accounts as their own
+With the node's switch on (token_seal, where accounts are their own
 users), an account's Claude Code, Codex CLI and Grok Build sign-ins are kept here
 sealed, never in the clear on a disk: a copied disk, a backup, the share or
 a snapshot carries nothing usable, and a root who arrives while the account
@@ -20,7 +20,7 @@ refresh written into it is sealed again within a pass. A login writes into
 the home as ever; the pass finds the plain file, seals it, and puts the
 link in its place.
 
-Which copy is the newest, for everything here that writes one (B1043): a
+Which copy is the newest, for everything here that writes one: a
 plain file in the home, then the opened copy, then the seal. An agent
 refreshes its sign-in by writing a new file and renaming it over the name,
 which takes the link's place, or by writing through the link into the
@@ -29,7 +29,7 @@ behind is worth nothing. So a seal is opened only where neither of the
 other two is, and neither is ever written from an older one.
 
 Copilot CLI keeps its token inside its config.json with
-its settings, so that file is sealed whole (R126 step 3): the settings in
+its settings, so that file is sealed whole: the settings in
 it are the CLI's own, read where it reads them, and the Installed page names
 who is signed in from the seal's header as for the others.
 """
@@ -59,7 +59,7 @@ FILES = tuple((agent, os.path.join(*row["kept"].split("/"))) for agent, row in S
 
 def files():
     """Every sign-in sealed here: the shipped agents', then the file each
-    pack's agent keeps its own in, where its pack says (R233 step 6)."""
+    pack's agent keeps its own in, where its pack says."""
     return FILES + tuple((agent, row["kept"]) for agent, row in sorted(pack_signins().items()))
 
 
@@ -102,7 +102,7 @@ def _at(d, path):
 
 def _jsonc(data):
     """A file's JSON, read past leading `//` lines (Copilot's config opens
-    with them since 1.0.103, B282)."""
+    with them since 1.0.103)."""
     lines = (data.decode("utf-8", "replace") if isinstance(data, bytes) else str(data)).splitlines()
     n = 0
     while n < len(lines) and (not lines[n].strip() or lines[n].lstrip().startswith("//")):
@@ -305,7 +305,7 @@ class TokensMixin:
         return d
 
     def _seal(self, acct, agent, data, home):
-        # The X25519 public (R158 step 3), with the library to seal with:
+        # The X25519 public, with the library to seal with:
         # a node with none seals nothing, said once, and its sign-ins stay
         # as they are, as they do before an account has a key here.
         pub = (self.state.get("token_pubs2") or {}).get(acct)
@@ -359,7 +359,7 @@ class TokensMixin:
         link, or one from before the switch) sealed, kept open while the
         account works here or, with `opening`, for the terminal about to
         start, and the plain file shredded with the link in its place. The
-        one path the pass and a terminal's open both take (B1043): the file
+        one path the pass and a terminal's open both take: the file
         is newer than whatever is sealed or open, so both are written from
         it. False with no public key to seal it with yet, and the file then
         stays exactly as it is; OSError where the file is not the account's
@@ -400,7 +400,7 @@ class TokensMixin:
 
     def token_pass_early(self):
         """The pass ahead of what waits on the controller, where node.json
-        already says sign-ins are sealed here (B1043): as this process
+        already says sign-ins are sealed here: as this process
         starts, and at the top of a turn before a hello. A process's first
         pass used to come after the bundle's fetch, the first hello with
         its census taken on the loop, and the passes ahead of it in the
@@ -443,7 +443,7 @@ class TokensMixin:
         try:
             pw = pwd.getpwnam(user_of(acct))
             if os.lstat(home).st_uid != pw.pw_uid:
-                return                      # not moved to its user yet (R125)
+                return                      # not moved to its user yet
         except (KeyError, OSError):
             return
         odir = os.path.join(OPEN_DIR, acct)
@@ -463,7 +463,7 @@ class TokensMixin:
                             # No seal behind the home's link and nothing
                             # open: the link goes, so a terminal here says
                             # to sign in rather than that a sign-in is
-                            # waiting to be opened (B386).
+                            # waiting to be opened.
                             os.unlink(name, dir_fd=fd)
         if not os.path.isdir(odir):
             return
@@ -502,7 +502,7 @@ class TokensMixin:
                         continue
                     # A plain file already in the home is a refresh renamed
                     # over the link since: newer than the copy, and already
-                    # what this puts back, so it stays as it is (B1043).
+                    # what this puts back, so it stays as it is.
                     if not plain(home, rel, pw.pw_uid):
                         data = _read_own(of, pw.pw_uid)[1]
                         with held_folder(home, rel, make=(pw.pw_uid, pw.pw_gid)) as (fd, name):
@@ -529,10 +529,10 @@ class TokensMixin:
 
     def token_open(self, tk):
         """An account's sign-ins made ready for the terminal a person just
-        opened for it (the controller's signed /term, R133), the newest copy
+        opened for it (the controller's signed /term), the newest copy
         of each kept. Every open used to write the opened copy from the
         seal, which put a spent token back over a refresh the pass had not
-        sealed yet and signed the account out at its next start (B1043).
+        sealed yet and signed the account out at its next start.
 
           a plain file in the home   newer than its seal: sealed, opened
                                      and made a link as the pass does, or
@@ -561,7 +561,7 @@ class TokensMixin:
                 if self._open_account(acct, home, pw, keys):
                     self._tok_state()[1][acct] = time.time()
         finally:
-            # The keys the terminal brought are let go, zeroed (R158 step 6).
+            # The keys the terminal brought are let go, zeroed.
             for k in keys.values():
                 wipe(k)
 

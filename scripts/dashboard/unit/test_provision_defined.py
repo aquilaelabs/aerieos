@@ -1,4 +1,4 @@
-"""Every helper the provisioner calls is defined (B166): R204's split into a
+"""Every helper the provisioner calls is defined: its split into a
 core and family files took svc_enable, svc_install, svc_active, svc_stop,
 svc_restart and is_vm out of the core and put them nowhere, and nothing
 noticed for eight days, since bash only says so when the line runs. A name

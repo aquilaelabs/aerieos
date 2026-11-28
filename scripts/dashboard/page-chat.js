@@ -9,7 +9,7 @@ let chatWith = null;                 // {who} or {project}, or null for the list
 let chatMsgs = [], chatDraft = {}, chatSeenRev = -1;
 let chatDrawn = "";                  // what the open conversation was last painted from
 // Messages sent and not yet answered for, drawn at the log's end on the press
-// (the operator, 22 Nov: a press must never look as if nothing happened)
+// (a press must never look as if nothing happened)
 // over every read of it, each until the answer or a read that has it.
 let chatSending = [];                // {key, who, at, text}
 
@@ -28,11 +28,11 @@ function loadChat(){
   });
 }
 
-// An open chat follows the chat's revision, which every message moves (R218
-// step 10, page-poll.js's watch on "chat").
+// An open chat follows the chat's revision, which every message moves
+// (page-poll.js's watch on "chat").
 function chatOpen(w){ chatWith = w; chatMsgs = []; chatDrawn = ""; loadChat(); }
 
-// The chat is the dock's Chat tab (R250 step 2): a tab of its own kind that
+// The chat is the dock's Chat tab: a tab of its own kind that
 // lives in the dock as a terminal does, its body the list of people and
 // project channels beside the open conversation at a desk, one at a time
 // on a phone, the composer at the foot. Chat on the dock's line opens it,
@@ -69,7 +69,7 @@ function drawChatList(el){
   const unread = c.unread || {};
   const cur = chatKey(chatWith);
   const here = new Set(c.online || []);
-  // When each was last here, beside the name (the operator, 4 Oct): "here
+  // When each was last here, beside the name: "here
   // now" for whoever is, the time since for everybody else.
   const seenAt = c.seen || {};
   const lastSeen = n => here.has(n) ? "here now" : seenAt[n] ? ago(seenAt[n]) : "never signed in";
@@ -199,7 +199,7 @@ function chatShown(key){
 async function sendKey(key){
   const t = tabOf(panes[active]);
   if (!t || t.kind !== "term") return;
-  // The terminal takes the key itself (R133 step 5): typed down its socket,
+  // The terminal takes the key itself: typed down its socket,
   // or a page scrolled. One with no socket says why under its screen.
   if (termOwn(t)) termKey(t, key);
 }

@@ -1,12 +1,12 @@
 // The Users tab: who may sign in, and which projects they see. Step 3 of
 // roadmap #22; the design and the reasoning are docs/users.md and are not
-// repeated here. A page of settings (the operator, 17 Oct): the accounts a
+// repeated here. A page of settings: the accounts a
 // list beside the picked one's settings, its name, roles and projects,
 // profile and password saved together and Remove at their foot; Add user
 // at the right of the page's bar, in a dialog. Its own classic script beside index.html, per the
 // new-surface rule: same page, same global scope, one file per surface.
 //
-// Chrome comes from docSurface() and the hard rules are held by uniform.mjs;
+// Chrome comes from docSurface and the hard rules are held by uniform.mjs;
 // this file fills slots. Every rule about WHO may do WHAT lives on the server
 // (users.py): a row that cannot be deleted is drawn without the control and
 // says why, rather than being offered one that fails, but the store refuses
@@ -20,7 +20,7 @@ let usersMeta = {owner: "", me: "", roles: [], role_names: [], projects: [], rol
 // What is typed into Add somebody, kept across the repaints a reload brings:
 // the form is drawn afresh each time, and a reload landing between typing
 // and Add emptied it, so Add said only "a name and a password" and sent
-// nothing (B422). Cleared once an add lands.
+// nothing. Cleared once an add lands.
 let usersAddDraft = {name: "", pw: "", role: "user"};
 
 function openUsersTab(){
@@ -55,7 +55,7 @@ async function usersAct(body, say = null, now = null){
        : body.action === "add" ? `${body.name} added`
        : `${body.name} updated`);
   // The roles data names the accounts whose roles this one may give, so an
-  // account added or removed is read there too (B32).
+  // account added or removed is read there too.
   if (body.action === "add" || body.action === "remove") await loadRoles();
   await loadUsers();
   return true;
@@ -86,11 +86,11 @@ function usersDirty(){
 }
 function usersRedraw(){ readMoved("users"); drawPanes(); }
 // Accounts and roles Read without its Write: the page is there to read, its
-// fields dead and the reason said over them (B34).
+// fields dead and the reason said over them.
 function usersReadOnly(){ return state?.can?.admin === false; }
 
 // An account's row: its name with what it holds as pills on one line, and
-// when it was last seen a fact under it (the operator, 18 Oct: the pills
+// when it was last seen a fact under it (the pills
 // and the seen ran together under the name).
 function userRow(u){
   const on = u.name === usersPick;
@@ -115,8 +115,8 @@ function usersDetail(u){
     formField(id, label, `<input id="${id}" data-ufield="${key}" type="${type}" value="${esc(e[key] || "")}" autocomplete="off" spellcheck="false" ${extra}${ro ? " disabled" : ""}>`, {help});
   const facts = [agentLogins(u) || "signed in to no agent yet", u.seen ? `seen ${esc(ago(u.seen))}` : "never seen",
                  u.projects?.length ? `on ${u.projects.length} space${u.projects.length === 1 ? "" : "s"}` : "on no space yet"];
-  // While the roles are read, their two fields in their places (the
-  // operator, 7 Nov: a block that grew in after the rest read as pop-in).
+  // While the roles are read, their two fields in their places
+  // (a block that grew in after the rest read as pop-in).
   const access = rolesData === null
     ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every space and on AerieOS itself, as far as each one's areas say")}<div class="loading">${skRows(1)}</div></div>
        <div class="setrow col ctlrow">${lbl("", "Spaces", "a role on a space puts the account on it; taken off, it is not on it")}<div class="loading">${skRows(2)}</div></div>`
@@ -147,17 +147,17 @@ function renderUsersInto(i){
   const d = docSurface(i, "users");
   if (!d) return;
   // A count where Jobs and Sessions keep theirs, not a sentence about the
-  // page (the operator, 18 Oct: a bar holds what the page acts on).
+  // page (a bar holds what the page acts on).
   // Refused outright (a plain account by link), there is nothing to count
-  // or add, and the refusal is the page (B38).
+  // or add, and the refusal is the page.
   const refused = usersErr && !(usersList || []).length;
-  // No count beside the button (the operator, 25 Oct: no loose words at a
+  // No count beside the button (no loose words at a
   // page's top): the list says how many.
-  // Add user on the head (the operator, 29 Oct: not a row of its own).
+  // Add user on the head (not a row of its own).
   d.setBar("");
   const addUser = refused || usersReadOnly() ? "" : `<button type="button" class="primary" id="uAddOpen">Add user</button>`;
   if (usersList === null){
-    // Its template (R218 step 16): the list beside the settings, whose
+    // Its template: the list beside the settings, whose
     // labels are the page's own; the accounts are on their way.
     const field = label => skField(label, 16);
     drawHTML(d.list, skTpl(`${pageHead({line: [{value: GHOST, label: "accounts"}], actions: addUser})}<div class="rsplit"><div class="rlist">${skRows(3)}</div><div class="rdetail">${
@@ -172,8 +172,8 @@ function renderUsersInto(i){
   }
   // The roles read for the accounts listed, and read again when the list
   // names one that read does not know (added in another browser, by aerie
-  // or the API): its roles read as not this person's to give (the
-  // operator's screen, 24 Nov). Once for each list of names, so an account
+  // or the API): its roles read as not this person's to give.
+  // Once for each list of names, so an account
   // the read leaves out on purpose asks for nothing more.
   const names = usersList.map(x => x.name).sort().join("\n");
   const unknown = rolesData && usersList.some(x => !(rolesData.people || []).some(p => p.name === x.name));
@@ -211,13 +211,13 @@ function wireUsers(el){
   });
   // The picked account's head is the way back on a phone (splitSects).
   el.querySelectorAll("[data-uback]").forEach(b => b.onclick = () => { if (!isPhone()) return; usersPhoneOpen = false; usersMoveNext = "back"; usersRedraw(); });
-  // What is typed is kept across the repaints a poll brings (B422's lesson).
+  // What is typed is kept across the repaints a poll brings.
   el.querySelectorAll("[data-ufield]").forEach(f => f.oninput = f.onchange = () => {
     usersEdit[f.dataset.ufield] = f.value;
     const st = el.querySelector(".rdetail .actbar .state");
     if (st) st.textContent = usersDirty() ? "unsaved" : "";
-    // Save and Revert awake only while something here is unsaved (the
-    // operator, 26 Oct), as every save bar is.
+    // Save and Revert awake only while something here is unsaved,
+    // as every save bar is.
     for (const b of el.querySelectorAll("#ueSave, #ueRevert")) if (!b.dataset.busy) b.disabled = !usersDirty();
   });
   const box = el.querySelector("#ueAccess");
@@ -226,14 +226,14 @@ function wireUsers(el){
   if (rv) rv.onclick = () => { usersEdit = null; rolesPeopleDraft = null; usersRedraw(); };
   const sv = el.querySelector("#ueSave");
   if (sv) sv.onclick = () => usersSave(el, sv);
-  // An account's key store purged for them (R154), for one that cannot sign
+  // An account's key store purged for them, for one that cannot sign
   // in to purge its own.
   const pg = el.querySelector("#uePurge");
   // Its question comes first and the button holds its ring after it, until
   // the purge has answered (the press's own promise).
   if (pg) pg.onclick = async () => { await keyStorePurge(usersPick); loadUsers(); };
   const rm = el.querySelector("#ueRemove");
-  // The account leaves the list on the press (the operator, 22 Nov), and
+  // The account leaves the list on the press, and
   // comes back saying why on a refusal.
   if (rm) rm.onclick = async () => {
     const name = usersPick;
@@ -266,7 +266,7 @@ async function usersSave(el, btn){
     if (!(await rolesAccessSave())) return;
     const was = usersEditFrom(u);
     // Only its roles changed: the list and the header are read again all
-    // the same, since they show what it holds (B33).
+    // the same, since they show what it holds.
     if (!USER_KEYS.some(k => was[k] !== e[k])){ usersEdit = null; await loadUsers(); return; }
     const body = {action: "edit", name: u.name, to: u.name === usersMeta.me ? "" : e.name.trim(),
                   profile: {full_name: e.full, email: e.email, git_name: e.git_name, git_email: e.git_email},
@@ -281,7 +281,7 @@ async function usersSave(el, btn){
 }
 
 // ---- Add user, a dialog ---------------------------------------------------
-// What an account gets is the docs' to say (the operator, 16 Oct), not a
+// What an account gets is the docs' to say, not a
 // block of prose here; a new one holds no role, given beside its account.
 function usersAddOpen(){
   let m = document.getElementById("uaddmodal");
@@ -293,7 +293,7 @@ function usersAddOpen(){
     armModal(m);
   }
   // The account beside the person's name, and the password beside itself
-  // typed again: one form (R301), the dialog's foot its verbs.
+  // typed again: one form, the dialog's foot its verbs.
   drawHTML(m, `<div class="box"><h3>Add user</h3>
     <div class="field">${formBox({fields: [
       formField("uNewName", "Account name", `<input id="uNewName" autocomplete="off">`),
@@ -306,7 +306,7 @@ function usersAddOpen(){
     <div class="field" id="uAddWhyF" hidden><div class="hint bad" id="uAddWhy"></div></div>
     ${dlgFoot(`<button type="button" id="uAddCancel">Cancel</button>`, `<button type="button" id="uAdd" class="primary" disabled>Add</button>`)}</div>`);
   // Add wakes once there is a name and a password of 8 or more typed the
-  // same twice (the operator, 18 Oct); why it sleeps is said in the dialog
+  // same twice; why it sleeps is said in the dialog
   // once something is typed, and a refusal from the server lands there too.
   const say = t => { m.querySelector("#uAddWhy").textContent = t; m.querySelector("#uAddWhyF").hidden = !t; };
   const why = () => {
@@ -335,7 +335,7 @@ function usersAddOpen(){
   m.querySelector("#uAdd").onclick = async () => {
     const name = m.querySelector("#uNewName").value.trim();
     const pw = m.querySelector("#uNewPw").value;
-    // Typed twice (R134): a password nobody can read back is one a slip
+    // Typed twice: a password nobody can read back is one a slip
     // locks somebody out with.
     if (!name || pw.length < 8 || pw !== m.querySelector("#uNewPw2").value) return ready();
     const full = m.querySelector("#uNewFull").value.trim(), email = m.querySelector("#uNewEmail").value.trim();

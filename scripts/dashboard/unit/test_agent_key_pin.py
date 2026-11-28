@@ -1,5 +1,4 @@
-"""A node's channel to its controller over TLS, under the controller's key
-(R267 step 15).
+"""A node's channel to its controller over TLS, under the controller's key.
 
 The agent takes a pin of the controller's public key, in the form curl's
 --pinnedpubkey takes (sha256// and the base64 of the sha256 of the key's

@@ -1,6 +1,6 @@
 // The notebook's History panes: the roadmap's own log with its Put back, and
 // the one pane the memory, bug and analysis views share. One classic script
-// beside index.html (docs/nodes.md §13): one file per notebook view (R60). A
+// beside index.html (docs/nodes.md §13): one file per notebook view. A
 // factory makeNotebook calls per notebook.
 
 "use strict";
@@ -41,7 +41,7 @@ function nbHistoryView({$, nb, project}){
   // In this browser's time zone (Profile), like every time on the page.
   const stamp = t => fmtTime(t * 1000,
     {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false});
-  // A log read by day and by release (R254 step 5): a heading at the head of
+  // A log read by day and by release: a heading at the head of
   // each day's first line, saying which release that day's work went out in
   // where the project has releases, and each id a link to its row.
   const dayOf = t => fmtTime(t * 1000, {weekday: "short", day: "2-digit", month: "short"});
@@ -75,8 +75,8 @@ function nbHistoryView({$, nb, project}){
          and drop lands here from now on.`}</div>`);
       return;
     }
-    // Only the entries on show are built, a page at a time (pageLimit, R228
-    // step 13); each day's heading reads the one before it, so a page is the
+    // Only the entries on show are built, a page at a time (pageLimit);
+    // each day's heading reads the one before it, so a page is the
     // log's first rows and not a slice from its middle.
     const lim = pageLimit($("roadmapHist"), "roadmapHist", nb.roadmapLog.length);
     const logAll = nb.roadmapLog;
@@ -170,7 +170,7 @@ function nbHistoryView({$, nb, project}){
   // same bar: search, a window, a cap. One helper because "functionally the
   // same" should be structurally the same: a divergence here is a bug
   // somebody has to notice by feel.
-  // ...each as a word (R254 step 5): the tracker's states as the page says
+  // ...each as a word: the tracker's states as the page says
   // them elsewhere, not their stored names.
   const LOG_WORDS = {wontfix: "won't fix", na: "not applicable", reopened: "reopened", filed: "filed",
                      fixed: "fixed", edited: "edited", noted: "noted", sent: "sent", deleted: "deleted"};
@@ -205,7 +205,7 @@ function nbHistoryView({$, nb, project}){
           </div>`).join(""));
       if (rows) wireIds(pane);
       // Every history through one pane means one place to page them, built
-      // a page at a time (R228 step 13).
+      // a page at a time.
       paginate(pane, ":scope > .hist", rows ? {key: paneId, noun: "entries", total: rows.length, more: () => draw(rows)}
                                             : {key: paneId, noun: "entries"});
     };

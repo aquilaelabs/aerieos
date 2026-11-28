@@ -1,4 +1,4 @@
-"""Home (R218 step 5): the overview's numbers across the whole install, in
+"""Home: the overview's numbers across the whole install, in
 one read the page makes on open, and a light one when the queue moves (the
 design's the-dashboard/home rule). Nothing here polls.
 
@@ -26,8 +26,8 @@ devapp = None              # devapp.py: on_node, containers
 # How long Home waits for a node's container listing before it counts that
 # node as unknown: a whole page of tiles is not held for one machine.
 CONTAINER_WAIT_S = 8
-# ...and how long once every node has answered before (the operator, 17 Oct:
-# Home took seconds to open): a node slower than this is counted from what it
+# ...and how long once every node has answered before
+# (Home took seconds to open): a node slower than this is counted from what it
 # last said, marked as last seen, while its listing finishes behind the
 # answer and is kept for the next open.
 KEPT_WAIT_S = 1.5
@@ -35,7 +35,7 @@ KEPT_WAIT_S = 1.5
 _kept = {}
 
 
-backups_summary = None    # storebackups.summary over the own machine's census (R162 step 5)
+backups_summary = None    # storebackups.summary over the own machine's census
 
 
 def configure(*, nodes_mod, devapp_mod):
@@ -110,7 +110,7 @@ def _jobs(rows, names):
             "failed_today": sum(1 for j in rows if j.get("state") == "failed"
                                 and (j.get("ended") or j.get("queued") or 0) >= since),
             # Where today began, so the Jobs page's Failed today lists the
-            # jobs this count counted, by this container's day (B113).
+            # jobs this count counted, by this container's day.
             "today": int(since),
             # A row's spec, not the job's whole one (nodes.job_row): ten jobs
             # that each carried a script were a quarter of a megabyte here.
@@ -129,7 +129,7 @@ def read(jobs_rows, job_names, machines, light=False):
         out["nodes"] = node_counts(ns)
         if not light:
             out["containers"] = _containers(ns)
-        # The own machine's backups (R162 step 5): the tile says the last
+        # The own machine's backups: the tile says the last
         # good run, or what failed or went stale.
         own = next((n for n in ns if (n.get("config") or {}).get("own")), None)
         if own and backups_summary:

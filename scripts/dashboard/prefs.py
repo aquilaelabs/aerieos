@@ -55,24 +55,24 @@ GATE_KINDS = ("roadmap", "bugs", "rules", "settings", "design", "wiki")
 GITPOL_KEYS = ("push", "main", "scan")
 GITPOL_MODES = ("allow", "deny")
 # `scan`: whether a push with lines that look sensitive is held for a
-# person's approval on the bell (R219), or goes without the hold (the
-# operator, 15 Oct: a test's made-up address held a push fifteen minutes).
+# person's approval on the bell, or goes without the hold
+# (a test's made-up address held a push fifteen minutes).
 GITPOL_KEY_MODES = {"push": GITPOL_MODES, "main": GITPOL_MODES, "scan": ("hold", "off")}
 GITPOL_DEFAULT = {"push": "allow", "main": "deny", "scan": "hold"}
-# What an agent may do on the git host over what the project's token allows
-# (R188): one per ability in forgeaccess.ABILITIES, which a unit test holds
+# What an agent may do on the git host over what the project's token allows:
+# one per ability in forgeaccess.ABILITIES, which a unit test holds
 # equal, allow or deny, merging off until somebody turns it on.
 FORGEPOL_DEFAULT = {"code_read": "allow", "push": "allow", "workflows": "allow", "pr_read": "allow",
                     "pr_write": "allow", "merge": "deny", "issues_read": "allow", "issues_write": "allow",
                     "actions_read": "allow", "actions_write": "allow", "releases_read": "allow",
                     "releases_write": "allow"}
-# The abilities another setting governs (B559), with where: no deny here.
+# The abilities another setting governs, with where: no deny here.
 FORGEPOL_FIXED = {"code_read": "a session has the tree itself", "push": "it is set under Pushing",
                   "releases_write": "it is set under Agents may: Tag and publish a release"}
 GATE_MODES = ("auto", "ask", "deny")
 # The modes a gate takes beyond those three, by kind: the wiki may also be
 # hidden, which keeps it from a session altogether, reading included
-# (wiki.py; the operator, 2 Oct).
+# (wiki.py).
 GATE_EXTRA = {"wiki": ("hidden",)}
 
 
@@ -82,7 +82,7 @@ def gate_ok(kind, mode):
 # project's dev instance. One vocabulary: a person who has set a notebook
 # tab to "ask me" knows what this one does without being told twice.
 DEVBUILD_MODES = ("deny", "ask", "auto")
-# What one project's VMs may hold in all, at most (R91 step 7): how many, and
+# What one project's VMs may hold in all, at most: how many, and
 # their vCPUs, memory and disk added up. An administrator's to raise.
 VM_CAPS = {"count": 4, "vcpus": 8, "mem_mb": 16384, "disk_gb": 200}
 VM_CAPS_MAX = {"count": 64, "vcpus": 256, "mem_mb": 1048576, "disk_gb": 16384}
@@ -97,10 +97,10 @@ def _vm_caps(v):
         x = v.get(k)
         out[k] = x if isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= VM_CAPS_MAX[k] else d
     return out
-# Agents may: Sign a build (R106). Ask by default: a signed build is
+# Agents may: Sign a build. Ask by default: a signed build is
 # something that leaves, and a person reads which build and which key.
 SIGN_MODES = ("deny", "ask", "auto")
-# Where `aerie test` runs a project's tests (roadmap R48, B241): on the node and
+# Where `aerie test` runs a project's tests: on the node and
 # never in its dev instance, which is the default; inside the instance when
 # it is up and on the node otherwise; or inside it and nowhere else.
 TESTS_IN = ("node", "up", "only")
@@ -109,13 +109,13 @@ TESTS_IN = ("node", "up", "only")
 # used to disagree about this per project; it is a setting now (25 Sep).
 TEST_CHANGE = ("wait", "restart")
 # Whether this project's sessions, builds and tests may compute on their
-# node's NVIDIA card (R102): on unless somebody said otherwise, since an
+# node's NVIDIA card: on unless somebody said otherwise, since an
 # unused card costs nothing; off runs them as if the machine had none.
 GPU = ("on", "off")
 # Whether this project's sessions report AerieOS's own problems with
 # `aerie report` (reports.py): on everywhere by default, and off where the
-# project IS AerieOS, whose sessions file those in its own tracker (the
-# operator, 24 Sep). Two of the gates' words, since there is nothing to ask.
+# project IS AerieOS, whose sessions file those in its own tracker.
+# Two of the gates' words, since there is nothing to ask.
 REPORT_MODES = ("auto", "deny")
 # The colors a person gives a space, worn by its card, its notebook tab and
 # its row so that eight open notebooks can be told apart at a glance: each
@@ -150,12 +150,12 @@ def configure(*, write_json, state):
     globals()["FILE"] = Path(state) / "claude-prefs.json"
 
 
-# ---- a project of several repositories (R136) ------------------------------
+# ---- a project of several repositories ------------------------------
 #
 # What one session in all of a project's repositories needs, and what the
 # project grants others, is the project's: kept on its own record (its key in
 # registry.py) and laid over each repository's as it is read, so every
-# caller of get() sees a repository's settings as its project has them. Each
+# caller of get sees a repository's settings as its project has them. Each
 # repository's own values for these are kept as they were, untouched, so a
 # repository split out is back to them. The rest (its build and test, its
 # outputs, its captures and snapshots, its tests' place, its gate on what a
@@ -163,8 +163,8 @@ def configure(*, write_json, state):
 GROUP_FIELDS = ("node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "test_node",
                 "agents_off", "agent_default", "agent_slots", "gitpol", "forgepol", "devbuild", "makevms", "vm_caps", "installpacks",
                 "kube", "discord", "test_change", "gpu", "report", "sign", "keys", "release", "pc", "log_from", "diag")
-# The dials a repository may set apart from its project (R208 step 6, the
-# operator, 3 Nov): the project's Agents may holds the defaults, and a
+# The dials a repository may set apart from its project:
+# the project's Agents may holds the defaults, and a
 # repository inherits each unless its record names the dial in `overrides`,
 # the notebook's own choice. A gate is named gate.KIND. "inherit" written
 # to one takes the override away.
@@ -180,7 +180,7 @@ DIAL_DEFAULTS = {"devbuild": "deny", "makevms": "deny", "kube": "deny", "discord
 def _dict_dials():
     """The dials made of parts, each part a repository may set apart from
     its space on its own: the gates, and how it pushes and what the git host
-    allows (R294 step 4, the operator 25 Nov: a space default with each
+    allows (a space default with each
     repository's override; they were the space's alone while edited on one
     repository's Permissions view, so a change there changed every one)."""
     return {"gate": (GATE_KINDS, lambda k: "auto"),
@@ -206,7 +206,7 @@ _repos = None
 def configure_repos(*, project_of, members, is_repos, keys=None):
     globals()["_repos"] = (project_of, members, is_repos)
     # Every project's key (registry.repos_keys), so the whole-list read
-    # names a repository whose project has no record yet (R208 step 6).
+    # names a repository whose project has no record yet.
     globals()["_keys"] = keys
 
 
@@ -217,7 +217,7 @@ def _rp():
     """repos.py's answers: the server's, or, in a process with no server (a
     bb verb loading this by path), the same three read from the state files
     themselves, so a repository is read with its project's settings there
-    too (R138)."""
+    too."""
     return _repos or _file_repos()
 
 
@@ -265,14 +265,14 @@ def _over(project, rec, raw):
             rec[d] = {k: mine[d].get(k, g[d][k]) if f"{d}.{k}" in own else g[d][k] for k in keys}
         rec["project_dials"] = {f: g[f] for f in OVERRIDABLE} | {d: dict(g[d]) for d in dicts}
         # The space's hosting nodes, less the ones this repository keeps its
-        # containers off (R223); the space's whole list beside them.
+        # containers off; the space's whole list beside them.
         off = set(rec.get("hosts_off") or [])
         rec["space_hosts"] = list(rec.get("hosts") or [])
         rec["hosts"] = [h for h in rec["space_hosts"] if h not in off]
         rec["repos_of"] = key
         # ...and the folders of its repositories, this one among them, as a
         # session's verb that works across them reads them (aerie version
-        # follow, R190 step 7).
+        # follow).
         rec["space_repos"] = list(_rp()[1](key))
     return rec
 
@@ -302,8 +302,8 @@ def adopt(key, first):
     with _lock:
         d = _load()
         was = d["projects"].get(first) if isinstance(d["projects"].get(first), dict) else {}
-        # ...the gates too, which are a project's defaults now (R208 step
-        # 6), and each moves rather than copies, so the repository inherits
+        # ...the gates too, which are a project's defaults now,
+        # and each moves rather than copies, so the repository inherits
         # them instead of reading as having set each apart.
         moved = tuple(GROUP_FIELDS) + ("gate",)
         rec = {f: was[f] for f in moved if f in was}
@@ -317,8 +317,8 @@ def adopt(key, first):
 
 def regrant(key, members):
     """Every project that reads one of these repositories reads their project
-    instead, and so every repository in it, the ones added later too (the
-    operator, 24 Oct: what one project grants another goes by the project).
+    instead, and so every repository in it, the ones added later too
+    (what one project grants another goes by the project).
     The projects whose reads changed, for a move to say who reads more now."""
     changed = []
     with _lock:
@@ -342,7 +342,7 @@ def regrant(key, members):
 
 # ---- what is the PERSON's rather than the project's ------------------------
 #
-# The operator's call (17 Sep): the model and the effort a session launches on
+# The operator's call: the model and the effort a session launches on
 # are facts about whoever is at the keyboard, not about the directory. Two
 # people on one project want different ones, and the old per-project pair made
 # one of them change the other's sessions. The author a commit carries is the
@@ -359,7 +359,7 @@ def regrant(key, members):
 # they read, and the notebook, commits and files are written as ever.
 # `asks`: how often Claude puts a question to this person on this project,
 # "" (Claude's own), fewer or rarely. Theirs too: it is their attention.
-# A terminal's colors (R133 step 10): Default the plain dark ground,
+# A terminal's colors: Default the plain dark ground,
 # Dashboard the color scheme the page is in, and the tints a person gives a
 # project to know it at a glance (a production one red). The rest of the
 # look is the person's alone, on their Profile.
@@ -367,7 +367,7 @@ TERM_SCHEMES = ("default", "amber", "blue", "dashboard", "green", "light", "red"
 USER_CHOICES = {"model": MODELS, "effort": EFFORTS, "reply": ("minimal",),
                 "asks": ("more", "fewer", "rarely"),
                 # Each other agent's model and effort, this person's on this
-                # project, from that agent's own lists (R95 step 9): what
+                # project, from that agent's own lists: what
                 # Start's step opens on next time.
                 **{f"{a}_{k}": tuple(getattr(agents, k.upper() + "S")[a])
                    for a in agents.MODELS for k in ("model", "effort")}}
@@ -380,7 +380,7 @@ def _clean_user(rec):
     rec = rec if isinstance(rec, dict) else {}
     out = {k: (rec.get(k) if rec.get(k) in vals else "") for k, vals in USER_CHOICES.items()}
     out.update({k: str(rec.get(k) or "").strip()[:n] for k, n in USER_TEXT.items()})
-    # Any model's pick (R144): a model name as the router lists it, held to
+    # Any model's pick: a model name as the router lists it, held to
     # its shape here and to the router's list where it is read.
     om = str(rec.get("open_model") or "").strip()
     out["open_model"] = om if agents.OPEN_MODEL.match(om) else ""
@@ -447,7 +447,7 @@ def _load():
     on every project that exists at the time, so nothing changes underfoot for
     an install that had one.
     """
-    # Read once while it is the same file (statefile.read_json, R228 step 1):
+    # Read once while it is the same file (statefile.read_json):
     # every space's row asks; its own copy each, as the shaping below edits it.
     d = statefile.read_json(FILE)
     if not isinstance(d, dict):
@@ -473,27 +473,27 @@ def _clean(rec):
             # The project's node (docs/nodes.md §6, §13): where EVERYTHING
             # this project does on a node goes: its containers, builds,
             # tests, CI and emulation. One setting, by the operator's
-            # decision (1 Sep): per-role pickers were more control than
+            # decision: per-role pickers were more control than
             # anybody wanted. A node id, "" meaning none.
             "node": str(rec.get("node") or "")[:40],
-            # ...and the set it works on (R82): the primary first, then the
+            # ...and the set it works on: the primary first, then the
             # others, so a project with a Linux node and a Windows one can be
             # worked on from either. Everything that reads one node keeps
             # reading `node`; containers may live on any of these.
             "nodes": _nodes_of(rec),
-            # The node its test suites run on (R151): one of its nodes, or
+            # The node its test suites run on: one of its nodes, or
             # "" for the session's own node, which is what aerie tests run and
             # the gate used before there was a choice.
             "test_node": str(rec.get("test_node") or "")[:40],
             # The nodes outside that set its containers may also run on: a
             # hosting-only node (nodes.host_only) holds no code and no
             # session, and a container of this project there is built on
-            # its own node and shipped (R166). Naming one here lets the
+            # its own node and shipped. Naming one here lets the
             # project's sessions make, rebuild and remove containers there
-            # under its Run its container dial (the operator, 10 Oct).
+            # under its Run its container dial.
             "hosts": _hosts_of(rec),
             # The space's hosting nodes this repository's containers may not
-            # go to (R223, the operator, 7 Nov): a repository narrows its
+            # go to: a repository narrows its
             # space's list, never adds to it.
             "hosts_off": _hosts_of({"hosts": rec.get("hosts_off")}),
             # The other projects a session here may READ: their trees, bound
@@ -502,33 +502,33 @@ def _clean(rec):
             # to them refused. Named here by the operator, never by a
             # session; a project never reads itself.
             "reads": _reads_of(rec),
-            # Which toolchains its sessions may use (R77): the shipped ones
+            # Which toolchains its sessions may use: the shipped ones
             # switched off here, and the tool packs switched on. Shipped
             # toolchains are on and packs off until somebody says otherwise,
             # so adding a pack hands it to no project by itself.
             "tc_off": _toolchain_names(rec, "tc_off"),
-            # The coding agents beside Claude its sessions may not run
-            # (R95): every live one allowed until somebody says otherwise.
+            # The coding agents beside Claude its sessions may not run:
+            # every live one allowed until somebody says otherwise.
             "agents_off": _agents_off(rec),
-            # The agent its Start opens (R95 step 4): Claude's unless the
+            # The agent its Start opens: Claude's unless the
             # project says another, which must be one it allows.
             "agent_default": _agent_default(rec),
             # How many sessions of one agent each person may run on it at
-            # once (R143), each a slot of its own: 3 unless it says.
+            # once, each a slot of its own: 3 unless it says.
             "agent_slots": _agent_slots(rec),
             "packs_on": _toolchain_names(rec, "packs_on"),
             # The places on its node a session here is shown besides its own
             # project: a share it works with. A session's view is built from
-            # what it is given (bb-session, B378), so a share mounted on the
+            # what it is given (bb-session), so a share mounted on the
             # node is out of it unless it is named here, by whoever may set
             # the project's node.
             "sees": _sees_of(rec),
             # Addresses a session here may still reach where its node keeps
-            # each session to its own project's network (R79): a machine or
+            # each session to its own project's network: a machine or
             # one port on it, named by the operator so a project need not be
             # made to read another for its sessions to reach a service, each
-            # on the project's nodes it names, every one when it names none
-            # (the operator, 7 Oct). devapp.session_net_own hands them on.
+            # on the project's nodes it names, every one when it names none.
+            # devapp.session_net_own hands them on.
             "reaches": _reaches_of(rec),
             # What `aerie build` / `aerie test` run there, and the globs whose
             # matches come back into dist/.
@@ -539,7 +539,7 @@ def _clean(rec):
             # Anything unrecognized reads as auto, for the same reason an
             # unknown model reads as "leave as is": a hand-edited file must
             # not lock a session out of the notebook by typo.
-            # What a session may do with git's network half (roadmap R36):
+            # What a session may do with git's network half:
             # push its own branch, and push to main. Enforced where the
             # controller runs git (the relay) and read by a session with
             # aerie git policy; a local commit or merge cannot be forbidden.
@@ -547,7 +547,7 @@ def _clean(rec):
                            if isinstance(rec.get("gitpol"), dict)
                            and (rec.get("gitpol") or {}).get(k) in GITPOL_KEY_MODES[k] else GITPOL_DEFAULT[k])
                        for k in GITPOL_KEYS},
-            # ...and on the git host, over what its token allows (R188).
+            # ...and on the git host, over what its token allows.
             "forgepol": {k: ((rec.get("forgepol") or {}).get(k)
                              if isinstance(rec.get("forgepol"), dict)
                              and (rec.get("forgepol") or {}).get(k) in GITPOL_MODES else v)
@@ -556,8 +556,8 @@ def _clean(rec):
                          if isinstance(rec.get("gate"), dict)
                          and gate_ok(k, (rec.get("gate") or {}).get(k)) else "auto")
                      for k in GATE_KINDS},
-            # The dials this repository sets apart from its project (R208
-            # step 6); every other reads the project's.
+            # The dials this repository sets apart from its project;
+            # every other reads the project's.
             "overrides": _overrides_of(rec),
             # Whether a SESSION may rebuild this project's dev instance,
             # and it is a real grant rather than a nicety: a rebuild runs the
@@ -569,27 +569,27 @@ def _clean(rec):
             # those are docker-write, which a session never has.
             "devbuild": _devbuild(rec.get("devbuild")),
             # Whether a session may make, start, stop and remove this
-            # project's VMs (R91 step 4), read as devbuild is: `deny` by
+            # project's VMs, read as devbuild is: `deny` by
             # default, `ask` puts each in front of a person, `auto` lets it.
             "makevms": _devbuild(rec.get("makevms")),
             # Whether a session may deploy to and roll back this space's
-            # Kubernetes environments (R281 step 6), read as devbuild is:
+            # Kubernetes environments, read as devbuild is:
             # `deny` by default, `ask` puts each in front of a person, `auto`
             # lets it; an environment marked production asks whatever it says.
             "kube": _devbuild(rec.get("kube")),
-            # Whether a session may apply its space's Discord layout (R293),
+            # Whether a session may apply its space's Discord layout,
             # read as kube is; a change that removes, changes a permission or
             # reaches members asks a person whatever it says.
             "discord": _devbuild(rec.get("discord")),
-            # Whether a session may add a tool pack from the vetted catalog
-            # (R169 step 5): `ask` by default puts it to a person who may
+            # Whether a session may add a tool pack from the vetted catalog:
+            # `ask` by default puts it to a person who may
             # curate, `auto` adds it at the index's pin, `deny` refuses.
             "installpacks": rec.get("installpacks") if rec.get("installpacks") in DEVBUILD_MODES else "ask",
             "vm_caps": _vm_caps(rec.get("vm_caps")),
             # Where `aerie test` runs the tests, one of TESTS_IN. On the node
             # unless the project says otherwise: an image built to ship
             # carries no tests, and a run inside one found none and reported
-            # success (B241). "only" makes a down instance a refusal that
+            # success. "only" makes a down instance a refusal that
             # names it, with nothing run on the node. Per project because
             # only a project with a compose file has a container to run in.
             "tests_in": _tests_in(rec),
@@ -600,27 +600,27 @@ def _clean(rec):
             # Agents may: Report AerieOS bugs. Off takes `aerie report` and
             # the rule that points at it away from this project's sessions.
             "report": "deny" if rec.get("report") == "deny" else "auto",
-            # Agents may: Sign a build, one of SIGN_MODES (aerie sign, R106).
+            # Agents may: Sign a build, one of SIGN_MODES (aerie sign).
             "sign": rec.get("sign") if rec.get("sign") in SIGN_MODES else "ask",
             # Agents may: Manage signing keys, one of SIGN_MODES: a new
-            # generated key or a package mapped to a key (R106 step 6).
+            # generated key or a package mapped to a key.
             "keys": rec.get("keys") if rec.get("keys") in SIGN_MODES else "ask",
             # Agents may: Tag and publish a release, one of SIGN_MODES (bb
             # version release): the tag and the forge's release, made on the
             # controller with the project's own credentials, which no session
-            # holds. Ask by default: the operator, 5 Oct.
+            # holds. Ask by default.
             "release": rec.get("release") if rec.get("release") in SIGN_MODES else "ask",
-            # Agents may: Use a lent PC, one of SIGN_MODES (aerie pc, R270
-            # step 6): the verbs a person's Windows companion lends this
+            # Agents may: Use a lent PC, one of SIGN_MODES (aerie pc):
+            # the verbs a person's Windows companion lends this
             # project. Deny by default: it is somebody's own machine.
             "pc": rec.get("pc") if rec.get("pc") in SIGN_MODES else "deny",
             # How long a capture (a reel's sheet, an emulator shot) stays in
-            # dist/ before the Artifacts tab's sweep removes it (R96). By
+            # dist/ before the Artifacts tab's sweep removes it. By
             # age and never by need: two sessions on one project may each
             # be reading a reel the other made. 0 keeps them.
             "capture_days": _capture_days(rec.get("capture_days")),
             "snapshot_days": _snapshot_days(rec.get("snapshot_days")),
-            # Releases (R255): whether a fixed bug with no changelog line and
+            # Releases: whether a fixed bug with no changelog line and
             # no reason refuses a release or goes out with it said, and the
             # table of what each of a release's files is for, put over its
             # notes unless switched off.
@@ -628,16 +628,16 @@ def _clean(rec):
             "files_table": rec.get("files_table") is not False,
             "files": _files(rec.get("files")),
             # How many dev builds of each kind the Artifacts tab keeps in
-            # dist/ before it removes the older (R105); 0 keeps them all.
+            # dist/ before it removes the older; 0 keeps them all.
             "dev_keep": _dev_keep(rec.get("dev_keep")),
             # What this project's sessions may read for debugging, by an
-            # administrator's grant (the operator, 6 Oct): the machine logs
+            # administrator's grant: the machine logs
             # of these nodes, and the controller's diagnostics. Per project,
             # not per node: a node's tick reached every project on it.
             "log_from": _log_from(rec),
             "diag": rec.get("diag") is True,
             # Gradle builds on the node's own disk rather than the projects
-            # share (B439): a build folder emptied on NFS while the daemon
+            # share: a build folder emptied on NFS while the daemon
             # holds a file in it keeps a .nfs file and will not go. On unless
             # the project says otherwise.
             "build_local": rec.get("build_local") is not False}
@@ -663,7 +663,7 @@ def debug_changed(project, req):
 
 
 CAPTURE_DAYS = 7
-# How many days of the project's daily snapshots are kept (R165), 0 for none:
+# How many days of the project's daily snapshots are kept, 0 for none:
 # what a node gone wrong through its synced copy can be undone from.
 SNAPSHOT_DAYS = 14
 DEV_KEEP = 3
@@ -682,7 +682,7 @@ FILES_MOST = 40
 
 
 def _files(v):
-    """A release's files described (R255): [{name, what}], a name being a
+    """A release's files described: [{name, what}], a name being a
     file's name with @VER@ for the version or * for any run of characters."""
     out = []
     for r in v if isinstance(v, list) else []:
@@ -748,10 +748,10 @@ def all_projects(workspace=None):
     d = _load()["projects"]
     out = {k: _over(k, _clean(v), d) for k, v in d.items() if isinstance(k, str)}
     # ...and every repository of a project with no record of its own yet (one
-    # made into it, R138), which reads the project's settings all the same.
+    # made into it), which reads the project's settings all the same.
     if _rp():
         # ...reached through a project's record or any of its repositories'
-        # (R208 step 6: a dial set in a notebook leaves the project with no
+        # (a dial set in a notebook leaves the project with no
         # record of its own).
         seen = set()
         keys = [k if _rp()[2](k) else _rp()[0](k) for k in list(d)]
@@ -776,7 +776,7 @@ def _agent_default(rec):
     return a.id if a and a.live and a.id not in off else "claude"
 
 
-# A person's sessions of one agent on one project at once (R143), unless
+# A person's sessions of one agent on one project at once, unless
 # the project says otherwise: at most agents.MAX_SLOTS.
 AGENT_SLOTS = 3
 
@@ -824,7 +824,7 @@ def reads_changed(project, reads):
     """Whether `reads`, as the dialog sends it, names other projects than the
     ones stored: the dialog sends every field on every save."""
     got = reads if isinstance(reads, list) else str(reads).split(",")
-    # By project (R138), as the setter keeps them: a repository named is its
+    # By project, as the setter keeps them: a repository named is its
     # project, and the project itself is never one it reads.
     home = (lambda r: r if _rp()[2](r) else (_rp()[0](r) or r)) if _rp() else (lambda r: r)
     own = home(project)
@@ -844,7 +844,7 @@ def node_changed(project, req):
     """Whether the node fields the dialog sent name another node set than
     the one stored: the dialog sends every field on every save, and a user
     changing their commit name was refused over the node riding along
-    unchanged (B488)."""
+    unchanged."""
     cur = get(project) or {}
     want = {"node": req.get("node") if "node" in req else cur.get("node"),
             "nodes": req.get("nodes") if "nodes" in req else cur.get("nodes")}
@@ -984,8 +984,8 @@ def reaches_on(project, node):
 def set_prefs(project, scope=None, **kw):
     """Change any of one project's settings; None leaves it, "" clears it.
     For a repository in a project, what the project holds (GROUP_FIELDS) is
-    written to the project and the rest to the repository (R136), but for
-    the dials (OVERRIDABLE and the gates, R208 step 6): from a notebook
+    written to the project and the rest to the repository, but for
+    the dials (OVERRIDABLE and the gates): from a notebook
     (no `scope`, or "repository") a dial lands on the repository as its
     own override, and "inherit" takes the override away; from the
     project's own door (`scope` "project") the dials land on the project,
@@ -1054,7 +1054,7 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
               agent_default=None, agent_slots=None, overrides=None):
     """Change any of one project's settings; None leaves it, "" clears it.
     `overrides` is {dial name: True to set it apart from the project,
-    False to inherit again} (R208 step 6)."""
+    False to inherit again}."""
     if not project:
         return {"error": "no space"}
     with _lock:
@@ -1119,7 +1119,7 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                 cur[key] = _toolchain_names({key: [str(x).strip() for x in got]}, key)
         if reads is not None:
             got = reads if isinstance(reads, list) else str(reads).split(",")
-            # By project (R138): a repository named is read as the project
+            # By project: a repository named is read as the project
             # it is in now, so a later move changes nobody's reads.
             if _rp():
                 home = lambda r: r if _rp()[2](r) else (_rp()[0](r) or r)  # noqa: E731
@@ -1242,10 +1242,10 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                 return {"error": f"tests_in is one of {', '.join(TESTS_IN)}, not {tests_in}"}
             cur["tests_in"] = tests_in
         if test_node is not None:
-            # One of the project's own nodes (R151), where its tree is synced
+            # One of the project's own nodes, where its tree is synced
             # and its session may run a job; "" is the session's own node.
             tn = str(test_node or "").strip()[:40]
-            # A repository's are its space's (R223): its own record holds none.
+            # A repository's are its space's: its own record holds none.
             sk = _rp()[0](project) if _rp() else ""
             sp = _clean(d["projects"].get(sk)) if sk and sk != project else {}
             if tn and tn not in _nodes_of(cur) + _nodes_of(sp) and tn not in (cur.get("node"), sp.get("node")):
@@ -1456,11 +1456,11 @@ def replay(project, verb, args):
 
 # ---- the settings dialog's save, one call from the dashboard ------------------
 
-# What dialog_save() needs from the server, set by configure_dialog: the
+# What dialog_save needs from the server, set by configure_dialog: the
 # projects' directory (set_prefs reads a project's files), a dev instance
 # pinned to the node it is on before its project moves
 # (devapp.pin_to_current_node), a project's agent sessions ended
-# (end_agents), and the sessions' networks told (R79).
+# (end_agents), and the sessions' networks told.
 WORKSPACE = None
 pin_instances = None
 end_agents = None
@@ -1479,9 +1479,9 @@ YOURS = ("model", "effort", "git_name", "git_email", "reply", "asks",
 
 def project_changes(name, req):
     """The fields of a settings save that would change the PROJECT's own
-    settings (B19): the asker's own (YOURS) left out, and a field sent with
+    settings: the asker's own (YOURS) left out, and a field sent with
     the value it already has, as the dialog sends the node beside a commit
-    name (B488), not counted."""
+    name, not counted."""
     cur = get(name) or {}
     out = []
     for k, v in req.items():
@@ -1555,7 +1555,7 @@ def dialog_save(name, req, uid):
     # should be able to change the other's (17 Sep).
     mine = {k: req[k] for k in YOURS if k in req}
     if mine and not r.get("error"):
-        # From the space's own door, for every repository of it (R294 step 5):
+        # From the space's own door, for every repository of it:
         # it wrote the first repository's alone, so a session on another
         # started on the defaults. A repository's own Settings view writes
         # that repository, its own choice over the space's.
@@ -1577,7 +1577,7 @@ def dialog_save(name, req, uid):
         r |= end_agents(name)
     if moved and not r.get("error"):
         r = dict(r) | {"pinned": moved}
-    # A project on another node owns its instances somewhere else now (R79).
+    # A project on another node owns its instances somewhere else now.
     if moved_node and not r.get("error"):
         net_nudge()
     return r, (400 if r.get("error") else 200)

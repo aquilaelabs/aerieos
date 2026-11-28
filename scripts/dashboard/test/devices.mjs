@@ -1,4 +1,4 @@
-// A person's devices (R272 step 1, R270 step 2): an app signs in with the
+// A person's devices: an app signs in with the
 // person's name and password once and holds a device token of its own
 // (bbd_), which acts as that person on the device door (/api/v1/device/*)
 // and nowhere else; through it the app keeps a project folder in step as a
@@ -41,7 +41,7 @@ for (const n of Object.keys(people)) await admin('/api/users', { action: 'edit',
 await admin('/api/roles', { action: 'set', name: 'dv-files-w', scope: 'projects', perms: { projects: 'write', files: 'write' } });
 // dv.none is on alpha with a role that gives no File access: being on the
 // project lets a person's machine in only as far as their roles' File access
-// goes (R104).
+// goes.
 await admin('/api/roles', { action: 'set', name: 'dv-nofiles', scope: 'projects', perms: { projects: 'write' } });
 for (const n of ['dv.rw', 'dv.r']) await admin('/api/roles', { action: 'assign', name: n, project_roles: { alpha: ['dv-files-w'] } });
 await admin('/api/roles', { action: 'assign', name: 'dv.none', project_roles: { alpha: ['dv-nofiles'] } });
@@ -140,7 +140,7 @@ await section("and one written on the controller some other way", async () => {
 // The agent's sync, shared, on the device door: signed in, a project picked
 // into a folder, the first copy made; then a change made in the folder goes
 // up and one made elsewhere comes down, with nothing but the app running.
-// The phone app's token (R290): the password traded once at sign-in, then
+// The phone app's token: the password traded once at sign-in, then
 // that person on the dashboard's own routes as the password was, and ended
 // by Profile's sign-out of the device. A PC's speaks only to its own door.
 await section("a phone's token is its person on the dashboard, until it is signed out", async () => {
@@ -174,7 +174,7 @@ await section("the app itself", async () => {
   ok(si.code === 0 && ad.code === 0 && once.code === 0 && existsSync(`${folder}/device-probe.txt`)
      && readFileSync(`${folder}/device-probe.txt`, 'utf8') === 'from the controller\n' && !existsSync(`${folder}/.git`),
      `the app signs in, keeps alpha in a folder, and makes the first copy there without .git (${[si.out, ad.out, once.out].join(' | ').replace(/\s+/g, ' ').slice(0, 200)})`);
-  // This PC lent to alpha (R270 step 6): a build and the editor's log, set
+  // This PC lent to alpha: a build and the editor's log, set
   // up here by its person; {folder} is the project's folder on this PC.
   writeFileSync(`${folder}/editor.log`, `opened ${folder}/Main.tscn\n`);
   const lent = app('lend', 'alpha', 'build', '--', 'python3', '-c', 'import os; print("built in", os.getcwd())');
@@ -240,7 +240,7 @@ const otherOut = await (await fetch(`${base}/api/profile`, { method: 'POST', hea
 ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
    `another account cannot sign a person's device out (${otherOut.error})`);
 // ...but an administrator sees each account's devices on the Users page
-// and cuts one off for them (R272 step 8): seeing and revoking, never driving.
+// and cuts one off for them: seeing and revoking, never driving.
 await section("but an administrator sees each account's devices on the Users page", async () => {
   const ul = await (await fetch(`${base}/api/users`, { headers: ADMIN })).json();
   const theirs = (ul.users || []).find(u => u.name === 'dv.rw')?.devices || [];
@@ -251,7 +251,7 @@ await section("but an administrator sees each account's devices on the Users pag
      `an administrator sees an account's devices and disconnects one for them; nobody else sees them (${JSON.stringify(cut)})`);
 });
 
-// ---- the apps this controller offers, from its release (R272 step 3) --------------------------
+// ---- the apps this controller offers, from its release --------------------------
 // A release with the three apps and their sha256 files, as the release
 // workflows attach them; the controller is 0.4.0-dev, so v0.4.0 matches.
 await section("the apps this controller offers, from its release", async () => {
@@ -276,7 +276,7 @@ await section("the apps this controller offers, from its release", async () => {
   assets.push({ name: 'SHA256SUMS', browser_download_url: `file://${rel}/SHA256SUMS` },
               { name: 'SHA256SUMS.sig', browser_download_url: `file://${rel}/SHA256SUMS.sig` });
   writeFileSync(`${DIR}/releases.json`, JSON.stringify([{ tag_name: 'v0.5.0', assets: [] }, { tag_name: 'v0.4.0', assets }]));
-  // The companion and the extension are dev features (the operator, 20 Oct):
+  // The companion and the extension are dev features:
   // on for this block, and checked gone with them off at its end.
   await admin('/api/settings', { set: { offer_unvetted: true } });
   const started = await admin('/api/apps', { action: 'check' });

@@ -1,5 +1,5 @@
 """A node that pinned AerieOS's release key holds the bundle its controller
-sends to the list of files the release signed (R267 step 6).
+sends to the list of files the release signed.
 
 The bundle was the controller's word but for root's tools: aerie, its
 library, the catalog, the publishers' keys and the hooks were unpacked as
@@ -133,7 +133,7 @@ class MayKeep(Case):
         for name in ("config/toolpacks/../x", "config/toolpacks/../../scripts/aerie.bundle", "config/toolpacks/a/b.bundle",
                      "config/toolpacks/.bundle", "config/toolpacks/..bundle", "config/toolpacks.json.bak",
                      "./config/toolpacks.json", "config/toolchains.catalog.json/x", "nodes/bundle.sig2", "nodes/root-tools.sh",
-                     # ...and the second signature over root's tools, which rides no more (R267 step 28).
+                     # ...and the second signature over root's tools, which rides no more.
                      "nodes/root-tools.sig"):
             ok, said = self.keep(self.pinned, **{name: sha(b"x")})
             self.assertFalse(ok, name)

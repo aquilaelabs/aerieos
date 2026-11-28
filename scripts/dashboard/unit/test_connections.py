@@ -1,4 +1,4 @@
-"""Connected services (R294 step 9): every kind's rows as they stand with
+"""Connected services: every kind's rows as they stand with
 what the ledger knows of each (who added it, its last use at most once a
 minute, its expiry), the install's first; Forget through the kind, its ledger
 row going with it, refused for a kind forgotten only where it lives and for

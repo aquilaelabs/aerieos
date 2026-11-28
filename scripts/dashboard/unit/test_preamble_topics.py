@@ -1,4 +1,4 @@
-"""R202: the briefing is a core plus an index, and the rest is topics a
+"""The briefing is a core plus an index, and the rest is topics a
 session reads with `aerie help TOPIC`. preamble.split reads the template's
 markers; this holds it to them without a server or a project."""
 import os
@@ -76,7 +76,7 @@ class Split(unittest.TestCase):
 
 
 class Mentioned(unittest.TestCase):
-    """What a prompt names on the record arrives on that prompt (R202)."""
+    """What a prompt names on the record arrives on that prompt."""
 
     def setUp(self):
         class Roadmap:
@@ -111,7 +111,7 @@ class Mentioned(unittest.TestCase):
 
 
 class HelpNamesTheTopic(unittest.TestCase):
-    """aerie help TOPIC is the topic, where its name is a verb's too (B992):
+    """aerie help TOPIC is the topic, where its name is a verb's too:
     map, build, tidy, capture, git and gpu printed the verb's usage, and the
     briefing sends a session to each by that name."""
 

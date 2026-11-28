@@ -1,4 +1,4 @@
-// Notifications as a system (R218 step 6, the design's the-dashboard/
+// Notifications as a system (the design's the-dashboard/
 // notifications rule): toasts in one stack at a corner, each with its kind's
 // icon and its own ×, held while the pointer is over them and each kept on
 // the account's record; the bell a short list with See all; and the
@@ -49,7 +49,7 @@ await section("the stack", async () => {
 });
 
 // ---- a toast stays put when a dialog opens ---------------------------------
-// One place for the stack (the operator, 24 Oct: it moving beside a dialog
+// One place for the stack (it moving beside a dialog
 // read as a jump): the same spot with a dialog open, above its backdrop, and
 // one in the way of a press is put away by its own ×.
 const toastAt = () => page.evaluate(() => { const t = document.querySelector('#toast .tst').getBoundingClientRect();
@@ -108,8 +108,8 @@ await section("the page's history", async () => {
   await page.waitForSelector('.noticestab .ntrow', { timeout: 15000 });
   const n0 = await page.$$eval('.noticestab .ntrow', rs => rs.length);
   ok(n0 >= 7, `the history lists what was said (${n0} rows)`);
-  // Each row says how long ago, from the seconds the record keeps (B769:
-  // handed milliseconds, every row landed in the future and read "just now").
+  // Each row says how long ago, from the seconds the record keeps
+  // (handed milliseconds, every row landed in the future and read "just now").
   await page.route('**/api/notices', async r => {
     const res = await r.fetch(); const j = await res.json();
     (j.notices || []).forEach(x => { x.at -= 7200; });
@@ -121,7 +121,7 @@ await section("the page's history", async () => {
   await page.unroute('**/api/notices');
   await page.evaluate(() => loadNotices());
   ok(whens, `a notice said two hours ago reads "2 h ago" (${(whens || []).slice(0, 1).join('')})`);
-  // All counts what is kept, once each: a failure is a kind as well (B30).
+  // All counts what is kept, once each: a failure is a kind as well.
   {
     // What is kept is the rows the list holds under All (the bar's count
     // went with the page heads: the All chip is that number).
@@ -133,7 +133,7 @@ await section("the page's history", async () => {
   await page.waitForFunction(() => [...document.querySelectorAll('.noticestab .ntrow')].every(r => r.classList.contains('bad')), null, { timeout: 5000 });
   ok(await page.$$eval('.noticestab .ntrow', rs => rs.length === 1 && /stack 6/.test(rs[0].textContent)),
      'the Failures chip narrows it to the failures');
-  // The chip on, pressed again, is no change: no fade (B317).
+  // The chip on, pressed again, is no change: no fade.
   await page.waitForFunction(() => !document.querySelector('.fghost'), null, { timeout: 5000 });
   await page.click('.noticestab [data-ntchip="bad"]');
   ok(await page.evaluate(() => !document.querySelector('.fghost')), 'the chip already on, pressed again, fades nothing');
@@ -151,7 +151,7 @@ await section("the page's history", async () => {
 
 // ---- an ask: answered on the row, its long part in a scrolling box -----------
 await section("a chip's change never draws one row over another", async () => {
-  // The operator, 23 Nov: rows of different heights slid across the ones
+  // Rows of different heights slid across the ones
   // fading in and out, their words over each other. Sampled every frame
   // through each change, on a phone's width where rows are tallest.
   await page.setViewportSize({ width: 393, height: 852 });
@@ -216,8 +216,8 @@ await section("an ask: answered on the row, its long part in a scrolling box", a
      `...and Approve answers it (${JSON.stringify(answered.calls)})`);
   const rec = await until(async () => ((await api('/api/notices')).notices || []).find(n => n.kind === 'ask'));
   ok(rec && /^Approved: container web on sandbox/.test(rec.text), `...an answer kept on the record as an answer (${rec?.text})`);
-  // ...with what it okayed, read again in History behind the same fold (the
-  // operator, 23 Nov: an approved push's lines were nowhere to be read).
+  // ...with what it okayed, read again in History behind the same fold
+  // (an approved push's lines were nowhere to be read).
   ok(rec?.what === 'the compose file' && /^services:\n  web:\n    image: nginx/.test(rec?.detail || ''),
      `...the record keeping what it okayed, whole (${rec?.what}, ${(rec?.detail || '').length} characters)`);
   await page.evaluate(() => { ph = { ...(ph || {}), asks: [] }; loadNotices(); });
@@ -231,8 +231,8 @@ await section("an ask: answered on the row, its long part in a scrolling box", a
   }, rec.id));
   ok(hist && hist.what === 'the compose file' && hist.scrolls && /^services:/.test(hist.text) && !hist.acts,
      `...and its History row opens it in a box that scrolls inside itself, nothing to press in it (${JSON.stringify(hist)})`);
-  // Shut again each time the page is come back to, never remembered past it
-  // (the operator, 24 Nov), while one opened stays open through a redraw.
+  // Shut again each time the page is come back to, never remembered past it,
+  // while one opened stays open through a redraw.
   const histSel = `.noticestab .ntrow[data-nt="${rec.id}"] details.ntlong`;
   await page.evaluate(s => { const d = document.querySelector(s); d.open = false; }, histSel);
   // The fold as the page has it when it is pressed, by what it is and not
@@ -295,7 +295,7 @@ await section("a job's toast follows the job, and its end is kept", async () => 
 });
 
 // ---- a session working with no word from its hooks is said -----------------
-// B1009: a coding agent passes over a hook it cannot run, so a session whose
+// A coding agent passes over a hook it cannot run, so a session whose
 // hooks are gone works on with no gate and says nothing. The heartbeat still
 // shows it working; a turn begun and ended with no hook heard is a bell row
 // for its account, and it goes when the session does.
@@ -327,14 +327,14 @@ await section("a session working with no word from its hooks is said", async () 
 });
 
 // ---- a session an outage held is offered back -------------------------------
-// R251: a session's gate marks it held while the controller is away, its
+// A session's gate marks it held while the controller is away, its
 // node's agent reports the mark, and once the controller answers the bell
 // lists it with a Resume that tells it to pick up from its note.
 await section("a session an outage held is offered back", async () => {
   const users = await api('/api/users');
   const uid = (users.users || []).find(u => u.name === 'test')?.uid;
   // As the gate writes it: bb-tty's hook is `bb-gate PROJECT ACCOUNT`, so the
-  // mark names the account, and Resume finds its Claude session (B773).
+  // mark names the account, and Resume finds its Claude session.
   writeFileSync(`${DIR}/sandboxdata/held.json`, JSON.stringify([{ project: 'alpha', uid, session: uid,
     since: Math.floor(Date.now() / 1000) - 120 }]));
   await page.evaluate(() => toggleBell(true));
@@ -347,7 +347,7 @@ await section("a session an outage held is offered back", async () => {
   ok(row && row.startsWith('0: '), `...first of what needs attention, above the updates (${row})`);
   ok(row && /test's session on sandbox/.test(row) && /Resume/.test(row),
      `a session an outage held is a bell row naming whose it is and where it runs, with Resume (${row})`);
-  // It blocks work, so it is Active (R280): over Earlier in the bell with
+  // It blocks work, so it is Active: over Earlier in the bell with
   // no Dismiss, and on the Notifications page over History with no ×.
   const bellPlace = await page.evaluate(() => {
     const kids = [...document.querySelectorAll('#bellPanel .bgroup, #bellPanel .bnote')];
@@ -368,7 +368,7 @@ await section("a session an outage held is offered back", async () => {
      `...and on the Notifications page it is under Active, above History, with no × and no Dismiss (${JSON.stringify(onPage)})`);
   await page.evaluate(() => toggleBell(true));
   rmSync(`${DIR}/sandboxdata/held.json`, { force: true });
-  // Pressed twice before the first send is back: one line, not two (B775).
+  // Pressed twice before the first send is back: one line, not two.
   await page.evaluate(sel => { const a = document.querySelector(sel); a.click(); a.click(); },
                       `#bellPanel [data-bheld][data-session="${uid}"]`);
   const said = await until(() => page.evaluate(() => [...document.querySelectorAll('#toast .tmsg')]
@@ -419,9 +419,9 @@ await section("on a phone the stack spans the width above the dock's line", asyn
   ok(Math.abs(back - r.bottom) < 2, `...and back above the dock's line once it is put away (${back} against ${Math.round(r.bottom)})`);
   await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
   // A question is the one dialog on a phone that is not the whole screen
-  // (R265, the operator, 19 Nov: two lines and two buttons were an empty
+  // (two lines and two buttons were an empty
   // page): a sheet at the foot, as tall as its words, the page showing
-  // above it (the theme's veil, see-through: R273); what one press needs a yes for is listed in it, each kind
+  // above it (the theme's veil, see-through); what one press needs a yes for is listed in it, each kind
   // under its heading; and a toast sits above the sheet.
   page.answers.push(() => new Promise(r => setTimeout(() => r(-1), 2500)));
   const asked = page.evaluate(() => askYes('', { title: 'Rebuild alpha?', verb: 'Rebuild', parts: [
@@ -455,7 +455,7 @@ await section("on a phone the stack spans the width above the dock's line", asyn
 
 // A request that never landed is the controller not answering, said so, and
 // the Phone page's own read leaves it to the poll rather than keeping a
-// failure (B301).
+// failure.
 await section("A request that never landed is the controller not answering, said so, and", async () => {
   const r = await page.evaluate(async () => {
     const words = [failWords(new TypeError('Failed to fetch')), failWords(new Error('quota spent'))];
@@ -469,7 +469,7 @@ await section("A request that never landed is the controller not answering, said
      `a fetch that never landed is said as the controller not answering, and the Phone page's own read keeps no failure for it (${JSON.stringify(r)})`);
 });
 
-// The header's pop-outs from the keyboard (R286 step 1): each opened by Enter
+// The header's pop-outs from the keyboard: each opened by Enter
 // on its button takes the caret into itself, and Escape gives it back to the
 // button, as a dialog does.
 await section("the bell, the Doctor and the gear from the keyboard", async () => {

@@ -1,5 +1,5 @@
 """aerie map find names a value declared in a file of the index when no
-function or type has the name (report #66, B527): a Kotlin table in a
+function or type has the name (report #66): a Kotlin table in a
 companion object, a python module's constant, a shell variable."""
 import importlib.util
 import os
@@ -48,7 +48,7 @@ class ValueDecls(unittest.TestCase):
 
 
 class ABundleIsNotRead(unittest.TestCase):
-    """B804: a name nothing defines was looked for as a page-level let in
+    """A name nothing defines was looked for as a page-level let in
     every page script, a one-line bundle the index skips among them, and
     code_only over Shebang-DevBoard's 290 kB xterm.js took fifty seconds."""
 
@@ -65,7 +65,7 @@ class ABundleIsNotRead(unittest.TestCase):
 
 
 class ADefAndALetOfOneName(unittest.TestCase):
-    """B1148: a python def and a page script's let of the same name, and find
+    """A python def and a page script's let of the same name, and find
     answered the def alone, leaving out where the page variable lives."""
 
     def test_both_are_listed(self):
@@ -82,7 +82,7 @@ class ADefAndALetOfOneName(unittest.TestCase):
 
 
 class TheSummary(unittest.TestCase):
-    """B806: the summary counted every file the brace scanner reads as js,
+    """The summary counted every file the brace scanner reads as js,
     so a Kotlin tree read as 44 js, and named a file it could not write."""
 
     def test_counted_by_extension_and_said_unkept_when_it_was_not_written(self):

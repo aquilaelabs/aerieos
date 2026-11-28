@@ -1,6 +1,6 @@
 """git.in_use: what the project directory's own open Claude session keeps
 off it. A switch waits while the session is open; a new branch switched to
-is a switch too (B859: it went round the guard and moved the tree under
+is a switch too (it went round the guard and moved the tree under
 an open session); a new branch left where it is moves nothing."""
 import os
 import sys

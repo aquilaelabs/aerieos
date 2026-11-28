@@ -1,5 +1,5 @@
 """What is not for this AerieOS is not offered, and what was kept and no
-longer fits is switched off (the operator, 12 Nov): a catalog entry written
+longer fits is switched off: a catalog entry written
 in a format past this build's, or for other release lines than this one, is
 left out of the Library's cards and counted; a pack an install holds whose
 manifest stops naming the running line after an upgrade stays where it is

@@ -1,4 +1,4 @@
-"""A phone's lock is in an account's home (R247 step 5): the room keeper's
+"""A phone's lock is in an account's home: the room keeper's
 walk opens it only as a regular file reached by no link, and never waits on
 one, so a FIFO or a link left there does not hold the walk or reach a device."""
 import fcntl

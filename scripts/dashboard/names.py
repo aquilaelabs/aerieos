@@ -1,7 +1,7 @@
 """What things are called, written once.
 
 Three rules several modules and a shell script each spelled for themselves
-until this file (R60): what a project may be called, what tmux will call a
+until this file: what a project may be called, what tmux will call a
 session, and the name a project's Claude session runs under. No imports
 from the rest of the dashboard but agents.py, which has none, so nodes.py
 and the doctor's probes can use it standalone.
@@ -30,27 +30,27 @@ def tmux_name(s):
 def claude_session(project):
     """The tmux session a project's Claude conversation runs in, before the
     account prefix a node puts in front of it: the agent table's name for
-    it (R95)."""
+    it."""
     return agents.session_name("claude", project)
 
 
 def agent_session(agent_id, project, slot=1):
     """The tmux session an agent's conversation on a project runs in, in
-    its slot (R143)."""
+    its slot."""
     return agents.session_name(agent_id, project, slot)
 
 
 def agent_sessions(project):
     """Every live agent's session name on a project in every slot, Claude's
     first slot first: what a check that must see any agent's session there
-    looks for (R95 step 16; R143)."""
+    looks for."""
     return tuple(agents.session_name(a.id, project, n)
                  for n in range(1, agents.MAX_SLOTS + 1) for a in agents.live())
 
 
 def running_session(prefix, project, running, want=""):
     """The session a message for this account on this project goes to:
-    the one the person picked (`want`, R143: one of several of their own
+    the one the person picked (`want`: one of several of their own
     sessions there) when it is theirs, on this project and running; else
     the first live agent's that is running (`running`, a set of full
     names), Claude's when several are, or Claude's name when none is, so

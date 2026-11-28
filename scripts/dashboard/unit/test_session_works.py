@@ -1,4 +1,4 @@
-"""bb-session's --works (R136 step 4): one session in every repository of a
+"""bb-session's --works: one session in every repository of a
 project, each repository's tree and worktrees in the view to write as the
 project's own are, the session's folder allowed in any of them, and a
 repository named twice, as a read too, or that is not there refused."""
@@ -80,8 +80,8 @@ if __name__ == "__main__":
 
 class Flutter(Works):
     """Flutter writes under its own tree on every run: a session gets a layer
-    of its own over it, and the tree itself stays read-only (B888, R247 step
-    5: a session that changed bin/cache's dart had others run it)."""
+    of its own over it, and the tree itself stays read-only
+    (a session that changed bin/cache's dart had others run it)."""
 
     def test_the_tree_is_read_only_and_the_session_writes_a_layer_of_its_own(self):
         store = f"{self.d}/store"

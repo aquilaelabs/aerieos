@@ -1,4 +1,4 @@
-"""The room keeper's prune of build caches by age (R110 step 7): a job's
+"""The room keeper's prune of build caches by age: a job's
 use stamps its project's cache, and cache-clear with older_days drops only
 the ones no job has used for that long."""
 import os

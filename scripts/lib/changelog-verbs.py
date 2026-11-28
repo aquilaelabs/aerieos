@@ -17,13 +17,13 @@ version = dash.load("version", _here)
 statefile = dash.statefile(_here)
 changelog = dash.load("changelog", _here)
 _state = os.environ.get("DASHBOARD_STATE", "/config")
-# The tracker, for what a release owes the changelog (R217): which bugs fixed
+# The tracker, for what a release owes the changelog: which bugs fixed
 # since the last release it carried, and the answer a bug's notes keep.
 bugs = dash.load("bugs", _here)
 bugs.configure(write_json=statefile.write_json, state=_state)
 version.configure(workspace=os.environ.get("BB_WORKSPACE", "/workspace"),
                   state=_state, write_json=lambda *a: None, bugs_mod=bugs, changelog_mod=changelog)
-# The repository's Releases setting (R255): owed lines refuse or warn.
+# The repository's Releases setting: owed lines refuse or warn.
 try:
     _prefs = dash.load("prefs", _here)
     _prefs.configure(write_json=statefile.write_json, state=_state)
@@ -104,7 +104,7 @@ def _bug_of(word):
 
 def _tie(b, words, kind):  # noqa: ARG001  (kind: the line's category, said by the caller)
     """The bug tied to the changelog line `words` in the notebook: listed on
-    its row, and the release check's answer (R255) while the tie stands."""
+    its row, and the release check's answer while the tie stands."""
     r = bugs.link_changelog(proj, b["id"], words, by="claude")
     if r.get("error"):
         print(r["error"], file=sys.stderr)
@@ -162,14 +162,14 @@ if argv and argv[0] == "add":
     # it describes, so it is written AFTER that commit and lands in the next
     # one: every entry but a session's last gets swept up by the commit that
     # follows it, and the last one sits in a dirty tree that Pull, Switch and
-    # Merge all refuse on (B162). Said rather than committed here, because the
+    # Merge all refuse on. Said rather than committed here, because the
     # wording belongs with whatever commit the author is making next.
     print(f"{changelog.FILE} is modified now: commit it with your next commit",
           file=sys.stderr)
     raise SystemExit(0)
 
 if argv and argv[0] == "missing":
-    # What the next release owes (R217): a bug fixed since the last release
+    # What the next release owes: a bug fixed since the last release
     # that it carried, or may have, with no Fixed line and no answer. A
     # release is refused while this lists anything.
     since = argv[1] if len(argv) > 1 else ""
@@ -200,8 +200,8 @@ if argv and argv[0] == "skip":
     raise SystemExit(0)
 
 if argv and argv[0] == "link":
-    # A line already written tied to the bugs it answers (the operator,
-    # 18 Nov): kept in the notebook, the public line left as it is.
+    # A line already written tied to the bugs it answers:
+    # kept in the notebook, the public line left as it is.
     if len(argv) < 3:
         print("aerie changelog link N BUG [BUG...]   the unreleased line N (aerie changelog unreleased) "
               "answers these bugs", file=sys.stderr)

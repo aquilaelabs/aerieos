@@ -1,4 +1,4 @@
-"""A node whose own console switched root commands off (R227 step 2) is not
+"""A node whose own console switched root commands off is not
 asked for one: the controller says the node's sentence before a person is
 asked to allow a command, before an administrator's own is queued, and
 names it in what the node reports."""

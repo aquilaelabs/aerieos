@@ -1,5 +1,5 @@
-"""An item's target, the release it is meant to ship in (the operator, 21
-Oct): set and cleared on its own verb and on add, checked as X.Y.Z, logged,
+"""An item's target, the release it is meant to ship in:
+set and cleared on its own verb and on add, checked as X.Y.Z, logged,
 and kept when a finished item's row is rebuilt from the log."""
 import json
 import os

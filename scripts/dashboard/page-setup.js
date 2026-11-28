@@ -1,12 +1,12 @@
 "use strict";
-// ---- first run: the setup page (R199, R267) ---------------------------------
+// ---- first run: the setup page ---------------------------------
 //
 // After the owner is made, the page is this until Finish: the four things a
 // new owner has to do, each a card with its state and its own action, at the
-// page's reading width with nothing beside it (the operator, 18 Oct: the
+// page's reading width with nothing beside it (the
 // panel over half a Nodes page, six storage paths and an idle timeout ahead
 // of the one step that blocks, read as anything but a start). A node first,
-// which cannot wait: nothing runs without one (the operator, 12 Oct), and
+// which cannot wait: nothing runs without one, and
 // Finish is refused by the server too until one is enrolled and answering.
 // Then the owner's name and email, which every commit carries; Claude Code
 // on that node; and a first project. Those three can wait: Home keeps them
@@ -22,8 +22,8 @@ function setupNeeded(){
 
 // A node enrolled, answering and running sessions, from the Nodes tab's
 // list. Not a hosting-only one: it holds no code and runs no sessions, so a
-// project has nowhere to work or to build its container (the operator,
-// 12 Oct). That is also why the first node reaches the controller over the
+// project has nowhere to work or to build its container.
+// That is also why the first node reaches the controller over the
 // LAN or WireGuard, never only through a public hostname.
 function setupNode(){
   const own = setupOwn();
@@ -31,7 +31,7 @@ function setupNode(){
                                      && !n.config?.host_only && (!own || n === own)) || null;
 }
 
-// On a controller installed bare metal (R90), its own machine, which the
+// On a controller installed bare metal, its own machine, which the
 // installer enrolled: the first node is that one, and Finish waits for it
 // rather than for one the person enrolls. Told by the install's own marker
 // (the status read's bare_metal), never guessed; where the installer made
@@ -74,8 +74,8 @@ function drawSetup(){
     if (setupWalking()) setupLandLoad();
   }
   const s = setupSteps();
-  // On a machine that is its own controller, its disks are a step (R161
-  // step 3), read again every few seconds until they are made.
+  // On a machine that is its own controller, its disks are a step,
+  // read again every few seconds until they are made.
   if (s.own && !setupDisksDone(setupDisks.own) && Date.now() - setupDisks.at > 5000) setupDisksLoad();
   const dk = setupDisks.own;
   // Drawn again only when what it shows has moved: a poll landing mid-type
@@ -85,7 +85,7 @@ function drawSetup(){
                               s.git, s.claude, s.project, s.own?.reported?.console || null, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
-  // Patched into what is there (R244): what was typed, a file picked and
+  // Patched into what is there: what was typed, a file picked and
   // the field being typed in stay where they were through the redraw.
   if (setupWalking()){
     patch(el, setupWalkHtml(s));
@@ -152,12 +152,11 @@ function drawSetup(){
 // What a disk's row shows, for the redraw test: a disk's temperature and the
 // like move on every read and are not the page's business.
 // The two presses at the top of the page on a machine that is its own
-// controller (the operator, 9 Nov): off, and a login for its screen. Neither
+// controller: off, and a login for its screen. Neither
 // is a step, so neither waits for one. One job runs on a machine at a time,
 // and either pressed while one runs is queued behind it by the server, not
 // refused: so both stay live, a muted line under them saying so while one
-// runs, and the press says it is queued and behind what (setupAhead; the
-// operator, 22 Nov).
+// runs, and the press says it is queued and behind what (setupAhead).
 function setupTopActs(s){
   if (!s.own) return "";
   const c = s.own.reported?.console;
@@ -280,7 +279,7 @@ function setupCard(n, title, done, wait, body, acts = "", said = ""){
 // ---- where the projects and containers go ---------------------------------
 //
 // A stick keeps them off itself, so until a pool or a folder on the disks is
-// named Docker and the VMs wait and no project can be made (B666): a step of
+// named Docker and the VMs wait and no project can be made: a step of
 // the first run of any stick, on a new start and on a move. On a new start the
 // first pool made is named by itself, the fast one where there is one, since
 // there is nothing to decide; the step says so, and offers the rest.
@@ -353,7 +352,7 @@ async function setupInTurn(calls, btn, word){
   return "";
 }
 
-// ---- moving here: the walk (R214, the operator, 4 Nov) -----------------------
+// ---- moving here: the walk -----------------------
 //
 // A person switching a machine over met a page that spoke only of a new start,
 // a door that named three pages it hid, and the order of things nowhere. So
@@ -438,8 +437,8 @@ function setupWalkHtml(s){
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
     : `<p>The moved controller's accounts, nodes, spaces and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed, old)}`;
   cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
-  // Said as sentences, a word in bold to find each by (the operator, 10 Nov:
-  // long values in a grid of two columns read as wonky).
+  // Said as sentences, a word in bold to find each by
+  // (long values in a grid of two columns read as wonky).
   cards.push(setupCard(++i, "After it lands", false, false,
     `<p><b>Sign in</b> with an account the old controller had.</p>
      <p><b>Your nodes</b> follow by themselves once they can reach this address. Any that does not is listed on the Nodes page, with the one line to run on it${old ? "; a node that was a VM on the old system is off until its VM runs here" : ""}.</p>
@@ -464,10 +463,10 @@ function setupWalkHtml(s){
   </div>`;
 }
 
-// ---- the disks step (R161 step 3) -------------------------------------------
+// ---- the disks step -------------------------------------------
 //
 // What the disks are for and how many may fail, never RAID levels up front
-// (the operator, 29 Oct: what is best across NAS software, not the
+// (what is best across NAS software, not the
 // traditional Linux way of partitioning by hand). The layout is picked from
 // the disks there and said with why; Advanced overrides it. Made with the
 // Storage page's own calls (storage-pool, storage-array, storage-share), so
@@ -475,13 +474,13 @@ function setupWalkHtml(s){
 
 // A disk this step may use: not the one the system runs from, not a stick.
 const setupDiskFree = d => !d.system && !d.removable;
-// The disks a stick's plan adopts (R163 step 9): the old system's array,
+// The disks a stick's plan adopts: the old system's array,
 // its parity and its pools, taken as they are on This machine under Disks
-// from the stick and never offered here to erase (B637: a person moving
+// from the stick and never offered here to erase (a person moving
 // off their NAS saw every disk of it listed under Make it). A plan's id is
 // the old system's name for the disk (MODEL_SERIAL), met by the serial or
 // the by-id name.
-// A pool is met by its disk where the plan names one (B945: pools carry no
+// A pool is met by its disk where the plan names one (pools carry no
 // id, and their disks were offered to erase), and a disk the plan sets
 // apart (encrypted, degraded) is the old system's all the same.
 function setupPlanned(){
@@ -505,12 +504,12 @@ function setupDiskSplit(n){
 const setupHolds = x => !!x && x !== "nothing";
 // ...and a disk with any partition at all counts, whatever the partition
 // holds: an old array's parity is a partition with no filesystem, and was
-// ticked to erase with no way to untick it (B945).
+// ticked to erase with no way to untick it.
 const setupDiskHeld = d => setupHolds(d.holds) || (d.parts || []).length > 0;
 
 // The plan for these disks: {main, fast, notes}. `main` is where the shares
 // live, {kind: "zfs"|"array", layout, disks, parity, usable_mb, may_fail,
-// grows}; `fast` the SSDs' pool by purpose (R162 step 6) beside hard disks,
+// grows}; `fast` the SSDs' pool by purpose beside hard disks,
 // or null. `lose` is how many disks may fail (0, 1 or 2); `layout` an
 // Advanced override ("", "mirror", "raidz1", "raidz2", "single", "array").
 function setupDiskPlan(disks, {lose = 1, layout = ""} = {}){
@@ -623,7 +622,7 @@ function setupDisksCard(num){
     <div class="actbar">${setupDisks.adv ? "" : `<button type="button" data-setdiskadv>Advanced</button>`}<button type="button" class="primary" data-setdisksmake${plan.main ? "" : " disabled"}>Make it</button></div></section>`;
 }
 
-// Shares, as a NAS has them (the operator, 4 Nov): a folder on a pool, internal
+// Shares, as a NAS has them: a folder on a pool, internal
 // until it is exported, and an export lists people; it has no password of its
 // own. Each person signs in as they do here. All optional.
 function setupSharesCard(num){
@@ -696,8 +695,8 @@ function wireSetupDisks(el){
 }
 
 // ---- one step at a time ----------------------------------------------------
-// The steps a setup cannot go on without are taken in order (the operator,
-// 8 Nov: a later step pressed early failed, or queued behind the one before
+// The steps a setup cannot go on without are taken in order
+// (a later step pressed early failed, or queued behind the one before
 // and was refused): each waits, its controls dead, until every one before it
 // is done, and says which. The rest (shares, your name, Claude, a first space,
 // what to have with you) stay open in any order. And one system job runs on a
@@ -744,7 +743,7 @@ function setupInOrder(el, s){
   const band = document.createElement("div");
   band.className = "field setjobband";
   // What it is on and how long it has run, so a long one reads as going
-  // rather than stuck (the operator, 8 Nov); no bar, since a job measures
+  // rather than stuck; no bar, since a job measures
   // nothing but its time (the progress rule).
   const since = job.started ? Math.max(0, Math.floor(Date.now() / 1000 - job.started)) : 0;
   const took = since >= 3600 ? `${Math.floor(since / 3600)} h ${Math.floor(since % 3600 / 60)} min` : since >= 60 ? `${Math.floor(since / 60)} min` : since ? `${since} s` : "";

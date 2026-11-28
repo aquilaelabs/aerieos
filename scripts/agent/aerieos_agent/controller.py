@@ -15,7 +15,7 @@ from . import AGENT_VERSION
 # ---------------------------------------------------------------------------
 # the connection
 
-# One TLS context of each kind a process (R228 step 18): one made for every
+# One TLS context of each kind a process: one made for every
 # request read the system's CA store each time, 4 to 7 ms a call. `verify`
 # is the CA-checked kind (a public hostname); the other checks nothing
 # itself, its caller comparing the certificate with the pin.
@@ -143,7 +143,7 @@ class Controller:
     """
 
     # The pin that means "no pin: the hostname's public certificate, by the
-    # system's CAs" (R170): a controller behind Cloudflare presents the
+    # system's CAs": a controller behind Cloudflare presents the
     # edge's certificate, which changes under it and is not the controller's.
     CA = CA_PIN
 
@@ -156,10 +156,10 @@ class Controller:
         self.port = u.port or (443 if u.scheme == "https" else 80)
         self.base = u.path.rstrip("/")
         # Which door it speaks to: the agent's, or a person's device's
-        # (/api/v1/device/, R270), whose app reuses this connection whole.
+        # (/api/v1/device/), whose app reuses this connection whole.
         self.door = door
         # Sent with every request beside the token: the companion's
-        # X-BB-Door, the door's compatibility window (R270 step 9).
+        # X-BB-Door, the door's compatibility window.
         self.headers = {}
 
     def _conn(self, timeout):
@@ -167,7 +167,7 @@ class Controller:
             return http.client.HTTPConnection(self.host, self.port, timeout=timeout)
         ctx = _context(self.pin == self.CA)
         if self.pin == self.CA:
-            # A public hostname (R170): the system's CAs and the name, as a
+            # A public hostname: the system's CAs and the name, as a
             # browser would; nothing is pinned, since the certificate the
             # node sees is Cloudflare's edge's and not the controller's.
             c = http.client.HTTPSConnection(self.host, self.port, timeout=timeout, context=ctx)  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected (its own CA, verified: ctx)
@@ -283,9 +283,9 @@ class Controller:
         return st, got
 
     def upload_pieces(self, path, src, piece, timeout=600, say=None):
-        """upload() in pieces of `piece` bytes, each its own request with
+        """upload in pieces of `piece` bytes, each its own request with
         offset and total in the query (relocate.data_put takes them): what
-        a body limit on the way (Cloudflare's 100 MB, R170) asks for. The
+        a body limit on the way (Cloudflare's 100 MB) asks for. The
         last piece's answer is the whole upload's; a piece the controller
         says it has already is not sent again."""
         size = os.path.getsize(src)

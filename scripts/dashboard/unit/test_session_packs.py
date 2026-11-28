@@ -1,4 +1,4 @@
-"""A session asks for a tool pack from the vetted catalog (R169 step 5): the
+"""A session asks for a tool pack from the vetted catalog: the
 project's Install a tool pack dial (ask by default) kept as the others are,
 the briefing naming the catalog and the dial, an ask held for the
 administrators with the index's pin and the node it is for, and aerie tool's
@@ -73,7 +73,7 @@ class SessionPacks(unittest.TestCase):
 
 
 class Touches(unittest.TestCase):
-    """R169 step 4: a pack says what it touches, the hosts its install
+    """A pack says what it touches, the hosts its install
     fetches from and whether it needs root; Look shows both, and one that
     needs root is an administrator's to add."""
     def test_touches_is_held_to_its_shape(self):
@@ -87,7 +87,7 @@ class Touches(unittest.TestCase):
         self.assertEqual(m["touches"], {"hosts": [], "root": False})
 
 class WorksWith(unittest.TestCase):
-    """R169 step 6: a pack names the release lines it works with; one that
+    """A pack names the release lines it works with; one that
     does not name this build's is not added, and one held is said."""
     def test_a_pack_fits_the_lines_it_names(self):
         self.assertEqual(toolpacks.line_of("0.9.0-dev.4342+48b768b"), "0.9")

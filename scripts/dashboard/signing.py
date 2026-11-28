@@ -1,4 +1,4 @@
-"""A project's Android signing keys, kept by the controller (R106).
+"""A project's Android signing keys, kept by the controller.
 
 Two routes, either or both per project:
 
@@ -12,7 +12,7 @@ Two routes, either or both per project:
 
 The keystore and its passwords live under /config/signing/PROJECT/, the
 directory 0700 and every file 0600, beside the git tokens and like them
-outside every session's view, and sealed there (R111 step 2) under the
+outside every session's view, and sealed there under the
 install's key, which is never in /config: a copied /config, or a
 backup of it, holds ciphertext alone. Root on the running controller still
 reads them, as it reads everything the dashboard can. A session never receives either: a signing is
@@ -20,7 +20,7 @@ a job on the project's node that fetches the key over the agent's own
 channel for that one job (step 2), so what a session can read, print or
 commit holds no key and no password.
 
-Nothing here runs a jdk or build-tools (the operator, 22 Oct: the
+Nothing here runs a jdk or build-tools (the
 controller runs nothing). What needs keytool or apksigner, an upload checked,
 a key made, a backup wrapped, a rotation's proof and a release's APK signed,
 is a sign-key job on the project's node (_on_node), as aerie sign is a sign job
@@ -75,12 +75,12 @@ def configure(*, state, project_name, secret_file=None):
     load_master(secret_file)
 
 
-# ---- sealed at rest (R111 step 2) ------------------------------------------
-# The install's key: INSTALL_KEY in the container's environment (R135, named
+# ---- sealed at rest ------------------------------------------
+# The install's key: INSTALL_KEY in the container's environment (named
 # SIGNING_SECRET before 0.8.0),
 # which the entrypoint shields like every secret and hands the dashboard as a
 # file of its own in /run (never /config), or with none set the key the
-# install made itself and the page changes (R154, installkey.py), with the
+# install made itself and the page changes (installkey.py), with the
 # one before it while anything is still sealed under that. Each keystore and each record's
 # passwords are sealed under it. The standard library has no cipher, so the
 # seal is built from what it has: HMAC-SHA256 as a pseudorandom function in
@@ -134,7 +134,7 @@ def _stream(key, nonce, n):
 
 def _aead(key=None):
     """ChaCha20-Poly1305 under a key HKDF derives from the install key, or
-    from `key` (an account's own): the vetted seal (R158 step 3)."""
+    from `key` (an account's own): the vetted seal."""
     from cryptography.hazmat.primitives import hashes                      # noqa: PLC0415
     from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305  # noqa: PLC0415
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF               # noqa: PLC0415
@@ -155,13 +155,13 @@ def _have_aead():
 
 
 def seal(data, key=None):
-    """`data` sealed under the install key, or under `key` (an account's own,
-    R154): MAGIC, nonce, ciphertext with its tag, ChaCha20-Poly1305 from the
-    cryptography library (R158 step 3). Where the library is not on the
+    """`data` sealed under the install key, or under `key` (an account's own):
+    MAGIC, nonce, ciphertext with its tag, ChaCha20-Poly1305 from the
+    cryptography library. Where the library is not on the
     machine nothing is sealed, said by NoCipher: it fell back to a cipher
     built here from HMAC-SHA256 (BBSEAL1), so a controller missing one
-    package sealed every secret with code nobody had reviewed, silently
-    (R243). A seal of that format is still opened."""
+    package sealed every secret with code nobody had reviewed, silently.
+    A seal of that format is still opened."""
     if not _have_aead():
         raise NoCipher("the cryptography library is not on this machine, so nothing can be sealed: "
                        "install python3-cryptography (the image carries it) and start again")
@@ -198,7 +198,7 @@ def _open_with(key, blob):
 
 def unseal(blob):
     """The data a seal holds, or Locked: under the install key, or the one
-    before it while a change keeps it (R154)."""
+    before it while a change keeps it."""
     if MASTER is None:
         raise Locked("this controller has no install key: set INSTALL_KEY as it was, or import the key's backup")
     for key in (MASTER, PREVIOUS):
@@ -279,7 +279,7 @@ def _projects():
 def seal_all(again=False):
     """Seal every key kept open, at start and whenever a secret first
     arrives: its keystore and its record's passwords. `again`, after the
-    install key changed (R154): one sealed under the key before it is
+    install key changed: one sealed under the key before it is
     sealed again under today's. Returns how many."""
     if MASTER is None:
         return 0
@@ -399,7 +399,7 @@ def key_for(project, package, route=""):
     else `default`, else, when no key is called that, the project's only key
     holding the route. A project whose one key had another name had every
     unmapped build approved and then failed for want of `default`
-    (AerieOS's own app, 5 Oct, B509)."""
+    (AerieOS's own app)."""
     mapped = mapping(project).get(package or "")
     if mapped:
         return mapped
@@ -425,7 +425,7 @@ def listing(project):
             "node": signer_name(project), "node_why": signer(project)[1],
             "backup_locked": bool(backup_locked(project)),
             # Sealed under the install's key, kept open, or
-            # locked (R111 step 2): the view says which.
+            # locked: the view says which.
             "at_rest": at_rest(project)}, 200
 
 
@@ -466,7 +466,7 @@ def _keep(project, route, key, blob, alias, kind, sha, store_pass, key_pass, by,
 
 def needs_lock(project):
     """(error, 409) while a project has no backup password, else None: a key
-    is only kept once its backups have one (the operator, 2 Oct), so no key
+    is only kept once its backups have one, so no key
     can leave the dashboard without it from the first one on."""
     if backup_locked(project):
         return None
@@ -645,7 +645,7 @@ def _rewrap(project, blob, store_pass, key_pass, alias, new_pass):
     """(PKCS12 bytes, error, whether the error is the node's state): the
     keystore's key under `new_pass`, as its store and key password both, by
     keytool -importkeystore on the project's node, the keystore's own
-    encryption (R111)."""
+    encryption."""
     r = _on_node(project, "wrap", {"keystore": base64.b64encode(blob).decode(), "store_pass": store_pass,
                                    "key_pass": key_pass or store_pass, "alias": alias, "new_pass": new_pass})
     if r.get("error"):
@@ -662,7 +662,7 @@ def backup(project, route, key=DEFAULT, password=""):
     the record marks it backed up; (error payload, status) otherwise. With
     the project's backup password (checked by the caller), the keystore in
     the zip is wrapped under it and password.txt never holds a password, so
-    a copy of the file is no key without it (R111)."""
+    a copy of the file is no key without it."""
     if not _ok_project(project) or route not in ROUTES or not _ok_key(key):
         return {"error": "unknown space, key or route"}, 400
     rec = _record(project, route, key)
@@ -705,7 +705,7 @@ def backup(project, route, key=DEFAULT, password=""):
     return (f"{base}.{ext}", blob), 200
 
 
-# ---- a backup brought back (R103, the operator 22 Oct) ----------------------
+# ---- a backup brought back ----------------------
 # What Download backup hands over goes back in, to this project or another:
 # the zip a generated key's backup is (the keystore and password.txt, which
 # says its password and alias, so nothing is retyped), or a bare keystore
@@ -744,7 +744,7 @@ def _read_backup(blob):
     pw = line("keystore and key password")
     if not pw:
         return no("the backup's password.txt names no password")
-    # Wrapped under its project's backup password (R111): the one typed in.
+    # Wrapped under its project's backup password: the one typed in.
     if pw == "this space's backup password":
         pw = ""
     return ks, pw, line("alias"), line("SHA-256"), stores[0], ""
@@ -802,7 +802,7 @@ def import_backup(project, route, blob_b64, key="", password="", alias="", filen
     return _keep(project, route, key, blob, alias, kind, sha, password, "", by, imported=zipped)
 
 
-# ---- the backup password (the operator, 1 Oct) ----------------------------
+# ---- the backup password ----------------------------
 # A project's owner may put a password on its keys' backups, which every
 # download then needs, AerieOS's owner's included: the dashboard's own
 # accounts stop being enough to walk off with a key. Kept as a PBKDF2 hash
@@ -887,7 +887,7 @@ def locked(project, route, key=DEFAULT):
     return str((_record(project, route, key) or {}).get("locked") or "")
 
 
-# ---- a release's APK, signed on the project's node (R106: the operator, 22 Oct)
+# ---- a release's APK, signed on the project's node (the operator)
 # Four keystore secrets set by hand on GitHub failed three ways and one put a
 # password in a public log. A release's APK is built unsigned in CI, fetched
 # by the controller, which holds the key, and signed on the project's node by
@@ -957,7 +957,7 @@ def sign_release(project, src, out):
             **({"rotated_from": chosen["rotated_from"]} if chosen.get("rotated_from") else {})}
 
 
-# ---- the key work on the project's node (R106, the operator 22 Oct) --------
+# ---- the key work on the project's node --------
 # One sign-key job per piece of work, on the node the project's signing runs
 # on. Its spec carries the op and a handover token and never a secret: what
 # the job needs waits here under the token, handed to that job's own node
@@ -1161,7 +1161,7 @@ def refusal(project, rel, route, key=""):
     # With no key named, the build's package decides on the node; when no
     # key is called default, several hold the route and none is mapped, no
     # package can find one, so it is refused here rather than after a
-    # person allowed it (B509).
+    # person allowed it.
     if not key and not _record(project, route, DEFAULT):
         holders = [k for k in key_names(project) if _record(project, route, k)]
         if len(holders) > 1 and not set(mapping(project).values()) & set(holders):
@@ -1176,7 +1176,7 @@ def refusal(project, rel, route, key=""):
     if not (node_of(project) or ""):
         return {"error": f"{project} has no node to sign on: its settings choose one"}, 400
     # A node whose agent is behind takes nothing but its own update, so the
-    # signing would be allowed and then refused (B515): said before the ask.
+    # signing would be allowed and then refused: said before the ask.
     why = node_refuses(node_of(project)) if node_refuses else ""
     if why:
         return {"error": why}, 409

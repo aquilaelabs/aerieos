@@ -1,5 +1,5 @@
-"""A node that refused this controller's bundle is said to a person (R267
-step 6). The refusal was in the node's own log and its jobs' and nowhere
+"""A node that refused this controller's bundle is said to a person.
+The refusal was in the node's own log and its jobs' and nowhere
 else: its row said nothing, the controller saw only terminals on another
 bundle, and a container's shell there waited 45 seconds for an update the
 node would never take.

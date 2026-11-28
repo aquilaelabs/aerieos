@@ -1,4 +1,4 @@
-"""aerie tests bisect (R55): the first commit between GOOD and BAD where a
+"""aerie tests bisect: the first commit between GOOD and BAD where a
 suite fails, found by halving, with a stand-in harness that fails at a
 commit carrying a file the fourth commit adds; a suite with flakes on
 record runs three times a commit, and --check counts only its own FAIL."""

@@ -33,16 +33,16 @@ function bootReadsDone(){
   setTimeout(() => { for (const k of Object.keys(preGets)) delete preGets[k]; }, 5000);
 }
 
-// ---- what a page reads (R9 step 2) ----------------------------------------
+// ---- what a page reads ----------------------------------------
 // Every read a page or a notebook view makes for what it draws goes through
-// reading(), so each has the same sequence guard: one read of a kind at a
+// reading, so each has the same sequence guard: one read of a kind at a
 // time, and a read asked for while one is out made once more when it lands
 // (the newest ask's), never stacked beside it: a token can move several
 // times a second while a job runs, and every move asked again. Each answer
 // lands and is drawn in the order asked, so a page whose reads are asked for
-// faster than they answer still draws each (B154). Landing moves the kind's
-// revision, which a page's live key reads with readRev() in place of a
-// counter of its own; readMoved() moves it for a change the page draws
+// faster than they answer still draws each. Landing moves the kind's
+// revision, which a page's live key reads with readRev in place of a
+// counter of its own; readMoved moves it for a change the page draws
 // that no read brought (a pick, a draft, a fold).
 const readings = new Map();
 function readingOf(key){
@@ -71,10 +71,10 @@ function reading(key, fn, {join = 0, about = ""} = {}){
   // A read that throws still lets the one asked meanwhile be made, and its
   // failure is its own asker's, said where nobody catches it (sayUnheard).
   // A read may leave its answer unlanded when a newer ask is already
-  // waiting (overtaken(): its answer is about an earlier moment, and a page
+  // waiting (overtaken: its answer is about an earlier moment, and a page
   // that builds a draft from what it reads would build it from that), but
   // never two in a row, so a page asked faster than it answers still lands
-  // one answer in two (B154). It says so by returning false, and whoever it
+  // one answer in two. It says so by returning false, and whoever it
   // was for is answered by the read after it.
   r.busy = (async () => {
     try{
@@ -134,7 +134,7 @@ function readKept(key, url, {land, keep, err, after}){
 }
 
 // A page whose read failed: what went wrong in one line, with Try again
-// beside it, which makes the read again (B1005). The page was one red line
+// beside it, which makes the read again. The page was one red line
 // until its revision token moved, which on nginx and Storage is rare, and a
 // proxy's 502 for a moment was enough to leave it there.
 function readFailed(said){
@@ -180,15 +180,15 @@ function reapDeadTerminals(){
 
 let refreshBusy = false;     // a poll is out
 let refreshAgain = false;    // ...and somebody asked for another while it was
-// ...and who is waiting on that other one: an `await refresh()` asked while a
+// ...and who is waiting on that other one: an `await refresh` asked while a
 // poll was out resolved at once, on the state from before, so a project's
 // settings Save read "what is saved now" from a poll sent before somebody
-// else's save and wrote over it unseen (B100). It resolves when the read
+// else's save and wrote over it unseen. It resolves when the read
 // asked for has landed.
 let refreshWaiters = [];
 // How many action answers applyNow has adopted: a poll sent before the last
 // of them was read before that action, so its reply is older than the rows
-// on screen (B294).
+// on screen.
 let adoptSeq = 0;
 
 async function refresh(){
@@ -219,15 +219,15 @@ async function refresh(){
     // Signed out (the cookie expired, or the secret rotated): go to the
     // login page rather than showing a dead dashboard with a red dot.
     if (r.status === 401){ location.href = "/login?next=%2F"; return; }
-    // A role of this account requires a second factor it has not set up
-    // (R127): the setup page before anything else.
+    // A role of this account requires a second factor it has not set up:
+    // the setup page before anything else.
     if (r.status === 403 && (await r.clone().json().catch(() => ({}))).two_factor_setup){ location.href = "/login/setup"; return; }
     if (!r.ok) throw new Error("HTTP " + r.status);
     const got = await r.json();
     // An action's own answer was adopted while this poll was out: this
     // reply was read before that action, and drawing it put the row back
-    // the way it was until the next poll, a locked padlock after an unlock
-    // (B294). Dropped, and a fresh one asked for.
+    // the way it was until the next poll, a locked padlock after an unlock.
+    // Dropped, and a fresh one asked for.
     if (adoptSeq !== adoptedBefore){ refreshAgain = true; return; }
     state = got;
     agentsAdopt(state.pack_agents);
@@ -334,7 +334,7 @@ async function refresh(){
   }catch(e){
     // A read the page itself cut short as it goes (a reload, a new
     // address) is no failure of the poll: Firefox runs this catch on the
-    // way out, where Chromium has stopped the old page's script (B1125).
+    // way out, where Chromium has stopped the old page's script.
     // A read held past its limit comes as a TimeoutError, and counts.
     if (e?.name === "AbortError") return;
     pollFails++;
@@ -387,7 +387,7 @@ async function refresh(){
   }
 }
 
-// The status poll's own clock (R218 step 10): the next read is due fifteen
+// The status poll's own clock: the next read is due fifteen
 // seconds after the last one, whoever asked for that one, so an action's
 // read is not followed a moment later by the timer's; none is due while the
 // page is hidden, where a git walk per project buys nothing nobody sees; and
@@ -416,11 +416,11 @@ let pollFails = 0;
 // out from under somebody mid-read, because a report went stale while they
 // were looking at it, would be worse than the empty state it would leave.
 // A notebook on a project that is no longer there (deleted, or never this
-// account's) is put away once the project list has said so (B40): restored
+// account's) is put away once the project list has said so: restored
 // from the saved layout, it opened on red "not a project" lines and seven
 // refused requests on every load.
 // One that was on show gives way to Projects, where the project was, not to
-// whichever page the fallback found (B94: deleted from its Settings, the page
+// whichever page the fallback found (deleted from its Settings, the page
 // landed on the Profile).
 function dropGoneNotebooks(){
   const have = new Set((state?.projects || []).map(p => p.name));
@@ -459,7 +459,7 @@ function onRev(key, fn){
   return () => { const i = revWatch.indexOf(w); if (i >= 0) revWatch.splice(i, 1); };
 }
 
-// A wait on a revision rather than a clock (R283 step 4): `check` is asked
+// A wait on a revision rather than a clock: `check` is asked
 // at once, again each time `key` moves, and every `slow` ms besides in case
 // the token stays still (the controller away); its first truthy answer is
 // what this resolves to, or null once `max` ms have gone. One check at a
@@ -489,7 +489,7 @@ function revUntil(key, check, {max = 60000, slow = 10000} = {}){
   });
 }
 
-// One out at a time, as refresh() is (R88): the timer, a tab coming back
+// One out at a time, as refresh is: the timer, a tab coming back
 // into view and a menu let go all start one, and with no guard an older
 // reply landing second set revs back to the past, every watch fired again
 // and every view's fetch doubled. Asked while one is out, it is remembered
@@ -497,8 +497,8 @@ function revUntil(key, check, {max = 60000, slow = 10000} = {}){
 let revsBusy = false, revsAgain = false;
 // ---- the controller restarted under this page ------------------------------
 // The page starts again, since what it holds is from a server that is gone.
-// With work on it that is not saved it waits for a press instead (the
-// operator, 13 Nov): a band under the header says the controller was updated
+// With work on it that is not saved it waits for a press instead:
+// a band under the header says the controller was updated
 // and what would be lost, with Reload, and the page stays as it was left so
 // the work can be saved or copied first. Until this it reloaded at once, and
 // a staged roadmap edit, a wiki page being written or a half-typed message
@@ -507,7 +507,7 @@ let restartHeld = false;
 
 // What this page holds that is not saved, in words, or "".
 // What a person typed into a field of any page or dialog that nothing has
-// taken yet (B1003): a controller update reloaded the page over a compose
+// taken yet: a controller update reloaded the page over a compose
 // file half typed into New container, a node's settings or a schedule, since
 // only the notebooks, the space settings dialog and the messages were
 // counted. Asked of the fields themselves, so a new form is counted without
@@ -706,10 +706,10 @@ async function pollRevsOnce(){
     // half for panes nobody has open. Always sent, empty included: an absent
     // `p` means "all of them", which is what `aerie` and the tests want.
     // ...and of those, the one on show and any holding work a person has not
-    // saved, whose moved-under-you note still has to be said (R228 steps 10
-    // and 11): every notebook visited stayed on this list, and each re-read
+    // saved, whose moved-under-you note still has to be said:
+    // every notebook visited stayed on this list, and each re-read
     // on every write to its space while another page was on show. One
-    // shown again is asked for at once (its shown()), and a token that
+    // shown again is asked for at once (its shown), and a token that
     // appears is news.
     const front = tabOf(panes[0]);
     const ps = [...new Set(tabs.filter(t => t.kind === "notebook"
@@ -740,7 +740,7 @@ async function pollRevsOnce(){
   // Anything moved: what the back-off below reads. A token only one page
   // draws counts only while that page is on show: a node's heartbeat moves
   // its numbers every poll, and counted everywhere it kept every page at a
-  // second and a half for good (R218 step 10).
+  // second and a half for good.
   if (first || Object.keys(now).some(k => was[k] !== now[k] && (!REVS_PAGE_ONLY[k] || REVS_PAGE_ONLY[k]())))
     revsMovedAt = Date.now();
   for (const w of revWatch){
@@ -759,7 +759,7 @@ async function pollRevsOnce(){
 // of the phone view. A hidden tab is exactly where a request lands while
 // nobody is watching, and a browser throttles background timers hard anyway;
 // what matters is that whenever the page does get to run, it catches up.
-// ...and slow while nothing moves (R218 step 2, the pages rule): a second
+// ...and slow while nothing moves (the pages rule): a second
 // and a half while something changed in the last minute, five seconds
 // after, thirty while hidden. A chain of timeouts rather than an interval,
 // so the next wait is decided after each poll.

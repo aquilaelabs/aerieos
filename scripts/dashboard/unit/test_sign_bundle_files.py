@@ -1,4 +1,4 @@
-"""A release signs the list of every file its bundle ships (R267 step 6):
+"""A release signs the list of every file its bundle ships:
 tools/sign-agent.py writes a second part to agent.sig beside the agent's,
 over the digest of the list scripts/lib/bundleparts.py makes of the tree
 (root's tools among its files), under a line of its own. --check holds that part too, so a shipped

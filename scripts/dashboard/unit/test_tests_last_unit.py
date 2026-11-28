@@ -1,4 +1,4 @@
-"""aerie tests last reads a gate that failed on its unit tier as failed (B989).
+"""aerie tests last reads a gate that failed on its unit tier as failed.
 
 The run's log was opened after the unit tier and the patch check, and
 neither's lines went into it, so a gate red only there read back as every

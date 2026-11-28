@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# The controller's package list, read one way (R90 step 2).
+# The controller's package list, read one way.
 #
 # config/controller-packages.tsv is the one list of what the controller
 # needs installed. The Dockerfile reads it for the image and

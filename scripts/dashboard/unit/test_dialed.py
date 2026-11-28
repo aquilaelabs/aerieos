@@ -122,7 +122,7 @@ class Dial(unittest.TestCase):
             self.assertEqual(h.said, [])
 
     def test_a_session_does_no_more_than_its_account_whatever_the_dial(self):
-        # R277 (the audit of 24 Nov): the dial on auto released for an
+        # The dial on auto released for an
         # account with no Releases Write.
         h, log, _ = lifted({"prefs.get": {"release": "auto"},
                             "users._session_account_why": "dana's roles give no Releases Write on alpha"})

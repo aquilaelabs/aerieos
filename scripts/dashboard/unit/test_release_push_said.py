@@ -1,5 +1,5 @@
 """A release whose tag could not be pushed says why, in git's own words, and
-never the credential a remote's URL carries (B398): "the push failed" alone
+never the credential a remote's URL carries: "the push failed" alone
 left the person guessing between the network, the credential and the
 remote."""
 import os
@@ -62,7 +62,7 @@ class PushSaid(unittest.TestCase):
         self.assertIn("git push origin v1.2.3", r["note"])
 
     def test_a_remote_that_does_not_answer_tags_nothing_and_says_no_secret(self):
-        # The release is of the pushed commit (R206 step 4), so a remote that
+        # The release is of the pushed commit, so a remote that
         # cannot be asked is the refusal, before any tag is made here.
         ws = Path(tempfile.mkdtemp())
         d = ws / "app"
@@ -82,7 +82,7 @@ class PushSaid(unittest.TestCase):
 
 class DevTag(unittest.TestCase):
     def test_a_dev_release_tags_the_dev_build_and_skips_the_gates(self):
-        # R179: the dev build's tag, vX.Y.Z-dev.N, no snapshot gate, no bump.
+        # The dev build's tag, vX.Y.Z-dev.N, no snapshot gate, no bump.
         ws = Path(tempfile.mkdtemp())
         d = ws / "app"
         d.mkdir()
@@ -99,10 +99,10 @@ class DevTag(unittest.TestCase):
         self.assertIn("already exists", version.release("app", push=False, dev=True).get("error", ""))
 
     def test_the_release_is_of_the_commit_and_nothing_in_the_directory_beside_it(self):
-        # B628: the controller's copy of a tree carries files a session keeps
+        # The controller's copy of a tree carries files a session keeps
         # out of git, and once a mode bit the share had changed, and every
         # tag was refused for 'uncommitted changes' the session never saw.
-        # R206 step 4: the release reads the commit, never that directory.
+        # The release reads the commit, never that directory.
         ws = Path(tempfile.mkdtemp())
         d = ws / "app"
         d.mkdir()
@@ -149,7 +149,7 @@ class DevTag(unittest.TestCase):
         self.assertIn("already exists", version.release_plan("app").get("error", ""))
         self.assertEqual(version.release_plan("app", dev=True).get("tag"), "v1.2.3-dev.2")
         # ...and needs its /config snapshot where the tree keeps them, as a
-        # release does (B988): a dev build is a release an install upgrades
+        # release does: a dev build is a release an install upgrades
         # from, and one shipped at a state no snapshot was taken at.
         # A plan is judged in a tree of the commit, so the folder is one.
         (d / version.UPGRADE_SNAPSHOTS / "0.1.0").mkdir(parents=True)
@@ -170,7 +170,7 @@ class DevTag(unittest.TestCase):
 
 class Finish(unittest.TestCase):
     def test_a_tag_pushed_by_hand_finishes_the_release(self):
-        """B399: the release's push failed and the tag went up by hand; the
+        """The release's push failed and the tag went up by hand; the
         release again is its page on the forge, nothing tagged twice."""
         ws = Path(tempfile.mkdtemp())
         remote = ws / "remote.git"

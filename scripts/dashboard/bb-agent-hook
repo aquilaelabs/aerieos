@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude's hooks, held for Codex CLI, Copilot CLI and Grok Build (R95 steps 6, 21).
+"""Claude's hooks, held for Codex CLI, Copilot CLI and Grok Build.
 
     bb-agent-hook AGENT EVENT [PROJECT SESSION]
     bb-agent-hook --claude-settings PROJECT ACCOUNT DIR
@@ -35,14 +35,14 @@ refuses), Copilot with its permissionDecision on stdout before a tool.
 Every failure of its own lets the call through, as each hook does: a guard
 is never worth an agent that cannot work.
 
-A coding agent a vetted pack brings (R169 step 10) is held the same way from
+A coding agent a vetted pack brings is held the same way from
 its adapter, which the bundle carries in the pack's row of
 config/toolpacks.json: its event names, its payload's shape (snake as
 Claude's and Codex's, camel as Grok's and Copilot's) and tool names, and its
 hooks file's shape, grouped answering as Claude does and flat as Copilot
 does.
 
-An agent whose hooks are none of those is held from data too (R234 step 3):
+An agent whose hooks are none of those is held from data too:
 its adapter says where its payload keeps each thing (hooks.payload as
 paths), how its hooks file is laid out (hooks.document) and how each answer
 is written (hooks.answers, a JSON object on stdout for a refusal, a pass,
@@ -140,7 +140,7 @@ def as_claude(agent, raw):
     tools = (pack.get("hooks") or {}).get("tools") or {} if pack else {}
     if pack and (pack.get("hooks") or {}).get("payload") == "camel":
         agent = "grok"
-    # A payload its adapter describes by paths (R234 step 3): read where it
+    # A payload its adapter describes by paths: read where it
     # says each thing is, and its tools' arguments by its own names for a
     # command, a file and a search.
     where = (pack.get("hooks") or {}).get("payload") if pack else None
@@ -211,7 +211,7 @@ UUID_TAIL = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 
 def keep(agent, raw):
-    """The conversation's log, copied where Claude Code's are (R95 step 8):
+    """The conversation's log, copied where Claude Code's are:
     ~/.claude/projects/<the session's tree, slashes as dashes>/<agent>/<id>.jsonl,
     which the projects share or claudesync carries to the controller, where
     aerie transcripts and the Sessions view read it. At the end of every turn,
@@ -307,7 +307,7 @@ def settle(agent, raw):
 def wall(path, cwd=""):
     """Why an edit to this path is refused, or "": the lines Claude's deny
     list draws (bb-tty's claude_scope) for an agent whose edits come
-    through here (R95 step 17). The session's view already holds no other
+    through here. The session's view already holds no other
     project; what is left is another tree of this one (another person's or
     another agent's worktree, or the owner's checkout seen from a worktree)
     and VERSION, which moves with aerie version alone."""
@@ -318,7 +318,7 @@ def wall(path, cwd=""):
     share = os.path.normpath(os.environ.get("BB_CLAUDE_SHARE") or os.path.join(ws, ".claude"))
     p = os.path.normpath(os.path.join(cwd or tree, os.path.expanduser(path)))
     under = lambda d: p == d or p.startswith(d.rstrip("/") + "/")  # noqa: E731
-    # A project of several repositories (R136): the others and this
+    # A project of several repositories: the others and this
     # session's worktrees of them are its trees as well, as Claude's walls
     # open to them (bb-tty's claude_scope).
     trees = [tree] + [os.path.join(ws, w) for w in os.environ.get("BB_WORKS", "").split()] \
@@ -340,8 +340,8 @@ def run(argv, payload, timeout):
 
 
 def run_here(argv, payload):
-    """A step's script run inside this process, as run() runs it in a
-    process of its own (R228 step 17): before every tool call each guard
+    """A step's script run inside this process, as run runs it in a
+    process of its own: before every tool call each guard
     was a python of its own, two of them a shell call's, about half of the
     100 ms the call waited. The script is run as `python3 SCRIPT` runs it
     (runpy, as __main__), with the step's argv and stdin and what it prints
@@ -411,7 +411,7 @@ HOOKS = {
         ("bb-work-note", [P, W], 30, ("Edit", "Write", "NotebookEdit"), None),
         ("bb-rule-hook", ["guard", P, W], 30, ("Bash",), None),
         ("bb-rule-hook", ["map", P, W], 30, ("Grep",), None)]},
-    # Claude Code waiting on its own permission prompt (B52): said to the
+    # Claude Code waiting on its own permission prompt: said to the
     # controller, so the dock and the bell show it.
     "asking": {"claude": ("Notification", "permission_prompt"), "codex": ("PermissionRequest", 15),
                "copilot": ("permissionRequest", 15), "open": ("permission.ask", 15), "steps": [
@@ -456,8 +456,8 @@ GUARD_GONE = ("AerieOS's guard could not be run in this session, so nothing runs
 
 
 def closed(command):
-    """A gate's command that refuses when the gate itself cannot be run
-    (B1009). A shell answers 127 for a program that is not there and 126 for
+    """A gate's command that refuses when the gate itself cannot be run.
+    A shell answers 127 for a program that is not there and 126 for
     one it may not run, which Claude Code reads as a hook that failed and
     passes over: a session whose hooks' folder had gone ran on for hours
     with no gate, no refused commands and no notices, saying only that a
@@ -725,7 +725,7 @@ def main(argv):
     return 0
 
 
-# ---- an agent answered from its adapter's templates (R234 step 3, R233) --------
+# ---- an agent answered from its adapter's templates --------
 # An agent that reads a hook's stdout and nothing else is answered in its
 # own words, which its adapter carries as templates (hooks.answers), one set
 # an event:

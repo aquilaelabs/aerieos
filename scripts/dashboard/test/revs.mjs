@@ -37,7 +37,7 @@ const served = () => page.evaluate(async () => {
 // not news for a view, it is the end of the page.
 const OWN = ['boot'];
 
-// The request trace (R75 step 4): what the server was asked, by endpoint,
+// The request trace: what the server was asked, by endpoint,
 // with query keys and never values. Read by an admin here; a session may
 // too; anybody else may not.
 await section("The request trace", async () => {
@@ -49,7 +49,7 @@ await section("The request trace", async () => {
      "...with a query's keys and never its values");
   ok((tr.rows || []).every(r => ['browser', 'curl', 'app', 'session', '?'].includes(r.agent) || r.agent) && (tr.rows || []).some(r => r.by === 'user'),
      '...and who asked, by principal and user agent');
-  // ...and how long each took (B245): a slow tab is one request that took
+  // ...and how long each took: a slow tab is one request that took
   // seconds, and a count alone could not say which.
   ok((tr.rows || []).every(r => Number.isInteger(r.ms_max) && Number.isInteger(r.ms_avg) && r.ms_max >= r.ms_avg)
      && Array.isArray(tr.slow),

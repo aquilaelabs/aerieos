@@ -1,5 +1,5 @@
 """A deploy key is kept sealed under the install key and opened only into
-the ssh agent (R243; the audit of 13 Nov): the page said sealed and safe in
+the ssh agent: the page said sealed and safe in
 a copy of /config, and scripts/deploy-key kept each as a plain key file
 with no passphrase, guarded by its mode alone. The helper itself, run here
 on a store of its own against a real ssh-agent: what is on disk is never a
@@ -84,7 +84,7 @@ class Sealed(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.store)), ["app-deploy.pub", "app-deploy.sealed"])
 
     def test_the_keys_a_move_carried_are_kept_and_loaded(self):
-        # B966: a landing hands over the old controller's keys (sealed under
+        # A landing hands over the old controller's keys (sealed under
         # the install key that came with it) to be kept where only this
         # helper writes; one kept here already, a link and a stranger stay out.
         self.dk("make", "app-deploy")

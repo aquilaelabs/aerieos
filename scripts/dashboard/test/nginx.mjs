@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The nginx tab (R171): one reverse proxy per node, AerieOS's own. A
+// The nginx tab: one reverse proxy per node, AerieOS's own. A
 // section per node with its routes and certificate; Save keeps them, Deploy
 // writes the container from them on the node and builds it, Remove takes it
 // off; and the Enroll dialog's tick puts nginx on a node the moment it
@@ -22,8 +22,8 @@ await ready(page);
 
 const base = URL.replace(/\/$/, '');
 
-// A service's page, beside Installed in the Machines group (R264, the
-// operator, 19 Nov; it was the Containers group's), for an account that
+// A service's page, beside Installed in the Machines group
+// (it was the Containers group's), for an account that
 // reads the Nodes tab.
 ok(await page.evaluate(() => railGroups().some(g => g.key === 'containers' && g.tools.map(([k]) => k).join() === 'docker,vms')
                               && groupOf('nginx')?.key === 'machines' && groupOf('scanners')?.key === 'machines' && railAllows('nginx')),
@@ -33,7 +33,7 @@ await page.waitForSelector('.nginxtab [data-ngnode]', { timeout: 15000 });
 const sandbox = await page.evaluate(() => (nginxList || []).find(n => n.name === 'sandbox'));
 ok(sandbox && !sandbox.deployed && sandbox.routes.length === 0 && !Object.keys(sandbox.certs || {}).length,
    `the tab lists the sandbox node with no nginx on it yet (${JSON.stringify(sandbox && [sandbox.deployed, sandbox.routes])})`);
-// One node at a time, picked in the bar like Toolchains (the operator, 11 Oct).
+// One node at a time, picked in the bar like Toolchains.
 ok(await page.$eval('.pane .bar label.pick select#ndPick', s => [...s.options].some(o => o.textContent === 'sandbox')),
    'the bar picks the node, as Toolchains does');
 await page.selectOption('.pane .bar #ndPick', sandbox.node);
@@ -56,7 +56,7 @@ ok(kept.ok && row.routes.length === 1 && row.routes[0].host === 'www.example.com
 await page.evaluate(() => loadNginx());
 await page.waitForFunction(id => /1 route and 0 certificates/.test(document.querySelector(`.nginxtab [data-ngnode="${id}"] .toolstate`)?.textContent || ''), sandbox.node, { timeout: 10000 });
 ok(true, '...and the undeployed node says Deploy will bring that route up');
-// A read that fails says so in one line with Try again (B1005), which reads
+// A read that fails says so in one line with Try again, which reads
 // again; the page was one red line until its token moved, which is rare.
 await section("a failed read says so with Try again, which reads again", async () => {
   await page.route('**/api/nginx', r => r.request().method() === 'GET' ? r.fulfill({ status: 502, body: '' }) : r.continue());
@@ -66,7 +66,7 @@ await section("a failed read says so with Try again, which reads again", async (
   await page.unroute('**/api/nginx');
   // Pressed where it is: a read of the page's own landing first under a
   // gate's load drew the section in its place, and a click waiting for the
-  // button gave up a minute later (B1173). Either way the page comes back.
+  // button gave up a minute later. Either way the page comes back.
   await holdPoll(page);
   await page.evaluate(() => document.querySelector('.nginxtab .readfail [data-readagain]')?.click());
   await page.waitForSelector(sect, { timeout: 10000 });
@@ -75,7 +75,7 @@ await section("a failed read says so with Try again, which reads again", async (
      `the failure is one line with Try again, and the press brings the page back (${said})`);
 });
 // Written from elsewhere (a Docker row's Add route, bb, another browser),
-// the open tab re-reads by the revisions token, not by its Refresh (B714).
+// the open tab re-reads by the revisions token, not by its Refresh.
 await section("Written from elsewhere", async () => {
   const two = [...row.routes, { host: 'two.example.com', path: '/', port: 8081, tls: false }];
   await api('/api/nginx', { action: 'save', node: sandbox.node, routes: two });
@@ -87,7 +87,7 @@ await section("Written from elsewhere", async () => {
   await page.waitForFunction(id => /1 route/.test(document.querySelector(`.nginxtab [data-ngnode="${id}"] .toolstate`)?.textContent || ''),
     sandbox.node, { timeout: 15000 });
 });
-// A hostname typed in the route row (the operator, 13 Oct): the last choice
+// A hostname typed in the route row: the last choice
 // of the pick turns it into a box, and the name saved joins Hostnames.
 await section("A hostname typed in the route row", async () => {
   const typed = await api('/api/nginx', { action: 'save', node: sandbox.node, routes: [...row.routes, { host: 'typed.example.com', path: '/', port: 8082, tls: false }] });
@@ -98,7 +98,7 @@ await section("A hostname typed in the route row", async () => {
   ok(await page.evaluate(() => /value="__type"[^>]*>type a hostname/.test(nginxHostPick({ host: '' }))),
      '...and the hostname pick offers to type one');
   // ...and a row typed into is drawn as the box again, with what was typed
-  // (B729: a redraw from the poll handed the pulldown back mid-word).
+  // (a redraw from the poll handed the pulldown back mid-word).
   ok(await page.evaluate(() => /^<input data-ng="host" value="turing"/.test(nginxHostPick({ host: 'turing', typed: true }).trim())),
      '...and draws a row typed into as the box again, carrying the letters so far');
   await api('/api/nginx', { action: 'save', node: sandbox.node, routes: row.routes });
@@ -130,7 +130,7 @@ ok(await page.$eval(sect, s => /deployed/.test(s.querySelector('.toolstate .pill
      && s.querySelector('[data-ngremove]') && !document.querySelector('.nginxtab [data-ngdeploy]')),
    '...and the state row now says so, with Remove in place of Deploy');
 // A Save rebuilds it, and a read between its down and its up said "deployed,
-// down" over a container on its way back (B65): while its job runs the
+// down" over a container on its way back: while its job runs the
 // line says rebuilding, and down only when nothing is bringing it back.
 await section("A Save rebuilds it, and a read between its down and its up said \"deployed", async () => {
   const pills = await page.evaluate(id => {
@@ -143,7 +143,7 @@ await section("A Save rebuilds it, and a read between its down and its up said \
 });
 ok(/already on the Containers page/.test((await api('/api/nginx', { action: 'deploy', node: sandbox.node })).error || ''),
    'a second Deploy is refused');
-// The deployed page in sections (R218 step 29): Hostnames, Routes,
+// The deployed page in sections: Hostnames, Routes,
 // Certificates and Image, each its state in its head; the routes a table
 // of records, each read-only with its Edit, no Save until one is open
 // (the record-lists rule); Remove apart at the foot; the certificate form
@@ -171,7 +171,7 @@ await section("The deployed page in sections", async () => {
   const awake = await page.$eval(`${sect} [data-ngcertsave]`, b => !b.disabled);
   const routesQuiet = !(await page.$(`${sect} .ngform`));
   // ...and the box being pasted in keeps its caret when a read draws the
-  // page again under it (B158): the focus went with the old box, and a
+  // page again under it: the focus went with the old box, and a
   // paste landing in that moment went nowhere, leaving Add asleep.
   await page.focus(`${sect} #ngKey`);
   await page.evaluate(() => { readMoved('nginx'); drawPanes(); });
@@ -188,10 +188,9 @@ await section("The deployed page in sections", async () => {
 
 // On the deployed form, a route typed: Save wakes, and Save keeps it and
 // rebuilds nginx; then the route list is put back as it was.
-// The hostname is made once on the shared list, then picked on the route
-// (the operator, 12 Oct).
+// The hostname is made once on the shared list, then picked on the route.
 // A hostname half typed survives the page being read and drawn again under
-// it, the caret with it (B809): its box was drawn empty by every re-read,
+// it, the caret with it: its box was drawn empty by every re-read,
 // and under load one landed between the typing and the press, so Add added
 // nothing and this waited out its time.
 await page.click(`${sect} [data-nghostnew]`);
@@ -255,7 +254,7 @@ await page.waitForSelector(`${sect} .ngform`, { timeout: 5000 });
 await page.fill(`${sect} .ngform [data-ng="port"]`, '8083');
 // The tab's reads held back, as a node's slow daemon holds them: the row
 // says the saved port, and the pill the rebuild the Save started, the
-// moment the Save answers, not when the read lands (B99, B65).
+// moment the Save answers, not when the read lands.
 await section("The tab's reads held back, as a node's slow daemon holds them", async () => {
   let held = 0;
   const slow = async r => { held++; if (r.request().method() === 'GET') await new Promise(f => setTimeout(f, 4000)); await r.continue().catch(() => {}); held--; };
@@ -282,9 +281,9 @@ await page.waitForFunction(s => !document.querySelector(s + ' .ngform'), sect, {
 await page.click(`${sect} [data-ngedit="1"]`);
 await page.waitForSelector(`${sect} .ngform [data-ngdel]`, { timeout: 5000 });
 await page.click(`${sect} .ngform [data-ngdel]`);
-// Off the list on the press (the operator, 22 Nov), before the server has
+// Off the list on the press, before the server has
 // answered, so the server's own list is asked until it says the same; each
-// wait given the suite's patience, which a whole gate's load needs (B1054).
+// wait given the suite's patience, which a whole gate's load needs.
 const offAtOnce = await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.length === 1, sandbox.node, { timeout: patience(15000) })
   .then(() => true, () => false);
 let served = [];
@@ -310,7 +309,7 @@ await api('/api/nginx', { action: 'save', node: sandbox.node, routes: row.routes
 await quietRoutes();
 await page.evaluate(() => loadNginx());
 
-// A certificate per domain (R175, R188): one made here with openssl is
+// A certificate per domain: one made here with openssl is
 // kept under the domain its names say, listed with its names, used by the
 // routes its names cover, and taken off again by its key. No default.
 await section("A certificate per domain", async () => {
@@ -338,7 +337,7 @@ await section("A certificate per domain", async () => {
 });
 
 
-// The image (R192): the one nginx's entry names by its digest (a file of the
+// The image: the one nginx's entry names by its digest (a file of the
 // world's own here, BB_SERVICE_IMAGES_FILE), which the deployed nginx was
 // pinned to as it was written. Nothing asks a registry: the entry naming
 // another image is what puts a node behind, said on the tab, on its
@@ -370,10 +369,10 @@ await page.click('#bBell');
 // ...and the Docker row says so with Update, the word every row's update uses.
 await page.evaluate(() => openDocker());
 await page.waitForSelector('.dmtab .row[data-inst="nginx-sandbox|main"] [data-dm="nginx-update"]', { timeout: 20000 });
-// System's row keeps what a person needs and loses what the nginx page owns
-// (the operator, 13 Oct; R207): Down, Remove and the update (Up while it is
+// System's row keeps what a person needs and loses what the nginx page owns:
+// Down, Remove and the update (Up while it is
 // stopped: a running row wears none), no Edit, Rebuild or Copy or move, and
-// Configure, which opens that page (R181, the operator, 29 Oct: its env is
+// Configure, which opens that page (its env is
 // the curated page's, never the row's).
 const sysBtns = await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', r => ({
   has: [...r.querySelectorAll('.dmacts [data-dm]')].map(b => b.dataset.dm), rel: !!r.querySelector('[data-dmrel]'),
@@ -381,7 +380,7 @@ const sysBtns = await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', 
 ok(['down', 'remove', 'nginx-update'].every(b => sysBtns.has.includes(b)) && !sysBtns.has.includes('edit') && !sysBtns.has.includes('rebuild') && !sysBtns.rel
    && sysBtns.conf === 'Configure',
    `AerieOS's nginx row keeps Down, Remove and the update, loses Edit, Rebuild and Copy or move, and carries Configure (${sysBtns.has.join(', ')}; ${sysBtns.rel ? 'copy or move' : 'no copy or move'})`);
-// System's section is pinned above every project's (R181).
+// System's section is pinned above every project's.
 ok(await page.$eval('.dmtab', t => t.querySelector('.dmcard .dmgroup b')?.textContent === 'System'),
    'System\'s containers are the first section of the Containers page');
 // Configure opens the nginx page, off the group's sub-nav, with a small top
@@ -404,7 +403,7 @@ await section("The nginx page opens from a space's page, and Back names the spac
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notebook' && /^#\/spaces\/alpha(\/|$)/.test(location.hash), null, { timeout: 10000 });
   const errs = page.errors.length;
   // By its address from when it was the Containers group's page, which
-  // still opens it (R264).
+  // still opens it.
   await page.evaluate(() => { location.hash = '#/containers/nginx'; });
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'nginx'
     && /alpha/.test(document.querySelector('.pane .bar.page .backhead [data-shellback]')?.textContent || ''), null, { timeout: 10000 });
@@ -428,7 +427,7 @@ ok(/image: nginx:1\.29-alpine@sha256:b{64}/.test(pinned.compose || '')
    && !(await page.$(`${sect} [data-ngupdate]`)),
    'Update pins the digest into the compose file and rebuilds, and the node is not behind any more');
 ok((await api('/api/nginx', { action: 'update', node: sandbox.node })).same === true, 'a second Update has nothing to move to and says so');
-// The same tag under another digest is a newer build, not the tag named twice (B27).
+// The same tag under another digest is a newer build, not the tag named twice.
 await section("The same tag under another digest is a newer build, not the tag named twice", async () => {
   entryMoves('1.29-alpine', 'f');
   await page.evaluate(() => loadNginx());
@@ -453,7 +452,7 @@ const again = await api('/api/container', { action: 'read', name: 'nginx-sandbox
 ok(two.ok && two.deployed && /location \/relay\/ \{ proxy_pass http:\/\/127\.0\.0\.1:8788; \}/.test(again.compose || ''),
    `Save on a deployed nginx rewrites its compose file and rebuilds (${JSON.stringify(two).slice(0, 80)})`);
 // The private key goes to the node inside that file and never into a text
-// box (B656): the Docker tab's copy carries a line in its place, and saving
+// box: the Docker tab's copy carries a line in its place, and saving
 // that copy back is refused, since the file is the nginx tab's to write.
 await section("The private key goes to the node inside that file and never into a text", async () => {
   const cert = readFileSync(`${DIR}/ngx-c.pem`, 'utf8'), key = readFileSync(`${DIR}/ngx-k.pem`, 'utf8');
@@ -466,7 +465,7 @@ await section("The private key goes to the node inside that file and never into 
      `the Containers page's copy of nginx's compose carries the certificate and a line in place of the key`);
   const back = await api('/api/container', { action: 'save', name: 'nginx-sandbox', compose: shown.compose, env: '' });
   ok(/written from the nginx page/.test(back.error || ''), `...and saving that copy back is refused (${(back.error || 'saved').slice(0, 60)})`);
-  // It is managed (the operator, 11 Oct): its env and its name are refused
+  // It is managed: its env and its name are refused
   // as its compose is, and the Edit dialog is for reading whatever its state.
   const envSet = await api('/api/devapp', { project: 'nginx-sandbox', instance: 'main', action: 'env-set', text: 'X=1\n' });
   const renamed = await api('/api/devapp', { project: 'nginx-sandbox', instance: 'main', action: 'rename', name: 'proxy' });
@@ -477,7 +476,7 @@ await section("The private key goes to the node inside that file and never into 
   // ...and the list the row was drawn from in hand, as it is for a person
   // who sees the row: the dialog reads who manages the container from it
   // once, as it opens, and opened while a re-read had the list put away it
-  // found no row and never locked (B810).
+  // found no row and never locked.
   await page.waitForFunction(() => (dockerList?.instances || []).some(d => d.project === 'nginx-sandbox' && d.instance === 'main'), null, { timeout: 20000 }).catch(() => {});
   await page.evaluate(() => openEditContainer('nginx-sandbox'));
   await page.waitForSelector('#cmodal:not([hidden])');
@@ -489,7 +488,7 @@ await section("The private key goes to the node inside that file and never into 
   ok(await page.waitForFunction(locked, null, { timeout: 15000 }).then(() => true, () => false),
      '...and its Edit dialog is for reading: name, compose file and env locked, Save ghosted');
   // ...and so it is opened while the list is put away for a re-read, with no
-  // row to say who manages it: its own read says so (B810).
+  // row to say who manages it: its own read says so.
   await page.evaluate(() => { document.getElementById('cmodal').hidden = true; window.__keptList = dockerList; dockerList = null; openEditContainer('nginx-sandbox'); });
   ok(await page.waitForFunction(locked, null, { timeout: 15000 }).then(() => true, () => false),
      '...and so it is when opened while the list is being read again');
@@ -502,14 +501,14 @@ await section("The private key goes to the node inside that file and never into 
 await quiet();
 await page.click(`${sect} [data-ngremove]`);
 // A node read as quiet queues the down and keeps the row until it has
-// run (B597), which under a whole gate is a while: the record's going is
+// run, which under a whole gate is a while: the record's going is
 // waited for, not read at once.
 let after = null, gone = false, queued = false;
 for (let i = 0; i < 60; i++){
   after = (await api('/api/nginx')).nodes.find(n => n.node === sandbox.node);
   gone = !('nginx-sandbox' in JSON.parse(readFileSync(`${DIR}/state/devapps.json`, 'utf8')));
   // On a node read as quiet the down is queued and the row kept until it has
-  // run (B597): that job in the queue is the remove having happened here.
+  // run: that job in the queue is the remove having happened here.
   queued = ((await api('/api/v1/jobs?active=1')).jobs || []).some(j => j.type === 'compose' && j.project === 'nginx-sandbox' && j.spec?.action === 'remove');
   if (!after.deployed && (gone || queued)) break;
   await new Promise(r => setTimeout(r, 1000));     // the loop's own period
@@ -517,7 +516,7 @@ for (let i = 0; i < 60; i++){
 ok(!after.deployed && after.routes.length === 2 && (gone || queued),
    `Remove takes the container off the Containers page, or queues its down on a quiet node, and keeps the routes here (${JSON.stringify([after.deployed, after.routes.length, gone, queued])})`);
 // The Save's rebuild (two.job) may land after the Remove forgot the row:
-// its result must not stamp a record back into being (B633).
+// its result must not stamp a record back into being.
 await jobEnd(two.job, { ms: 60000, step: 500 });
 const ghost = JSON.parse(readFileSync(`${DIR}/state/devapps.json`, 'utf8'))['nginx-sandbox'];
 ok(!ghost || !!(await api('/api/v1/jobs?active=1')).jobs?.some(j => j.project === 'nginx-sandbox'),
@@ -548,7 +547,7 @@ const en = await (await fetch(base + '/api/v1/agent/enroll', { method: 'POST',
 const vps = JSON.parse(readFileSync(`${DIR}/state/devapps.json`, 'utf8'))['nginx-vpsbox'];
 ok(en.ok && vps?.main?.node === pending.id && vps.main.source === 'file',
    `...and the node enrolling puts nginx on it from the routes saved for it (${JSON.stringify(vps?.main).slice(0, 80)})`);
-// A wildcard pair on a public box (R93): its key sits there, so the pair
+// A wildcard pair on a public box: its key sits there, so the pair
 // says which names beyond the box's own routes a box taken over could
 // pass as, in the warning's color, not red.
 await section("A wildcard pair on a public box", async () => {
@@ -562,7 +561,7 @@ await section("A wildcard pair on a public box", async () => {
      `a wildcard pair on a hosting-only node is named wide, and none on a node at home (${JSON.stringify([w?.wide, lan?.wide])})`);
   if (await page.$('#ndBody #ndTokDone')) await page.click('#ndBody #ndTokDone');
   // Asked for by a list read before it enrolled: the page waits for it
-  // rather than standing the first node in for it (B160).
+  // rather than standing the first node in for it.
   await page.evaluate(id => openNginxTab(id), pending.id);
   const line = await page.waitForFunction(id => {
     const e = document.querySelector(`.nginxtab [data-ngnode="${id}"] .ngcert .ngwide`);

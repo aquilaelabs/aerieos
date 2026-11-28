@@ -1,6 +1,6 @@
 """aerie token keep, which the node agent runs to refresh an idle session's
-token (R27): kept where bb reads it, and when it cannot be, a failure that
-says why rather than an exit 0 over nothing written (B419)."""
+token: kept where bb reads it, and when it cannot be, a failure that
+says why rather than an exit 0 over nothing written."""
 import base64
 import os
 import subprocess

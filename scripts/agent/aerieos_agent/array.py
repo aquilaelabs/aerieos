@@ -1,4 +1,4 @@
-"""An Unraid-style array on the controller's own machine (R162 step 2):
+"""An Unraid-style array on the controller's own machine:
 disks of mixed sizes, each its own XFS or btrfs filesystem, pooled into one
 tree by mergerfs with parity on one or two disks kept by SnapRAID, which
 is periodic rather than real time: a file written since the last sync is
@@ -48,7 +48,7 @@ CONTENT = VAR + "/snapraid.content"
 # alone. A disk's own top is often everybody's to write (one taken over
 # from another system is 0777), and SnapRAID writes its content beside it
 # as .snapraid.content.tmp first, as root, following a link planted at that
-# name to /etc/passwd or anywhere (B858).
+# name to /etc/passwd or anywhere.
 CONTENT_DIR = ".aerie-snapraid"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
@@ -88,7 +88,7 @@ def mount_of(kind, slot):
 
 def slot_mount(kind, x):
     """Where a slot's disk is: its own path for a disk another system's
-    array had (R163 step 3: /mnt/diskN, kept), the array's otherwise."""
+    array had (/mnt/diskN, kept), the array's otherwise."""
     return str(x.get("where") or "") or mount_of(kind, int(x["slot"]))
 
 
@@ -225,7 +225,7 @@ def adopted_pools():
 
 def stale_content():
     """With no array recorded, any content file on the system is an earlier
-    one's (B704): taken away before a new array's first sync, which would
+    one's: taken away before a new array's first sync, which would
     otherwise read it and refuse its disks as changed."""
     p = env_or("BB_SNAPRAID_CONTENT", CONTENT)
     for x in (p, p + ".tmp", p + ".lock"):
@@ -247,7 +247,7 @@ def on_stick():
 def render_snapraid(rec):
     """snapraid.conf from the record: the parity files on the parity disks,
     a content file on every data disk and, on a machine installed to a disk,
-    one on the system too; never on a stick (the operator, 8 Nov): the
+    one on the system too; never on a stick: the
     content file is a catalog of every block of the array, gigabytes for
     a large one and rewritten whole at every autosave, which filled the
     stick's own partition and took the controller down with it."""
@@ -346,7 +346,7 @@ def array_now():
             "last_sync": int(st.get("last_sync") or 0), "last_scrub": int(st.get("last_scrub") or 0),
             "last_check": int(st.get("last_check") or 0), "status": str(st.get("status") or "")[:400],
             "running": str(st.get("running") or "")[:16], "progress": str(st.get("progress") or "")[:40],
-            # The last full parity check (R163 step 15); its key's presence
+            # The last full parity check; its key's presence
             # says this agent has the verb.
             "verify": st.get("verify") if isinstance(st.get("verify"), dict) else {}}
 
@@ -561,7 +561,7 @@ class ArrayMixin:
         folder by a descriptor opened a part at a time through no link: a
         share's users write its tree, and a folder swapped for a link
         between the list and the copy took root's copy, and its removal of
-        the source, wherever the link pointed (B859). A folder made on the
+        the source, wherever the link pointed. A folder made on the
         other side takes its source's mode and owner, as rsync's own did.
         The folders it empties are removed through descriptors as well."""
         say, worst = job.say, 0
@@ -655,7 +655,7 @@ class ArrayMixin:
                     say(f"{s}: files are still on {p}, so its new files may land there until the mover takes them\n")
 
     def _array_takeover(self, job, cfg, rec, disks, snapraid, settle, run_snapraid):
-        """Take an adopted array over (R163 step 3): its data disks made
+        """Take an adopted array over: its data disks made
         writable where they are (/mnt/diskN, never formatted or
         repartitioned), SnapRAID's parity on its old parity disk's first
         partition, given a filesystem (its partition table never rewritten),
@@ -689,7 +689,7 @@ class ArrayMixin:
         # The parity disk found again by what the adoption read of it (its
         # by-id link or serial), never by the kernel name it had then: a
         # stick plugged in or a reboot moves sdX to another disk, which this
-        # would format (B718).
+        # would format.
         pars = []
         for x in (plan_.get("parity") or [])[:MAX_PARITY]:
             if not x.get("id"):
@@ -800,7 +800,7 @@ class ArrayMixin:
         # The first sync builds the parity from nothing, hours for a large
         # array: run in the background, so this job ends and the machine's
         # other jobs (a system pool, a spaces folder) are not held behind
-        # it (the operator, 8 Nov); its progress is the array's, on This
+        # it; its progress is the array's, on This
         # machine and the Storage page.
         why = self.background_run("sync", [snapraid, "sync"], key="last_sync", rec=rec)
         if why:
@@ -1120,7 +1120,7 @@ class ArrayMixin:
                 say(f"rebuilding parity on p{slot}: the array is unprotected until this ends\n")
                 rc = run_snapraid("sync", "-F", key="last_sync")
         elif action == "verify":
-            # Check parity (R163 step 15): every block of every data disk
+            # Check parity: every block of every data disk
             # read back against the parity, not the scrub's sampled part;
             # what differs is corrected only when asked, its count said first.
             if not rec:
@@ -1207,7 +1207,7 @@ class ArrayMixin:
                 return "failed", 64
             # SnapRAID's content files go with it, on the system and on each
             # data disk, or the next array's first sync reads them as this
-            # one's and refuses its disks as changed (B704); on a disk taken
+            # one's and refuses its disks as changed; on a disk taken
             # over from another system they are what this machine added.
             for path in [env_or("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), sub, ".snapraid.content")
                                                                      for d in rec.get("data") or [] for sub in (CONTENT_DIR, "")]:

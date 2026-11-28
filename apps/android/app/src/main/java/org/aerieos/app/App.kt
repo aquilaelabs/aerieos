@@ -23,7 +23,7 @@ class App : Application() {
         nm.createNotificationChannel(NotificationChannel(CH_NOTE, "Attention",
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "Changes waiting for approval, a session finishing its turn, and nodes that need an update" })
-        // While it lasts (the operator, 4 Oct): your phone lent, a session
+        // While it lasts: your phone lent, a session
         // allowed. Quiet and no dot on the icon, which is what the watch's
         // old persistent note was taken out for.
         nm.createNotificationChannel(NotificationChannel(CH_HELD, "While it lasts",

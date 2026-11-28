@@ -1,4 +1,4 @@
-"""The write-ahead log folded into the database (B654): after fold() the
+"""The write-ahead log folded into the database: after fold the
 -wal file is empty and the rows are in the database file itself, read by
 a connection that never sees the log."""
 import os

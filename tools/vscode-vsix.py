@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package apps/vscode/ as a .vsix (R159 step 7), with nothing installed.
+"""Package apps/vscode/ as a .vsix, with nothing installed.
 
 A .vsix is a zip: the extension's files under extension/, a manifest VS
 Code's installer reads, and the content types. vsce makes the same thing

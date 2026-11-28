@@ -1,4 +1,4 @@
-"""An item that is not on the list says why (B737): finished (its last
+"""An item that is not on the list says why: finished (its last
 step done, or ticked off), dropped, or never there, rather than 'no such
 item' for all three."""
 import json
@@ -34,7 +34,7 @@ class Gone(unittest.TestCase):
         self.assertIn(f"R{rid} is done already", again["error"])
 
     def test_a_plan_finished_by_its_last_step_keeps_its_steps(self):
-        # B767: the Finished section showed it as the words alone.
+        # The Finished section showed it as the words alone.
         rid = roadmap.add("alpha", "a plan", by="claude", steps=["one", "two"])["item"]["id"]
         roadmap.step_done("alpha", rid, 0)
         roadmap.step_done("alpha", rid, 1)
@@ -42,7 +42,7 @@ class Gone(unittest.TestCase):
         self.assertEqual([st["text"] for st in done["steps"]], ["one", "two"])
 
     def test_a_finished_item_keeps_its_words_and_details_open(self):
-        # B766: finished is how it shows, not a lock. Its details and its
+        # Finished is how it shows, not a lock. Its details and its
         # words can still be put right, and it stays under Finished with them;
         # the verbs about doing the work still say it is done.
         rid = roadmap.add("alpha", "a plan", by="claude", steps=["one"])["item"]["id"]
@@ -58,7 +58,7 @@ class Gone(unittest.TestCase):
                          "and it is still off the open list")
 
     def test_inside_a_batch_a_finished_item_still_takes_a_note(self):
-        # B819: the close waited in the batch's events, so the note written
+        # The close waited in the batch's events, so the note written
         # next read the item as never there.
         rid = roadmap.add("alpha", "a plan", by="claude", steps=["one"])["item"]["id"]
         self.assertTrue(roadmap.begin("alpha").get("ok", True) is not False)
@@ -68,7 +68,7 @@ class Gone(unittest.TestCase):
 
     def test_a_finished_item_reopens_as_it_was(self):
         # More work found on a finished item is its own step, not a new item
-        # naming the old one (the operator, 15 Oct).
+        # naming the old one.
         rid = roadmap.add("alpha", "plan", by="claude", steps=["one"])["item"]["id"]
         roadmap.set_info("alpha", rid, "a note", step=0)
         roadmap.step_done("alpha", rid, 0)
@@ -84,7 +84,7 @@ class Gone(unittest.TestCase):
         self.assertTrue(any(x["id"] == rid for x in roadmap.finished("alpha")), "finished again by its new last step")
 
     def test_an_item_a_release_shipped_stays_closed(self):
-        # The operator, 15 Oct: never reopen an item a previous version shipped.
+        # Never reopen an item a previous version shipped.
         ws = tempfile.mkdtemp()
         os.makedirs(os.path.join(ws, "alpha"))
         old = os.environ.get("WORKSPACE")
@@ -94,7 +94,7 @@ class Gone(unittest.TestCase):
             roadmap.tick("alpha", rid)
             with open(os.path.join(ws, "alpha", "CHANGELOG.md"), "w") as f:
                 f.write("# Changelog\n\n## Unreleased\n\n## 1.2.0: 2099-01-01\n\n- shipped\n")
-            # The page offers Reopen only where it would land (R254 step 2).
+            # The page offers Reopen only where it would land.
             self.assertFalse(next(r for r in roadmap.finished("alpha") if r["id"] == rid)["reopenable"])
             err = roadmap.reopen("alpha", rid).get("error", "")
             self.assertIn("before 1.2.0 was released", err)
@@ -110,7 +110,7 @@ class Gone(unittest.TestCase):
                 os.environ["WORKSPACE"] = old
 
     def test_finished_items_outlive_the_trim(self):
-        # B768: the log keeps its last MAX_HISTORY events and every finished
+        # The log keeps its last MAX_HISTORY events and every finished
         # item, since a done event is the finished item.
         old = roadmap.add("alpha", "old work", by="claude")["item"]["id"]
         roadmap.tick("alpha", old)

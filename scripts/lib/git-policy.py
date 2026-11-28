@@ -8,7 +8,7 @@ import sys
 
 rec = json.load(sys.stdin)
 p = rec.get("gitpol") or {}
-# Whether a push can happen at all, first (B734): a project with no rights,
+# Whether a push can happen at all, first: a project with no rights,
 # or an https remote with no credential on the controller, has aerie git push
 # refused, and that is the thing to know before the policy under it.
 pu = rec.get("push") or {}

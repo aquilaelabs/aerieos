@@ -1,4 +1,4 @@
-"""What the page has said to each account, kept (R218 step 6, the design's
+"""What the page has said to each account, kept (the design's
 the-dashboard/notifications rule). A toast says a thing for a few seconds
 to whoever was looking; every one is also written here, so a failure you
 were not at the screen for is still there to read on the Notifications
@@ -11,7 +11,7 @@ acted on. Each entry: id, at (epoch seconds), kind ("said" for what the
 page said about a press, "ask" for an answer to an ask, "job" for how a
 followed job ended), level ("info", "warn", "bad") and the text, with an
 optional job id or link the page can open again, and for an ask approved
-what it okayed (the operator, 23 Nov): `what` names it and `detail` is it
+what it okayed: `what` names it and `detail` is it
 whole, read again behind a fold on the Notifications page. Both optional,
 so an entry from before reads as it did.
 """

@@ -1,4 +1,4 @@
-"""Grok Build's sign-in sealed beside Claude's and Codex's (R126 step 3):
+"""Grok Build's sign-in sealed beside Claude's and Codex's:
 its file is one of the sealed ones, and its seal's header names the
 account its token's claims name, or that it is an xAI account."""
 import base64

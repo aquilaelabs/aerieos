@@ -1,4 +1,4 @@
-"""A sealed sign-in is a sign-in, whoever looks (the operator, 24 Nov: a
+"""A sealed sign-in is a sign-in, whoever looks (a
 restart said Claude was signed out on a node that held the sign-in, and
 signing in again showed only after a reload).
 

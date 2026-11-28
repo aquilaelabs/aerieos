@@ -1,4 +1,4 @@
-// AerieOS's own terminal (R133): a shell tab is drawn by xterm.js in the
+// AerieOS's own terminal: a shell tab is drawn by xterm.js in the
 // page and joined to /termws, which runs bb-tty in a pty on this
 // controller. What is typed reaches the shell and what it prints reaches
 // the screen; the screen fits its box and the pty follows; a terminal that
@@ -95,7 +95,7 @@ await section("The look is the person's", async () => {
   await quiet(1500);
   const there = await opts();
   const padThere = await page.evaluate(() => getComputedStyle(document.querySelector('#pane1 .slot.on.ownterm')).backgroundColor);
-  // A space has no colors of its own now (R223): Profile's are every space's.
+  // A space has no colors of its own now: Profile's are every space's.
   ok(pad === 'rgb(250, 250, 250)' && padThere === pad,
      `the room around the text wears the terminal's color, Profile's in every space (${pad} then ${padThere})`);
   ok(mine.size === 16 && mine.cursor === 'bar' && mine.bg === '#fafafa' && there.bg === '#fafafa' && there.size === 16,
@@ -108,7 +108,7 @@ await section("The look is the person's", async () => {
 // shell's history, by the line, in tmux's copy mode; a press held on a word
 // selects it, with grips and Copy; Copy puts it on the clipboard.
 // Its drags are real touch through Chromium's gesture recognizer (finger):
-// said skipped in the other engines (R263 step 6).
+// said skipped in the other engines.
 if (ENGINE !== 'chromium') skip('On a phone (step 11)', "its drags are a real touch through Chromium's gesture recognizer");
 else await section("On a phone (step 11)", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 800 }, hasTouch: true, isMobile: true });
@@ -128,7 +128,7 @@ else await section("On a phone (step 11)", async () => {
     return null; };
   await phone.evaluate(() => { const r = [...TERMS.values()].find(r => r.t.arg === 'sh:9:alpha'); r.term.focus(); });
   // The shell's prompt first: typed before the new shell is up, the line
-  // went nowhere and every check after it read an empty screen (B328).
+  // went nowhere and every check after it read an empty screen.
   await until(rows => rows.some(l => /[$#] *$/.test(l)), 20000);
   let typed = null;
   for (let i = 0; i < 3 && !typed; i++){
@@ -142,7 +142,7 @@ else await section("On a phone (step 11)", async () => {
   phone.on('request', r => { if (r.url().includes('/api/keys')) asked.push(r.postData() || ''); });
   const box = await phone.$eval('#pane1 .slot.on .xterm-screen', e => { const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, top: b.top + 20, h: b.height }; });
   // Under a full run's load one drag's lines did not always reach the
-  // screen in time (B328): a second drag, said in the result.
+  // screen in time: a second drag, said in the result.
   const scrolled = rows => rows.some(l => /\[\d+\/\d+\]/.test(l)) && !rows.some(l => /^pick-me-word/.test(l)) && rows;
   await finger(phone, box.x, box.top, box.x, box.top + box.h * 0.6);
   let back = await until(scrolled, 5000), drags = 1;
@@ -180,7 +180,7 @@ else await section("On a phone (step 11)", async () => {
   await phone.close();
 });
 
-// Popped out (R8): the same terminal on a page of its own, terminal.html on
+// Popped out: the same terminal on a page of its own, terminal.html on
 // /termws, the tmux session the tab had; Reattach brings it back.
 await section("Popped out (R8)", async () => {
   const [win] = await Promise.all([page.waitForEvent('popup'), page.evaluate(id => popOut(id), id)]);
@@ -208,7 +208,7 @@ await page.waitForFunction(() => ![...TERMS.values()].some(r => r.t.arg === 'sh:
 const after = await page.evaluate(() => [...TERMS.values()].filter(r => r.t.arg === 'sh:7:alpha').map(r => r.key));
 ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${before}: ${JSON.stringify(after)})`);
 
-// A log in the dock (R133 step 12): the page's own terminal, read-only, following the controller's log as it is written.
+// A log in the dock: the page's own terminal, read-only, following the controller's log as it is written.
 await section("A log in the dock", async () => {
   mkdirSync(`${DIR}/state/logs`, { recursive: true });
   appendFileSync(`${DIR}/state/logs/builderbot.log`, 'log-follow-first\n');
@@ -255,13 +255,13 @@ await section("A log in the dock", async () => {
   await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:dm::bad name').id));
 });
 
-// A shell on this controller is an administrator's (B1166, the operator, 25
-// Nov): it runs as the dashboard's own account, so an account with Terminal
+// A shell on this controller is an administrator's:
+// it runs as the dashboard's own account, so an account with Terminal
 // Write on a space with no node is told the shell opens on a node; and a
-// terminal is its account's alone (R133 step 8): an administrator naming the
+// terminal is its account's alone: an administrator naming the
 // owner's account on the argument opens one of their own, never the owner's
 // session, whose screen holds what the owner typed above. (A grant taken
-// away ends a terminal it opened, R133 step 9: now a node's shell's, which
+// away ends a terminal it opened: now a node's shell's, which
 // this fixture's nodes do not serve.)
 await section("A shell on this controller is an administrator's, and opens as one's own account", async () => {
   const h = OWNER;
@@ -314,8 +314,8 @@ await section("A shell on this controller is an administrator's, and opens as on
      `naming another account on a terminal's argument opens one of your own, never theirs (${forged.seen.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)})`);
 });
 
-// A terminal closed while a frame of its own is still pending (B802): xterm
-// runs the frame after dispose() and reads a renderer that is gone, which
+// A terminal closed while a frame of its own is still pending: xterm
+// runs the frame after dispose and reads a renderer that is gone, which
 // the console showed as "reading 'dimensions'" whenever a terminal's start
 // was a little slow and it was closed at once. Terminals made as termMount
 // makes them and dropped by termDrop at a few delays; disposed at once, 18
@@ -351,7 +351,7 @@ await section("A terminal closed while a frame of its own is still pending", asy
      `a terminal closed with a frame of its own still pending throws nothing${thrown.length ? ': ' + thrown.join(' | ').slice(0, 200) : ''}`);
 });
 
-// A terminal not on show writes nothing until it is shown (R228 step 14),
+// A terminal not on show writes nothing until it is shown,
 // but answers a question as it comes: tmux asks who the terminal is as it
 // attaches, and an answer held until the tab was shown reached it after it
 // had stopped waiting and was typed into the shell as "1;2c0;276;0c".

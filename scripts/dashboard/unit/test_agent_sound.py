@@ -1,4 +1,4 @@
-"""The node agent's sound in its census (R107): ALSA's cards read from
+"""The node agent's sound in its census: ALSA's cards read from
 /proc/asound/cards, the virtual ones apart, and the sound server installed.
 Drives _sound against a cards file of the test's own."""
 import os

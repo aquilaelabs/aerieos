@@ -1,4 +1,4 @@
-"""A project's group and its color (the operator, 18 Oct): labels of one
+"""A project's group and its color: labels of one
 account's, a group keeping projects together on the Projects page and a
 color worn by its card, its tabs and its bar, set and cleared one project at
 a time, kept apart per account, and only for a project that exists. Colors

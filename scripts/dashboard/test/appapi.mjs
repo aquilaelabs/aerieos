@@ -26,7 +26,7 @@ ok(meta.status === 200 && meta.body.api === surface.api && appApi === surface.ap
    `the surface number agrees everywhere: server ${meta.body.api}, source ${srcApi}, app ${appApi}, contract ${surface.api}`);
 ok(typeof meta.body.version === 'string' && typeof meta.body.apk === 'string',
    '...and /api/meta names the image and where a newer app would be');
-// `built` rides the same endpoint for aerie status on a node (R62): a session
+// `built` rides the same endpoint for aerie status on a node: a session
 // there reads the controller's build off /api/meta, since its own env carries
 // no image stamp. Not an app field (not in api-surface.json), so it does not
 // move APP_API; asserted here because this is where /api/meta's shape is kept.
@@ -34,9 +34,9 @@ ok(typeof meta.body.built === 'string',
    '...and carries the build time, which aerie status on a node shows for the controller');
 // Where a newer app would be is a SIGNED build when there is one, however
 // new an unsigned one is: the phone's app was installed signed and Android
-// will not update it with a debug build (B507, 5 Oct).
+// will not update it with a debug build.
 // AerieOS's own project is the one whose origin is its repository, whatever
-// its folder is called (B4): a folder named AerieOS with no such remote,
+// its folder is called: a folder named AerieOS with no such remote,
 // holding a newer signed build, is not where the app is sent.
 await section("Where a newer app would be is a SIGNED build when there is one, however", async () => {
   const self = `${DIR}/ws/bb-public`, d = `${self}/dist`;
@@ -63,7 +63,7 @@ await section("Where a newer app would be is a SIGNED build when there is one, h
 
 // ---- a row in each list the app reads ----------------------------------------------
 // A row's types are held only where there is a row, and the fixture leaves
-// most of these lists empty, so a type changed on one went unseen (B107).
+// most of these lists empty, so a type changed on one went unseen.
 // Each list the notebook or the tree fills gets a row here, through the verbs
 // a session or a person uses; the world is put back before the next file.
 await section("a row in each list the app reads", async () => {
@@ -118,7 +118,7 @@ for (const e of surface.endpoints) {
   const r = await get(path);
   if (r.status !== 200) { missing.push(`${e.path}: HTTP ${r.status} ${r.body?.error || ''}`); continue; }
   for (const f of e.fields || []) if (!(f in r.body)) missing.push(`${e.path}: no "${f}" in the answer`);
-  // ...and each as the type the app reads it as (R79 step 8).
+  // ...and each as the type the app reads it as.
   typed.push(...pinBreaks(r.body, (surface.types || {})[e.path], e.path));
   // The rows' fields, on the first row where there is one; a field pinned
   // with ? is one only some rows carry (a kind's own), so it may be absent.
@@ -134,7 +134,7 @@ for (const e of surface.endpoints) {
 ok(missing.length === 0, `every path the app reads answers with the fields it draws${missing.length ? ': ' + missing.join('; ') : ''}`);
 // Every row field the app reads is pinned a type, so a list the fixture
 // leaves empty still says what its rows hold, and is held to it wherever a
-// row turns up (B107).
+// row turns up.
 const untyped = [];
 for (const e of surface.endpoints) {
   if (e.method !== 'GET' || e.needs) continue;
@@ -159,7 +159,7 @@ ok(typed.length === 0 && unpinned.length === 0,
 // ---- every POST action the app sends is one the server knows --------------------------
 // Read from the source rather than sent: a real send would change the
 // fixture. The handler for each path, or the module it calls into (a
-// handler is a gate plus one call, R77), names its actions as `act == "x"`
+// handler is a gate plus one call), names its actions as `act == "x"`
 // or a tuple, and each one the contract lists must appear in one of them.
 const DASH = join(REPO, 'scripts', 'dashboard');
 const serverSrc = readdirSync(DASH).filter(f => f.endsWith('.py'))

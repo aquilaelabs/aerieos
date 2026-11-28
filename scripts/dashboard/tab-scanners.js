@@ -1,4 +1,4 @@
-// The Scanners page (R145, the operator, 26 Oct): AerieOS's own static
+// The Scanners page: AerieOS's own static
 // analysis scanners (Semgrep, Trivy, mobsfscan) deployed to each node that
 // holds projects and run there on one schedule. Every node at once rather
 // than one picked in the bar: the question here is whether every project
@@ -10,7 +10,7 @@
 // the page, each with why. The SARIF a run sends up lands on the Analysis
 // page as a host scanner's report did.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Data from
+// Chrome from docSurface; the hard rules are uniform.mjs's. Data from
 // /api/scanners, read when the page opens, after each press and on the
 // jobs revision while a run or a deploy is going.
 
@@ -68,7 +68,7 @@ function scannersLastRun(n){
         last.job ? ` <a href="#" data-scanlog="${esc(last.job)}">its log</a>` : ""}`;
 }
 
-// A node read without Configure Write there (R277): said under what it reads,
+// A node read without Configure Write there: said under what it reads,
 // and nothing that changes it drawn (its section is .svcro).
 const scannersRo = (ro, body, why = SVC_RO) => ro ? `${body}<div class="field"><div class="hint">${esc(why)}</div></div>` : body;
 
@@ -107,7 +107,7 @@ function scannersNodeSection(n){
 }
 
 // The timetable is every node's, so its controls are Configure Write's on
-// every node (may_all, R277); a reader reads it with them dead.
+// every node (may_all); a reader reads it with them dead.
 function scannersScheduleSection(s, deployed, ro = false){
   const custom = scannersCustom !== null || !SCAN_WHEN.some(([c]) => c === s.cron);
   const cron = scannersCustom ?? s.cron;
@@ -135,7 +135,7 @@ function scannersUncovered(rows){
     tblWrap(cols, rows.map(r => `<div class="row">${tblLine(cols, [esc(r.project), esc(r.why)])}</div>`).join(""), "scanuncovered"));
 }
 
-// The page's buttons, on its head (the operator, 29 Oct: never a row of
+// The page's buttons, on its head (never a row of
 // their own over a gap).
 function scannersActs(d){
   if (d && d.may_all === false) return "";
@@ -162,7 +162,7 @@ function renderScannersInto(i){
   const lt = data.latest || {};
   d.setBar("");
   const deployed = (data.nodes || []).some(n => n.deployed);
-  // One line (R274): how many nodes scan; the versions this AerieOS names
+  // One line: how many nodes scan; the versions this AerieOS names
   // at the foot, under the nodes that run them.
   const names = scannersVersions(lt.versions);
   patch(d.list, pageHead({line: [(n => ({value: n, label: n === 1 ? "node scanning" : "nodes scanning"}))((data.nodes || []).filter(x => x.deployed).length)], actions: scannersActs(data)})
@@ -188,7 +188,7 @@ function wireScannersTab(root){
   });
   act("[data-scanrun]", b => scannersAct({action: "run", node: b.dataset.scanrun}));
   act("[data-scanrunall]", () => scannersAct({action: "run"}));
-  // Turn on and Turn off flip on the press (the operator, 22 Nov): the
+  // Turn on and Turn off flip on the press: the
   // section's head and its button say it at once, and a refusal flips them
   // back saying why.
   root.querySelectorAll("[data-scanon]").forEach(b => b.onclick = async () => {

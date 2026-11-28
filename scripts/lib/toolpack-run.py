@@ -1,4 +1,4 @@
-"""Behind `aerie tool PACK [VERB ARGS...]` for a tool pack (R77): the verb's
+"""Behind `aerie tool PACK [VERB ARGS...]` for a tool pack: the verb's
 words from the pack's manifest, as the catalog carries them, with the
 placeholders filled in, run in place of this process. Nothing here is a
 shell: a verb is a list of words a person approved when the pack was added,
@@ -69,10 +69,10 @@ for w in spec["run"]:
     argv.append(w)
 if "{dist}" in " ".join(spec["run"]):
     os.makedirs(dist, exist_ok=True)
-# What the pack is configured with on this node (R172): the agent writes
+# What the pack is configured with on this node: the agent writes
 # the fields that name an environment variable into the store, owned by
 # the session account, and the verb reads them from there; then this
-# person's own answers from their home (R172 step 5), which win.
+# person's own answers from their home, which win.
 for conf in (os.path.join(os.path.dirname(pack_dir), ".bb", "config", name + ".env"),
              os.path.join(os.path.expanduser("~"), ".bb", "config", name + ".env")):
     try:

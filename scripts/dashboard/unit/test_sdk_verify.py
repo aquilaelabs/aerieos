@@ -1,4 +1,4 @@
-"""sdk.sh's sdk_verify_download (R137): a download that matches what its
+"""sdk.sh's sdk_verify_download: a download that matches what its
 publisher states is kept and the install says how it was checked; one that
 does not is removed and the install stops naming both digests; a row whose
 publisher states nothing says so and goes on."""

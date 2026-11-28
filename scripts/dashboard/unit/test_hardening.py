@@ -1,5 +1,5 @@
-"""The process hardened (R158 step 6): core dumps off and the process not
-dumpable, said for the Doctor; wipe() zeroes a key's bytes in place."""
+"""The process hardened: core dumps off and the process not
+dumpable, said for the Doctor; wipe zeroes a key's bytes in place."""
 import json
 import os
 import shutil

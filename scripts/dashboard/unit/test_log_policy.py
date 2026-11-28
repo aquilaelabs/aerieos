@@ -1,5 +1,5 @@
-"""One log policy, applied on a clock and bounded everywhere (the operator,
-12 Oct): a running job's log is capped with its start and its end kept, the
+"""One log policy, applied on a clock and bounded everywhere:
+a running job's log is capped with its start and its end kept, the
 job logs follow the Logs section's days, Clear reaches the job logs and the
 CI runs, old job rows and audit rows go, and a live file past its ceiling
 is copied to its next generation and emptied in place."""
@@ -33,8 +33,8 @@ class JobLogs(unittest.TestCase):
                      None if state == "running" else int(time.time()) - ago))
 
     def test_a_probe_ending_sweeps_nothing(self):
-        """A quiet probe's end leaves the sweep alone (the operator, 17 Oct:
-        each Docker read's result swept every project's history); a job
+        """A quiet probe's end leaves the sweep alone
+        (each Docker read's result swept every project's history); a job
         somebody queued still sweeps its project's."""
         swept = []
         real = nodes.prune_job_logs

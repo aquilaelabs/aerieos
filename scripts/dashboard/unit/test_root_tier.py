@@ -1,5 +1,5 @@
 """The root tier is run where it can be root and nowhere it should not be
-(R240 step 5, R3 step 8; the operator's choice of 14 Nov: a container tier,
+(a container tier,
 in CI).
 
 Its modules (scripts/dashboard/roottier) plant a link where the root agent

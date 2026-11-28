@@ -1,4 +1,4 @@
-"""The array (R162 step 2): the agent renders snapraid.conf and the fstab
+"""The array: the agent renders snapraid.conf and the fstab
 lines from its record, reads the array into the census, and holds the
 storage-array job to its shapes (a parity disk at least as large as the
 largest data disk, no held disk without wipe, never the system disk) before
@@ -135,7 +135,7 @@ class TheAgent(unittest.TestCase):
         self.assertIn("fuse.mergerfs", open(self.env["BB_ARRAY_FSTAB"]).read())
 
     def test_a_create_that_stops_partway_says_which_disks_it_wrote(self):
-        # B529: no record holds them, so the job names them.
+        # No record holds them, so the job names them.
         self.fail_mkfs = "/dev/sdc"
         state, code, text, rec = self.run_job({"array": "create", "data": ["sda", "sdb"], "parity": ["sdc"], "fs": "xfs", "policy": "mfs"})
         self.assertEqual(state, "failed", text)
@@ -160,7 +160,7 @@ class TheAgent(unittest.TestCase):
             self.assertEqual(self.ran, [], cfg)
 
     def test_snapraid_never_runs_with_a_disk_of_the_array_unmounted(self):
-        # B718: a sync over an empty mount point writes the parity into the
+        # A sync over an empty mount point writes the parity into the
         # stick's memory; a scrub or fix reads a missing disk as emptied.
         self.down = {"/mnt/parity/p1"}
         for cfg in ({"array": "sync"}, {"array": "scrub"}, {"array": "check"}, {"array": "verify", "correct": True}):
@@ -188,7 +188,7 @@ class TheAgent(unittest.TestCase):
             self.am._state_set(running="")
 
     def test_a_sync_runs_in_the_background_and_one_left_by_a_restart_is_cleared(self):
-        # The operator, 8 Nov: a sync held the machine's one job slot for
+        # A sync held the machine's one job slot for
         # hours; the job ends at once, the sync's progress is the array's.
         bg = []
 
@@ -225,7 +225,7 @@ class TheAgent(unittest.TestCase):
 
 
     def test_a_parity_check_reads_everything_and_corrects_only_when_asked(self):
-        # R163 step 15: a whole scrub, its findings read off SnapRAID's own
+        # A whole scrub, its findings read off SnapRAID's own
         # log (summary:error_*, and each file whose hash failed), the count
         # said, and the fix only with Correct: -e for the blocks SnapRAID
         # marked, and the files it named by name (as walked on the stick:
@@ -272,7 +272,7 @@ class TheAgent(unittest.TestCase):
 
 
 class Takeover(unittest.TestCase):
-    """R163 steps 3 and 5: an adopted array taken over as SnapRAID's. The
+    """An adopted array taken over as SnapRAID's. The
     data disks are made writable where they are and never formatted; the
     old parity disk's first partition is the one thing given a filesystem;
     SnapRAID's content files are the only new thing on a data disk; Release
@@ -348,7 +348,7 @@ class Takeover(unittest.TestCase):
         made = [a for a in self.ran if a[0].startswith(("mkfs", "wipefs", "sgdisk", "parted", "fdisk", "sfdisk"))]
         self.assertEqual(made, [["mkfs.xfs", "-L", "aerie-p1", "/dev/sdd1"]], "the parity partition alone, never a data disk, never a partition table")
         self.assertIn(["mount", "-T", self.env["BB_ADOPT_FSTAB"], "/mnt/disk1"], self.ran)
-        # The first sync is the background's (the operator, 8 Nov): the job
+        # The first sync is the background's: the job
         # ends once the parity disk is mounted, the sync's progress is the
         # array's state, and its end stamps last_sync.
         self.assertEqual(self.ran[-1], ["mount", "/mnt/parity/p1"])
@@ -400,7 +400,7 @@ class Takeover(unittest.TestCase):
         self.assertEqual((rec, [a for a in self.ran if a[0].startswith("mkfs")]), ({}, []))
 
     def test_the_parity_disk_is_found_by_its_serial_never_by_its_old_name(self):
-        # B718: the adoption saw the parity as sdd; after a reboot sdd is a
+        # The adoption saw the parity as sdd; after a reboot sdd is a
         # spare holding nothing blkid knows, and the parity is sde.
         self.adopt()
         self.disks[2] = {"name": "sdd", "size_mb": 8000000, "serial": "SPARE9", "by_id": "/dev/disk/by-id/ata-ST8000_SPARE9",
@@ -466,7 +466,7 @@ class Takeover(unittest.TestCase):
         class M(self.am.ArrayMixin):
             def _sh(inner, job, argv, timeout=0, pass_fds=(), **kw):
                 lst = next(a for a in argv if a.startswith("--files-from="))[13:]
-                # Folders handed by descriptors (B859): kept as where each reaches.
+                # Folders handed by descriptors: kept as where each reaches.
                 for x in argv[-2:]:
                     assert int(x.split("/")[4]) in pass_fds, (x, pass_fds)
                 seen.append((argv[:3], open(lst).read(), [os.path.realpath(x) + "/" for x in argv[-2:]]))
@@ -488,7 +488,7 @@ class Takeover(unittest.TestCase):
         self.assertIn("isos: 1 file from the data disks to fast", job.text())
 
     def test_the_mover_never_writes_to_an_unmounted_place_over_a_newer_copy_through_a_link_or_under_an_open_file(self):
-        # B718: an empty mount point is the stick's memory; the copy on the
+        # An empty mount point is the stick's memory; the copy on the
         # other side is the one /mnt/user shows; a link may point anywhere;
         # a file held open would lose what is written after the copy.
         root = tempfile.mkdtemp()
@@ -526,7 +526,7 @@ class Takeover(unittest.TestCase):
         self.assertTrue(os.path.isdir(os.path.join(root, "cache", "media", "keep")), "a folder the mover did not empty is kept")
 
     def test_snapraid_keeps_its_catalog_in_a_folder_roots_alone_on_each_disk(self):
-        # B858: a disk's top is often everybody's to write, and SnapRAID
+        # A disk's top is often everybody's to write, and SnapRAID
         # writes .snapraid.content.tmp beside its content file as root,
         # following a link planted at that name anywhere.
         root = tempfile.mkdtemp()
@@ -558,7 +558,7 @@ class Takeover(unittest.TestCase):
         self.assertTrue(os.path.islink(os.path.join(d2, ".snapraid.content")), "a link at the old name is left, never followed")
 
     def test_a_folder_swapped_for_a_link_while_it_moves_takes_nothing_elsewhere(self):
-        # B859: a share's users write its tree, and a folder swapped for a
+        # A share's users write its tree, and a folder swapped for a
         # link between the list and the copy took root's copy, and its
         # removal of the source, wherever the link pointed.
         root = tempfile.mkdtemp()
@@ -638,7 +638,7 @@ class TheController(unittest.TestCase):
         self.assertEqual(nodes._census({"array": {"data": []}})["array"], {})
 
     def test_each_shares_places_are_held_to_the_adopted_pools(self):
-        # R163: where a share's new files land and the mover's from and to,
+        # Where a share's new files land and the mover's from and to,
         # set on the takeover or later, each a pool in front of the data
         # disks or the array.
         import nodes
@@ -684,7 +684,7 @@ class TheController(unittest.TestCase):
             r = nodes.node_storage_array("user:t", "n1", {"array": "create", "data": ["sdb", "sda"], "parity": ["sdc"], "fs": "btrfs", "policy": "lfs", "wipe": True})
             self.assertTrue(r.get("ok"), r)
             self.assertEqual(add.call_args[0][3]["config"], {"array": "create", "data": ["sdb", "sda"], "parity": ["sdc"], "fs": "btrfs", "policy": "lfs", "wipe": True,
-                             # Each disk as the person saw it, for the agent to hold its name to (B527).
+                             # Each disk as the person saw it, for the agent to hold its name to.
                              "ids": {"sdb": {"by_id": "", "serial": "B"}, "sda": {"by_id": "", "serial": "A"},
                                      "sdc": {"by_id": "", "serial": "C"}}})
             self.assertEqual(add.call_args[0][3]["timeout"], 86400)

@@ -86,7 +86,7 @@ def house_rules(project, rel, told=()):
     """(what to say, the names) for the conditional rules this path fires,
     read from the store here, on the controller. On a node the same comes
     back in the note's answer (hooks.py), which is how a session there is
-    told at all (B686: it used to be silent on a node, which is every
+    told at all (it used to be silent on a node, which is every
     session). Silent on any failure: a rule that cannot be read is never
     worth taking an edit with."""
     try:
@@ -135,7 +135,7 @@ def main():
         overlap.configure(state=os.environ.get("DASHBOARD_STATE", "/config"),
                           workspace=os.environ.get("WORKSPACE", "/workspace"),
                           write_json=rulehook.write_json)
-        # Keyed by account and agent (R95), named the same way.
+        # Keyed by account and agent, named the same way.
         me = overlap.key(session, os.environ.get("BB_AGENT") or "claude")
         others = [overlap.said(o) for o in overlap.others_touching(project, me, rel)]
         overlap.note(project, me, rel, symbol)

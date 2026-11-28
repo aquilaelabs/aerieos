@@ -1,4 +1,4 @@
-"""Behind `aerie node busy` and `aerie node wait-quiet` (cmd_node in bb, R108):
+"""Behind `aerie node busy` and `aerie node wait-quiet` (cmd_node in bb):
 whether the node this session is on is quiet enough to time anything on.
 
 The controller's answer (busy.report) is the node's last heartbeat joined
@@ -62,7 +62,7 @@ def ask():
         elif load / cores >= 0.5 and d["verdict"] == "quiet":
             d["verdict"] = "busy"
             d["why"] = [f"load {load:g} on {cores} cores right now"]
-    # ...and its memory now (R271): a build or an emulator that filled it
+    # ...and its memory now: a build or an emulator that filled it
     # since the heartbeat says so at once, as the controller's verdict
     # would on the next one (busy.py: 92% used is saturated).
     mem = now_mem()
@@ -85,7 +85,7 @@ def show(d):
     if d.get("gpu_mem_mb"):
         print(f"  gpu      {d.get('gpu_pct')}%, {gb(d.get('gpu_mem_used_mb'))} of {gb(d.get('gpu_mem_mb'))}"
               + (f", {d['gpu_procs']} computing" if d.get("gpu_procs") else ""))
-        # ...and what holds it, by kind (B532): an emulator that filled the
+        # ...and what holds it, by kind: an emulator that filled the
         # card while it booted read as a mystery.
         held = {k: v for k, v in (d.get("gpu_mem_kinds") or {}).items() if v}
         if held:

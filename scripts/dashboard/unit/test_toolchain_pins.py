@@ -1,4 +1,4 @@
-"""The versions a node's projects pin (B712): read off their Gradle files,
+"""The versions a node's projects pin: read off their Gradle files,
 each a row of its own in the Library and on the Installed page, installed by the store's
 own listing, and nothing from an agent that does not list versions."""
 import os
@@ -76,7 +76,7 @@ class Pins(unittest.TestCase):
 
 
 class Implied(unittest.TestCase):
-    """What a build needs with no line pinning it (R215): the build-tools its
+    """What a build needs with no line pinning it: the build-tools its
     Android Gradle plugin defaults to, and an emulator image for compileSdk."""
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -126,7 +126,7 @@ class Implied(unittest.TestCase):
                      'android-application = { id = "com.android.application", version.ref = "agp" }\n')
         self.assertEqual(toolchains.gradle_needs(self.proj), {
             "build-tools;36.0.0": ["gradle/libs.versions.toml: the Android Gradle plugin 9.4.1 defaults to it"]})
-        # The level it compiles against is the Emulator tab's question (B720).
+        # The level it compiles against is the Emulator tab's question.
         self.assertEqual(toolchains.levels_needed("n_1"), {"37": [("shebang", "app/build.gradle.kts")]})
         self.assertEqual(toolchains.levels_needed("n_2"), {})
         # A pinned buildToolsVersion is the project's own answer.

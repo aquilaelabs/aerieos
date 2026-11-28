@@ -1,4 +1,4 @@
-"""The agent channel's signing-key verb (R106 step 2): a key goes only to
+"""The agent channel's signing-key verb: a key goes only to
 the running sign job's own node, once, and is audited."""
 import io
 import os

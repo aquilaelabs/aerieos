@@ -1,5 +1,5 @@
-"""A project's tree as it was each day, kept for the days its settings say
-(R165), so a node gone wrong, or compromised, cannot destroy the original
+"""A project's tree as it was each day, kept for the days its settings say,
+so a node gone wrong, or compromised, cannot destroy the original
 through its synced copy.
 
 What is kept is exactly what a node can change: every file the sync
@@ -142,7 +142,7 @@ def take(project, why=""):
 
 
 def pin(project, day, on=True):
-    """Keep one day whatever the days kept say (R105, the operator, 22 Oct),
+    """Keep one day whatever the days kept say,
     or let it go with the rest again: a mark in the day's own record."""
     if not DAY.fullmatch(str(day or "")):
         return {"error": "not a day kept here"}
@@ -163,8 +163,8 @@ def pin(project, day, on=True):
 
 
 def prune(project, keep):
-    """Days older than `keep` go, and a pinned day stays. At 0 nothing goes
-    (the operator, 13 Nov): 0 is no snapshot taken, and the ones a
+    """Days older than `keep` go, and a pinned day stays. At 0 nothing goes:
+    0 is no snapshot taken, and the ones a
     repository has are a person's to let go, by keeping some days again.
     It removed them all, so a repository set to 0 lost what it could be
     restored from at the next daily look."""

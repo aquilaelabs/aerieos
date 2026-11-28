@@ -1,5 +1,5 @@
 """The bell's Claude Code update counts the Claude sessions running on the
-node, which the update ends, not the projects bound to it (B57: it said 5, 6
+node, which the update ends, not the projects bound to it (it said 5, 6
 or 7 projects with 0 or 1 sessions running)."""
 import os
 import sys
@@ -40,7 +40,7 @@ class Sessions(unittest.TestCase):
         toolchains.last_check = lambda nid: ({}, None)
         try:
             bound = {"alpha": "n1", "beta": "n1", "ep.silon": "n1", "gamma": "n1", "far": "n2"}
-            # The coding agents' own row (R95: the coding agents'), not the
+            # The coding agents' own row (the coding agents'), not the
             # toolchains'.
             self.assertFalse([r for r in toolchains.attention(bound) if r["kind"] == "toolchain"])
             got = [r for r in toolchains.agent_attention(bound) if r["kind"] == "agents"]

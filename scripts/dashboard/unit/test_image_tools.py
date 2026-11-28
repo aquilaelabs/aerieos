@@ -1,5 +1,5 @@
 """The programs the controller's image takes from their vendors' releases
-as it is built are pinned (R267 step 17): config/image-tools.json says, for
+as it is built are pinned: config/image-tools.json says, for
 cloudflared, the linters, uv and mise, the version and the sha256 of the
 exact file for each architecture, written as a toolchain's pinned source is
 so tools/pins.py checks, moves and verifies it with the other tables. The

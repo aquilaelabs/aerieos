@@ -1,5 +1,5 @@
-"""Where a compose file publishes on every address (devapp.every_address,
-R217): the literal, or a variable defaulting to 0.0.0.0, read as text so the
+"""Where a compose file publishes on every address (devapp.every_address):
+the literal, or a variable defaulting to 0.0.0.0, read as text so the
 variable's name can be said; nothing when the file names no address."""
 import os
 import shutil

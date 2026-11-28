@@ -1,4 +1,4 @@
-"""What the page says, held to the words rule (R287, the operator's words
+"""What the page says, held to the words rule (the operator's words
 pass of 25 Nov): a person reads space and repository, never project or repo
 (the names in code and the API keep project); a toast is one sentence; a
 hint is a line, not a paragraph. Read from the page's sources as text: a

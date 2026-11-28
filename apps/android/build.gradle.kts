@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.20" apply false
 }
 
-// Where the build writes, on a node (B351). The tree there is on the
+// Where the build writes, on a node. The tree there is on the
 // projects share, and a directory emptied and removed in one build on NFS
 // can fail to go: a file deleted while a process still holds it is renamed,
 // not removed, and the directory around it is not empty. So a build on a

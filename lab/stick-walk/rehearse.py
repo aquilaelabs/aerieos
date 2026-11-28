@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The move off another NAS rehearsed on the walked stick (R163 step 4):
+"""The move off another NAS rehearsed on the walked stick:
 the branch's agent and rehearse-inside.py handed to the stick over QEMU's
 user network, run as root there in the background, and its PASS and FAIL
 lines read back until it ends. The stick must be booted (walk.py boot) with

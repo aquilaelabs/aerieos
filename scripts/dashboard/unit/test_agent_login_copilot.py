@@ -1,7 +1,7 @@
 """Copilot CLI's sign-in on a machine with no keyring asks whether to keep
 its token in its config file, after the device is approved, and waits on
-the answer; the agent's sign-in answers it, and says so (the operator, 23
-Oct: the sign-in hung after GitHub said the device was connected)."""
+the answer; the agent's sign-in answers it, and says so
+(the sign-in hung after GitHub said the device was connected)."""
 import os
 import sys
 import tempfile

@@ -1,4 +1,4 @@
-"""The machine's power and its own packages (R164 step 3): the agent reads
+"""The machine's power and its own packages: the agent reads
 the UPS through NUT and counts the host's package updates once an hour,
 the host-update job runs apt and restarts only when asked, and the
 controller keeps both to their shape, puts the battery and the updates on
@@ -137,7 +137,7 @@ class TheController(unittest.TestCase):
             self.assertEqual([(r["what"], r["bad"]) for r in nodes.power_attention()], [("low", True)])
 
     def test_any_node_s_packages_are_on_the_bell_its_ups_the_own_machine_s_alone(self):
-        # R294 step 13: a node whose agent counts its packages is on the bell
+        # A node whose agent counts its packages is on the bell
         # with them, where only the controller's own machine was.
         import nodes
         other = {"id": "n2", "name": "box", "kind": "agent", "live": True, "config": {},

@@ -160,7 +160,7 @@ STORE_ID_FILE = ".bb-store-id"
 
 
 # ---------------------------------------------------------------------------
-# the toolchain store, a directory per node (R196)
+# the toolchain store, a directory per node
 #
 # One share can serve any number of machines only if their binaries do not
 # land on top of each other: a node's root is therefore <store>/<node id>,
@@ -172,8 +172,8 @@ STORE_ID_FILE = ".bb-store-id"
 # fetch a second copy per node.
 
 
-# This node's own directory under the toolchain store (R196, the operator, 12
-# Oct): its node id, so no two machines share a directory of toolchains,
+# This node's own directory under the toolchain store:
+# its node id, so no two machines share a directory of toolchains,
 # whatever distro each runs, and an id is never renamed or reused. Set by the
 # agent from its state at start and on every hello (use_scope). An agent that
 # has no id has no toolchain directory: tc_root is "" and every toolchain
@@ -240,7 +240,7 @@ def store_id(path):
 
 def store_here(path, role, node_id, made=()):
     """Why `path` already is a store, said before anything is copied into
-    it (B661): "marked" when it carries the controller's marker, "mine"
+    it: "marked" when it carries the controller's marker, "mine"
     when it is a toolchain store holding this node's own folder, "own"
     when this agent made it for the store before (the folder the page nested
     for the node), and "" when none of those. The page asks the same of the
@@ -267,7 +267,7 @@ def _stores(stores, used=False):
         try:
             # Within seconds or not at all: a store on a share that stopped
             # answering blocked statvfs, and with it every turn of the
-            # agent's loop, which samples the stores (B980).
+            # agent's loop, which samples the stores.
             st = statvfs_within(path)
             out[role] = {"path": path, "id": store_id(path),
                          "free_mb": st.f_bavail * st.f_frsize // (1024 * 1024),
@@ -389,11 +389,11 @@ def store_dirs(state):
     # An empty directory is no toolchain: a delete that could not finish
     # (a file still open over NFS) or a mount point leaves one, and listed,
     # an empty android/platform-tools read as two Android rows installed on
-    # a store wiped to start over (the operator, 12 Oct).
+    # a store wiped to start over.
     def full(d):
         # ...nor one an install has not finished (its marker beside it,
         # sdk.sh sdk_mark_partial): half a toolchain left by an Abort read
-        # as installed (the operator, 12 Oct).
+        # as installed.
         if os.path.exists(os.path.join(os.path.dirname(d), ".bb-installing." + os.path.basename(d))):
             return False
         with contextlib.suppress(OSError):
@@ -408,7 +408,7 @@ def store_dirs(state):
     with contextlib.suppress(OSError):
         out["android"] = sorted(x for x in os.listdir(os.path.join(store, "android"))
                                 if x.startswith(".") or full(os.path.join(store, "android", x)))[:64]
-    # ...and the versions under android's versioned families (B712): what a
+    # ...and the versions under android's versioned families: what a
     # project pins (ndkVersion, buildToolsVersion, compileSdk) is a directory
     # here, one listdir each, and the controller says which pins this store
     # lacks. The key is sent even when empty: it is absent only where there
@@ -437,7 +437,7 @@ def store_dirs(state):
             out.setdefault("incomplete", []).append(entry["name"])
     # ...and the directories at the top of the store, whose names say whose
     # they are (a node's id, `shared`, the controller's own): a retired
-    # node's is the controller's to offer for removal (R196).
+    # node's is the controller's to offer for removal.
     base = (state.get("stores") or {}).get("toolchains") or ""
     if base:
         with contextlib.suppress(OSError):
@@ -516,7 +516,7 @@ def load_state():
 # the keys added beside it, whether an unsigned agent is taken, whether an
 # older one may be put back and whether a person chose to pin no key
 # (release.py), and whether a root
-# command the controller sends is run at all (root_off, R227 step 2). A running agent holds
+# command the controller sends is run at all (root_off). A running agent holds
 # node.json in memory and writes it whole at every token it is handed, so
 # what the console wrote is read back from the file and kept, never the
 # agent's older copy of it.
@@ -567,7 +567,7 @@ def console_said():
     return {k: cur[k] for k in CONSOLE_KEYS if isinstance(cur, dict) and k in cur}
 
 
-# One save at a time (B982): node.json is saved by the agent's loop, its job
+# One save at a time: node.json is saved by the agent's loop, its job
 # threads and the configuration plane (a new token at every hello among
 # them), and by the console's own commands in another process. Two saves
 # through one fixed .tmp could interleave into a file that is not JSON,

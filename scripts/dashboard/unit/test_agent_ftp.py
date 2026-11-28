@@ -1,4 +1,4 @@
-"""The node agent's half of a project's file access (FtpServers, R151): a
+"""The node agent's half of a project's file access (FtpServers): a
 bb-ftpd started per project hello names, each login it asks relayed to the
 controller's ftp-auth and the answer handed back down its stdin, a server
 for a project no longer named stopped, and a node without the toolchain
@@ -111,7 +111,7 @@ class AgentFtp(unittest.TestCase):
         self.assertEqual([b for v, b in self.fake.ctl.calls if v == "ftp"][-1], {"servers": []})
 
     def test_a_stray_left_on_the_port_by_an_earlier_agent_is_ended(self):
-        # B573: an update execs in place, so a bb-ftpd the agent before
+        # An update execs in place, so a bb-ftpd the agent before
         # started is still this process's child and holds the port, refusing
         # every login; the new agent ends it and starts its own.
         import subprocess
@@ -150,7 +150,7 @@ sys.stderr.write("bb-ftpd: listening on x:2121\\n"); sys.stderr.flush(); time.sl
         self.addCleanup(lambda: other.poll() is None and other.kill())
         # Up before it is looked for: _end_strays reads /proc for a child
         # whose command names bb-ftpd, and a child still between fork and
-        # exec carries this process's own (B438: the one failure most gates
+        # exec carries this process's own (the one failure most gates
         # ended on, under the tier's load).
         self.assertIn(b"listening on", other.stderr.readline())
         self.assertFalse(self.ftp._end_strays(2121))

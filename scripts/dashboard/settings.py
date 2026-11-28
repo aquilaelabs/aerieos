@@ -1,4 +1,4 @@
-"""Controller settings the operator changes on the Settings page (roadmap R29).
+"""Controller settings the operator changes on the Settings page.
 
 The rule (env-only-what-must, on the Briefing tab): a setting is an
 environment variable only when the container cannot start without it or the
@@ -13,7 +13,7 @@ the tab cap is a constant, the packages a node needs come from the package
 manager and the controller carries what it needs in the image, the project
 bootstrap and the icon name went with the features, and the commit identity
 is a project's own (prefs.py, the settings dialog). Two more went with the
-Claude Code install itself (R47): this container does not carry it, so
+Claude Code install itself: this container does not carry it, so
 whether to update it here and on which channel were settings about nothing:
 a node installs its own and `claude update` in a session there keeps it
 current.
@@ -38,7 +38,7 @@ import checks  # noqa: E402
 import statefile  # noqa: E402
 
 write_json = None
-# A secret's value sealed under the install key where there is one (R135),
+# A secret's value sealed under the install key where there is one,
 # as signing keys and two-factor secrets are: set by the server.
 seal = None               # bytes -> bytes, signing.seal
 unseal = None             # bytes -> bytes, or raises signing.Locked
@@ -59,7 +59,7 @@ KEYS = {
     # tier. On, every entry is offered, the unproven ones tagged dev, and
     # the header says dev. One tree behaves as two products: production
     # leaves this off, a dev instance turns it on, and an entry crosses
-    # over when a lab suite or a real run proves it (roadmap R54, step 6).
+    # over when a lab suite or a real run proves it.
     "offer_unvetted": {"default": False, "kind": "bool", "applied": "now"},
     # Off, a session on a node reads only logs belonging to the work it is
     # doing: the CI runs for its project, and what its own test runs left.
@@ -74,43 +74,43 @@ KEYS = {
     # the screen. A node is not implicitly granted its own logs, because its
     # own journal is as much system level as any other machine's.
     "debug_mode": {"default": False, "kind": "bool", "applied": "now"},
-    # First run (R199, the operator, 12 Oct): False from the moment the
+    # First run: False from the moment the
     # owner is made until Finish on the setup page, which needs a node
     # enrolled and answering. While False the page shows only the setup
     # panel and the Nodes tab. True by default: a controller that never
     # went through the setup page is one already set up.
     "setup_done": {"default": True, "kind": "bool", "applied": "now"},
     # The disks and shares under Other disks and shares that the controller's
-    # backup copies also go to, by their ids (the operator, 6 Nov: a copy off
+    # backup copies also go to, by their ids (a copy off
     # the machine), besides its own pools.
     "backup_also": {"default": "", "kind": "text", "shape": "line", "applied": "now"},
-    # The home tunnel the controller runs itself (R176, tunnel.py): the
+    # The home tunnel the controller runs itself (tunnel.py): the
     # public hostname a node off the LAN dials, the tunnel's token from
     # Zero Trust, and an API token with which the hostname's record and the
     # tunnel's rules are written rather than clicked. The two tokens are
     # secrets: kept here, never shown back, only said to be set.
     "tunnel_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
-    # A reverse proxy in front of the dashboard (R243): its address, or
+    # A reverse proxy in front of the dashboard: its address, or
     # several and networks parted by spaces. Wrong passwords are then
     # counted against the address it passes on, not against the proxy, which
     # is everybody behind it. The install's own tunnel needs no entry.
     "trusted_proxies": {"default": "", "kind": "text", "shape": "line", "applied": "now"},
-    # The vetted catalog's address (R169 step 2): where index.json and index.sig are read from.
+    # The vetted catalog's address: where index.json and index.sig are read from.
     "catalog_url": {"default": "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/", "kind": "text", "shape": "url", "applied": "now"},
     # Whether a pack a person added themselves (sideloaded) may offer the
-    # coding agent it brings (the operator, 12 Nov): off, since an agent's
+    # coding agent it brings: off, since an agent's
     # adapter decides what runs in every session of it and nobody vetted
     # this one; on for somebody trying an agent of their own before they
     # submit it to the catalog.
     "sideload_agents": {"default": False, "kind": "bool", "applied": "now"},
     "tunnel_token": {"default": "", "kind": "secret", "applied": "now"},
     "cf_api_token": {"default": "", "kind": "secret", "applied": "now"},
-    # The dashboard's own connection (R158 step 2, tls.py): http, self (the
+    # The dashboard's own connection (tls.py): http, self (the
     # install's own certificate) or acme (Let's Encrypt for the hostname,
     # by DNS-01 through the Cloudflare API token); "" is self where a
     # hostname is set and http otherwise. The hostname is the controller's
     # own public name; the email is the ACME account's.
-    # The mail server the bell's rows go out through (R149, reach.py):
+    # The mail server the bell's rows go out through (reach.py):
     # Controller settings, Mail; the password sealed like the tokens.
     "smtp_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
     "smtp_port": {"default": "", "kind": "text", "shape": "port", "applied": "now"},
@@ -121,7 +121,7 @@ KEYS = {
     "tls_mode": {"default": "", "kind": "text", "shape": "word", "applied": "now"},
     "tls_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
     "tls_email": {"default": "", "kind": "text", "shape": "email", "applied": "now"},
-    # The apps this controller offers its people (R272 step 3, apps.py):
+    # The apps this controller offers its people (apps.py):
     # each one on fetches that app from the release matching this
     # controller's version, checks it and serves it from /apps; off, it is
     # neither fetched nor offered. Set first by the seed file a compose
@@ -133,32 +133,32 @@ KEYS = {
     # from the page, a phone or a session; every other account is told why
     # and stays signed in for after. Nodes are not accounts and keep running.
     "maintenance_mode": {"default": False, "kind": "bool", "applied": "now"},
-    # The update window (R160 step 4): when a newer release is applied by
+    # The update window: when a newer release is applied by
     # itself, never by default; the day (daily, or one weekday) and the hour.
-    # The backup password (R161 step 4): the copies of the state on the
+    # The backup password: the copies of the state on the
     # machine's pools are sealed under a key it derives; eight characters
     # at least, sealed here like every secret.
     "backup_password": {"default": "", "kind": "secret", "applied": "now"},
     # A GitHub token that may read AerieOS's repository, with which a
-    # controller in debug mode sees and fetches unpublished (draft) builds
-    # (the operator, 1 Nov); debug mode's alone, cleared at a start without it.
+    # controller in debug mode sees and fetches unpublished (draft) builds;
+    # debug mode's alone, cleared at a start without it.
     "release_token": {"default": "", "kind": "secret", "applied": "now"},
     "update_window": {"default": "", "kind": "choice", "applied": "now",
                       "choices": ["", "daily", "mon", "tue", "wed", "thu", "fri", "sat", "sun"]},
-    # The release channel (R179): normal is the releases as published; dev
+    # The release channel: normal is the releases as published; dev
     # takes the pre-releases CI publishes from a dev build too, and may be
     # picked only on a controller started in debug mode with the dev switch
     # on. Reset to normal at a start without debug mode, as the switches are.
     "release_channel": {"default": "normal", "kind": "choice", "applied": "now", "choices": ["normal", "dev"]},
-    # How often each check runs by itself (R176, checks.py): weekly unless
+    # How often each check runs by itself (checks.py): weekly unless
     # an administrator says otherwise; Check now beside each runs it at once.
     **{f"check_{k}": {"default": "weekly", "kind": "choice", "applied": "now", "choices": ["daily", "weekly", "monthly", "off"]}
        for k in checks.KINDS},
     "update_hour": {"default": 4, "kind": "number", "min": 0, "max": 23, "applied": "now"},
     # How many versions an update pushes out of its slot stay on the boot
-    # menu (R201), 0 for none; AerieOS alone.
+    # menu, 0 for none; AerieOS alone.
     "os_keep": {"default": 3, "kind": "number", "min": 0, "max": 10, "applied": "now"},
-    # The room a node keeps for itself (R110): the disk left free under
+    # The room a node keeps for itself: the disk left free under
     # which the bell warns and a build, a test or a container's rebuild is
     # refused (a tenth of a disk smaller than ten times this), the memory
     # in use over ten minutes past which the bell warns, and a memory limit
@@ -170,7 +170,7 @@ KEYS = {
 
 
 # The debug and dev options exist only on a controller started with
-# DEBUG_MODE=1 (the operator, 12 Oct): a switch for those who know, kept out
+# DEBUG_MODE=1: a switch for those who know, kept out
 # of the env example, the template and the README on purpose. Without it the
 # two switches read off and cannot be turned on, the Settings tab offers
 # neither, and at start every option they opened (these two, and each
@@ -178,7 +178,7 @@ KEYS = {
 # from nothing granted.
 DEBUG_KEYS = ("debug_mode", "offer_unvetted")
 # ...and what only those allow, put back at a start without them: the dev
-# release channel (R193, the operator, 1 Nov: dev updates for a controller
+# release channel (dev updates for a controller
 # in debug mode alone).
 DEBUG_ONLY = ("release_token",)
 
@@ -207,7 +207,7 @@ def reset_debug():
 
 def boot_channel():
     """The release channel a boot asked for (BB_RELEASE_CHANNEL, from a
-    stick's aerieos.env, R161 step 12), taken at start: dev picks the dev
+    stick's aerieos.env), taken at start: dev picks the dev
     channel, so a stick made for it follows the pre-releases from its first
     start. Nothing for any other word. Whether it moved anything."""
     if os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
@@ -230,7 +230,7 @@ _lock = statefile.on(lambda: FILE)
 
 
 def load():
-    # Read once while it is the same file (statefile.read_json, R228 step 1):
+    # Read once while it is the same file (statefile.read_json):
     # every setting asked for reads it, a dozen times a status read.
     d = statefile.read_json(FILE)
     return d if isinstance(d, dict) else {}
@@ -265,7 +265,7 @@ def _parse(key, raw):
     if kind == "text":
         if isinstance(raw, bool) or raw is None:
             return None
-        # Each text has its own shape (B445): a hostname, an address, a
+        # Each text has its own shape: a hostname, an address, a
         # port, a word, an email, or one line as typed.
         shape = spec.get("shape", "host")
         v = str(raw).strip()
@@ -328,7 +328,7 @@ def _sealed(v):
 
 def seal_all(again=False):
     """Every secret kept open sealed, once the install has a key: at start.
-    `again`, after the install key changed (R154): every sealed one sealed
+    `again`, after the install key changed: every sealed one sealed
     once more, under today's key. Returns how many."""
     if not (seal and sealing and sealing()):
         return 0
@@ -362,7 +362,7 @@ def effective():
     for key, spec in KEYS.items():
         if off and key in DEBUG_KEYS:
             out[key] = {"value": False, "source": "locked"}
-        # Debug mode is the environment's (the operator, 26 Oct): on exactly
+        # Debug mode is the environment's: on exactly
         # when the controller was started with DEBUG_MODE=1, with nothing to
         # switch on in the page as well.
         elif key == "debug_mode":
@@ -372,7 +372,7 @@ def effective():
         else:
             out[key] = {"value": spec["default"], "source": "default"}
         # A secret is never shown back: the tab learns that one is set,
-        # sealed (R135) or not.
+        # sealed or not.
         if spec["kind"] == "secret":
             sealed = isinstance(d.get(key), str) and d[key].startswith(SEALED)
             out[key] = {"value": "", "set": sealed or bool(out[key]["value"]),

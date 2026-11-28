@@ -1,4 +1,4 @@
-"""Accounts as their own users on a node (R125): the sudo rule and the layout
+"""Accounts as their own users on a node: the sudo rule and the layout
 say so only once the agent is ready, tmux goes to the server a session is on,
 and bb-session holds each caller to its own account and refuses a terminal
 that is not proven."""
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
 
 class ShareFolder(unittest.TestCase):
-    """An account's folder of conversations goes with its home (R125, the dev
+    """An account's folder of conversations goes with its home (the dev
     pair's walk of 24 Oct): on a node's own disk the session account's 0700
     folder was one the account's user could not write, so its conversations
     stayed in its home and the controller listed none."""

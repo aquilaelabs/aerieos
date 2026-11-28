@@ -1,4 +1,4 @@
-"""The companion app's own settings (R270 step 4): which projects this
+"""The companion app's own settings: which projects this
 machine keeps and in which folders, the controller's address and its
 certificate's pin, and what this PC lends each project (pc.py: "lend",
 {project: {verb: a command line, a file or a port}}). Not secret: the

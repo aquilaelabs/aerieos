@@ -1,4 +1,4 @@
-"""Older versions kept (R201): a version an update pushes out of its slot is
+"""Older versions kept: a version an update pushes out of its slot is
 kept as files on the data partition with its configuration's copy, on GRUB's
 menu and This machine; only an image that can boot that way, the oldest going
 first, never stopping the update. A visit lasts one boot: the configuration a
@@ -106,7 +106,7 @@ class Keeping(unittest.TestCase):
         self.assertEqual(read(self.w.env["BB_OS_ESP"], "grub", "kept.cfg"), "", "an empty menu")
 
     def test_a_pruned_version_named_for_the_next_boot_is_unnamed(self):
-        # B620: Boot this next named 0.9.1 (aerie_kept_next in grubenv), then
+        # Boot this next named 0.9.1 (aerie_kept_next in grubenv), then
         # an update pruned it; GRUB's default named an entry the menu no
         # longer had and booted slot A, whichever slot was in use.
         tool, log = os.path.join(self.w.d, "slot"), os.path.join(self.w.d, "slot.log")
@@ -252,7 +252,7 @@ class TheBoot(unittest.TestCase):
 
 class LogsKept(unittest.TestCase):
     def test_the_logs_ram_disks_come_across_by_a_bind_and_the_rest_by_a_move(self):
-        # B730: mount --move is refused under systemd's shared mounts, so a
+        # Mount --move is refused under systemd's shared mounts, so a
         # stick's logs RAM disk landed on the stick; ci-logs was not carried.
         with tempfile.TemporaryDirectory() as d:
             fakes = os.path.join(d, "bin")

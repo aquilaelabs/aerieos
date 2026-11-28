@@ -1,4 +1,4 @@
-"""AerieOS's own terminal on a node (R133): a pty per browser tab, served
+"""AerieOS's own terminal on a node: a pty per browser tab, served
 on the screen relay's port (screen.py), which every node's firewall already
 opens to the controller alone.
 
@@ -6,7 +6,7 @@ The controller is the only caller. It signs what the terminal is (its kind
 and its words, bb-tty's arguments) and the minute, keyed with the hash of
 this node's own token, as it signs a VM's screen. What runs is what the
 session half records for that kind (term_kinds): bb-tty, or bb-session tty where accounts
-are their own users (R125), so the token, the grant and the account's own
+are their own users, so the token, the grant and the account's own
 user are decided where they always were. Nothing here reads what passes.
 
 The wire, inside binary websocket frames: from the browser a type byte then
@@ -68,7 +68,7 @@ def unpack(blob):
             or not all(isinstance(a, str) and 0 < len(a) <= WORD_MAX and "\0" not in a for a in argv):
         return None
     out = {"kind": d["kind"], "argv": argv, "cols": _dim(d.get("cols"), 80), "rows": _dim(d.get("rows"), 24)}
-    # An account's sealed sign-ins opened for this terminal (R126): the
+    # An account's sealed sign-ins opened for this terminal: the
     # account, the wrap's public half and the wrap, each as the controller
     # wrote them; opened by the agent before the program starts.
     tk = d.get("tk")
@@ -150,7 +150,7 @@ def relay(conn, frames, frame, spec, how, alive=None):
     """One tab: the pty's program and the browser's socket joined until
     either ends. `frames` reads the browser's frames, `frame` makes one.
     `alive`, asked every few seconds, says why the terminal may no longer
-    be open (a grant taken away, R133 step 9), and it is then ended."""
+    be open (a grant taken away), and it is then ended."""
     p, fd = spawn(how, spec["argv"], spec["cols"], spec["rows"])
     ro = spec["kind"] == "ro"
     why = ""
@@ -165,7 +165,7 @@ def relay(conn, frames, frame, spec, how, alive=None):
                     got = b""
                 if not got:
                     # The pty can end before the program is reaped: its
-                    # code waited for a moment, so the tab says it (B327).
+                    # code waited for a moment, so the tab says it.
                     try:
                         p.wait(timeout=2)
                     except subprocess.TimeoutExpired:

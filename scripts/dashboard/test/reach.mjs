@@ -1,4 +1,4 @@
-// Where the bell reaches you (R149): the Profile section lists nothing at
+// Where the bell reaches you: the Profile section lists nothing at
 // first, Add a webhook with its fields and the kinds it takes, Test sends
 // a line the harness's own receiver gets, the row says it was sent, the
 // Keys page lists the destination's address as sealed, and Remove takes
@@ -20,8 +20,8 @@ const page = await newPage(browser);
 await page.goto(BASE);
 await page.waitForFunction(() => typeof state !== 'undefined' && state && state.repos);
 await page.evaluate(() => openProfileTab());
-// The Profile is a list of its sections beside the one picked (the
-// operator, 16 Oct): the reach section is picked first, then drawn.
+// The Profile is a list of its sections beside the one picked:
+// the reach section is picked first, then drawn.
 await page.waitForSelector('.profiletab .snav [data-spick="reach"]', { timeout: patience(20000) });
 await page.click('.profiletab .snav [data-spick="reach"]');
 await page.waitForSelector('.doc details[data-sect="profile:reach"]', { timeout: patience(20000) });
@@ -41,9 +41,9 @@ const row = await page.$eval('details[data-sect="profile:reach-webhook"] .row[da
 ok(/the harness/.test(row) && /session asking/.test(row) && !/two places/.test(row) && !/sent/.test(row),
    `the destination is listed with what it takes and never sent (${row.slice(0, 120)})`);
 
-// The switch (R173): off keeps the destination with its settings and says
+// The switch: off keeps the destination with its settings and says
 // so; on brings it back; more than one kind is on at once, each its own block.
-// The row reads off on the press (the operator, 22 Nov: a press must never
+// The row reads off on the press (a press must never
 // look as if nothing happened), and the switch's answer is waited for before
 // the next press, so a Test is never sent ahead of it.
 const switched = () => page.waitForResponse(r => r.url().endsWith('/api/profile') && /"reach-on"/.test(r.request().postData() || ''), { timeout: patience(15000) });

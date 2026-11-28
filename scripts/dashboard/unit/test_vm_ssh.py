@@ -1,7 +1,7 @@
 """aerie vm ssh (scripts/lib/vm-verbs.py): the key aerie vm new made for the session,
 and the hosts it met, named to ssh from $HOME, the account's own home, where
 own_key made them. ssh reads the Unix account's home from the password file,
-which for an account's session is the shared session account's (B307)."""
+which for an account's session is the shared session account's."""
 import importlib.util
 import os
 import shutil

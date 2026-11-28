@@ -2,14 +2,14 @@
 # The agent's version is the one number in this tree a person moves by hand,
 # and a node compares the FILE while the Nodes tab names the NUMBER: when the
 # file moved without it, three tabs said "runs 0.6.92 and ships 0.6.92" and
-# refused work (B221). So the agent (scripts/agent: the entry and the
+# refused work. So the agent (scripts/agent: the entry and the
 # aerieos_agent package, which a node gets as one zip) may not change
 # against the branch's base without AGENT_VERSION's patch moving.
 #
 # The base is the last commit that moved the number, so every change to the
 # agent after one bump needs the next: measured from origin/main's merge
-# point, one bump early on a long branch passed every change after it (the
-# audit of 13 Nov: fe36377 changed the agent with no bump, 226 commits into
+# point, one bump early on a long branch passed every change after it
+# (fe36377 changed the agent with no bump, 226 commits into
 # a branch). Where history does not hold that commit (a shallow checkout),
 # the previous commit; a tree with no base to compare is said, not passed.
 # Run by `aerie lint` and by the lint workflow, so the two agree.

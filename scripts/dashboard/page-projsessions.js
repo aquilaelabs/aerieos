@@ -1,7 +1,7 @@
 // The foot of a project's settings dialog: every account's sessions on the
-// project, for an administrator, each with End (projsessions.py, the
-// operator's call of 24 Sep). Ending is the one thing an administrator may
-// do to another person's session; keys and typing stay theirs (B172).
+// project, for an administrator, each with End (projsessions.py).
+// Ending is the one thing an administrator may
+// do to another person's session; keys and typing stay theirs.
 // Unlike the settings above it, End acts at once, behind its own confirm,
 // the way Delete project does in the same dialog.
 // One classic script beside index.html (docs/design-language.md, Files):
@@ -14,8 +14,8 @@
 
 function rnSessionsLoad(name){
   return reading("rn.sessions", async () => {
-    // Not asked for and refused (B89), and not drawn for a role that does
-    // not give it (the operator, 21 Oct).
+    // Not asked for and refused, and not drawn for a role that does
+    // not give it.
     if (rnSettingsWhy(name)) return;
     let j;
     try{
@@ -28,7 +28,7 @@ function rnSessionsLoad(name){
 }
 
 // Whose, what and where on each row; "you" for the reader's own. What it is
-// is the agent's own name, or shell (B1023: every agent's but Claude's was
+// is the agent's own name, or shell (every agent's but Claude's was
 // called a shell, and End asked about one).
 const rnSessWho = r => r.who === state?.me ? "you" : r.who;
 const rnSessWhat = r => r.kind === "shell" ? "shell" : (r.agent || r.kind);
@@ -48,7 +48,7 @@ function rnSessionsDraw(name, rows){
   $("rnSessField").hidden = false;
 }
 
-// Its row goes on the press (the operator, 22 Nov: a press must never look
+// Its row goes on the press (a press must never look
 // as if nothing happened), and comes back saying why on a refusal; the list
 // is read again once the server has it. `rows` is the list it was drawn in.
 async function rnSessionEnd(name, r, rows){

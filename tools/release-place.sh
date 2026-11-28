@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Where a release may be cut from (the operator, 14 Nov): a dev build
+# Where a release may be cut from: a dev build
 # (vX.Y.Z-dev.N) on a commit that is on one of the branches a release is
 # cut from (tools/release-branches: main, and a release's working branch);
 # a stable release (vX.Y.Z) or a release candidate (vX.Y.Z-rc.N, any other

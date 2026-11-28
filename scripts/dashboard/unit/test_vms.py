@@ -1,4 +1,4 @@
-"""The VM manager (R91): the OS asked for in words found in the catalog, a
+"""The VM manager: the OS asked for in words found in the catalog, a
 person's OS refused to a session, the project's limits and the node's room
 said in one sentence, a create recorded and queued as its node's vm job, the
 job's end landing on the record; and the agent building its commands from its
@@ -47,7 +47,7 @@ class Controller(unittest.TestCase):
         return vms.create("user:test", "web", {"name": "db", "os": "debian 13", "keys": [KEY], **kw}, ["n1"])
 
     def test_a_vm_may_belong_to_the_machine_rather_than_a_project(self):
-        # R165 step 3: keyed under the machine's own name, on any VM host a
+        # Keyed under the machine's own name, on any VM host a
         # person may use, listed by that name and by no project's.
         r = vms.create("user:test", vms.MACHINE, {"name": "ha", "os": "debian 13", "keys": [KEY]}, ["n1"])
         self.assertNotIn("error", r, r)
@@ -55,7 +55,7 @@ class Controller(unittest.TestCase):
         self.assertEqual(vms.view(["web"]), [])
 
     def test_a_vm_s_hardware_is_checked_before_its_node_sees_it(self):
-        # R100: a thread another VM is pinned to is refused unless shared, a
+        # A thread another VM is pinned to is refused unless shared, a
         # memory ceiling under its start is refused (none is its start), the
         # shared folder is the project's own, and a device is an
         # administrator's.
@@ -86,7 +86,7 @@ class Controller(unittest.TestCase):
         self.assertIn("a person's", vms.hardware({"hw": {"net": "lan"}}, "web", "n1", False, 2048, person=False)[1])
         self.assertEqual(vms.hardware({"hw": {"net": "project"}}, "web", "n1", False, 2048, person=False)[0], {"net": "project"})
         # A bridge or a libvirt network by name is a person's too, and the
-        # model and MAC are checked (R219 step 4).
+        # model and MAC are checked.
         self.assertIn("a person's", vms.hardware({"hw": {"net": "br:virbr0"}}, "web", "n1", False, 2048, person=False)[1])
         got = vms.hardware({"hw": {"net": "net:default", "model": "e1000", "mac": "52:54:00:AA:bb:cc"}}, "web", "n1", False, 2048)[0]
         self.assertEqual(got, {"net": "net:default", "model": "e1000", "mac": "52:54:00:aa:bb:cc"})
@@ -99,7 +99,7 @@ class Controller(unittest.TestCase):
         self.assertEqual((spec["hw"], spec["autostart"]), ({"cpuset": [0, 1], "net": "lan"}, True))
 
     def test_a_usb_device_is_given_to_a_vm_and_taken_back(self):
-        # R116: named as the node's census names it; an administrator's;
+        # Named as the node's census names it; an administrator's;
         # refused for one the host uses, one not here, and one another VM
         # here holds; a take names what the VM holds, plugged in or not.
         r = self.new()
@@ -135,7 +135,7 @@ class Controller(unittest.TestCase):
         self.assertEqual(row["usb"][0]["name"], "SanDisk Ultra Fit")
 
     def test_a_refused_job_leaves_the_agent_s_reason_on_the_row(self):
-        # B191: the agent's refusal from the job's log, not "exit 64".
+        # The agent's refusal from the job's log, not "exit 64".
         self.new()
         vms.vm_done({"id": "j1", "node": "n1", "spec": {"action": "create", "domain": "bbvm-web-db"}, "error": "exit 64"}, "failed")
         self.assertEqual(vms.view()[0]["error"], "exit 64", "with no log to read, the code is all there is")
@@ -150,7 +150,7 @@ class Controller(unittest.TestCase):
                            ("AlmaLinux 9", "almalinux-9"), ("centos stream", "centos-9"), ("arch", "arch-latest"),
                            ("leap 16", "opensuse-16.0"), ("tumbleweed", "opensuse-tumbleweed"), ("gentoo", "gentoo-latest")):
             self.assertEqual((vms.find_os(said)[0] or {}).get("id"), want, said)
-        # Images with no BIOS boot partition hang under SeaBIOS (B198).
+        # Images with no BIOS boot partition hang under SeaBIOS.
         for said in ("debian", "gentoo"):
             self.assertEqual(vms.find_os(said)[0].get("boot"), "uefi", said)
         img, why = vms.find_os("debain 13")
@@ -175,7 +175,7 @@ class Controller(unittest.TestCase):
         self.assertIn("already", self.new()["error"])
 
     def test_a_vm_aerieos_did_not_make_is_cloned_into_a_space(self):
-        # R163 step 12: an administrator's, from a shut-off VM the node lists
+        # An administrator's, from a shut-off VM the node lists
         # as not AerieOS's; recorded as making, as New VM's is.
         self.f.nodes["n1"]["reported"]["vms_other"] = [{"name": "Windows 11", "state": "stopped", "vcpus": 4, "mem_mb": 8192},
                                                        {"name": "Ubuntu", "state": "running", "vcpus": 2, "mem_mb": 2048}]
@@ -202,7 +202,7 @@ class Controller(unittest.TestCase):
         self.assertEqual(self.f.jobs[0][2]["project"], "web")
 
     def test_remove_waits_for_a_create_still_going(self):
-        # B553: Remove while the create still ran dropped the record and the
+        # Remove while the create still ran dropped the record and the
         # create then made a VM nobody had; a create that stalled may still
         # be cleared.
         self.assertTrue(self.new().get("ok"))
@@ -216,7 +216,7 @@ class Controller(unittest.TestCase):
 
     def test_a_report_from_before_a_vm_was_made_is_an_earlier_vms(self):
         # Made again under a name an earlier VM had: the node's report, taken
-        # before, describes that one (B319), and its address is nobody's now.
+        # before, describes that one, and its address is nobody's now.
         self.new()
         d = vms._load()
         rec = next(iter(d["vms"].values()))
@@ -265,7 +265,7 @@ class Controller(unittest.TestCase):
 
     def test_a_vm_refused_makes_no_node_row_to_stand_in_the_way(self):
         # A create past the cap minted the node's enroll row first, and the
-        # next try was refused by that row's name (R97's walk, 21 Oct).
+        # next try was refused by that row's name.
         made, dropped = [], []
         vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# AerieOS: enroll x"}
         vms.node_discard = lambda by, nid: dropped.append(nid)
@@ -286,7 +286,7 @@ class Controller(unittest.TestCase):
             vms.enroll_script = vms.node_discard = None
 
     def test_from_an_installer(self):
-        # R99: a person's VM from an ISO on the node, with further disks, a
+        # A person's VM from an ISO on the node, with further disks, a
         # MAC and a screen password; never a session's, never a node.
         self.f.nodes["n1"]["reported"]["vm_isos"] = [{"name": "ubuntu-26.04-live-server-amd64.iso", "mb": 3100}]
         r = self.new(os="", iso="ubuntu-26.04-live-server-amd64.iso", keys=[], disks=[20], mac="52:54:00:aa:bb:cc",
@@ -381,7 +381,7 @@ class Controller(unittest.TestCase):
 class Shipped(unittest.TestCase):
     """Every file under config/ the dashboard's modules read beside
     themselves is copied into the image: the catalog read empty on the dev
-    instance because the Dockerfile left it out (B164)."""
+    instance because the Dockerfile left it out."""
     def test_every_config_file_read_is_in_the_image(self):
         import re as _re
         root = os.path.join(HERE, "..", "..", "..")
@@ -411,7 +411,7 @@ class Census(unittest.TestCase):
         self.assertEqual(got["vm_pool"], {"free_mb": 39000, "total_mb": 60000})
 
     def test_the_domains_builderbot_did_not_make_reach_the_record_by_name_state_and_size(self):
-        # R165 step 1: read-only on the VMs page, so only what names and
+        # read-only on the VMs page, so only what names and
         # sizes one is kept, each to its shape.
         import nodes
         got = nodes._census({"vms_other": [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "disk": "/x"},
@@ -422,7 +422,7 @@ class Census(unittest.TestCase):
         self.assertEqual(vms.others.__doc__ is not None, True)
 
     def test_a_usb_device_s_name_and_use_reach_the_record(self):
-        # R116: the fields that name a device again and say what the host
+        # The fields that name a device again and say what the host
         # does with it, each kept to its shape; a VM's devices as named; the
         # IOMMU feature's two facts.
         import nodes
@@ -479,7 +479,7 @@ class Agent(unittest.TestCase):
             self.assertEqual((got, job.t), (("failed", 75), ["refused: stop the VM first; a disk grows while it is off\n"]))
 
     def test_a_clone_copies_each_disk_and_keeps_the_rest(self):
-        # R163 step 12: each file disk copied as qcow2 (the original
+        # Each file disk copied as qcow2 (the original
         # untouched), a cdrom left empty, a passed-through disk kept and
         # said, the variables copied, a new UUID and AerieOS's marker.
         from unittest import mock
@@ -534,7 +534,7 @@ class Agent(unittest.TestCase):
         self.assertIn("run one at a time", "".join(job.t))
 
     def test_the_domains_it_did_not_make_are_listed_and_never_ours(self):
-        # R165 step 1: a name without the prefix, or with it and without the
+        # A name without the prefix, or with it and without the
         # agent's marker, is somebody else's; one with both is AerieOS's
         # and stays out of this list.
         from unittest import mock
@@ -575,7 +575,7 @@ class Agent(unittest.TestCase):
             self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web"}), ("succeeded", 0))
 
     def test_the_agents_own_vm_folders_hold_no_link(self):
-        # B552: on the controller's own machine a link the jobs account left
+        # On the controller's own machine a link the jobs account left
         # where the root agent writes a disk named any file for root to write
         # over; the agent removes every link there before a VM job.
         from unittest import mock
@@ -594,7 +594,7 @@ class Agent(unittest.TestCase):
             self.assertEqual(open(target).read(), "root:x:0:0\n", "the file it named untouched")
 
     def test_an_iso_already_here_is_taken_only_when_it_is_the_file_given(self):
-        # R247 step 5: ISOs are the node's, and the same name from another
+        # ISOs are the node's, and the same name from another
         # person's own address answered an ask for the official one.
         import hashlib
         from unittest import mock
@@ -615,7 +615,7 @@ class Agent(unittest.TestCase):
                 self.assertEqual(got, ("succeeded", 0))
 
     def test_on_the_controllers_own_machine_a_vm_job_runs_as_the_agent(self):
-        # R165 step 1: the wall's file says the machine is the controller's
+        # The wall's file says the machine is the controller's
         # own, and there the job keeps root rather than dropping to the jobs
         # account, which is out of libvirt's group on that machine.
         from unittest import mock
@@ -733,7 +733,7 @@ class Agent(unittest.TestCase):
         key = sc.screen_key("bbn_secret")
         import hashlib
         import hmac
-        # R288: derived from the token, never the hash the controller's database keeps.
+        # Derived from the token, never the hash the controller's database keeps.
         self.assertEqual(key, hmac.new(b"bbn_secret", b"aerieos node relay v1", hashlib.sha256).hexdigest())
         self.assertNotEqual(key, hashlib.sha256(b"secret").hexdigest())
         t = 1_800_000_000
@@ -750,7 +750,7 @@ class Agent(unittest.TestCase):
         self.assertEqual(fr.feed(frame[5:]), [(2, payload)])
 
     def test_a_shared_folder_is_where_it_really_is_and_the_projects_own(self):
-        # B541: virtiofsd serves a link's target as root, so a link to / in
+        # Virtiofsd serves a link's target as root, so a link to / in
         # the project's tree gave its VM the host; the agent resolves the
         # path, keeps it inside the project's folder, and writes the target.
         from unittest import mock
@@ -765,7 +765,7 @@ class Agent(unittest.TestCase):
             self.assertEqual((why, got["share"]["path"]), ("", "/workspace/web/store/data"))
 
     def test_a_tpm_where_the_host_has_swtpm_and_refused_by_name_where_not(self):
-        # R163 step 16: Windows 11 will not install without a TPM 2.0.
+        # Windows 11 will not install without a TPM 2.0.
         from unittest import mock
         hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
         x = self.av.domain_xml("bbvm-web-win", "web", 2, 4096, "/v/d.qcow2", "/v/s.iso", "bbvm-n00", boot="uefi")
@@ -780,7 +780,7 @@ class Agent(unittest.TestCase):
         self.assertFalse(hw.read(hw.apply(out, {"tpm": False}, 2, 4096))["tpm"])
 
     def test_a_vm_s_hardware_lands_in_its_domain_and_reads_back(self):
-        # R100: what clean() lets through, apply() writes, and read() finds
+        # What clean lets through, apply writes, and read finds
         # again, so the row says what the VM has.
         hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
         x = self.av.domain_xml("bbvm-web-db", "web", 2, 2048, "/v/d.qcow2", "/v/s.iso", "bbvm-n00", mac="52:54:00:12:34:56")
@@ -812,7 +812,7 @@ class Agent(unittest.TestCase):
         self.assertIsNone(hw.clean({"devices": [{"type": "pci", "addr": "1:2"}]}, 2, 2048)[0])
 
     def test_a_usb_device_is_read_off_sysfs_named_again_and_written_as_a_hostdev(self):
-        # R116 steps 1 and 3: the census from a sysfs laid out as the
+        # The census from a sysfs laid out as the
         # kernel's (a stick behind a controller, with a mounted partition;
         # a receiver; a hub left out), the device found again by serial or
         # port, the hostdev XML, and the numbers refreshed after a replug.
@@ -871,7 +871,7 @@ class Agent(unittest.TestCase):
         self.assertIsNone(hw.usb_refresh(dom, kept, []), "pulled out: its numbers stay, and the source is optional")
 
     def test_a_vm_is_refused_what_the_host_needs(self):
-        # B870: its LAN card, a disk controller with a disk mounted, a card
+        # Its LAN card, a disk controller with a disk mounted, a card
         # in an IOMMU group with one of those, and a USB device it uses.
         from unittest import mock
         hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
@@ -900,7 +900,7 @@ class Agent(unittest.TestCase):
             self.assertTrue(ok({"type": "pci", "addr": "0000:01:00.0"}, {"type": "usb", "vendor": "0x0781", "product": "0x5583"}))
 
     def test_a_usb_give_attaches_live_and_keeps_the_device_by_name(self):
-        # R116 step 3: give runs virsh attach-device --persistent with the
+        # Give runs virsh attach-device --persistent with the
         # hostdev, keeps the device by name beside the disk, and says now or
         # at the next start; take detaches it; the refusals say why.
         from unittest import mock
@@ -976,7 +976,7 @@ class Agent(unittest.TestCase):
         self.assertIn("<nvram format='qcow2'>/v/d_VARS.fd</nvram>", u, "qcow2, which a UEFI VM's snapshot needs")
         self.assertIn("machine='q35'", u)
         self.assertNotIn("<loader", x)
-        # A screen for the dock (R99), on a socket libvirt makes in the
+        # A screen for the dock, on a socket libvirt makes in the
         # domain's own folder: the agent's relay is the only way to it,
         # where a loopback port was any account's of the machine to dial.
         self.assertIn("<graphics type='vnc'><listen type='socket'/></graphics>", x)
@@ -990,7 +990,7 @@ class Agent(unittest.TestCase):
         self.assertIn("<mac address='52:54:00:12:34:56'/>", i.replace('"', "'"))
         self.assertIn("<graphics type='vnc' passwd='s3cret'><listen type='socket'/></graphics>", i.replace('"', "'"))
         # A VM made a node is on the LAN by the host's own interface, where
-        # the controller reaches it (R97's walk: behind the NAT it was not).
+        # the controller reaches it (behind the NAT it was not).
         self.assertIn("<source network='bbvm-n00'/>", x.replace('"', "'"))
         n = self.av.domain_xml("bbvm-web-db", "web", 2, 2048, "/v/d.qcow2", "/v/s.iso", "bbvm-n00", lan="enp1s0")
         self.assertIn("<interface type='direct'><source dev='enp1s0' mode='bridge'/>", n.replace('"', "'"))
@@ -1091,7 +1091,7 @@ class Agent(unittest.TestCase):
 
 class Record(unittest.TestCase):
     """A VMs' record that is JSON and not an object reads as empty, kept
-    aside, where it raised and took the VMs page with it (B1025)."""
+    aside, where it raised and took the VMs page with it."""
 
     def test_a_record_that_is_not_an_object_reads_as_empty(self):
         import contextlib
@@ -1109,7 +1109,7 @@ if __name__ == "__main__":
 
 
 class Verbs(unittest.TestCase):
-    """aerie vm's hardware words (R100): what is named is sent, none takes it
+    """aerie vm's hardware words: what is named is sent, none takes it
     off, and what is not a hardware word is left for the verb."""
 
     def setUp(self):
@@ -1145,7 +1145,7 @@ class Ask(unittest.TestCase):
         self.assertEqual(seen["shown"][-7:], ["--pin", "2,3", "--mem-max", "none", "--share", "data", "--ro"])
         phone.ask_vm("bigger", "web", {"action": "disk-grow", "name": "db", "disk": "vdb", "gb": 60}, "s")
         self.assertEqual((seen["shown"][-2:], seen["extra"]["vm"]["gb"], seen["extra"]["vm"]["disk"]), (["vdb", "60G"], 60, "vdb"))
-        # A USB device to a VM (R116), as aerie vm usb names it.
+        # A USB device to a VM, as aerie vm usb names it.
         phone.ask_vm("the stick", "web", {"action": "usb-give", "name": "db", "usb": {"vendor": "0x0781", "product": "0x5583", "serial": "4C53"}}, "s")
         self.assertEqual(seen["shown"], ["vm", "usb", "db", "give", "0781:5583:4C53"])
         self.assertEqual(seen["extra"]["vm"]["usb"]["serial"], "4C53")

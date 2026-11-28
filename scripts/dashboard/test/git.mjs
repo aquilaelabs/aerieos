@@ -1,4 +1,4 @@
-// The notebook's Git view (roadmap R36, step 1). The repository is read out:
+// The notebook's Git view. The repository is read out:
 // what is changed and not committed, the history as a graph, one commit's
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
@@ -105,8 +105,8 @@ ok((await api('what=status').then(() => fetch(URL.replace(/\/$/, '') + '/api/git
 // ---- the view ---------------------------------------------------------------
 await page.evaluate(() => openNotebook('beta', 'git'));
 // The view's first read runs git's status, log and branch list on the
-// space's tree, which under a whole gate's load took past twenty seconds
-// (B1172): its own budget, stretched as every wait here is.
+// space's tree, which under a whole gate's load took past twenty seconds:
+// its own budget, stretched as every wait here is.
 await page.waitForFunction(() => !!document.querySelector('.nb .nbview[data-view="git"] #gitPicker:not([hidden]) .gbpickname')?.textContent,
                            null, { timeout: patience(45000) });
 const NB = '.nb .nbview[data-view="git"]';
@@ -115,13 +115,13 @@ ok(new RegExp(`${st.files.length} changes? not committed`).test(await page.$eval
 ok(await page.$eval(`${NB}`, e => e.querySelectorAll('.gfile').length) === st.files.length,
    'Changes lists each uncommitted file as a fold');
 // Opened, not clicked: every fold opens by default (d890eda), and a click
-// on one the view had already opened shut it, the diff with it (B566).
+// on one the view had already opened shut it, the diff with it.
 await openFold(page, `${NB} .gfile[data-path="a.txt"]`);
 await page.waitForSelector(`${NB} .gfile[data-path="a.txt"] pre.diff`, { timeout: 10000 });
 ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.test(e.textContent)
      && !!e.querySelector('.d-add')),
    '...and opening one shows its diff, additions marked');
-// An open diff is read once, not on every redraw of the view (B833: a
+// An open diff is read once, not on every redraw of the view (a
 // hundred reads in a few minutes on the controller). The view redraws when
 // a commit lands: one of another file asks nothing of this one; one after
 // this file changed asks once.
@@ -150,7 +150,7 @@ await section("An open diff is read once, not on every redraw of the view", asyn
   rmSync(`${B}/other.txt`); rmSync(`${B}/other2.txt`);
   writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n');
 });
-// One section open at a time (the operator, 5 Oct): History is opened.
+// One section open at a time: History is opened.
 await openFold(page, `${NB} [data-sect="git:history"]`);
 // By day first, as a forge lists commits: a head where the day changes and
 // each commit under it, with the graph a switch away.
@@ -169,7 +169,7 @@ const graph = await page.$eval(`${NB} .gitgraph`, g => ({
 ok(graph.rows >= 4 && graph.nodes === graph.rows && graph.edges >= graph.rows - 1 && graph.lanes >= 2,
    `History is a graph: a node per commit, edges to parents, and a second lane for the branch (${JSON.stringify(graph)})`);
 // ...and one anybody can see: each lane's line and dot take their color from
-// a class built as gl${lane % 5}, which a sweep for unused CSS once removed (B79).
+// a class built as gl${lane % 5}, which a sweep for unused CSS once removed.
 const inked = await page.$eval(`${NB} .gitgraph`, g => {
   const strokes = [...g.querySelectorAll('path, circle')].map(e => getComputedStyle(e).stroke);
   return { strokes: new Set(strokes).size, bare: strokes.filter(s => !s || s === 'none').length };
@@ -202,7 +202,7 @@ ok(await page.$eval(`${NB} #gitDetail`, e => !!e.querySelector('pre.diff .d-add'
 await page.setViewportSize({ width: 1280, height: 360 });
 // The view laid out again at that height and its reads in before the pick:
 // under a whole run's load what sat above the detail changed after the
-// page had gone down to it, leaving it 151 px past the pane's top (B833).
+// page had gone down to it, leaving it 151 px past the pane's top.
 await until(async () => {
   const a = await page.$eval(`${NB} .nbview[data-view="git"]`, e => Math.round(e.scrollHeight));
   await new Promise(r => setTimeout(r, 250));
@@ -250,7 +250,7 @@ await section("the actions (step 2)", async () => {
     return { status: r.status, ...(await r.json()) };
   };
   // On the projects share, hidden so it is not a project: the only place a
-  // local remote is reachable through the relay (B148).
+  // local remote is reachable through the relay.
   const origin = `${DIR}/ws/.remotes/beta-origin.git`;
   mkdirSync(`${DIR}/ws/.remotes`, { recursive: true });
   execFileSync('git', ['init', '-q', '--bare', origin]);
@@ -279,7 +279,7 @@ await section("the actions (step 2)", async () => {
 
   // The credential the CONTROLLER holds, not the one the tree's config names:
   // the mirror copies remote.* and branch.* and nothing else, because a
-  // credential helper is a command the tree names (B153), so before this the
+  // credential helper is a command the tree names, so before this the
   // view could read everything and reach nothing: Fetch on an https remote
   // died on "could not read Username", which is git saying it had no
   // credential and no terminal to ask at. Asked of the composed command
@@ -312,7 +312,7 @@ print(json.dumps(next((a for a in seen if "fetch" in a), [])))
     mkdirSync(`${DIR}/state/gitcreds`, { recursive: true });
     writeFileSync(`${DIR}/state/gitcreds/beta`, 'https://oauth2:tok@example.invalid\n', { mode: 0o600 });
     const withTok = JSON.parse(argvFor(true));
-    // The controller's own helper (R135), which opens the token sealed or not
+    // The controller's own helper, which opens the token sealed or not
     // and hands it over for the host it was written for.
     ok(withTok.some(a => /^credential\.helper=!\S*git-credential-bb\S* \S*\/state\/gitcreds\/beta$/.test(String(a)))
        && withTok[withTok.indexOf('-c') + 1].startsWith('credential.helper='),
@@ -385,7 +385,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
      "Switch is refused while the owner's session stands in the directory, and says it is theirs");
   // A merge into the tree waits only while that session is WORKING: at its
   // prompt it sees the changed files when it next reads them, and one merely
-  // open refused the operator's own merge (24 Sep).
+  // open refused the operator's own merge.
   execFileSync('tmux', ['select-pane', '-t', '=claude-beta:', '-T', '\u25d0 Building the thing']);
   const busyMerge = await act('merge', { name: main });
   ok(busyMerge.status === 409 && /your Claude session is working in this directory/.test(busyMerge.error || ''),
@@ -456,7 +456,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     git('checkout', '-q', '-b', 'ready'); writeFileSync(`${B}/r.txt`, 'r\n');
     git('add', 'r.txt'); git('commit', '-q', '-m', 'Ready work');
     // The status poll keeps what git said of a project until its .git
-    // moves (R94): a branch switched under it is read at once, never a
+    // moves: a branch switched under it is read at once, never a
     // kept answer from before.
     const statusBranch = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/status',
       { headers: OWNER })).json()).projects || [])
@@ -507,7 +507,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   ok((await act('delete', { name: main })).error && (await act('delete', { name: 'nope' })).error,
      'the main branch and a branch that is not there are refused');
 
-  // R69 step 3: commits main lacks, holding nothing main lacks. Work that
+  // Commits main lacks, holding nothing main lacks. Work that
   // shipped another way reads exactly like work that is waiting, and the
   // only way to tell them apart was to go and diff it by hand.
   {
@@ -526,7 +526,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     ok((await act('delete', { name: 'shipped', force: true })).ok, '...and deletes it when told');
   }
 
-  // R69 step 1: a branch that is only on the host. The fold knew nothing
+  // A branch that is only on the host. The fold knew nothing
   // about its own rows, so the one delete that cannot lose work was the one
   // thing the view could not do.
   {
@@ -551,7 +551,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
        'the host\'s main branch, one that is not there, and a name that is not a remote branch are refused');
   }
 
-  // R69 step 2: merging into a main the host has moved past. The merge
+  // Merging into a main the host has moved past. The merge
   // itself is fine; what it leaves is a main both ahead and behind, which
   // is how the copy on the share drifts 294 commits out of step.
   {
@@ -589,7 +589,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     rmSync(other, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 
-  // B203: a write is not disturbed by the view reading beside it, nor by
+  // A write is not disturbed by the view reading beside it, nor by
   // another write. The write directory is one per tree, rebuilt as each write
   // starts, and the branch list (a read, on the poll path) once went through
   // it to ask whether a branch differs from main: every poll pulled the refs
@@ -614,7 +614,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     for (let n = 0; n < 6; n++){ git('branch', '-D', `race-a${n}`); git('branch', '-D', `race-b${n}`); }
   }
 
-  // The WRITES run none of the programs the tree names either (B153). The
+  // The WRITES run none of the programs the tree names either. The
   // reads were the first half; a commit, a switch and a merge are the half
   // that has to move the tree afterwards, and each of them is a hook git
   // would otherwise run here as the dashboard's account.
@@ -683,7 +683,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   const tok = mint('beta');
   const asSession = await act('fetch', {}, { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
   ok(asSession.status === 403 && /aerie git/.test(asSession.error), "a session's token is refused the buttons, and told about aerie git");
-  // Its owner's lock leaves its owner working (R119); an administrator's
+  // Its owner's lock leaves its owner working; an administrator's
   // holds the owner too, written as one here since this account owns beta.
   await page.evaluate(() => fetch('/api/lock', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'beta', locked: true }) }));
@@ -709,7 +709,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     { timeout: 20000 });
   const view = await page.$eval('.nb .nbview[data-view="git"]', v => ({
     net: !v.querySelector('#gitNet').hidden, push: !v.querySelector('[data-gitact="push"]').disabled,
-    // Pull says why when it is off, the one reason it can be (B294).
+    // Pull says why when it is off, the one reason it can be.
     pull: (b => b.disabled === /no upstream/.test(b.title))(v.querySelector('[data-gitact="pull"]')),
     commitBar: !!v.querySelector('.gcommitbar[data-add] #gitMsg'),
     discard: !!v.querySelector('[data-gitdiscard="a.txt"]'),
@@ -731,7 +731,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
      && /not yet in/.test(grouped.words) && !/level with/.test(grouped.words)
      && grouped.oneLine && grouped.shown.every(k => k === 'active'),
      `branches are a table a line a branch, Active chosen until another chip is pressed: work not yet in main offers Merge into main, branches already in main are one Delete, and a remote row mirroring a local branch is not repeated (${JSON.stringify(grouped).slice(0, 240)})`);
-  // B80: a branch with nothing of its own (level with main) has nothing to
+  // A branch with nothing of its own (level with main) has nothing to
   // merge, rebase or review, so its ⋯ offers none of it.
   git('branch', 'level-b80', main);
   // A branch made beside the tree moves no HEAD log, so the view reads again
@@ -751,7 +751,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   // ...the rows on show, not the copies of the ones a chip took away while
   // they fade (.fghost, which every reader of the parts skips). The search
   // narrows as typing settles, so what it shows is waited for, not sampled
-  // at once (B814).
+  // at once.
   const shown = '.nb .nbview[data-view="git"] .gbranch:not([hidden]):not(.fghost)';
   await page.waitForFunction(s => [...document.querySelectorAll(s)].map(r => r.dataset.branch).join() === 'old-work', shown,
     { timeout: 10000 }).catch(() => {});
@@ -761,7 +761,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
      `a chip narrows the table to its kind, and the search to the names holding what is typed (${JSON.stringify({ narrowed, ghosts })})`);
   await page.fill('.nb .nbview[data-view="git"] #gitBranchFind', '');
   await page.click('.nb .nbview[data-view="git"] [data-gbchip="active"]');
-  // R69 step 1 in the view: the fold lists what is only on the host, and
+  // In the view: the fold lists what is only on the host, and
   // offers the delete on exactly the rows where it cannot lose work.
   ok(grouped.originRows.includes('origin/stale') && grouped.originRows.includes('origin/live')
      && grouped.remoteDel.includes('origin/stale') && !grouped.remoteDel.includes('origin/live'),
@@ -770,7 +770,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   // Work not yet in main is a row you open: its commits and diff against
   // main, read here rather than on a pull request page.
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:branches"]');   // one section open at a time
-  // ...on a page of its own (R269 step 2), as a pull request's: its address
+  // ...on a page of its own, as a pull request's: its address
   // names the branch, Back to branches returns, and the address alone
   // lands on it.
   await page.click('.nb .nbview[data-view="git"] .gbranch[data-branch="old-work"] > .tline .td.lead');   // the line opens it
@@ -793,7 +793,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.nb .nbview[data-view="git"] #gitBody')).display !== 'none', null, { timeout: 5000 });
   ok(true, '...an address naming the comparison lands on it, and the browser\'s Back leaves it');
   // A new branch where the tree is, with changes not committed, is made and
-  // switched to with the changes along (B858): it was made, then the switch
+  // switched to with the changes along: it was made, then the switch
   // refused for the changes, a branch left behind.
   {
     const was = git('rev-parse', '--abbrev-ref', 'HEAD'), dirty = git('status', '--porcelain');
@@ -805,7 +805,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
        `a new branch made and switched to with changes not committed takes them along (${JSON.stringify({ error: j.error, on, dirty, still })})`);
   }
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:changes"]');   // one section open at a time
-  // A message being typed outlives the view drawn again under it (R244): a
+  // A message being typed outlives the view drawn again under it: a
   // session's commit moves the view (its token is HEAD's log) while a person
   // writes the words of their own.
   {
@@ -827,7 +827,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   await page.click('.nb .nbview[data-view="git"] #gitCommit');
   await refreshUntil(page, () => /From the view/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 20000 });
   ok(git('log', '-1', '--format=%s') === 'From the view', 'Commit from the view commits, and the graph shows it');
-  await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time (the operator, 5 Oct)
+  await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time
   await page.click('.nb .nbview[data-view="git"] .grow[data-sha]');
   await page.waitForSelector('.nb .nbview[data-view="git"] #gitDetail [data-gitrevert]', { timeout: 10000 });
   // ...and its read is in: a commit picked earlier in this file left its
@@ -836,7 +836,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   // which shut the picker opened below it.
   await page.waitForFunction(() => !readBusy('beta:commit'), null, { timeout: 15000 });
   ok(true, "a picked commit's detail carries Revert and Branch here");
-  // The branch picker in the head row (R269 step 3), on a clean tree: the branch the tree is
+  // The branch picker in the head row, on a clean tree: the branch the tree is
   // on, opening the local branches under a box; a name nobody has offers
   // Create, which makes it and switches to it, and a press on another
   // switches back.
@@ -913,7 +913,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
      && execFileSync('git', [`--git-dir=${origin}`, 'branch', '--list', 'topic'], { encoding: 'utf8' }).includes('topic'),
      `...while its own branch goes up (${(own.out || own.err || '').trim().slice(0, 40)})`);
   // A branch never pushed goes up on a bare aerie git push and is given its
-  // upstream there (B220), rather than git's refusal and a hint about
+  // upstream there, rather than git's refusal and a hint about
   // push.autoSetupRemote.
   {
     const was = execFileSync('git', ['-C', B, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -927,7 +927,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
     ok(first.status === 200 && first.code === 0 && there && up === 'refs/heads/fresh-b220',
        `a branch never pushed goes up on a bare aerie git push, its upstream set (${first.status} code ${first.code} ${there} ${up} ${JSON.stringify((first.err || first.error || '') + ' / ' + (first.out || '')).slice(0, 400)})`);
   }
-  // B191: the policy is about REFS, not about the word `main` appearing in
+  // The policy is about REFS, not about the word `main` appearing in
   // the arguments. "Its branch" is the one the tree is on, so everything
   // else on that remote is somebody's, and a setting naming one branch must
   // not hand over all of them.
@@ -935,7 +935,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   ok(other.status === 403 && /no someone-else in this tree/.test(other.error || ''),
      `writing a branch this tree does not have is refused, which is the one on the remote (${
        (other.error || '').slice(0, 70)})`);
-  // B397: a tag the tree holds is refused as a tag, the release's, and not
+  // A tag the tree holds is refused as a tag, the release's, and not
   // as a branch the tree lacks.
   execFileSync('git', ['-C', B, 'tag', 'v9.9.9-b397']);
   const tag = await relay(['git', 'push', 'origin', 'v9.9.9-b397']);
@@ -963,7 +963,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   const stillNot = await relay(['git', 'push', 'origin', 'HEAD:someone-else']);
   const act = async (action, args) => post('/api/git', { project: 'beta', action, args: args || {} });
 
-  // A push that would send a secret or something private is held (R219):
+  // A push that would send a secret or something private is held:
   // the bell shows the lines whole, Approve pushes from the controller and
   // okays those exact lines, Deny drops it, and a line that changes is
   // asked about again. The Git view's Push asks the same in a confirm.
@@ -999,7 +999,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
      `the Git view's Push shows the same lines in its confirm (${(pv.confirm || pv.error || '').slice(0, 60)})`);
   const pv2 = await act('push', { confirmed: true });
   ok(pv2.ok && top() === 'rotated', `...and confirmed, it pushes and okays them (${JSON.stringify(pv2).slice(0, 60)})`);
-  // The project's policy can turn the hold off (the operator, 15 Oct): a
+  // The project's policy can turn the hold off: a
   // session's push then goes without being read. Asked as a dry run and the
   // commit taken back, so no line nobody okayed is left in the history a
   // later push to another remote would send.
@@ -1019,14 +1019,14 @@ await section("step 3: the policy, and Send to Claude", async () => {
   ok(stillNot.status === 403 && /its own branches/.test(stillNot.error || ''),
      '...while a branch that is only on the remote stays refused, since that dial names one ref');
   // Push rights hold on the relay itself: a read-only clone's refusing hook
-  // is a file in the tree a session can remove (B149).
+  // is a file in the tree a session can remove.
   writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({}));
   const noRights = await relay(['git', 'push', 'origin', 'topic']);
   writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({ beta: { repo: 'owner/beta', how: 'key' } }));
   ok(noRights.status === 403 && /no push rights/.test(noRights.error || ''),
      `a space without push rights is refused on the relay, not left to a hook in its tree (${noRights.error})`);
   // ...and one whose Authentication is Off, an https remote with no
-  // credential, is refused at once with where to change it (B1119): its push
+  // credential, is refused at once with where to change it: its push
   // ran on into the host and said nothing for minutes.
   {
     const was = git('remote', 'get-url', 'origin').trim();
@@ -1042,7 +1042,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   }
   await post('/api/prefs', { project: 'beta', gitpol: { push: 'allow', main: 'deny' } });
 
-  // The relay never runs git in the tree a session can write (B148). Every
+  // The relay never runs git in the tree a session can write. Every
   // program the tree names, in a hook, in its config or as a local remote's
   // pack program, would leave a mark; the network step still happens.
   {
@@ -1154,7 +1154,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
      'a commit, a kind or a file that is not one is refused, not sent');
   tmuxKill('claude-beta');
   execFileSync('git', ['-C', B, 'checkout', '-q', '--', 'a.txt']);
-  // ...and it is the PRESSER's session (B235). The bare name alone was the
+  // ...and it is the PRESSER's session. The bare name alone was the
   // owner's, so a second account's press typed into the owner's
   // conversation, or found no session while its own was running.
   {
@@ -1181,7 +1181,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   await refreshUntil(page, () => !!document.querySelector('.nb .nbview[data-view="git"] [data-gitaskfile]'), { timeout: 20000 });
   // A row that is not already picked: a click on the picked row puts it
   // away, and which row that is depends on what the tests above committed.
-  await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time (the operator, 5 Oct)
+  await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time
   await page.click('.nb .nbview[data-view="git"] .grow[data-sha]:not(.on)');
   // Read in one look, and waited for as one: the view repaints on the poll,
   // and a wait for the commit's button followed by a second read of the
@@ -1199,7 +1199,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
       && el.querySelectorAll('[data-gitaskbranch]').length >= 1;
   }, null, { timeout: 30000 }).then(() => true, () => false);
   // A commit's detail is read when its row is picked, slower than 10 s under
-  // a whole run's load (B923); a pick a repaint took is picked again.
+  // a whole run's load; a pick a repaint took is picked again.
   if (!await offered() && !(await page.$('.nb .nbview[data-view="git"] .grow[data-sha].on'))) {
     await page.click('.nb .nbview[data-view="git"] .grow[data-sha]:not(.on)');
     await offered();
@@ -1207,7 +1207,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   const v = await look();
   ok(v.file && v.commit && v.branch >= 1 && v.pol === 0,
      `the view offers Send to Claude on a change, a commit and a branch, and no push policy, which is the Permissions view's (${JSON.stringify(v)})`);
-  // Every Send to Claude asks first (the operator, 6 Oct): what it sends is
+  // Every Send to Claude asks first: what it sends is
   // a prompt Claude starts on at once. Answered no here, so nothing goes.
   {
     const asks = [];
@@ -1231,7 +1231,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
     const r = await page.evaluate(() => {
       const was = state.sessions;
       // Without a Claude session on beta: one an earlier check started may
-      // still be up, and sendAgent takes Claude's first (B917).
+      // still be up, and sendAgent takes Claude's first.
       state.sessions = [...(was || []).filter(s => s.name !== myAgentSession('claude', 'beta')), { name: myAgentSession('codex', 'beta') }];
       const opened = [], realL = window.launchAgent, realS = window.startClaude;
       window.launchAgent = (id, p) => opened.push(`agent:${id}:${p}`);
@@ -1243,7 +1243,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
        `with a ChatGPT session running, a send is named for ChatGPT and opens its tab, not Claude's (${JSON.stringify(r)})`);
   }
   // What a session may do, in one view of its own beside Overview and
-  // Settings (the operator, 22 Oct): the settings form's Agents may section
+  // Settings: the settings form's Agents may section
   // lent to it, and the push policy under it, staged until Apply.
   await page.evaluate(() => openNotebook('beta', 'permissions'));
   await page.waitForSelector('.nb .nbview[data-view="permissions"] [data-gitpol="push"]', { state: 'visible', timeout: 10000 });
@@ -1253,7 +1253,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   ok(perm.dials && perm.pol === 3 && perm.apply === true,
      `Permissions holds Agents may and the push policy, its Apply asleep (${JSON.stringify(perm)})`);
   // Agents may, lent here from the settings form: a dial changed lights its
-  // own Save, and put back puts it out (B568: neither reached the form's
+  // own Save, and put back puts it out (neither reached the form's
   // listeners, so Save stayed dead).
   const DIAL = '.nb .nbview[data-view="permissions"] details[data-sect="rn:claude"] select';
   await page.waitForSelector(DIAL, { state: 'visible', timeout: 10000 });
@@ -1269,10 +1269,10 @@ await section("step 3: the policy, and Send to Claude", async () => {
   ok(await page.$eval('.nb .nbview[data-view="permissions"] .permGitApply', b => !b.disabled),
      '...picking a policy wakes Apply and saves nothing yet');
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-gitpol="push"]', 'allow');
-  // On the git host (R188): every ability with what the token says (here
+  // On the git host: every ability with what the token says (here
   // never measured: no token) and an Allow or Deny over it, merging at
   // Deny, staged until Apply and saved as the project's forgepol. Each is the
-  // space's until this repository sets it apart (R294 step 4): "as the space
+  // space's until this repository sets it apart: "as the space
   // (deny)" first, as every dial on this view is.
   await page.waitForSelector('.nb .nbview[data-view="permissions"] [data-forgepol="merge"]', { state: 'visible', timeout: 10000 });
   const hostSect = await page.$eval('.nb .nbview[data-view="permissions"] .permhost', el => ({
@@ -1281,8 +1281,8 @@ await section("step 3: the policy, and Send to Claude", async () => {
     pr: el.querySelector('[data-forgepol="pr_write"]').selectedOptions[0]?.textContent, apply: el.querySelector('.permHostApply')?.disabled,
     said: /not measured/.test(el.textContent), measure: !!el.querySelector('.permHostMeasure'),
     elsewhere: /set under Pushing/.test(el.textContent) && /set under Agents may: Tag and publish a release/.test(el.textContent) }));
-  // Push, Read the code and Publish and edit releases have no switch here
-  // (B559): another setting governs each, and the row says which.
+  // Push, Read the code and Publish and edit releases have no switch here:
+  // another setting governs each, and the row says which.
   ok(hostSect.n === 9 && /^(as the space \()?deny\)?$/.test(hostSect.merge) && /^(as the space \()?allow\)?$/.test(hostSect.pr) && hostSect.apply === true && hostSect.said && hostSect.measure
      && hostSect.elsewhere,
      `Permissions lists each git host ability it governs with an Allow or Deny, merging at Deny, the rest where they are set, and Measure (${JSON.stringify(hostSect)})`);
@@ -1325,7 +1325,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
 });
 
 // ---- the strip on a phone -------------------------------------------------
-// Five groups in one row (R259, the operator 16 Oct: eleven tabs were too
+// Five groups in one row (eleven tabs were too
 // many), the open group's views in one row under it, every one on screen.
 await page.setViewportSize({ width: 393, height: 851 });
 await page.waitForFunction(() => document.querySelector('.nb .nbtabs')?.getBoundingClientRect().width > 0);
@@ -1340,7 +1340,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
    && strip.views.inside && strip.over <= 0,
    `on a phone the strip is five groups in one row and the open group's views in one row under it, every tab on screen (${JSON.stringify(strip)})`);
 
-// Back goes back (R256 step 3): a view switched to is a history entry, and
+// Back goes back: a view switched to is a history entry, and
 // a node page's address names the node it shows.
 await section("Back goes back", async () => {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -1351,7 +1351,7 @@ await section("Back goes back", async () => {
   await page.waitForFunction(b => location.hash === b, before, { timeout: 10000 });
   const view = await page.evaluate(() => getNotebook(tabOf(panes[0])?.arg)?.where());
   ok(/\/git$/.test(before) && view === 'git', `a view switched to is a history entry, and Back returns to the one before (${before}, ${view})`);
-  // The Build group opens on the Library since R170, a node page like Toolchains was.
+  // The Build group opens on the Library a node page like Toolchains was.
   await page.evaluate(() => railGo('build', 'library'));
   await page.waitForFunction(() => /^#\/build\/library\/[^/]+$/.test(location.hash), null, { timeout: 15000 });
   const tc = await page.evaluate(() => ({ hash: location.hash, node: libNode }));
@@ -1360,7 +1360,7 @@ await section("Back goes back", async () => {
 
 // aerie projects lists what the dashboard lists: a directory carrying .bbignore
 // (the fixture's toolchain store) is not a project, and a worktree, whose .git
-// is a file naming its repository, is one and has a branch (B122).
+// is a file naming its repository, is one and has a branch.
 await section("aerie projects lists what the dashboard lists", async () => {
   git('worktree', 'add', '-q', `${DIR}/ws/beta-wt`, '-b', 'wtcheck');
   const listed = execFileSync('bash', [`${REPO}/scripts/aerie`, 'projects'],
@@ -1372,7 +1372,7 @@ await section("aerie projects lists what the dashboard lists", async () => {
 });
 
 // ---- a branch is its session's: its account's, or an administrator's ------
-// The operator's rule of 24 Sep. A branch checked out in another account's
+// The rule: a branch checked out in another account's
 // worktree is theirs. A plain account may not merge it, have a session merge
 // it, or delete it, and its row offers none of that and says whose it is. An
 // administrator may merge it, asked every time with the owner named, and
@@ -1461,11 +1461,11 @@ await section("a branch is its session's", async () => {
   ok(/test's working tree/.test(peerTreeView.hint) && peerTreeView.writes === 0 && peerTreeView.note,
      `...and its view says whose working tree it is and offers nothing that changes it (${JSON.stringify(peerTreeView)})`);
   // Review at most: the merge above put the branch in main, and a branch with
-  // nothing of its own has nothing to review either (B80).
+  // nothing of its own has nothing to review either.
   ok(peerRow.acts === 0 && peerRow.asks.every(k => k === 'review') && /only w\.dev merges it/.test(peerRow.text),
      `...while a plain account's row offers none of it and says whose it is (${JSON.stringify({ acts: peerRow.acts, asks: peerRow.asks })})`);
   await peerPage.close();
-  // B236: the project directory is the owner's working tree. A plain
+  // The project directory is the owner's working tree. A plain
   // account changes nothing in it; an administrator is asked first.
   const treeWrites = [['commit', { message: 'from w.peer' }], ['discard', { path: 'a.txt' }],
                       ['switch', { name: main }], ['pull', {}], ['revert', { sha: 'zzzz' }],
@@ -1493,13 +1493,13 @@ await section("a branch is its session's", async () => {
   page.errors = [];                     // the 403s and the 409 above are refusals by design
 });
 
-// B153's protection degrades QUIETLY by design: where the controller cannot
+// The protection degrades QUIETLY by design: where the controller cannot
 // build a git dir of its own it falls back to the tree, because a Git view
 // that goes blank is worse than one still doing what it always did. That is
 // the right default and a terrible thing to leave untested: the fallback runs
 // the tree's hooks, so a transient failure turns every guarantee above into a
 // coin toss, and the only trace is a line in the log. Read it here, which is
-// how a hook firing in the container was told from a test being wrong (R65).
+// how a hook firing in the container was told from a test being wrong.
 await section("B153's protection degrades QUIETLY by design", async () => {
   const log = (() => { try { return readFileSync(`${DIR}/server.log`, 'utf8'); }
                        catch { return ''; } })();
@@ -1531,7 +1531,7 @@ await section("a project with no repository gets one from the view", async () =>
   ok(again.status !== 200 || again.error, `...and a second Init is refused (${again.error || '?'})`);
   ok(readFileSync(`${DIR}/ws/gamma/.git/info/exclude`, 'utf8').split('\n').includes('.bb-map/'),
      '...and the repository it makes keeps the code map out, as a created space does');
-  // B234: two branches with no commit in common, the shape a project that
+  // Two branches with no commit in common, the shape a project that
   // began without a repository ends up in. Joined only when asked.
   const G = `${DIR}/ws/gamma`;
   const who = { ...process.env, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 't@example.invalid',
@@ -1557,7 +1557,7 @@ await section("a project with no repository gets one from the view", async () =>
 });
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
-// B164: a repository with no main and no master. Merge into main cannot
+// A repository with no main and no master. Merge into main cannot
 // mean anything there, and the refusal said "or on :" with the name empty.
 await section("B164: a repository with no main and no master", async () => {
   const said = execFileSync('python3', ['-c', `
@@ -1578,7 +1578,7 @@ print(json.dumps(g.act(repo, "merge", {"name": "trunk", "into": "main"})))`], { 
      `with no main or master, the merge refusal says so rather than naming an empty branch (${r.error})`);
 });
 
-// ---- the CI watch (R117) ------------------------------------------------------
+// ---- the CI watch ------------------------------------------------------
 // What the daily look found, planted where ciwatch keeps it: a CI section on
 // the Git view saying it in rows, a bell row while main is red, and Check now
 // replacing it with a fresh look (beta has no workflows, and it says so).
@@ -1608,7 +1608,7 @@ await section("the CI watch", async () => {
      && sect.rows.some(r => /^Runner: .*ubuntu-latest.*android\.yml:10/.test(r))
      && sect.rows.some(r => /^Action: .*setup-android.*v4 is out/.test(r)),
      `...each finding a row in words, with where it is (${JSON.stringify(sect.rows)})`);
-  // Its log in the dock (R133 step 12): the newest run's, a read-only tab
+  // Its log in the dock: the newest run's, a read-only tab
   // the server writes the run into once and ends, saying so.
   await page.click(`${NB} details.sect[data-sect="git:ci"] [data-cilog="11"]`);
   const ciTab = await page.waitForFunction(() => tabs.find(t => t.kind === 'term' && t.arg === 'log:ci:beta:11'), null, { timeout: 10000 })
@@ -1624,9 +1624,9 @@ await section("the CI watch", async () => {
   ok(/The Android CI check failed on main/.test(bell) && /Git view/.test(bell) && /On GitHub/.test(bell)
      && link === 'https://github.com/o/beta/actions/runs/11',
      `the bell carries a row while main is red, with the way to the Git view (${bell.slice(0, 80)})`);
-  // Its buttons each one line tall, their words whole (B332). A red main
+  // Its buttons each one line tall, their words whole. A red main
   // blocks work, so the row stands in Active with no Dismiss: it leaves
-  // when the branch is green again (R280, the operator, 24 Nov).
+  // when the branch is green again.
   const tall = await page.$eval('#bellPanel', p => {
     const row = [...p.querySelectorAll('.bnote')].find(n => /CI failing in beta/.test(n.textContent));
     return [...row.querySelectorAll('.acts a, .acts button')].map(a => { const r = a.getBoundingClientRect(), lh = parseFloat(getComputedStyle(a).lineHeight) || 16;
@@ -1642,7 +1642,7 @@ await section("the CI watch", async () => {
   ok(!held.dismiss && /^Active/.test(held.under), `a red main stands in Active with no Dismiss (${JSON.stringify(held)})`);
   await page.evaluate(() => postJSON('/api/bell', { action: 'restore' }));
   await page.evaluate(() => toggleBell(false));
-  // R117 step 4: the runner row carries Fix, which writes that one line into
+  // The runner row carries Fix, which writes that one line into
   // the working tree, uncommitted, and Changes shows it; nothing is pushed.
   {
     const GITENV = { ...process.env, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 't@example.invalid',
@@ -1655,7 +1655,7 @@ await section("the CI watch", async () => {
     await page.evaluate(() => openNotebook('beta', 'git'));
     await page.waitForSelector(`${NB} [data-cifix="android.yml:10"]`, { timeout: 15000 });
     ok(await page.$$eval(`${NB} [data-cifix]`, bs => bs.length) === 1, 'only the finding that carries a fix offers Fix');
-    await openFold(page, `${NB} [data-sect="git:ci"]`);   // one section open at a time (the operator, 5 Oct)
+    await openFold(page, `${NB} [data-sect="git:ci"]`);   // one section open at a time
     await page.click(`${NB} [data-cifix="android.yml:10"]`);
     await page.waitForFunction(sel => [...document.querySelectorAll(sel)].some(e => /android\.yml/.test(e.textContent)),
                                `${NB} details.gfile summary`, { timeout: 15000 });
@@ -1673,7 +1673,7 @@ await section("the CI watch", async () => {
                              `${NB} details.sect[data-sect="git:ci"] .sst`, { timeout: 20000 });
   const fresh = JSON.parse(readFileSync(`${DIR}/state/ciwatch/beta.json`, 'utf8'));
   ok(fresh.findings.length === 0 && fresh.workflows === 0, 'Check now looks again and keeps it: beta has no workflows');
-  // B81: and the section says that, not "nothing drifting" in green.
+  // And the section says that, not "nothing drifting" in green.
   const bare = await page.$eval(`${NB} details.sect[data-sect="git:ci"]`, d => ({
     ok: d.querySelector('.sst').classList.contains('ok'), said: d.querySelector('.body .sub').textContent }));
   ok(!bare.ok && /no workflow in \.github\/workflows/.test(bare.said),

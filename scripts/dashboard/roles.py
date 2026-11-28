@@ -1,4 +1,4 @@
-"""Roles and permissions (R137): what an account may read and change, as
+"""Roles and permissions: what an account may read and change, as
 named roles made of grants, kept in roles.json beside users.json.
 
 A grant is a CAPABILITY on a SCOPE. The capabilities are the actions the
@@ -13,7 +13,7 @@ owner, admin and user are built in, with grants that reproduce what each
 could do before roles existed, so nothing changes until a role is made or
 given. Built-in roles are not edited: copy one into a role of your own.
 
-The operator, 5 Oct: the permission settings were too inconsistent, and a
+The permission settings were too inconsistent, and a
 person should be given a group of permissions.
 """
 import contextlib
@@ -26,58 +26,58 @@ import statefile
 
 NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
 
-# ---- R152: areas, each Read and Write -------------------------------------
-# The operator, 7 Oct: a role is a scope and, per area, Read or Write;
+# ---- areas, each Read and Write -------------------------------------------
+# A role is a scope and, per area, Read or Write;
 # Write needs Read, and an area without Read is not seen. Project areas hold
 # on a project (a Global role's on every one, a role given on a project on
 # that one); global areas only through a Global role, which only an
 # administrator gives. Each sentence is what the Roles tab shows.
 AREAS = (
     ("projects", "Spaces", "project", "its notebook and code", "an agent's session, edits, builds and tests"),
-    # Locking is its owner's or an administrator's (R119), never this area's.
+    # Locking is its owner's or an administrator's, never this area's.
     ("settings", "Space settings", "project", "the settings", "change them, rename and delete"),
     ("releases", "Releases and versions", "project", "versions and releases", "move the version and release"),
     ("gitauth", "Git authentication", "project", "how it authenticates", "change the credential"),
     ("files", "File access", "project", "the files over FTP or in an editor", "save, upload, rename and delete them"),
     ("containers", "Containers", "project", "its containers and their logs", "start, stop and rebuild them"),
-    # A project's VMs (R91): Read sees them on the VMs page, Write makes,
+    # A project's VMs: Read sees them on the VMs page, Write makes,
     # starts, stops, snapshots and removes them.
     ("vms", "VMs", "project", "its VMs and their state", "make, start, stop, snapshot and remove them"),
     ("terminal", "Terminal", "project", "the shielded agent console", "the full tmux shell"),
-    # Where its software goes (R281, the operator, 25 Nov): Read sees its
+    # Where its software goes: Read sees its
     # Kubernetes environments and what runs in them, Write deploys, rolls
     # back, restarts and scales. Owner roles gained it on upgrade (0033).
     ("deploy", "Deploy", "project", "its environments and their logs", "deploy, roll back, restart and scale"),
     ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a space's sessions reach"),
-    # The Kubernetes clusters a space may deploy to (R281 step 2): Read sees
+    # The Kubernetes clusters a space may deploy to: Read sees
     # them and their namespaces, Write adds, tests and forgets one.
     ("clusters", "Clusters", "global", "the Clusters page", "add, test and forget clusters"),
-    # What the Library and the Installed page do (R174, the operator, 28
-    # Oct): Install and Configure on a node, each grantable node by node,
+    # What the Library and the Installed page do:
+    # Install and Configure on a node, each grantable node by node,
     # and Curate, the catalog's own entries, which every node shares.
     ("install", "Install", "global", "the Library and the Installed page", "install, update and remove toolchains, coding agents and packs on a node"),
     ("configure", "Configure", "global", "a service's and a pack's settings on a node", "change them, and deploy or remove a service there"),
     ("curate", "Curate", "global", "the catalog's own entries", "add your own pack or app, edit and remove it"),
     ("jobs", "Jobs", "global", "the Jobs page", "run a command on a node"),
-    # Scheduled scripts (R117): an administrator's own cron, given to no
+    # Scheduled scripts: an administrator's own cron, given to no
     # other role unless somebody says so.
     ("schedules", "Schedules", "global", "the Schedules page and its runs", "add, change and run schedules"),
     ("runner", "CI runner", "global", "the runner tab", "install and configure runners"),
     ("accounts", "Accounts and roles", "global", "the Users and Roles pages", "add accounts, give roles"),
     ("newprojects", "New spaces", "global", "the nodes a space may be made on", "make a space, and own it"),
     ("controller", "Controller", "global", "settings and diagnostics", "settings, debug, pinned commands"),
-    # The Storage tab (R169): what every node's disks hold, by project.
+    # The Storage tab: what every node's disks hold, by project.
     # Read sees it; Write measures a node again now.
     ("storage", "Storage", "global", "the Storage page", "measure a node's disks now"),
 )
 # The areas a Global role may hold on named nodes alone (its `nodes`, none
-# named being every node): what reaches a machine (the operator, 7 Oct).
+# named being every node): what reaches a machine.
 NODE_AREAS = frozenset({"nodes", "install", "configure", "jobs", "newprojects", "storage"})
 # The areas an Everywhere role may hold instance by instance, each at its own
-# level (the operator, 16 Oct: expand an area's row to say which nodes, which
+# level (expand an area's row to say which nodes, which
 # runners, Read or Write on each, the area's own boxes ticking every one).
 # A node area's instances are nodes, by id; a runner is NODE_ID/SLOT; a
-# Kubernetes cluster its id (R281 step 2, as Nodes is asked node by node). Held
+# Kubernetes cluster its id (as Nodes is asked node by node). Held
 # in a role's `only`: {area: {instance: level}}; an area not in it holds on
 # every instance, those added later included.
 INSTANCE_AREAS = NODE_AREAS | {"runner", "clusters"}
@@ -106,7 +106,7 @@ CAP_AREA = {
     # person on its list reaches no more than their own roles' File access
     # gives (ftp.access_for).
     "ftp": ("files", "write"),
-    # Each its own area (R255 step 3, the operator, 16 Oct): what these
+    # Each its own area: what these
     # gated was behind accounts write whatever it was, so a role's areas
     # did not say what it could do.
     "controller": ("controller", "write"), "controller-read": ("controller", "read"),
@@ -116,26 +116,26 @@ CAP_AREA = {
     "vms-write": ("vms", "write"), "vms-read": ("vms", "read"),
     "settings": ("settings", "write"), "signing": ("releases", "write"),
     # A container written on the Containers page for no space: every space's
-    # at once, so an Everywhere role's (R277, the audit of 24 Nov).
+    # at once, so an Everywhere role's.
     "docker-any": ("containers", "write"),
     # One space's containers, their state and their logs: Containers Read
     # on that space, as the area's sentence says.
     "docker-read": ("containers", "read"),
     # A repository in the bin whose space is gone: no space's, so Space
-    # settings Write held Everywhere (R277).
+    # settings Write held Everywhere.
     "trash-any": ("settings", "write"),
     # A shell on no space (the workspace's, a scratch one): every space's
-    # trees at once, so Terminal Write held Everywhere (R277).
+    # trees at once, so Terminal Write held Everywhere.
     "terminal-any": ("terminal", "write"),
     # The Nodes page and what is read with it (a node's router, the scanners):
-    # Nodes Read, on the node where one is named (R277: an action no table
+    # Nodes Read, on the node where one is named (an action no table
     # named fell to Spaces Write held anywhere).
     "nodes-read": ("nodes", "read"),
-    # The CI runner page, read: CI runner Read (R277: the page was drawn on
+    # The CI runner page, read: CI runner Read (the page was drawn on
     # Write alone, though the runners readable were served).
     "runner-read": ("runner", "read"),
     # A node's services' settings, read (nginx, the scanners, the model
-    # router): Configure Read, as the area says (R277).
+    # router): Configure Read, as the area says.
     "configure-read": ("configure", "read"),
 }
 
@@ -144,20 +144,20 @@ _ALL = {a: "write" for a in AREA_KEYS}
 RESERVED = frozenset({"user", "session"})
 
 BUILTIN = {
-    # Named for a person (R255 step 1): AerieOS's owner is not a
+    # Named for a person: AerieOS's owner is not a
     # project's, and neither is the Owner of X role a project's owner holds.
     "owner": {"scope": "global", "perms": dict(_ALL), "builtin": True, "only": {}, "label": "AerieOS's owner",
               "note": "the account every other rule is a guard rail around"},
     "admin": {"scope": "global", "perms": dict(_ALL), "builtin": True, "only": {}, "label": "Administrator",
               "note": "everything the owner may do, except change the owner's account or roles"},
 }
-# There is no built-in user role (the operator, 7 Oct): an account on `user`
+# There is no built-in user role: an account on `user`
 # is moved to no role and so no permission, and a project's owner holds
 # PROJECT_owner, given on that project, with every project area to write.
 OWNER_PERMS = {a: "write" for a in PROJECT_AREAS}
 
 
-# registry.label, handed over by the server (R138): a project's name as a
+# registry.label, handed over by the server: a project's name as a
 # person reads it, which its owner role is named for. Unset, the name given.
 label_of = None
 
@@ -229,7 +229,7 @@ _read_kept = [None, None]
 
 
 def _read():
-    # What the file is, looked at once a request (statefile.sig, R228 step 1).
+    # What the file is, looked at once a request (statefile.sig).
     sig = statefile.sig(FILE) if FILE else None
     if sig is None:
         return {}
@@ -255,7 +255,7 @@ def _save(custom, two_factor=None):
 
 
 def _two_factor_list():
-    """The roles an administrator requires a second factor of (R127),
+    """The roles an administrator requires a second factor of,
     built in ones included."""
     v = _read()
     got = v.get("two_factor") if isinstance(v, dict) else None
@@ -316,7 +316,7 @@ def all_roles():
         for n, r in sorted(_load().items()):
             out[n] = dict(r, name=n, two_factor=n in tf)
             # A project's owner role reads as whose it is, not as its key,
-            # by the name the project is shown under, not its folder (B102).
+            # by the name the project is shown under, not its folder.
             if str(r.get("note") or "").startswith("the owner of ") and n.endswith("_owner"):
                 out[n]["label"] = "Owner of " + shown(str(r["note"])[len("the owner of "):])
     return out
@@ -380,27 +380,27 @@ def remove(name):
 
 def roles_of(u):
     """The roles an account carries everywhere: its list, or the one its role
-    names (every account from before R137). The ones it carries on a single
+    names (an account made before roles were a list). The ones it carries on a single
     project are project_roles_of's."""
     if not isinstance(u.get("roles"), list):
         return [str(u.get("role") or "user")]
     rs = [str(r) for r in u["roles"] if str(r)]
     # Owner and admin stay what the account's role says (is_admin reads it);
-    # anything else is the list, which is the whole answer since R152.
+    # anything else is the list, which is the whole answer.
     base = str(u.get("role") or "")
     if base in BUILTIN and base not in rs:
         rs.insert(0, base)
     return rs
 
 
-# repos.key_of, handed over by the server (R138): a project's roles are kept
+# repos.key_of, handed over by the server: a project's roles are kept
 # by project, and a repository is asked about through its project's.
 home_of = None
 
 
 def project_roles_of(u, project):
-    """The roles an account was given on `project` alone (R152), a
-    repository's being its project's (R138)."""
+    """The roles an account was given on `project` alone, a
+    repository's being its project's."""
     pr = u.get("project_roles") if isinstance(u.get("project_roles"), dict) else {}
     if project is None:
         return []
@@ -418,8 +418,8 @@ def level_of(u, area, project=None, on_project=None, node=None, everywhere=False
     """The level this account holds on `area` ("", read or write), on
     `project` where one is named. An Everywhere (global) role holds
     everywhere; a role on a project holds on the project it is given on, and
-    nowhere through the account's own list since R155 (the operator, 8 Oct:
-    one way to give a project role). A global area is only ever an
+    nowhere through the account's own list
+    (one way to give a project role). A global area is only ever an
     Everywhere role's. With no project named, the best it holds anywhere.
     `on_project` is kept in the signature for the callers that pass it.
     `everywhere` counts the Everywhere roles alone, for an action that
@@ -467,7 +467,7 @@ def granted(u, action, project=None, on_project=None, node=None, nodes_of=None, 
     CAP_AREA), on `project` where one is named. A node's actions are global
     areas, held through a Global role on every node."""
     # An action not listed on its own (roadmap, bugs, pending, a project's
-    # settings saved) is work on the project, as before R152.
+    # settings saved) is work on the project.
     area, need = CAP_AREA.get(action, ("projects", "write"))
     lvl = level_of(u, area, project if area in PROJECT_AREAS else None, on_project,
                    node if area in NODE_AREAS else None, everywhere=action in EVERYWHERE_ONLY,

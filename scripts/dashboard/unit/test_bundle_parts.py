@@ -1,5 +1,5 @@
-"""Everything the bundle a node fetches is made of is in the image (R246;
-the audit of 13 Nov): the bundle is built from the install's own files, a
+"""Everything the bundle a node fetches is made of is in the image:
+the bundle is built from the install's own files, a
 part that is not there was left out without a word, and the Dockerfile
 copies nodes/ one file at a time, so a new root helper reached no node
 until its own COPY line was written. Held here for every part, and said by

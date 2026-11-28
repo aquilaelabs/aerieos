@@ -1,4 +1,4 @@
-"""A node heard again re-asks the doctor (the operator, 19 Oct: after a crash
+"""A node heard again re-asks the doctor (after a crash
 the card kept saying two nodes were not dialing in long after
 both were back). Two ways that ask was lost: one made while a run was out was
 dropped, and a starting agent's beat made the node live before its hello, so

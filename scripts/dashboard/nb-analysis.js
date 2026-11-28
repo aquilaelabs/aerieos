@@ -1,6 +1,6 @@
 // The notebook's Analysis view, the code base read out, and the preamble a
 // session is handed. One classic script beside index.html, the shape tab-*.js
-// has (docs/nodes.md §13): one file per notebook view (R60). A factory
+// has (docs/nodes.md §13): one file per notebook view. A factory
 // makeNotebook calls per notebook.
 
 "use strict";
@@ -26,7 +26,7 @@ function nbAnalysisView({$, nb, project}){
       for (const rep of findings.reports)
         for (const f of rep.findings)
           if (f.project === project) rows.push(f);
-      // The glance (R109): the findings by level, the worst first, an error
+      // The glance: the findings by level, the worst first, an error
       // in its color; a clean scan said on the line instead.
       const lv = {};
       rows.forEach(f => lv[f.level] = (lv[f.level] || 0) + 1);
@@ -37,10 +37,10 @@ function nbAnalysisView({$, nb, project}){
       // narrowing shared by both surfaces, so learning one is learning the
       // other. The bar only appears when there is something to narrow.
       const shown = fxFilter(rows, anaFx);
-      // Built a rule at a time, a page of rules (pageLimit, R228 step 13).
+      // Built a rule at a time, a page of rules (pageLimit).
       const nRules = new Set(shown.map(f => f.rule ?? "none")).size;
       const lim = pageLimit(list, "anaList", nRules);
-      // Patched (R244): the find box in the bar keeps its caret while the list
+      // Patched: the find box in the bar keeps its caret while the list
       // under it narrows, and a scan landing leaves it as it is.
       patch(list, (rows.length ? fxBarBand(rows, anaFx) : "")
         + (rows.length && !shown.length
@@ -70,7 +70,7 @@ function nbAnalysisView({$, nb, project}){
   // cached by commit on the server, so this is cheap after the first time.
   let codeData = null;
   // Asked on every show of the briefing, and by the rules load beside it:
-  // one read answers everyone who asks while it is out (B218).
+  // one read answers everyone who asks while it is out.
   function loadCodebase(){
     return reading(`${project}:codebase`, async () => {
       codeData = await getJSON("/api/codebase?project=" + encodeURIComponent(project));

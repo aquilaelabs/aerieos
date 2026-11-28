@@ -1,5 +1,5 @@
-"""aerie lint's own checks (scripts/lib/lint-checks.py), which had no test
-(R246; the audit of 13 Nov): the layout check answered 1 for a tracked file
+"""aerie lint's own checks (scripts/lib/lint-checks.py), which had no test:
+the layout check answered 1 for a tracked file
 its page does not name and the dispatcher dropped it, so lint printed FAIL
 and was clean; and the checks that compare against the newest release took
 git's version sort, which puts v0.9.0-dev.5341 above v0.9.0."""
@@ -66,10 +66,10 @@ class Verdicts(unittest.TestCase):
     def test_every_check_is_one_the_dispatcher_knows(self):
         self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "pinned", "channels", "shipped",
                                               "formats", "packs", "unraid", "changelog", "dupes", "releasekey",
-                                              "releasesigners", "selectors", "forms"})
+                                              "releasesigners", "selectors", "forms", "cites"})
 
     def test_a_field_written_outside_formField_only_ever_gets_rarer(self):
-        # R301: a form is formBox and formField; the fields page code writes
+        # A form is formBox and formField; the fields page code writes
         # outside them are counted per file against a baseline that only falls.
         os.makedirs(os.path.join(self.d, "scripts", "dashboard", "test"))
         self.put("scripts/dashboard/test/forms-baseline.json", '{"tab-x.js": 1}\n')
@@ -93,8 +93,37 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(rc, 1, "a file the baseline does not name may write none: " + said)
         self.assertIn("tab-y.js: 1 fields written outside formField, 0 before", said)
 
+    def test_a_number_of_the_notebook_s_or_a_dated_instruction_only_ever_gets_rarer(self):
+        # A comment says what the code does and why; who asked and when is the
+        # commit's, and a tracker's number is the notebook's. Counted per
+        # tracked source file against a baseline that only falls.
+        os.makedirs(os.path.join(self.d, "scripts", "dashboard", "statemigrations"))
+        os.makedirs(os.path.join(self.d, "tools"))
+        self.put("tools/cites-baseline.json", '{"scripts/ids.py": 2}\n')
+        self.put("scripts/ids.py", '"""A roadmap item is R12 and a bug is B62."""\n')
+        self.put("scripts/plain.py", "x = 1   # noqa: B018 (a linter's rule, not a bug)\nRFC = 'R2D2'\n")
+        self.put("scripts/dashboard/statemigrations/0001_first.py", "# from before R152 (the operator, 7 Oct)\n")
+        self.put("scripts/notes.md", "R4 and B7 are examples in a doc, which is not source\n")
+        self.git("add", "-A")
+        rc, said = self.run_check("cites")
+        self.assertEqual(rc, 0, "the ids' own module at its baseline, a linter's code, a shipped migration and a doc: " + said)
+        self.assertIn("2 left in 1 files", said)
+        self.put("scripts/plain.py", "x = 1   # the fix for B340 (the operator, 3 Nov: no jump)\n")
+        rc, said = self.run_check("cites")
+        self.assertEqual(rc, 1, said)
+        self.assertIn("scripts/plain.py: 2 tracker numbers or dated citations, 0 allowed", said)
+        self.put("scripts/plain.py", "x = 1\n")
+        self.put("scripts/ids.py", '"""A roadmap item is R12."""\n')
+        rc, said = self.run_check("cites")
+        self.assertEqual(rc, 1, "a count that fell is written down, so it cannot rise back: " + said)
+        self.assertIn("scripts/ids.py: 1 tracker numbers or dated citations, 2 in tools/cites-baseline.json: lower it to 1", said)
+        self.put("tools/cites-baseline.json", '{"scripts/ids.py": 1, "scripts/gone.py": 3}\n')
+        rc, said = self.run_check("cites")
+        self.assertEqual(rc, 1, said)
+        self.assertIn("scripts/gone.py is in tools/cites-baseline.json and is no tracked source file", said)
+
     def test_a_has_inside_a_has_is_refused_and_one_beside_another_is_not(self):
-        # R278: a browser drops a rule whose selector nests :has(), every
+        # A browser drops a rule whose selector nests :has, every
         # selector in its list with it, and says nothing.
         os.makedirs(os.path.join(self.d, "scripts", "dashboard"))
         self.put("scripts/dashboard/page-x.css",
@@ -108,7 +137,7 @@ class Verdicts(unittest.TestCase):
         self.assertIn("page-x.css", said)
 
     def test_an_action_named_by_a_tag_is_a_note_anywhere_and_a_failure_here(self):
-        # R206: an action at @v4 runs whatever its publisher points v4 at,
+        # An action at @v4 runs whatever its publisher points v4 at,
         # in jobs that hold the release key.
         os.makedirs(os.path.join(self.d, ".github", "workflows"))
         sha = "3d3c42e5aac5ba805825da76410c181273ba90b1"

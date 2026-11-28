@@ -15,7 +15,7 @@ import os
 
 def scope_dir(project, *parts):
     """This account's AerieOS cache folder for `project`, or the path
-    `parts` name under it. The account is in the path on purpose (B159): on
+    `parts` name under it. The account is in the path on purpose: on
     a node every account's ~/.cache is a link to the base home's, so the id
     is all that separates one account's files from another's. With no home
     to keep it under, a folder of this user's own in /tmp."""

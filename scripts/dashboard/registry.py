@@ -1,4 +1,4 @@
-"""Projects by id (R154, the operator, 8 Oct).
+"""Projects by id.
 
 A project has three things that used to be one: a permanent number (its id),
 the directory it lives in under /workspace, and the name people see. The
@@ -12,12 +12,12 @@ one's notebook or containers, and a rename is the shown name alone.
 
 projects.json: {"next": N, "projects": {dir: {"id", "name", "state", "at",
 "moved"}}}, state being live, trashed or purged, and moved when it last
-changed (the trash's "deleted 2 min ago"). A project (R138, repos.py) is a
+changed (the trash's "deleted 2 min ago"). A project (repos.py) is a
 record of its own in state `repos`: a key shaped like a directory and counted
 as one, so no folder ever takes it, though none is on disk; its id and name
 are the project's, and every repository is in one, keeping its own record,
 folder and name. A project's name is a title (spaces and punctuation kept,
-title()); a repository's is GitHub's (clean_name). Each is unique among its
+title); a repository's is GitHub's (clean_name). Each is unique among its
 own kind, so a project and its repository may share one. Only AerieOS
 makes a repository: a folder made by hand on the share is not one. On the
 first run every folder already there is recorded, which is the whole
@@ -39,7 +39,7 @@ STATES = ("live", "trashed", "purged", "repos")
 # The states a name is taken in: a live project's, and a project of
 # repositories'.
 NAMED = ("live", "repos")
-# GitHub's for a repository's name (the operator, 9 Oct): a project is one,
+# GitHub's for a repository's name: a project is one,
 # or becomes one, and a name GitHub would refuse or rewrite is not one to show.
 NAME_MAX = 100
 
@@ -54,8 +54,8 @@ def configure(*, state, workspace, write_json):
 
 
 def _load():
-    # What the file is, looked at once a request (statefile.sig, R228 step
-    # 1): a status read asked here some seven hundred times.
+    # What the file is, looked at once a request (statefile.sig):
+    # a status read asked here some seven hundred times.
     m = statefile.sig(FILE) if FILE is not None else None
     if m is not None and m == _cache["mtime"] and _cache["data"] is not None:
         return _cache["data"]
@@ -106,8 +106,8 @@ def _on_disk():
 
 def sync():
     """Bring the records in step with the disk. Only AerieOS makes a
-    project (create, clone, an imported archive: claim()); a folder made by
-    hand on the share is not one and is not listed (the operator, 8 Oct).
+    project (create, clone, an imported archive: claim); a folder made by
+    hand on the share is not one and is not listed.
     The one exception is the first run, when every folder already there is
     recorded, which is the whole migration. After that a record follows its
     folder: gone from the workspace it is trashed or purged, and moved back
@@ -127,7 +127,7 @@ def sync():
         # clash numbered "Name (2)") is brought to them once, as it would have
         # been given: numbered if another live project already has it. A
         # repository's name alone: a project's keeps its spaces and
-        # punctuation (R138).
+        # punctuation.
         for name, r in ps.items():
             was = str(r.get("name") or "")
             if was and r.get("state") != "repos" and not r.get("project") and clean_name(was) != was:
@@ -138,7 +138,7 @@ def sync():
         # Not a folder of the projects there, and records say there were: the
         # disk is not (not mounted yet, a stick's hold, a move landed before
         # its folder was named), not every project gone at once. A purge has
-        # no way back and takes the owners with it (B595).
+        # no way back and takes the owners with it.
         absent = not live and not gone
         for name, r in ps.items():
             st = r.get("state")
@@ -192,16 +192,16 @@ def labels():
 
 def clean_name(raw):
     """A shown name by GitHub's rules for a repository's: ASCII letters,
-    digits, - _ and . only, each run of anything else one -, as GitHub turns
-    "Turing Lens" into Turing-Lens, at most NAME_MAX, and never . or ..
-    (the operator, 9 Oct: a rename to "Turing Lens" kept the space)."""
+    digits, - _ and. only, each run of anything else one -, as GitHub turns
+    "Turing Lens" into Turing-Lens, at most NAME_MAX, and never. or ..
+    (a rename to "Turing Lens" kept the space)."""
     s = re.sub(r"[^A-Za-z0-9._-]+", "-", str(raw or "").strip()).strip("-")
     s = s[:NAME_MAX].strip("-")
     return "" if s in (".", "..") else s
 
 
 def title(raw):
-    """A project's name (R138, the operator, 25 Oct): what was typed, spaces
+    """A project's name: what was typed, spaces
     and punctuation kept, each run of whitespace one space, no control
     character, at most NAME_MAX."""
     s = " ".join("".join(ch for ch in str(raw or "") if ch.isprintable()).split())
@@ -230,7 +230,7 @@ def live_named(name, but=None, kind=None):
 
 
 def is_repos(key):
-    """Whether this key is a project's (R138), as against a repository's."""
+    """Whether this key is a project's, as against a repository's."""
     r = _load()["projects"].get(str(key or ""))
     return bool(r) and r.get("state") == "repos"
 
@@ -241,7 +241,7 @@ def repos_keys():
 
 
 def claim_repos(name):
-    """A new project (R138): its key, a directory nothing has had, made from
+    """A new project: its key, a directory nothing has had, made from
     its name, and its record under the name, refused where another project
     has it. The record with its key, or {error}."""
     with _lock:
@@ -258,7 +258,7 @@ def claim_repos(name):
 
 
 def drop_repos(key):
-    """A project deleted (R138, only with no repository left in it): purged,
+    """A project deleted (only with no repository left in it): purged,
     so its key and id are never handed out again, as a deleted
     repository's are."""
     with _lock:
@@ -274,7 +274,7 @@ def drop_repos(key):
 def unique_name(name, but=None):
     """`name`, or `name-2`, `name-3`, as a directory is numbered: never the
     name a live project is shown under, so two clones of one repository read
-    apart (the operator, 8 Oct), and a name GitHub would take as it is."""
+    apart, and a name GitHub would take as it is."""
     name = clean_name(name)
     cand, n = name, 2
     while live_named(cand, but=but, kind="live"):
@@ -289,7 +289,7 @@ def taken_dirs():
     purged ones too (their notebook, settings, containers and transcripts
     are kept under it, and a new project would inherit them), and anything
     on disk. The New project dialog reads it to say before Create when the
-    folder will be numbered (B63)."""
+    folder will be numbered."""
     with _lock:
         ps = _load()["projects"]
         live, gone = _on_disk()
@@ -325,7 +325,7 @@ def claim(dirname, name):
 def forget(dirname):
     """A create that never took (a clone that failed, an archive refused,
     git init failing): its record goes, so its folder is free again and the
-    next try with the name lands in it rather than in NAME-2 (B93). Only a
+    next try with the name lands in it rather than in NAME-2. Only a
     record whose folder is not there: nothing was ever kept under it."""
     with _lock:
         d = _load()
@@ -364,7 +364,7 @@ def set_name(dirname, name):
 
 def note_project(dirname, key):
     """The project a repository last belonged to, kept on its record as it
-    goes to the trash (R138): what the trash says it belonged to, and where
+    goes to the trash: what the trash says it belonged to, and where
     a restore puts it back."""
     with _lock:
         d = _load()
@@ -396,7 +396,7 @@ def mark(dirname, state):
 
 
 def resolve(word):
-    """A live project's directory, or a project of repositories' key (R136),
+    """A live project's directory, or a project of repositories' key,
     from what somebody typed: the directory or key itself, its id (P3), else
     a shown name that is one project's. "" when none of them."""
     word = str(word or "").strip()

@@ -161,7 +161,7 @@ def configure(*, workspace, state, write_json, roadmap_mod=None, bugs_mod=None,
     globals()["FILE"] = Path(state) / "versions.json"
 
 
-# The tree a release is judged by, while one is (R206 step 4): (project,
+# The tree a release is judged by, while one is: (project,
 # a tree of the commit, the branch it was pushed on). This thread's alone:
 # every other question asked meanwhile is about the space's own directory.
 _judging = threading.local()
@@ -173,11 +173,11 @@ def root(project):
     cwd) when that is one of this project's. A session working in a
     worktree asked `aerie version --file` for a package name and was answered
     for the main checkout's HEAD, and shipped nothing rather than a file
-    named after a commit that did not hold its code (24 Sep): the branch's
+    named after a commit that did not hold its code: the branch's
     own commits, VERSION file and ordinal are what a build there is about.
     Checked to lie under the project's worktrees, or to be a worktree of
     the project's own repository wherever it is (a Claude Code worktree
-    under the project's .claude/worktrees, B214), so the variable cannot
+    under the project's .claude/worktrees), so the variable cannot
     point this at another project's tree."""
     at = getattr(_judging, "tree", None)
     if at and at[0] == project:
@@ -239,7 +239,7 @@ def components(project):
 
 
 # What a git read about history answered, kept per tree against a stamp of
-# the repository's own files (the operator, 18 Oct: the Artifacts view took
+# the repository's own files (the Artifacts view took
 # nine seconds on the controller, sixteen git commands on a network share at
 # half a second each, five of them repeats). Counts, a file's last commit, a
 # tag, an old VERSION: none of them moves until a commit, a tag or a fetch
@@ -299,12 +299,11 @@ def _git(project, *args, timeout=10, env=None):
             return kept[2][args]
     # GIT_OPTIONAL_LOCKS=0: a status here is a read, and the index lock it
     # would otherwise take can make a session's git in the same tree fail
-    # with index.lock: File exists (B155). A commit still takes the locks it
+    # with index.lock: File exists. A commit still takes the locks it
     # needs; only the optional one is skipped.
     out = None
     # A read about history that fails is tried once more: a push landing in
-    # the tree that moment fails it, and once was said as no history at all
-    # (B586).
+    # the tree that moment fails it, and once was said as no history at all.
     for attempt in range(2 if keep else 1):
         try:
             r = subprocess.run(["git", "-C", tree, *args],
@@ -358,8 +357,8 @@ def target(project, comp=""):
         # Every failed read was "not adopted here yet", and the answer then
         # fell back to git describe: Shebang-DevBoard, whose VERSION says
         # 0.5.5, got v0.5.4-13-g7766f70 from aerie version --file for a minute
-        # and filed builds under it, and the next call was right again (B524;
-        # the share answered this read with an error the controller's git
+        # and filed builds under it, and the next call was right again
+        # (the share answered this read with an error the controller's git
         # did not meet). The committed VERSION is asked for next; only a
         # file that is in neither place is a project that has not opted in.
         raw = _committed(project, p)
@@ -375,8 +374,8 @@ def target(project, comp=""):
 
 
 def _committed(project, path):
-    """The VERSION file as HEAD has it, or None: what target() reads when the
-    file on disk cannot be (B524)."""
+    """The VERSION file as HEAD has it, or None: what target reads when the
+    file on disk cannot be."""
     try:
         rel = path.resolve().relative_to(root(project).resolve())
     except (OSError, ValueError):
@@ -402,7 +401,7 @@ def _relspec(project, where):
 def no_history(project):
     """Why HEAD has no commit, in the one sentence that is true: the
     Artifacts view said "not a git repository, or no commits yet" beside a
-    Git view showing the repository (B456)."""
+    Git view showing the repository."""
     if _git(project, "rev-parse", "--git-dir") is not None:
         return "no commits yet: the version is counted from the first commit"
     return "not a git repository: Init on the Git view makes one"
@@ -428,7 +427,7 @@ def _repo(project):
             "tags": (_git(project, "tag", "--points-at", "HEAD") or "").splitlines()}
 
 
-# A branch's line (R112): the release it is working toward, said with
+# A branch's line: the release it is working toward, said with
 # `aerie version line X.Y.Z` (the branch's own git config) or read off a branch
 # named for it, claude/0.7.0 or release/v0.6.2.
 LINE_RE = re.compile(r"(?:^|/)v?(\d{1,4}\.\d{1,5}\.\d{1,6})$")
@@ -447,7 +446,7 @@ def branch_of(project):
 
 def line(project):
     """The release this branch is working toward, or "": its own setting,
-    else its name's version (R112, the operator, 22 Oct: some work toward
+    else its name's version (some work toward
     0.7.0, some toward 0.6.2, at once)."""
     b = branch_of(project)
     if not b:
@@ -469,8 +468,8 @@ def line_of(project, branch):
 
 
 def forward(project, source, env=None):
-    """Merge a released patch line into this branch's later line (R112 step
-    3): `source` is the patch line's branch (or its release tag). The merge
+    """Merge a released patch line into this branch's later line:
+    `source` is the patch line's branch (or its release tag). The merge
     keeps this line's VERSION, stitches the changelog (changelog.stitch:
     the patch's dated sections placed by version, its released entries not
     repeated in this line's Unreleased), and commits naming what it carried.
@@ -527,8 +526,8 @@ def forward(project, source, env=None):
 
 
 def backport(project, commit, env=None):
-    """A commit from a later line carried back onto this patch line (R112
-    step 4): cherry-picked, this line's VERSION kept, and the changelog
+    """A commit from a later line carried back onto this patch line:
+    cherry-picked, this line's VERSION kept, and the changelog
     entries the commit added put under this line's Unreleased in their own
     categories rather than merged as text (the two files differ by every
     release between them). A conflict anywhere else is left for a person."""
@@ -598,7 +597,7 @@ def parts(project, comp="", repo=None):
     tgt, err = target(project, comp)
     # A line newer than VERSION is what a dev build here heads for: after
     # 0.6.1 shipped, a 0.7.0 branch built as 0.6.1-dev.N, sorting before
-    # the release it came after (R112).
+    # the release it came after.
     if not comp and tgt and _VER.fullmatch(tgt):
         ln = line(project)
         if ln and vkey(ln) > vkey(tgt):
@@ -646,10 +645,10 @@ _PRE_TAG = re.compile(r"v(\d{1,4}\.\d{1,5}\.\d{1,6})-([a-z][a-z0-9]{0,15})\.(\d{
 def pre_on_head(tags, tgt, comp=""):
     """The pre-release HEAD is tagged as, X.Y.Z-LABEL.N, or "".
 
-    A build of the tag reports the number the tag says (R217): the image's
+    A build of the tag reports the number the tag says: the image's
     workflow stamped the tag's own words while this said X.Y.Z-dev.N+sha of
-    the same commit, and a release candidate's tag read here as a dev build
-    (R206 step 9). Where HEAD carries several, the one this build was
+    the same commit, and a release candidate's tag read here as a dev build.
+    Where HEAD carries several, the one this build was
     started for (BB_VERSION_TAG, which a tag's workflow sets) is taken, then
     one of this tree's own version, the newest, a named one before a dev
     build's.
@@ -706,7 +705,7 @@ def render(project, comp="", repo=None):
             # The ordinal stays in the two forms Windows compares, as it does
             # for a dev build: 1.2.3 read as MSI 1.2.3 ranked BELOW the
             # 1.2.390 of the dev build before it, and the upgrade did not
-            # fire (B276).
+            # fire.
             a3, b3, _c3 = tgt.split(".")
             forms.update(semver=tgt + (f"+{mark}" if mark else ""),
                          pep440=tgt + (f"+{mark}" if mark else ""),
@@ -768,7 +767,7 @@ def render(project, comp="", repo=None):
 # Who may move it
 
 def load():
-    d = statefile.read_json(FILE)            # read once while the same file (R228 step 1)
+    d = statefile.read_json(FILE)            # read once while the same file
     if isinstance(d, dict) and isinstance(d.get("projects"), dict):
         return d
     return {"projects": {}}
@@ -852,14 +851,14 @@ def _branch_facts(project):
 
 def lands(project, comp="", facts=None):
     """Where this block's number lives against the branch builds come from,
-    in the words the version row and `aerie version` both print (B338).
+    in the words the version row and `aerie version` both print.
 
     A bump commits on whatever branch the checkout is on and never pushes,
     and that stays: a bump can belong in a release branch's pull request.
     What was missing is saying so. A project released from main was bumped
     to 0.8.0 on a branch already merged into main, unpushed, while the tab
     showed 0.8.0 and main still read 0.7.0, so its release found nothing
-    new to tag. Release refuses the same situation (B94); the bump only
+    new to tag. Release refuses the same situation; the bump only
     has to say it.
 
     `now` is said whenever the number here and the one builds come from
@@ -928,7 +927,7 @@ def lands(project, comp="", facts=None):
 def current_tag(project, comp=""):
     """The tag of the version this tree is on, once it is released: (tag,
     "") or ("", why). What aerie version release --edit edits unless it names
-    another (R139)."""
+    another."""
     tgt, err = target(project, comp)
     if err:
         return "", err
@@ -942,10 +941,10 @@ def current_tag(project, comp=""):
 
 def channel_of(project, dev=False, stable=False):
     """(dev, words): whether a session's release is the dev build's, and
-    the channel it lands on said for the person (R190 step 1). Asked for
+    the channel it lands on said for the person. Asked for
     neither, a release from a branch other than the one builds ship from
-    is a dev pre-release: a stable one from claude/0.9.0 had to be pulled
-    (the operator, 30 Oct). --stable asks for a stable one, which is cut only
+    is a dev pre-release: a stable one from claude/0.9.0 had to be pulled.
+    --stable asks for a stable one, which is cut only
     from a commit on the branch builds ship from (_not_from_here)."""
     f = _branch_facts(project) if not (dev or stable) else None
     if f and f["branch"] and f["branch"] != f["base"]:
@@ -954,9 +953,9 @@ def channel_of(project, dev=False, stable=False):
                  else "a stable release: it becomes Latest, and every install on the stable channel is offered it")
 
 
-# A pre-release's name (R217): dev, rc, beta, nightly, anything a tag can
+# A pre-release's name: dev, rc, beta, nightly, anything a tag can
 # carry after the version. Every name is numbered by the commit's ordinal, as
-# every dev build is stamped (R218): one clock for every name, so an install
+# every dev build is stamped: one clock for every name, so an install
 # on the dev channel tells which pre-release is newer whatever each is called,
 # and a build of the tag reports the number the tag says.
 _LABEL = re.compile(r"^[a-z][a-z0-9]{0,15}$")
@@ -1017,7 +1016,7 @@ def _stable_keep(project, comp=""):
 
 def _section_commit(project, comp, title, env=None, keep=None):
     """The changelog's section for the release `title`, written and committed
-    on its own before the tag (R217): a pre-release's from Unreleased, a
+    on its own before the tag: a pre-release's from Unreleased, a
     stable one's gathering every pre-release since the last stable. Returns
     an error sentence, or ""."""
     where = _sub(project, comp)
@@ -1044,8 +1043,8 @@ def _section_commit(project, comp, title, env=None, keep=None):
     return ""
 
 
-# Whether what the changelog owes stops a release or goes out with it said
-# (R255): the repository's Releases setting, "refuse" or "warn", handed over
+# Whether what the changelog owes stops a release or goes out with it said:
+# the repository's Releases setting, "refuse" or "warn", handed over
 # by whoever configures this module (the server, the verbs); refuse unless.
 release_gate = None
 
@@ -1078,13 +1077,13 @@ def _gaps_refusal(project, comp=""):
         return ""
 
 
-# A release is of a commit, and of the one that is pushed (R206 step 4).
+# A release is of a commit, and of the one that is pushed.
 #
 # The tag was judged by the controller's copy of the tree: its VERSION and
 # changelog as files, its `git status`. That copy is where a node's sync
 # lands, so it carried files a session keeps out of git, and once a mode bit
 # the share had changed, and every tag was refused for 'uncommitted changes'
-# the session's own status never showed (B628); a real change there, in a
+# the session's own status never showed; a real change there, in a
 # file nobody had committed, would as easily have been read into a release
 # it was not part of. So nothing of that directory's files is read: the
 # commit is the branch's head as origin has it, which must be the commit
@@ -1205,7 +1204,7 @@ def _of_the_commit(fn, project, env, remote, *a, **k):
 
 def _not_from_here(project, name, label):
     """Why a release that is not a dev build may not be cut from this
-    commit, or "" (the operator, 14 Nov): a stable release or a named
+    commit, or "": a stable release or a named
     pre-release is cut from a commit that is on the branch builds come from;
     a dev build is tagged where it was built. A space whose remote names no
     such branch is not held to it."""
@@ -1222,11 +1221,11 @@ def _not_from_here(project, name, label):
 
 def release_plan(project, comp="", dev=False, stable=False, pre="", env=None, may_push=True):
     """What a release here would tag, without doing it: {tag, sha, target}
-    or {error}, from the same refusals release() makes first. A session's
-    ask is made from this (aerie version release, R138), so the person asked
+    or {error}, from the same refusals release makes first. A session's
+    ask is made from this (aerie version release), so the person asked
     reads which tag on which commit, and a release that could not happen is
-    refused before anybody is asked. With `dev` the tag is the dev build's
-    (R179), as release() names it; planned as the plain one, a dev release
+    refused before anybody is asked. With `dev` the tag is the dev build's,
+    as release names it; planned as the plain one, a dev release
     was refused because the last release's tag already existed. Judged by
     the pushed commit, as the release is (_judged)."""
     if (dev or pre) and stable:
@@ -1252,12 +1251,12 @@ def _plan_in_tree(project, comp, dev, stable, label):
     if sha is None:
         return {"error": no_history(project)}
     # A pre-release writes its changelog section in a commit of its own
-    # first (R217), so its tag is on the commit after this one.
+    # first, so its tag is on the commit after this one.
     ahead = 1 if dev and _owes_section(project, comp) else 0
     base = tgt
     if dev:
         # The dev build's own number, as its stamp reads it: the branch's
-        # line where that is newer than VERSION (R112), so a 0.9.0 branch
+        # line where that is newer than VERSION, so a 0.9.0 branch
         # after 0.8.2 shipped tags v0.9.0-dev.N, never v0.8.2-dev.N.
         tgt, err = _pre_tgt(project, comp, tgt, label, ahead)
         if err:
@@ -1265,7 +1264,7 @@ def _plan_in_tree(project, comp, dev, stable, label):
     name = f"{comp}-v{tgt}" if comp else f"v{tgt}"
     if _git(project, "rev-parse", "--verify", "--quiet", f"refs/tags/{name}") is not None:
         # Tagged here and pushed by hand after the release's push failed:
-        # what is left is its page on the forge (B399).
+        # what is left is its page on the forge.
         on = _git(project, "rev-list", "-n", "1", "--abbrev-commit", name) or ""
         if on and (sha.startswith(on) or on.startswith(sha)):
             return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "pre": label, "channel": channel}
@@ -1278,22 +1277,22 @@ def _plan_in_tree(project, comp, dev, stable, label):
     if why := floor_behind(project, comp):
         return {"error": why}
     # A dev build is a release an install upgrades from as much as any
-    # (B988: 6054 and 6094 shipped at state 29 while the newest snapshot the
+    # (6054 and 6094 shipped at state 29 while the newest snapshot the
     # upgrade suite started from was 27), so it needs its snapshot at this
-    # tree's state too, as release() has it: its version's, the one its
+    # tree's state too, as release has it: its version's, the one its
     # stable release keeps.
     if why := no_upgrade_snapshot(project, comp, base):
         return {"error": why}
-    # ...and what the git host owes the tag's workflows, which release()
+    # ...and what the git host owes the tag's workflows, which release
     # meets last: asked here, a rehearsal and a person's Allow are never
-    # spent on a release the host would refuse (B1156).
+    # spent on a release the host would refuse.
     if why := host_owed(project, comp):
         return {"error": why}
     return {"tag": name, "sha": sha, "target": tgt, "dev": dev, "pre": label, "channel": channel,
             **({"section": True} if ahead or (not dev and _owes_stable_section(project, comp, tgt)) else {})}
 
 
-# A tree that keeps a /config snapshot per release (AerieOS's own, R79)
+# A tree that keeps a /config snapshot per release (AerieOS's own)
 # releases only a version it has one for: the upgrade suite starts every
 # later build on each release's snapshot, and a release without one is an
 # install nothing proves the next build can read.
@@ -1335,17 +1334,17 @@ def no_upgrade_snapshot(project, comp, tgt):
 CATALOG_FLOOR = "config/catalog-floor"
 catalog_made = None
 
-# A tree that rehearses its releases (R190 step 2) cuts a pre-release only
+# A tree that rehearses its releases cuts a pre-release only
 # from a commit a rehearsal passed on (step 6): the tag runs what the
 # rehearsal proves first, and a commit nobody rehearsed sent its paths to
-# the tag untried (6049's two deaths, 21 Nov). `rehearsed` is the server's
+# the tag untried (6049's two deaths). `rehearsed` is the server's
 # (forgeaccess): (project, sha) -> True, False, or why it cannot be told.
 REHEARSAL = ".github/workflows/release-rehearsal.yml"
 rehearsed = None
 
 
-# What the person owes on the git host for this tree's workflows (R267 step
-# 29): the server's (forgeaccess.owed), (project, wants) -> rows.
+# What the person owes on the git host for this tree's workflows:
+# the server's (forgeaccess.owed), (project, wants) -> rows.
 owes = None
 WORKFLOWS = ".github/workflows"
 
@@ -1469,7 +1468,7 @@ def _remote_has_tag(project, name, env=None):
 
 def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre=""):
     """Cut the release: an annotated tag on this commit, pushed. With `dev`
-    (R179) the tag is the dev build's, vX.Y.Z-dev.N, a pre-release on the
+    the tag is the dev build's, vX.Y.Z-dev.N, a pre-release on the
     dev channel: no bump, no changelog section, no snapshot gate, and the
     forge's release page is CI's to make (marked a pre-release there).
 
@@ -1483,7 +1482,7 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
     So this does not move VERSION and does not write the changelog: both
     were settled by the bump. It marks the commit and publishes the mark.
 
-    The tag's name is the same one `parts()` looks for, `vX.Y.Z`, and
+    The tag's name is the same one `parts` looks for, `vX.Y.Z`, and
     `<dir>-vX.Y.Z` for a component; otherwise `released` would stay false on
     a tag this very function made.
 
@@ -1509,7 +1508,7 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
 
 def rehearsal_section(project, comp="", env=None):
     """The changelog's section for the dev build a rehearsal is run for,
-    written and committed before the rehearsal (R190 step 2), so the
+    written and committed before the rehearsal, so the
     release later tags the very commit that was rehearsed rather than a
     changelog commit made after it: {"rolled": VERSION, "commit": SHA};
     {} where there is nothing to roll (Unreleased empty, and the newest
@@ -1567,12 +1566,12 @@ def _release_in_tree(project, comp, env, may_push, push, label):
         return {"error": no_history(project)}
     base = tgt
     # A pre-release writes its changelog section first, in a commit of its
-    # own, and is tagged on that commit (R217); a stable one does when no
+    # own, and is tagged on that commit; a stable one does when no
     # bump wrote its section, gathering the pre-releases since the last.
     section = _owes_section(project, comp) if dev else _owes_stable_section(project, comp, tgt)
     if dev:
         # The dev build's own number, as its stamp reads it: the branch's
-        # line where that is newer than VERSION (R112), so a 0.9.0 branch
+        # line where that is newer than VERSION, so a 0.9.0 branch
         # after 0.8.2 shipped tags v0.9.0-dev.N, never v0.8.2-dev.N.
         tgt, err = _pre_tgt(project, comp, tgt, label, 1 if section else 0)
         if err:
@@ -1586,7 +1585,7 @@ def _release_in_tree(project, comp, env, may_push, push, label):
         here = "this commit" if on and sha.startswith(on) or on.startswith(sha) else on
         # ...on this commit and on the remote too, pushed by hand after the
         # release's own push failed: the release is finished, its page on
-        # the forge made by the caller (B399), and nothing is tagged again.
+        # the forge made by the caller, and nothing is tagged again.
         if here == "this commit" and push and _remote_has_tag(project, name, env):
             return {"ok": True, "tag": name, "sha": sha, "target": tgt, "pushed": True, "finished": True}
         # ...or made here and never pushed: its push is what is left.
@@ -1597,7 +1596,7 @@ def _release_in_tree(project, comp, env, may_push, push, label):
                          "published tag is not moved from here: bump to the next number"}
     if why := floor_behind(project, comp):
         return {"error": why}
-    # A dev build's too (B988): every install is a released one. Its
+    # A dev build's too: every install is a released one. Its
     # snapshot is its version's, the one its stable release keeps.
     if why := no_upgrade_snapshot(project, comp, base):
         return {"error": why}
@@ -1607,7 +1606,7 @@ def _release_in_tree(project, comp, env, may_push, push, label):
     # the merge commit on the default branch, while this checkout stays on the
     # branch that was merged. Tagging here names a commit no image was ever
     # built from, and leaves the build that did ship reading `-dev` forever.
-    # Measured on 0.5.0 (B94): HEAD was the branch tip, origin/main was the
+    # Measured on 0.5.0: HEAD was the branch tip, origin/main was the
     # merge of it, and the running image was built from the merge.
     #
     # Refused only when HEAD is strictly BEHIND that branch, which is exactly
@@ -1696,7 +1695,7 @@ def _push_tag(project, name, out, env=None):
     name a store git cannot read (a sealed token, one in a person's key
     store). `out` gains pushed, or a note saying why not."""
     cfg = _creds_c(project)
-    # git's own words when it fails (B398): "the push failed" alone left the
+    # git's own words when it fails: "the push failed" alone left the
     # person guessing between the network, the credential and the remote.
     try:
         r = subprocess.run(["git", "-C", str(root(project)), *cfg, "push", "origin", f"refs/tags/{name}"],
@@ -1757,7 +1756,7 @@ def _cl_guard(project, where):
 # AerieOS is the case. Its minor IS the compatibility window, stamped again
 # in the agent's AGENT_VERSION and in the CLAUDE.md template's WINDOW line, and
 # 0.5.0 only came out consistent because a person moved both by hand before
-# pressing Bump (B91). A test holds the three equal, but only after the
+# pressing Bump. A test holds the three equal, but only after the
 # commit, and only if somebody runs it.
 #
 # Generic on purpose: this module serves every project and must not know what
@@ -1801,8 +1800,8 @@ def _stamp(project, value, part, env=None):
 
 def _changelog_added(project, rel):
     """Each commit that changed the changelog, oldest first, with the lines
-    it added: one walk of its history for every entry a cut dates (R228 step
-    22), where each entry was a `git log -S` of its own, 0.65 s apiece, and
+    it added: one walk of its history for every entry a cut dates,
+    where each entry was a `git log -S` of its own, 0.65 s apiece, and
     one that ran past its 30 s kept its old stamp without a word. None when
     git cannot say."""
     out = _git(project, "log", "--reverse", "-p", "-U0", "--format=%x00%h", "--", rel, timeout=120)
@@ -1817,7 +1816,7 @@ def _changelog_added(project, rel):
 
 
 def _cite(project, rel, text, have=(), hist=None):
-    """The commits an entry names once it is dated (B284): the commits its
+    """The commits an entry names once it is dated: the commits its
     line was stamped with, and the commit that introduced its line where it
     has none or where its stamp is a commit that changed nothing but the
     changelog, which is never the change (a line logged while its change was
@@ -1826,8 +1825,8 @@ def _cite(project, rel, text, have=(), hist=None):
     commit the line is about (HEAD after the change was committed, or a tied
     bug's fix commits), and the line then rides in whatever commit comes
     next. Taking that next commit for the change whenever the stamp was the
-    one before it (B710's guess) renamed the right commit to the wrong one
-    when the next commit was another change (B735). `hist` is the
+    one before it renamed the right commit to the wrong one
+    when the next commit was another change. `hist` is the
     changelog's history as _changelog_added reads it, read here when not
     given."""
     have = [h for h in have if h]
@@ -1867,7 +1866,7 @@ def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
         return _cite(project, rel, text, have, hist[0])
 
     # A stable version gathers the pre-releases since the last stable one,
-    # leaving out the fixes to what only they had (R217).
+    # leaving out the fixes to what only they had.
     keep = None if changelog is None or changelog.is_pre(value) else _stable_keep(project, comp)
     if changelog is not None and changelog.roll(
             where, value, time.strftime("%Y-%m-%d"), resolve=cite, keep=keep):
@@ -2058,7 +2057,7 @@ def bump(project, part, by="claude", comp="", env=None, to=None, fold=False):
     if why:
         return {"error": why}
     new = to or next_version(tgt, part)
-    # A branch working toward a release moves only to it (R112): a patch
+    # A branch working toward a release moves only to it: a patch
     # bump on the 0.7.0 line, or a minor on the 0.6.2 line, is the other
     # line's number.
     ln = line(project) if not comp else ""
@@ -2222,7 +2221,7 @@ def one(project, comp="", repo=None, facts=None):
         "sealed": (_release_tag_exists(project, v["target"], comp)
                    if v["target"] else False),
         # Where the number here lives against the branch builds come from,
-        # and where a staged bump would land (B338): {} with no remote.
+        # and where a staged bump would land: {} with no remote.
         "lands": lands(project, comp, facts=facts) if facts else {},
     }
 
@@ -2381,7 +2380,7 @@ def ask(project, sessions=(), comp=""):
     # to 704 characters, which a TUI does not finish rendering inside the
     # window notify.tell waits, so it was left sitting in the input box
     # unsent. It used to point at the version section of the project's
-    # CLAUDE.md; that block went with R63 step 3, so it points at the verb
+    # CLAUDE.md; that block went, so it points at the verb
     # that answers the same question wherever it is run.
     line = (f"From the operator, on the Artifacts view: what version should "
             f"{what} start at? Read the code and `aerie version policy`, then "
@@ -2444,7 +2443,7 @@ SESSIONS = None
 AUDIT = None
 FORGE = None        # (project, tag, version, sha, comp) -> the forge's release (forgerelease.publish)
 # (project, tag, commit) once a release's tag is pushed: what a space's
-# environments deploy on a release (R281 step 6). Set by server.py.
+# environments deploy on a release. Set by server.py.
 RELEASED = None
 MADE = None         # (project, tag): a release's tag pushed, dev or not (what follows it is looked for)
 UNSEALED = None     # (project) -> why the host would not start what finishes a release, or "" (releasesign.unstartable)
@@ -2479,7 +2478,7 @@ def verb(name, act, req, who, principal):
         # The other half of a release, and the outward-facing one: the
         # bump decided the number, this says it happened and pushes the
         # tag. A person's from here; a session asks through its own
-        # dial (Agents may: Tag and publish a release, R138), whose Allow
+        # dial (Agents may: Tag and publish a release), whose Allow
         # comes back through this same branch.
         pre = field(req, "pre") or ""
         dev = req.get("dev") is True or bool(pre)
@@ -2491,20 +2490,20 @@ def verb(name, act, req, who, principal):
                     may_push=MAY_PUSH(name), dev=dev, pre=pre)
         if r.get("error"):
             return r, 400
-        # A tag on GitHub gets GitHub's release beside it (R123): titled with
+        # A tag on GitHub gets GitHub's release beside it: titled with
         # the version, the changelog's section as its notes, the builds of
         # that commit attached. Only once the tag is there, and a forge that
         # says no leaves the tag as the release, with its reason. A
-        # pre-release's page is made too, marked one (R218); where the
+        # pre-release's page is made too, marked one; where the
         # space's CI makes its releases (.release-files) the page is CI's,
         # as publish says.
         if r.get("pushed") and FORGE:
             r["forge"] = FORGE(name, r["tag"], r["target"], r["sha"], comp, **({"pre": True} if dev else {}))
         # What CI builds for it is looked for whichever channel it is on: a
-        # dev release's APK was left to the hourly look (B469).
+        # dev release's APK was left to the hourly look.
         if r.get("pushed") and MADE:
             MADE(name, r["tag"])
-        # ...and what its environments deploy on a release (R281 step 6).
+        # ...and what its environments deploy on a release.
         if r.get("pushed") and RELEASED:
             RELEASED(name, r["tag"], r.get("sha") or "")
         if dev:

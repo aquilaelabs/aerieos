@@ -1,5 +1,5 @@
 """How many suites the browser harness runs at once, and how it runs the
-ones that failed again (R228 step 19; measured 14 Nov on sixteen cores, a
+ones that failed again (measured 14 Nov on sixteen cores, a
 quiet machine: eight workers 9m16s with nothing failed, ten 14m21s with
 three suites run again, sixteen 39m54s with ten).
 
@@ -99,7 +99,7 @@ class InFlight(unittest.TestCase):
 
 class Layers(unittest.TestCase):
     """What absorbed a flake came off once the suites waited on what they
-    check (R7 step 7): a wait's two spare budgets, every wait doubled for a
+    check: a wait's two spare budgets, every wait doubled for a
     run with workers and in CI, the three seconds of console errors let
     through after a network change, and CI's second whole run. Measured
     first: a whole run with one budget and nothing doubled flaked no more
@@ -133,7 +133,7 @@ class Layers(unittest.TestCase):
 
 class Sections(unittest.TestCase):
     """A suite is a run of parts, and one that throws is one failure, not
-    the end of the file (R7 step 6): a wait that ran out ended the suite
+    the end of the file: a wait that ran out ended the suite
     there with no total, and everything after it went unrun and unsaid."""
 
     TESTS = os.path.join(HERE, "..", "test")

@@ -1,4 +1,4 @@
-"""aerie version follow (R190 step 7, the operator 23 Nov): what a release
+"""aerie version follow: what a release
 owes once it is out, done by each repository of the space in its own
 .aerie/after-release, in the space's order, handed the tag and a checkout of
 it; a repository outside the space is never run, and --check says what is

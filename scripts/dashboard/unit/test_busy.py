@@ -1,4 +1,4 @@
-"""Whether a node is quiet enough to time on (R108): busy.verdict's word
+"""Whether a node is quiet enough to time on: busy.verdict's word
 and reasons, and the agent's count of what runs there by kind."""
 import os
 import sys
@@ -65,7 +65,7 @@ class Kinds(unittest.TestCase):
         self.assertEqual(agent._proc_kinds(root), {"emulator": 1, "gradle": 1, "java": 1, "claude": 1, "codex": 1, "copilot": 1})
 
     def test_an_agent_is_counted_as_it_runs_not_only_by_its_name(self):
-        """B288: Copilot's process is named MainThread, ChatGPT's work runs in
+        """Copilot's process is named MainThread, ChatGPT's work runs in
         its codex-code-mode-host helper (named codex-code-mode, cut to 15),
         and neither was counted; a word naming an agent later in another
         command's arguments is not one."""

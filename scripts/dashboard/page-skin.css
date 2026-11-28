@@ -1,4 +1,4 @@
-/* The page's stylesheet, in four cascade layers (R9 step 4), each a file:
+/* The page's stylesheet, in four cascade layers, each a file:
    page-skin.css, page-components.css, page-surfaces.css and
    page-overrides.css, linked in that order by index.html. A layer later in
    the order wins over every rule of an earlier one, whatever either's
@@ -37,12 +37,12 @@
      warning's own surface (a band, a banner) is --warn-wash with
      --warn-wash-ink and its edge --warn-edge: in the dark half a faint
      yellow over --ground that the page shows through, the yellow carried by
-     the words and the edge (the operator, 17 Nov: see-through, where the
+     the words and the edge (see-through, where the
      solid yellow had replaced a tint over the space's color that read
      dirty); in the light half a pale wash. */
   --pass:#3fb950;
   --ground:#1c2029; --ground-ink:#eef1f6;
-  /* What a dialog lays over the page (Perch, the operator 23 Nov): the
+  /* What a dialog lays over the page (Perch): the
      theme's own page, most of the way, so what is behind stays its
      color and reads as set back; in the light half the ink at about a
      third, since a pale veil over a pale page set nothing back. */
@@ -57,8 +57,8 @@
      no color-mix, the mix second where there is one. */
   --btn:#232b34;        --btn:color-mix(in srgb, var(--panel), #ffffff 5%);
   --btn-hi:#2b3540;     --btn-hi:color-mix(in srgb, var(--panel), #ffffff 9%);
-  /* What a lit control is filled with: the scheme's second color (the
-     operator, 16 Oct: a selected tab, a primary button, a button that is on
+  /* What a lit control is filled with: the scheme's second color
+     (a selected tab, a primary button, a button that is on
      carry the second color, filled; the accent keeps the rail, the dots and
      the notebook's group row). Every lit surface below is mixed from it, so
      the names keep "accent" for where they came from. */
@@ -67,12 +67,12 @@
   --accent-deep:#1a4f8f;--accent-deep:color-mix(in srgb, var(--lit), #000000 40%);
   /* What is written on a filled accent: the ink in a dark scheme, where the
      ink is light; white in a light one, where the ink is dark and the fill
-     is still the darkened accent (R216). */
+     is still the darkened accent. */
   --on-fill:var(--ink);
   /* The shade at a scrolling edge (more below, more above): a deep one on a
      dark page, a faint one on a light page, where the same shade read as a
-     smear of soot (the light half, 13 Oct), and a shade lighter on both
-     (the operator, 16 Oct: it read too dark), then shorter and a touch
+     smear of soot (the light half), and a shade lighter on both
+     (it read too dark), then shorter and a touch
      darker again the same day. */
   /* ...and capped below, in the block under this one. Every filled accent
      surface on the page draws --ink on --accent-deep: the active tab, a
@@ -92,16 +92,16 @@
   /* The flyout: what the terminal's bottom bar opens (Keys, Commands,
      Sessions, Chat). It was --panel, the color of the bar under it, the
      cards beside it and the tab strip above, so on a phone, where it sits in
-     the flow between the terminal and the bar, nothing said where it ended
-     (19 Sep). Tinted a tenth towards the scheme's accent, the color of the
+     the flow between the terminal and the bar, nothing said where it ended.
+     Tinted a tenth towards the scheme's accent, the color of the
      button that opened it: measured across the twelve schemes, --dim on it
      stays at 5.0:1 or better and --ink at 9.6. */
-  /* Tinted with the second color, as the lit controls on it are (the
-     operator, 17 Oct: tinted with the accent it clashed in a theme whose
+  /* Tinted with the second color, as the lit controls on it are
+     (tinted with the accent it clashed in a theme whose
      two colors differ). */
   --flyout:#243633;     --flyout:color-mix(in srgb, var(--panel), var(--lit, var(--accent)) 8%);
-  /* What floats over the page and is easy to miss on it (the operator, 18
-     Nov: a tour's card read as part of the page): the tour, the header's
+  /* What floats over the page and is easy to miss on it
+     (a tour's card read as part of the page): the tour, the header's
      pop-outs (the bell's, the doctor's, the gear's), a row's menu, a help
      pop, the phone's More sheet and a toast. The panel a step brighter,
      with a breath of the second color so each scheme keeps its own, and a
@@ -118,11 +118,11 @@
      Android devices actually carry. */
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Roboto Mono",
          "Noto Sans Mono","Droid Sans Mono",monospace;
-  /* Prose read at length, the wiki's articles and nothing else (the
-     operator, 2 Oct: read like an encyclopedia). The same Android care as
+  /* Prose read at length, the wiki's articles and nothing else
+     (read like an encyclopedia). The same Android care as
      the mono: Noto Serif is what those devices carry. */
   --serif:"Linux Libertine","Georgia","Times New Roman","Noto Serif","Droid Serif",serif;
-  /* The display face (R218 step 7): a big number's, a tile's figure. The
+  /* The display face: a big number's, a tile's figure. The
      platform's display cut where it has one (Windows 11's Segoe UI Variable
      Display, a Mac's SF Pro Display), Inter where somebody installed it, the
      system sans otherwise; set with tabular figures and a touch of negative
@@ -130,13 +130,13 @@
   --display:"Segoe UI Variable Display","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme:dark;
   /* 32px, the height the group header's New VM and Enroll were alone in
-     (the operator, 13 Nov: a more reasonable size for a button everywhere;
+     (a more reasonable size for a button everywhere;
      it was 38px). Every control takes it: a button, a field and a pulldown
      on one row stay one height. */
   --tap:32px;
   /* One height for every control a person types into or presses beside
      another, the finger's: a field, a pulldown, a one-line prose box and a
-     button on the same row were 35, 35, 38 and 30px (the operator, 29 Sep),
+     button on the same row were 35, 35, 38 and 30px,
      and the rows that already matched did so at --tap. */
   --ctl:var(--tap);
   --doc-w:1080px;
@@ -148,10 +148,10 @@
      Read where it is used, so 100% is that band's own box. */
   --doc-in:max(0px, calc((100% - var(--doc-w)) / 2));
   /* A card's head: the ink a step into the panel, its own shade in every
-     scheme (the operator, 18 Oct: a head the card's color did not pop). */
+     scheme (a head the card's color did not pop). */
   --head-bg:color-mix(in srgb, var(--ink) 6%, var(--panel));
-  /* Every page's bar is the height of a project's header (the operator,
-     17 Oct: it reads better with that much room): its 32px controls and
+  /* Every page's bar is the height of a project's header
+     (it reads better with that much room): its 32px controls and
      6px above and below them. */
   --pbar-h:45px;
   /* The row a page's tabs sit in: one height on every page, a group's under
@@ -168,7 +168,7 @@
      read as a soft highlight bending round a hard tab. Circles and full
      pills are not these and stay round everywhere. */
   --r-surface:6px; --r-control:6px; --r-small:4px;
-  /* A hairline (R218 step 7): one device pixel where the screen has two or
+  /* A hairline: one device pixel where the screen has two or
      more to the CSS pixel, so a border is a line and not a stroke; 1px
      elsewhere, where half a pixel would round away. Every border drawn in
      --line is this width. */
@@ -177,10 +177,10 @@
      a field that runs the whole width of a tab reads as a
      form pretending to be a page (docs/design-language.md, Controls). */
   --ctl-w:30rem;
-  /* What holds controls is capped at (R301 step 6: a form, a row of them, a
+  /* What holds controls is capped at (a form, a row of them, a
      picker's label; never a control alone): the control width, short of the
-     surface at a desk. On a phone a holder fills its surface to the gutter
-     (the operator, 28 Nov), the edge a section's own presses and a dialog's
+     surface at a desk. On a phone a holder fills its surface to the gutter,
+     the edge a section's own presses and a dialog's
      foot already end on: a cap there put a form 15px inside the Add button
      under it, and one in a field 28px short of one beside it. */
   --ctl-cap:min(var(--ctl-w), 88%);
@@ -210,13 +210,13 @@
   --f-row:13px/1.45 system-ui,sans-serif;      /* what a row says */
   /* WHAT YOU TYPE INTO: every text field and picker, named once. Mono, and
      a step below --f-ui, because mono at the size of the text beside it
-     reads a size larger (the operator, 25 Sep and again 28 Sep). The 16px
+     reads a size larger. The 16px
      iOS needs on a typed field is its own rule, further down. */
   --f-field:11px/1.5 var(--mono);
   --f-tag:600 10px/1 system-ui,sans-serif;     /* pills and badges */
   /* A SECTION'S HEADING: the one voice above a row's, since it names what
      the rows under it are about. It was --f-ui at 600, a step below the
-     rows it headed, and read as small (the operator, 7 Oct). */
+     rows it headed, and read as small. */
   --f-sect:600 14px/1.4 system-ui,sans-serif;
   /* A ROW'S FACTS: the mono line under a name (ports, a path, a revision),
      named so it moves with the scale below rather than staying 12px while
@@ -225,7 +225,7 @@
   /* code and logs read as prose in mono: a diff, a commit message, a log */
   --f-code:12px/1.5 var(--mono);
   --f-pill:11px/1 var(--mono);
-  /* A tile's number (R216): the one voice above --f-sect, for a figure a
+  /* A tile's number: the one voice above --f-sect, for a figure a
      tab is about, read from across the room. */
   --f-stat:650 24px/1.05 var(--display);
   /* The badge palette: who/what colors used by tags across the notebook.
@@ -240,7 +240,7 @@
 @media(max-width:600px){ :root{--ctl-cap:none} }
 @media(min-resolution:2dppx){ :root{--hair:.5px}
 }
-/* ONE STEP UP AT A DESK (the operator, 13 Oct: "a lot of text looks too
+/* ONE STEP UP AT A DESK ("a lot of text looks too
    small on desktop in a lot of places"). The phone keeps the sizes above,
    which were set against a thumb's width; a desk reads from further away
    and had the same 11px explainers and 12px mono facts. Every voice moves
@@ -294,8 +294,8 @@
 html[data-theme="nostromo"],.sw[data-theme="nostromo"]{
   --bg:#1d2228; --panel:#29333c; --line:#50606e; --ink:#ecf5fd;
   --dim:#b4c3d2; --accent:#f6a900; --note:#3da5f9}
-/* Square corners are the dark half's, the hallways (the operator,
-   16 Oct); the light half, the white corridors, is rounded like every other
+/* Square corners are the dark half's, the hallways;
+   the light half, the white corridors, is rounded like every other
    scheme. */
 html[data-theme="nostromo"]:not([data-mode="light"]),html:not([data-mode="light"]) .sw[data-theme="nostromo"]{
   --r-surface:0; --r-control:0; --r-small:0}
@@ -329,7 +329,7 @@ html[data-theme="ice"],.sw[data-theme="ice"]{
 html[data-theme="sepia"],.sw[data-theme="sepia"]{
   --bg:#262118; --panel:#373125; --line:#6b5b3f; --ink:#fef2dd;
   --dim:#cebfa6; --accent:#ebb000; --note:#00e2ce}
-/* ---- the light half (R216) -----------------------------------------------
+/* ---- the light half -----------------------------------------------
    Every scheme has a light half: the same hue family token for token, with
    the page near white, the ink dark, and the accent and the marks pulled
    down to read on it (each at AA against --bg or better; the generator and
@@ -343,15 +343,15 @@ html[data-theme="sepia"],.sw[data-theme="sepia"]{
 html[data-mode="light"]{
   color-scheme:light;
   /* AA on the page bar's band too, which is a step darker than the page
-     where it lays its 92% over the pane (R286 step 4: #00752c read 3.6:1
+     where it lays its 92% over the pane (#00752c read 3.6:1
      there, measured). */
   --pass:#00622a;
   --ground:#fbfbf8; --ground-ink:#1d2633;
   --veil:color-mix(in srgb, var(--ink) 34%, transparent);
   --warn-wash:#fdf1bf; --warn-wash-ink:#1d2633; --warn-edge:#d8b62a;
   /* A lit control in the light half is a soft tint of the second color with
-     its edge in the color itself and the ink on it (the operator, 16 Oct:
-     the second color filled, darkened for white text, was too dark). The
+     its edge in the color itself and the ink on it
+     (the second color filled, darkened for white text, was too dark). The
      ink clears AA on the tint in every scheme; the color as text on it would
      not. */
   --on-fill:var(--ink);
@@ -381,8 +381,8 @@ html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
 html:not([data-theme]),.sw[data-theme="default"]{--lit:#ff8f4a}
 html[data-mode="light"]:not([data-theme]),html[data-mode="light"] .sw[data-theme="default"]{--lit:#b8470f}
 /* Nostromo's light half is the ship's white corridors: cool gray-white
-   walls and panels and the hazard marking's red-orange for what is the one
-   (the operator, 16 Oct); its graphics are with the dark half's, below. */
+   walls and panels and the hazard marking's red-orange for what is the one;
+   its graphics are with the dark half's, below. */
 html[data-mode="light"][data-theme="nostromo"],html[data-mode="light"] .sw[data-theme="nostromo"]{
   --bg:#e3e6de; --panel:#fdfdfa; --line:#bbbfb5; --ink:#1e2123;
   --dim:#54595c; --accent:#ba3900; --note:#327500}
@@ -419,7 +419,7 @@ html[data-mode="light"][data-theme="sepia"],html[data-mode="light"] .sw[data-the
 
 /* ---- Nostromo -----------------------------------------------------------
    The one scheme that is more than a recolor: the ship itself, a half for
-   each of its interiors (the operator, 16 Oct). Its dark half is the
+   each of its interiors. Its dark half is the
    hallways: cold blue-black steel, grated deck, silver pipe under amber
    lamps, a chamfered bulkhead, copper seams, square corners. Its light half,
    below, is the white corridors. The graphics are hand-written SVG under
@@ -431,7 +431,7 @@ html[data-mode="light"][data-theme="sepia"],html[data-mode="light"] .sw[data-the
    a card's own face stays clean: that is where a stack trace is read. */
 
 /* Smoked glass: the pane bars and the ground under a document let the deck
-   show, at three tenths (the operator, 24 Sep). The stack's ground, so the
+   show, at three tenths. The stack's ground, so the
    document fading in does not take its glass with it; a terminal keeps its
    own solid ground: output read through a pattern is output misread. */
 html[data-theme="nostromo"]:not([data-mode="light"]){--glass:color-mix(in srgb, var(--panel) 70%, transparent)}
@@ -451,8 +451,8 @@ html[data-theme="nostromo"]:not([data-mode="light"]) body::before{
     url(/static/nostromo/bulkhead.svg) right -60px bottom -60px / 340px no-repeat,
     url(/static/nostromo/grate.svg) repeat}
 
-/* ---- Nostromo's light half: the ship's white corridors (the operator,
-   16 Oct) ------------------------------------------------------------------
+/* ---- Nostromo's light half: the ship's white corridors
+   ------------------------------------------------------------------
    Rounded like every scheme, and a ship of its own: large chamfered wall
    panels behind the page, one wall panel's octagon relief set into its foot,
    the ceiling's grilles and light panels across the header's middle, the
@@ -476,7 +476,7 @@ body{margin:0;background:var(--bg);color:var(--ink);display:flex;
           env(safe-area-inset-bottom) env(safe-area-inset-left)}
 /* A link in words is the scheme's second color, --note, so each scheme
    shows two hues and a pointer elsewhere never reads as a control, which
-   is the accent's (the operator, 16 Oct: every scheme but the default was
+   is the accent's (every scheme but the default was
    shades of one color). Without this a link was the browser's own blue. */
 a{color:var(--note)}
 /* The selection, in the scheme's own colors. It was the one color on the
@@ -507,8 +507,8 @@ a{color:var(--note)}
 
 /* The page's own secondary voice, not the browser's: `font:12px/1 inherit`
    is not valid shorthand (inherit cannot ride inside it), so the whole
-   declaration was dropped and every button wore 13.3px Arial (B711). */
-/* A press has a little depth (the operator, 13 Nov: a subtle gradient, to
+   declaration was dropped and every button wore 13.3px Arial. */
+/* A press has a little depth (a subtle gradient, to
    look nicer): lighter at its top edge, darker at its foot, laid over
    whatever color the button wears, so the accent, the danger tone and a
    space's own color keep theirs. --sheen is the button's own and never its
@@ -523,7 +523,7 @@ button{background:var(--btn);color:var(--ink);border:var(--hair) solid var(--lin
   white-space:nowrap;min-height:var(--tap);touch-action:manipulation;
   -webkit-tap-highlight-color:transparent}
 /* A control that is dead but still answers a press with why (the roadmap's
-   arrows, B213): the same fade, and the pointer stays, because pressing it
+   arrows): the same fade, and the pointer stays, because pressing it
    does something. */
 button[aria-disabled="true"]{opacity:.5}
 /* Every box and radio the page has, not just the one tab that remembered to
@@ -683,20 +683,20 @@ pre{margin:0;padding:9px 11px;font:var(--f-code);white-space:pre-wrap;
    coming into being: the Resume/New chooser under a Claude button, which
    used to snap into place. 8px over .22s on the ease-out cubic the bottom
    bar's sheet uses, a little shorter for a smaller thing, so a menu at a
-   desk moves the way the sheet on a phone does (the operator, 16 Oct: the
+   desk moves the way the sheet on a phone does (the
    quicker drop read as a pop). */
 @keyframes menuIn{from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none}}
 /* ...and one that opens upward from what opened it, the bottom bar's More,
    rises into place rather than dropping, a sheet's travel rather than a
-   menu's twitch: 16px over .32s on an ease-out cubic, fading the whole way
-   (the operator, 16 Oct). */
+   menu's twitch: 16px over .32s on an ease-out cubic, fading the whole way.
+   */
 @keyframes menuUp{from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none}}
 /* ...and a context menu that opens above what was pressed rises the same
    8px over the same time a menu below it drops (menuIn): the motion goes the
-   way the menu opened (the operator, 18 Oct). */
+   way the menu opened. */
 @keyframes menuRise{from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none}}
-/* Up, it slides out of its line rather than appearing (the operator,
-   16 Oct): the pane starts where the line sat, all but the line below the
+/* Up, it slides out of its line rather than appearing:
+   the pane starts where the line sat, all but the line below the
    frame, and rises to its height. The ground it uncovers is the page's. */
 @keyframes dockUp{from{transform:translateY(calc(100% - 44px))} to{transform:none}}
 @keyframes dockDown{from{top:var(--dock-top,50%)} to{top:calc(100% - 44px)}}
@@ -706,16 +706,16 @@ html,body{overscroll-behavior-x:none}
    the child on show, and never the document's own: the fade is on the
    document, so a document that painted its ground faded it in with the rest,
    over the pane's black, and every switch to a notebook opened on a black
-   pane for the first frames (the operator, 27 Sep). The ground is there on
+   pane for the first frames. The ground is there on
    the first frame now, in every scheme, and only what is drawn on it
    arrives. The frames are contentIn's under a name of their own: a document
-   that paint() drew straight into wears .justpainted for good, a class that
+   that paint drew straight into wears .justpainted for good, a class that
    asks for the name an element already has starts nothing, and Projects,
    drawn that way, snapped to the front while every other document faded. */
 @keyframes docIn{from{opacity:0} to{opacity:1}}
 /* ...and the page it replaces fades out first, quickly, so the two are
    never laid over each other at full strength: a fade through, not a double
-   exposure (the operator, 16 Oct: the even crossfade read as muddled). The
+   exposure (the even crossfade read as muddled). The
    old page is gone by .09s; the new one starts at .06s and eases in. */
 @keyframes docOut{from{opacity:1} to{opacity:0}}
 }

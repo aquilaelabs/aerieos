@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Behind `aerie tests bisect SUITE GOOD BAD` (R55): the first commit
+"""Behind `aerie tests bisect SUITE GOOD BAD`: the first commit
 between GOOD (where the suite passes) and BAD (where it fails) at which it
 fails, found by halving the commits between, each run with the harness's
 --at, which copies the commit rather than the working tree.

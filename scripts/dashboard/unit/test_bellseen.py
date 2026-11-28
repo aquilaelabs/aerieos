@@ -1,4 +1,4 @@
-"""What an account puts away from its bell (bellseen.py, R144): an update to
+"""What an account puts away from its bell (bellseen.py): an update to
 one version, for that account alone, back when a newer version is out; what
 stops work cannot be put away."""
 import json
@@ -65,7 +65,7 @@ class BellSeen(unittest.TestCase):
         self.assertEqual(bellseen.dismiss("u1", [])[1], 400)
 
     def test_a_row_its_maker_keyed_goes_while_its_key_is_put_away(self):
-        # B1146: a release short of its files, a space's leftover and a
+        # A release short of its files, a space's leftover and a
         # node that turned the controller away were drawn with Dismiss and
         # came back on the next read; the release's key is what is missing,
         # so it comes back when that changes. A row with no key stays.
@@ -82,7 +82,7 @@ class BellSeen(unittest.TestCase):
         self.assertEqual(len(bellseen.filter_rows("u2", keyed)[0]), 4, "another account still sees them")
 
     def test_what_blocks_work_is_active_and_never_put_away(self):
-        # R280: Active holds what blocks work now, with no Dismiss; a key put
+        # Active holds what blocks work now, with no Dismiss; a key put
         # away before it became active hides nothing.
         rows_ = [{"kind": "ci", "id": "web", "key": "ci:web@run7", "bad": True},
                  {"kind": "disk", "id": "n1", "what": "failing", "bad": True, "key": "disk:failing:n1"},

@@ -1,4 +1,4 @@
-"""Encrypted pools (R162 step 3): the passphrase of each ZFS pool made with
+"""Encrypted pools: the passphrase of each ZFS pool made with
 native encryption on the controller's own machine, the person's choice of
 where it lives: kept here, sealed under the install key as every secret
 is, so the pool unlocks itself at every boot (what it protects against: a

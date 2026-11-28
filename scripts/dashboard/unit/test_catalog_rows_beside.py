@@ -1,5 +1,5 @@
 """The catalog's newer rows reach a node as a file beside the shipped
-catalog, and the three readers there take it (R267 step 6).
+catalog, and the three readers there take it.
 
 The bundle carried config/toolchains.json rewritten with the vetted
 catalog's newer rows, so the file a node read was never the one its release

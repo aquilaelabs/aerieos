@@ -1,5 +1,5 @@
-"""Plain http://THE-MACHINE/ on a controller's own machine finds the dashboard
-(R202, the operator, 1 Nov): the dashboard stays on its port, and while nothing
+"""Plain http://THE-MACHINE/ on a controller's own machine finds the dashboard:
+the dashboard stays on its port, and while nothing
 else wants port 80 this answers there with a redirect to it.
 
 It wants nothing for itself. It lets go the moment a nginx container exists

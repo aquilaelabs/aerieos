@@ -1,4 +1,4 @@
-"""A recipe's system packages reach the machine whole (B836): the agent read
+"""A recipe's system packages reach the machine whole: the agent read
 the first 64 and dropped the rest without a word, and Playwright with
 WebKit's libraries is past that on apt, so WebKit installed and could not
 launch. Every package the shipped playwright recipe names is asked about,
@@ -43,7 +43,7 @@ class SysdepsTest(unittest.TestCase):
         self.assertEqual(len(missing), agent.SYSDEPS_MAX)
 
     def test_apt_waits_for_the_lock(self):
-        """B838: another apt holding the dpkg lock failed the install at
+        """Another apt holding the dpkg lock failed the install at
         once; apt is told to wait for it."""
         agent._have = lambda b: b == agent.DPKG_BIN
         fam, _, install = agent.pkg_backend()

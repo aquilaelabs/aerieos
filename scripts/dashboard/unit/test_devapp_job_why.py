@@ -1,4 +1,4 @@
-"""A failed compose job's row says why it failed (B96): a Rebuild on a node
+"""A failed compose job's row says why it failed: a Rebuild on a node
 whose image could not be pulled ended 'exit 1', and the row said only that,
 while the reason was in the job's log on the Jobs page."""
 import os

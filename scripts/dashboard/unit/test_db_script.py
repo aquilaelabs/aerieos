@@ -1,4 +1,4 @@
-"""db.script: a numbered migration's SQL (statemigrations/NNNN_*.sql, R295)
+"""db.script: a numbered migration's SQL (statemigrations/NNNN_*.sql)
 run in one transaction, all of it or none."""
 import os
 import shutil

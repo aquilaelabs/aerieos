@@ -9,7 +9,7 @@
 "use strict";
 
 // ---- toasts -------------------------------------------------------------
-// One stack at a corner (R218 step 6, the design's the-dashboard/notifications
+// One stack at a corner (the design's the-dashboard/notifications
 // rule): the bottom left above the dock's line, and there while a dialog is
 // open too, the newest at the foot, at most TOAST_MAX on screen, each with its
 // kind's icon and its own ×, gone after a while but held while the pointer
@@ -36,12 +36,12 @@ let toastHeld = false;
 
 // A failed request in words: the browser's TypeError for a fetch that never
 // landed is the controller not answering (a restart, the network), said so
-// rather than as a JavaScript error; anything else as it came (B301).
-// ...a read past its limit (readFetch, B1002) among them.
+// rather than as a JavaScript error; anything else as it came.
+// ...a read past its limit (readFetch) among them.
 const unreached = e => (e instanceof TypeError && /fetch|network|load failed/i.test(e.message || ""))
   || e?.name === "TimeoutError";
 const failWords = e => unreached(e) ? "the controller did not answer" : String(e?.message || e);
-// What nothing caught is said rather than lost (R9 step 1): a promise a
+// What nothing caught is said rather than lost: a promise a
 // press or a draw dropped with its failure in it, as a toast in words, once
 // a minute for the same words so a loop that keeps failing is one line. A
 // read the page itself called off (AbortError) is no failure.
@@ -77,8 +77,8 @@ function toastPlace(){
   if (!stack) return;
   const m = innerWidth <= 900 ? topModal() : null;
   const sheet = m && !m.classList.contains("inline") ? m : null;
-  // ...and above a question whole, which is a short sheet at the foot
-  // (R265): by its laid-out height, not where it is drawn at this moment,
+  // ...and above a question whole, which is a short sheet at the foot:
+  // by its laid-out height, not where it is drawn at this moment,
   // since it is placed while the sheet is still coming in and a few pixels
   // short of where it rests.
   const ask = sheet?.classList.contains("askdlg") && !sheet.classList.contains("typed") ? sheet.querySelector(":scope > .box") : null;
@@ -144,8 +144,8 @@ function toastGone(el){
 // Text put on the clipboard and said in a toast: the browser's way where it
 // allows it, and a hidden field's copy where it does not (a page not served
 // over TLS). Where neither copies, the toast says so in one sentence and
-// never prints the text: a key or a fingerprint is not toast words (the
-// operator, 20 Nov). Every Copy on the page is this.
+// never prints the text: a key or a fingerprint is not toast words.
+// Every Copy on the page is this.
 async function copyText(text, said){
   let ok = true;
   try{ await navigator.clipboard.writeText(text); }
@@ -161,7 +161,7 @@ async function copyText(text, said){
   return ok;
 }
 
-// A job's toast (R218 step 6): it stays while the job runs, its line the
+// A job's toast: it stays while the job runs, its line the
 // job's state and step as the queue reports them, read again each time the
 // jobs token moves; when the job ends it takes the outcome's tone, starts
 // its clock like any other, and the outcome is kept on the record as a
@@ -169,10 +169,10 @@ async function copyText(text, said){
 // Dismissed before then, it is still followed, so the end is still kept.
 const jobToasts = new Map();     // job id -> {el, label}
 // onEnd(job), when given, is called once the job is over: what pressed it
-// frees itself then, rather than waiting out a window of its own (B862).
+// frees itself then, rather than waiting out a window of its own.
 // Why a job failed, as a toast and the record's line say it: the reason's
 // first sentence, without a leading "refused: " or "ERROR: ", and no longer
-// than a line or two (the operator, 20 Nov: a node's refusal of an update
+// than a line or two (a node's refusal of an update
 // came up as a paragraph, with which keys it takes and what its console
 // can do). The whole of it is the job's own, on its row and in its log.
 function toastWhy(error){
@@ -245,8 +245,8 @@ function keepNotice(n){
 const NOTE_CAP = 50;
 let notes = [], notesSeen = 0, bellOpen = false;
 // The red things the bell has already flashed for, by identity, so a new
-// one flashes it twice and a redraw of the same one does not (the operator,
-// 11 Oct). null until the first draw, which flashes nothing: a reload is
+// one flashes it twice and a redraw of the same one does not.
+// null until the first draw, which flashes nothing: a reload is
 // not news.
 let bellRedSeen = null;
 
@@ -265,11 +265,11 @@ function logNote(msg, bad){
 // way there and Dismiss on the row. Out of window is red and cannot be put
 // away: work there is stopped until it is updated.
 function attRow(a){
-  // What blocks work now stands in Active with no Dismiss (R280, the
-  // operator, 24 Nov): drawn without its key, it leaves when it stops being
+  // What blocks work now stands in Active with no Dismiss:
+  // drawn without its key, it leaves when it stops being
   // true.
   if (a.active && a.key) a = {...a, key: ""};
-  // An environment whose workloads are stuck or short (R281 step 7),
+  // An environment whose workloads are stuck or short,
   // Active until it recovers or is rolled back.
   if (a.kind === "deploy") return `<div class="bnote att bad">
       <div class="bt">${esc(a.env)} in ${esc(projLabel(a.space))} is not healthy</div>
@@ -278,12 +278,12 @@ function attRow(a){
         <span class="acts"><a href="#" data-bkube="${esc(a.repo || a.space)}">Kubernetes view</a></span></div></div>`;
   if (a.kind === "toolchain" || a.kind === "agents"){
     const keys = a.tools.map(t => t.key).filter(Boolean).join(" ");
-    // The Claude sessions running there now, which an update ends (B57), not
+    // The Claude sessions running there now, which an update ends, not
     // the projects bound to the node.
     const cc = a.tools.some(t => t.name === "claude-code") && a.sessions > 0;
     const n = a.tools.length;
-    // A coding agent's update and a toolchain's are each a row of their own
-    // (R95), both opening the Library on the node, where Update is.
+    // A coding agent's update and a toolchain's are each a row of their own,
+    // both opening the Library on the node, where Update is.
     const ag = a.kind === "agents";
     const where = "Library";
     return `<div class="bnote att">
@@ -298,7 +298,7 @@ function attRow(a){
         <span class="acts">${keys ? `<a href="#" data-bdismiss="${esc(keys)}">Dismiss</a>` : ""}
           <a href="#" ${ag ? "data-bag" : "data-btc"}="${esc(a.id)}">${where}</a></span></div></div>`;
   }
-  // A session the controller's outage held (R251): it was told to write
+  // A session the controller's outage held: it was told to write
   // where it was and stop; Resume tells it to pick up from that note.
   if (a.kind === "held"){
     return `<div class="bnote att warn">
@@ -308,7 +308,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bheld="${esc(a.node_id)}" data-session="${esc(a.session)}" data-claude="${esc(a.claude || a.session)}">Resume</a></span></div></div>`;
   }
-  // A session working with no word from its hooks (B1009): its gate and
+  // A session working with no word from its hooks: its gate and
   // what AerieOS refuses are not running there. Starting it again brings
   // them back, which is the space's Manage agent.
   if (a.kind === "unguarded"){
@@ -329,10 +329,10 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bdocker="${esc(a.node_id)}">Containers page</a></span></div></div>`;
   }
-  // A release's APK signed on its project's node (R106): what would stop it, said
+  // A release's APK signed on its project's node: what would stop it, said
   // before the release in amber, and a signing that failed after one in red.
   // `sealing`: the APK is signed, and the workflow that signs the release's
-  // list of files could not be started (R199); the row says what to do.
+  // list of files could not be started; the row says what to do.
   if (a.kind === "release-sign"){
     return `<div class="bnote att${a.bad ? " bad" : ""}">
       <div class="bt">${a.sealing ? `${esc(a.tag)}'s list of files in ${esc(projLabel(a.project))} is not signed`
@@ -343,7 +343,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bsign="${esc(a.project)}">Signing view</a></span></div></div>`;
   }
-  // A release short of a file its project lists in .release-files (R190):
+  // A release short of a file its project lists in .release-files:
   // each file and why, and the release's page.
   if (a.kind === "release-files"){
     const n = (a.files || []).length;
@@ -355,7 +355,7 @@ function attRow(a){
           ${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">The release</a>` : ""}</span></div></div>`;
   }
   // A project whose git access was linked to an account's token, gone with
-  // that account's key store (R154): its settings, to give it another.
+  // that account's key store: its settings, to give it another.
   if (a.kind === "git-unlinked"){
     return `<div class="bnote att bad">
       <div class="bt">${esc(projLabel(a.project))} has no git access</div>
@@ -364,7 +364,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bprojset="${esc(a.project)}">Its settings</a></span></div></div>`;
   }
-  // An empty project 0.8.0's B402 left beside the one its repository went
+  // An empty project an older release left beside the one its repository went
   // into: Delete it from here, asked first as the card's Delete asks.
   if (a.kind === "project-leftover"){
     return `<div class="bnote att">
@@ -374,7 +374,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bleftover="${esc(a.project)}">Delete it</a></span></div></div>`;
   }
-  // A scheduled script (R117): a run that failed, could not be queued, or
+  // A scheduled script: a run that failed, could not be queued, or
   // was skipped because the one before it was still going; its log where
   // there is one, else the Schedules page.
   if (a.kind === "schedule"){
@@ -385,7 +385,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           ${a.job ? `<a href="#" data-bschedjob="${esc(a.job)}">Its log</a>` : `<a href="#" data-bsched>Schedules page</a>`}</span></div></div>`;
   }
-  // A container whose registry image moved (R195): one note per node, to
+  // A container whose registry image moved: one note per node, to
   // the Docker tab on that node, where Update is on each row.
   if (a.kind === "image"){
     const n = a.containers.length;
@@ -396,7 +396,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bdocker="${esc(a.id)}">Containers page</a></span></div></div>`;
   }
-  // A node short of disk or memory (R110): what is short and how much is
+  // A node short of disk or memory: what is short and how much is
   // left, to that node's Storage page, which says what is taking the room.
   if (a.kind === "room"){
     const parts = [...(a.short || []).map(x => x.used_pct != null ? `${x.what} has been ${x.used_pct}% used for ten minutes`
@@ -409,7 +409,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bstorage="${esc(a.id)}">Storage page</a></span></div></div>`;
   }
-  // No second factor on this account yet (R127): a standing notice, put
+  // No second factor on this account yet: a standing notice, put
   // away for the day at most, its Set up opening Profile's section.
   if (a.kind === "two-factor"){
     return `<div class="bnote att${a.required ? " warn" : ""}">
@@ -420,7 +420,7 @@ function attRow(a){
           <a href="#" data-b2fa="1">Set up</a></span></div></div>`;
   }
   // An account's coding-agent sign-in opened on a node by something that was
-  // neither that account nor the agent (R125 step 6): root, most likely. A
+  // neither that account nor the agent: root, most likely. A
   // sign-out here deletes this copy, not one already taken, so the row says
   // to treat it as copied and end it at the provider.
   if (a.kind === "token-read"){
@@ -434,7 +434,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bag="${esc(a.id)}">Library</a></span></div></div>`;
   }
-  // A node whose agent is turned away (B569): it is running and asking, and
+  // A node whose agent is turned away: it is running and asking, and
   // the controller will not take its credential, so it is quiet for good.
   if (a.kind === "node-refused"){
     return `<div class="bnote att bad">
@@ -444,7 +444,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
   }
-  // A node's retired token presented again after its grace (R135 step 4): a
+  // A node's retired token presented again after its grace: a
   // copy of its credential is in use somewhere, and its tokens are revoked.
   if (a.kind === "token-reuse"){
     return `<div class="bnote att bad">
@@ -454,7 +454,7 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
   }
-  // A certificate from Let's Encrypt (R150): came, or could not; the nginx
+  // A certificate from Let's Encrypt: came, or could not; the nginx
   // page on that node says the rest.
   if (a.kind === "acme"){
     return `<div class="bnote att${a.bad ? " bad" : ""}">
@@ -465,7 +465,7 @@ function attRow(a){
           <a href="#" data-bnginx="${esc(a.nid)}">nginx page</a></span></div></div>`;
   }
   // A scanner run that failed on a node, or a node behind the newest
-  // scanner versions (R145): to the Scanners page.
+  // scanner versions: to the Scanners page.
   if (a.kind === "scan"){
     return `<div class="bnote att${a.what === "failed" ? " bad" : ""}">
       <div class="bt">${a.what === "failed" ? `Scan failed on ${esc(a.node)}` : `Scanner update on ${esc(a.node)}`}</div>
@@ -675,7 +675,7 @@ function needsRows(which = ""){
 // What an ask is, in one line: the machine and that it is root there, the
 // project and the verb, a container and its node. The bell's row and the
 // Notifications page's both lead with it.
-// An ask that ended (R280): under Earlier, plain where a waiting one is
+// An ask that ended: under Earlier, plain where a waiting one is
 // gold, saying how it went and when, with nothing left to press.
 function askEnded(a){
   const how = a.state === "denied" ? "denied"
@@ -750,8 +750,8 @@ function askLong(a){
 
 // An answer to an ask, from the bell or the Notifications page, and onto
 // the account's record (kind "ask"): which ask, and what was said to it;
-// approved, with what it okayed, to read again in History (the operator,
-// 23 Nov). A denied ask's lines are not kept: they went nowhere.
+// approved, with what it okayed, to read again in History.
+// A denied ask's lines are not kept: they went nowhere.
 function askAnswer(id, allow, session = false){
   const a = (ph?.asks || []).find(x => x.id === id);
   if (allow){ phBusy = "running it"; readMoved("phone"); drawPanes(); }
@@ -776,19 +776,19 @@ function drawBell(){
   // What sessions have waiting for approval, per project (roadmap #27):
   // the server's fact like an ask, so it leaves the moment it is answered.
   const waiting = (state?.projects || []).filter(p => p.pending > 0);
-  // Claude sessions sitting on Claude Code's own permission prompt (B52),
+  // Claude sessions sitting on Claude Code's own permission prompt,
   // which only their terminal can answer: the row opens it.
   // This account's own: the owner's bare-named session on a shared project
-  // is in a member's list too, and is not asking that member (B104).
+  // is in a member's list too, and is not asking that member.
   const asking = (state?.sessions || []).filter(s => s.claude?.state === "asking"
     && (!state?.tmux_prefix || s.name.startsWith(state.tmux_prefix)));
   // What the nodes need: an agent behind, or from another window. From the
   // poll, never stored here, so a row leaves the moment it stops being true.
   const att = state?.attention || [];
-  // A project whose main branch's newest CI run failed (R117): from the
+  // A project whose main branch's newest CI run failed: from the
   // poll, so it leaves when a run passes.
   const ciRed = state?.ci_red || [];
-  // A file changed on two synced copies at once (R162): listed until the
+  // A file changed on two synced copies at once: listed until the
   // copy kept beside it is deleted.
   const syncC = state?.sync_conflicts || [];
   const unread = Math.max(0, notes.length - notesSeen);
@@ -817,8 +817,8 @@ function drawBell(){
   }
   bellRedSeen = red;
   setHidden(dot, !(pendingOn || att.length || ciRed.length || syncC.length || unread));
-  // ...and its name says as much as the dot shows, for a screen reader
-  // (R286 step 2): a dot is a picture of a number.
+  // ...and its name says as much as the dot shows, for a screen reader:
+  // a dot is a picture of a number.
   const waitingN = pendingOn + att.length + ciRed.length + syncC.length + unread;
   const bellName = waitingN ? `notifications, ${waitingN} waiting` : "notifications";
   if (bell.getAttribute("aria-label") !== bellName) bell.setAttribute("aria-label", bellName);
@@ -830,7 +830,7 @@ function drawBell(){
   bell.classList.toggle("has", !!(pendingOn || att.length || ciRed.length || syncC.length || unread));
   bell.classList.toggle("waiting", pendingOn > 0);
   // Its description directly, and only when it changed: a title written on
-  // every draw was taken off again by untitle() each time (R218 step 10).
+  // every draw was taken off again by untitle each time.
   setAttr(bell, "aria-description", pendingOn
     ? `${pendingOn} waiting on an answer`
     : att.length + ciRed.length + syncC.length
@@ -843,7 +843,7 @@ function drawBell(){
   const when = t => fmtTime(t, {hour: "2-digit", minute: "2-digit"});
   const answer = [
     // Above everything the page merely said: somebody is blocked on these.
-    // A root ask (roadmap R38) is the same row with the stakes said: which
+    // A root ask is the same row with the stakes said: which
     // machine, and that it is root there. `#` is the prompt root gets.
     // A removal from a release takes something away from the people
     // downloading, so it wears the destructive color, as root does.
@@ -851,27 +851,27 @@ function drawBell(){
         <div class="btag">${askTag(a)}</div>
         <div class="bwhy">${esc(a.why)}</div>
         <div class="bcmd">${askCmd(a)}</div>${
-        // A push (R219) is approved by reading the lines that look like a
+        // A push is approved by reading the lines that look like a
         // secret or something private, whole, open, each with its file and
         // line: Approve sends them and okays these exact lines.
         a.kind === "push" ? `<details class="bdetail chev" open><summary>the ${a.count || ""} flagged line${a.count === 1 ? "" : "s"}: approving okays these exact lines until they change</summary><pre class="bflag">${
             esc(a.detail || "")}</pre></details>` : ""}${
         // A container is approved by reading its compose file, the way root
-        // is approved by reading its argv (R71): the file is the request, so
+        // is approved by reading its argv: the file is the request, so
         // it is here whole, folded, with the env file's keys and never its
         // values, which is where a token would be.
         a.kind === "container" ? `<details class="bdetail chev"${sectAttr("bell:detail:" + a.id)}><summary>the compose file${
             a.env_keys?.length ? `, and an env file setting ${a.env_keys.map(esc).join(", ")}` : ""}${
             a.for ? `, for ${esc(a.for)}` : ""}</summary><pre>${esc(a.detail || "")}</pre></details>` : ""}${
-        // An edit of a release (R139) is approved by reading the notes it
+        // An edit of a release is approved by reading the notes it
         // would put on the page, whole.
         a.kind === "release-edit" && a.detail ? `<details class="bdetail chev"${sectAttr("bell:detail:" + a.id)}><summary>the new notes</summary><pre>${
             esc(a.detail)}</pre></details>` : ""}
         <div class="bfoot"><span>${a.asker || a.project ? esc(askWho(a)) + " · " : ""}${askLeft(a)}</span>
           <span class="acts"><a href="#" data-bdeny="${a.id}">Deny</a>${
             // A phone's commands come one after another: the second answer
-            // lets the rest from this session run without asking (the
-            // operator, 4 Oct), taken back on the Phone tab.
+            // lets the rest from this session run without asking,
+            // taken back on the Phone tab.
             a.kind === "phone" || a.kind === "phone-use"
               ? `<a href="#" data-ballow="${a.id}" data-bsession="1">Approve for this session</a>` : ""}
             <a href="#" data-ballow="${a.id}">Approve</a></span></div></div>`),
@@ -899,7 +899,7 @@ function drawBell(){
         <div class="bfoot"><span>on the notebook</span>
           <span class="acts"><a href="#" data-bpend="${esc(p.name)}">Review</a></span></div></div>`),
   ];
-  // Two sections (R280, the operator, 24 Nov): Active, what waits on an
+  // Two sections: Active, what waits on an
   // answer pinned at its top in gold and then what blocks work now, none of
   // it put away; Earlier, the asks that ended (plain, saying how), what can
   // be dismissed, and the latest of what the page said.
@@ -917,13 +917,13 @@ function drawBell(){
     ? `<div class="bgroup${cls}"><span>${title} · ${total}</span>${extra}</div>` + list.join("") : "";
   const putAway = hidden ? `<div class="bfootbar"><span>${hidden} update${hidden === 1 ? "" : "s"} dismissed</span>
       <button type="button" id="bellRestore">Show again</button></div>` : "";
-  // A short list (R218 step 6): what waits on an answer, what needs doing,
+  // A short list: what waits on an answer, what needs doing,
   // then the latest five of what the page said, and See all for the rest
   // and the account's whole record on the Notifications page.
-  // ...headed as the doctor's and the gear's are (the operator, 22 Oct),
+  // ...headed as the doctor's and the gear's are,
   // See all at the head's right where the eye starts.
   const head = `<div class="popbar"><b>Notifications</b><button type="button" id="bellAll">See all</button></div>`;
-  // Patched, and left alone when nothing in it moved (R228 step 14): it was
+  // Patched, and left alone when nothing in it moved: it was
   // written whole on every poll, open or not, and every press bound again.
   // What is bound below is set as a property, so a row kept keeps its own.
   const active = [...answer, ...needsNow], earlier = [...ended, ...needsLater, ...said.slice(0, 5)];
@@ -935,7 +935,7 @@ function drawBell(){
     // nothing to report.
     : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway, true)) return;
   // Any press in the drawer closes it, after the press's own handler has
-  // run (the operator, 7 Oct): Approve, Deny, an invitation's answer, Clear,
+  // run: Approve, Deny, an invitation's answer, Clear,
   // a link to where a row is about. One listener on the drawer, so a row
   // added later is covered without remembering to.
   panel.onclick = e => {
@@ -994,7 +994,7 @@ function toggleBell(open){
                      {opacity: 1, transform: "none"}], {duration: 160, easing: "ease"});
   } else if (!panel.hidden){
     // ...and it hides only a panel still meant to be shut: pressed open again
-    // inside the 120ms, the old close's end hid it (B855, as the gear's did).
+    // inside the 120ms, the old close's end hid it (as the gear's did).
     const hide = () => { if (!bellOpen) panel.hidden = true; };
     if (noMotion()) hide();
     else {
@@ -1038,9 +1038,9 @@ function wireNeeds(root, after = () => {}){
     return goNow(keys.map(k => "bell:" + esc(k)), {rows, redraw: () => { drawBell(); render(); },
       send: () => postJSON("/api/bell", {action: "dismiss", keys}), after: () => refresh()});
   });
-  // Resume (R251): the session an outage held is told to pick up from its
+  // Resume: the session an outage held is told to pick up from its
   // note; the row goes once the line was sent. One send at a time: a second
-  // press while the first is out typed the line twice (B775).
+  // press while the first is out typed the line twice.
   root.querySelectorAll("[data-bheld]").forEach(a => a.onclick = async e => {
     e.preventDefault();
     if (a.getAttribute("aria-busy") === "true") return;
@@ -1067,7 +1067,7 @@ function wireNeeds(root, after = () => {}){
     sectOpen["git:ci"] = true;
     openNotebook(a.dataset.bci, "git");
   });
-  // ...and a release's signing to the project's Signing view (R106).
+  // ...and a release's signing to the project's Signing view.
   root.querySelectorAll("[data-bschedjob]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); openJob(a.dataset.bschedjob);
   });
@@ -1110,7 +1110,7 @@ function wireNeeds(root, after = () => {}){
     after();
     openLibraryOn(a.dataset.btc);
   });
-  // ...and a coding agent's update to the Library on that node (R95).
+  // ...and a coding agent's update to the Library on that node.
   root.querySelectorAll("[data-b2fa]").forEach(a => a.onclick = e => {
     e.preventDefault();
     after();
@@ -1142,7 +1142,7 @@ function wireNeeds(root, after = () => {}){
     after();
     openDockerOn(a.dataset.bdocker || "");
   });
-  // ...and a release's Update (R90 step 5): the own node's job, said once queued.
+  // ...and a release's Update: the own node's job, said once queued.
   root.querySelectorAll("[data-brelease]").forEach(a => a.onclick = async e => {
     e.preventDefault();
     const j = await postJSON("/api/v1/nodes", {action: "controller-update", id: a.dataset.brelease});
@@ -1159,7 +1159,7 @@ function wireNeeds(root, after = () => {}){
     after();
     openNginxTab(a.dataset.bnginx);
   });
-  // ...and a scan's note to the Scanners page (R145).
+  // ...and a scan's note to the Scanners page.
   root.querySelectorAll("[data-bscanners]").forEach(a => a.onclick = e => {
     e.preventDefault();
     after();

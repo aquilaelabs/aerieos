@@ -1,4 +1,4 @@
-"""Where a request's time went (the operator, 17 Oct: pages took seconds to
+"""Where a request's time went (pages took seconds to
 load, and the trace could say which request but not why). A part of the
 work wraps itself in `timed("name")`; the request's parts, its own thread's
 CPU time beside its wall time, ride its line in the trace (server.py

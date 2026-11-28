@@ -32,7 +32,7 @@ class Membership(unittest.TestCase):
         membership.configure(state=self.tmp, write_json=write_json)
         import roles
         roles.configure(state=self.tmp, write_json=write_json)
-        # An invitation names the role it offers, a role on a project (R155).
+        # An invitation names the role it offers, a role on a project.
         roles.set_role("dev", "projects", {"projects": "write"})
         membership.on_create("app", "ada")
 
@@ -47,7 +47,7 @@ class Membership(unittest.TestCase):
         self.assertEqual(membership.member_refusal(self.me("bob"), "app"), "")
         self.assertNotEqual(membership.member_refusal(self.me("cy"), "app"), "")
         # A plain account is refused for what it is, not told the project
-        # is invite only when it is not (B36).
+        # is invite only when it is not.
         self.assertNotIn("invite only", membership.member_refusal(self.me("cy"), "app"))
         self.assertIn("ada", membership.member_refusal(self.me("cy"), "app"))
 

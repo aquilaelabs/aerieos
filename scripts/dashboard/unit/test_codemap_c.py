@@ -1,9 +1,9 @@
-"""aerie map's C and C++ scanner (B544, report #74 from Shebang-DevBoard): a
+"""aerie map's C and C++ scanner (report #74 from Shebang-DevBoard): a
 function is its header at file, namespace or class level, a type is
 `struct|union|enum|class NAME {` or a typedef's name, a prototype is
 neither and is no call, calls are made inside functions, and a JNI
 implementation is indexed under the Kotlin or Java method it implements.
-And the python scanner counts a function handed on as `module.name` (B543)."""
+And the python scanner counts a function handed on as `module.name`."""
 import os
 import sys
 import unittest
@@ -74,7 +74,7 @@ class CScanner(unittest.TestCase):
 
     def test_the_rare_forms_report_85_named(self):
         # K&R, a function returning a function pointer, and an explicit
-        # specialization beside its primary template (B575).
+        # specialization beside its primary template.
         s = scan("int\nkr_style(a, b)\n int a; int b;\n{ return helper(a + b); }\n"
                  "int (*returns_fp(void))(int, void *) { return 0; }\n"
                  "static int caller(void) { return kr_style(1, 2); }\n")
@@ -119,7 +119,7 @@ class CScanner(unittest.TestCase):
 
 
 class Followup(unittest.TestCase):
-    """Report #79 (B554), Shebang-DevBoard's follow-up on the C scanner."""
+    """Report #79, Shebang-DevBoard's follow-up on the C scanner."""
 
     def test_an_ifdef_whose_branches_each_open_a_brace_loses_nothing(self):
         s = scan("int f(int a) {\n#ifdef X\n if (a) {\n#else\n if (!a) {\n#endif\n return 1; }\n return 0; }\n"
@@ -133,7 +133,7 @@ class Followup(unittest.TestCase):
         self.assertEqual(sorted(d["name"] for d in s.defs), ["a", "d"])
 
     def test_balanced_later_branches_are_read(self):
-        # B805: ggml's SIMD helpers, one whole function per branch of an
+        # Ggml's SIMD helpers, one whole function per branch of an
         # #if/#elif chain, were missing behind the first branch
         s = scan("#if defined(NEON)\nstatic inline int ld(int x) { return x; }\n#elif defined(AVX)\n"
                  "static inline __m256 ld8(const float *p) {\n  return _mm256_loadu_ps(p);\n}\n"
@@ -149,7 +149,7 @@ class Followup(unittest.TestCase):
         self.assertEqual(got, {"a": (2, 8), "z": (10, 10), "d": (12, 12)})
 
     def test_a_template_with_a_default_is_a_definition(self):
-        # B807: the header's = read as an assignment
+        # The header's = read as an assignment
         s = scan("template <typename T, int N = 0>\nvoid two(T x) { return; }\n"
                  "template <typename T,\n  typename std::enable_if<is_q<T>::value, int>::type = 0>\n"
                  "inline void scale_C(const T * tile) { return; }\nint x = 0;\nint after(void) { return 1; }\n",
@@ -171,7 +171,7 @@ class Followup(unittest.TestCase):
 
 class AnonymousFunctions(unittest.TestCase):
     """An anonymous `function (` handed to a call owns its body, and the
-    first name in it is a call, not the function's name (B545: a WordPress
+    first name in it is a call, not the function's name (a WordPress
     functions.php read add_theme_support, $css and echo as functions)."""
 
     def scan(self, text, name):

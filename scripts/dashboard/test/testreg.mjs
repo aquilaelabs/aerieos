@@ -197,7 +197,7 @@ await section("A name that carries a uid or a port changes on every run, so ever
      '...and the description stays on the row whose words survived');
 });
 
-// Bug B121: THREE assertions inserted above a run of such names, with two
+// THREE assertions inserted above a run of such names, with two
 // neighbors of similar wording among them. Pairing by likeness within two
 // ordinals could not reach a test moved by three, and gave the description
 // to the neighbor whose words were closest instead.
@@ -325,7 +325,7 @@ ok(await page.evaluate(() => ({
 // A redraw is not always this panel's own: an ingest under an open tab draws
 // one on the next poll, and it used to take unsaved typing with it.
 await page.fill(`${box} .tstN`, 'half a sentence, not saved yet');
-// ...and since R244 the field itself stays, focused, the caret where it was.
+// ...and the field itself stays, focused, the caret where it was.
 await page.$eval(`${box} .tstN`, e => { e.focus(); e.setSelectionRange(4, 4); window.__tstN = e; });
 await page.evaluate(() => notebooks.get('alpha').reloadTests());
 await page.waitForFunction(s => document.querySelector(s + ' .tstN'), box, { timeout: 10000 });
@@ -345,13 +345,13 @@ await section("The same mark from the row", async () => {
   writeFileSync(LOG, runlog([['wait.mjs', 'a boot that really takes thirty seconds', 30.0]]));
   bb('ingest', LOG);
   const row = '#tstList .tst[data-key="wait.mjs#1"]';
-  // Through the poll, which keeps testsRev in step: a direct reloadTests()
+  // Through the poll, which keeps testsRev in step: a direct reloadTests
   // leaves the rev behind, and the next poll redraws the list a second
-  // time, in the middle of the ticking below (B79).
+  // time, in the middle of the ticking below.
   await page.evaluate(() => refresh());
   try { await page.waitForSelector(row, { timeout: 10000 }); }
   catch (e) {
-    // B201: what the page held when the row did not show. Whether it is in
+    // What the page held when the row did not show. Whether it is in
     // the DOM and not visible, or not there at all, is the one fact that
     // separates every theory tried so far, and nothing recorded it.
     console.log('B201 probe: ' + JSON.stringify(await page.evaluate(sel => ({
@@ -451,7 +451,7 @@ await section("The run's output is the shell's, not a box on a row", async () =>
      'the Tests view carries Open the run\'s output beside its summary');
 });
 
-// B201: a write that lands WHILE the panel's read is out is not marked as
+// A write that lands WHILE the panel's read is out is not marked as
 // seen. The panel used to record the page's token as of when its answer
 // arrived; a poll in between had already moved that token for the write, so
 // the panel recorded "seen" against an answer from before it, and the row
@@ -566,7 +566,7 @@ page.errors = [];
 // `aerie test` says when a run starts and ends (run_here's tests_going), and the
 // status poll carries it on the project row, so the companion app can hold
 // its "waiting on you" note until the tests finish where the project's
-// During-a-test-run setting waits for them (the operator, 30 Sep).
+// During-a-test-run setting waits for them.
 const post = body => pageCall(page, '/api/tests', body);
 const testingOf = async () => (await page.evaluate(async () =>
   (await (await fetch('/api/status')).json()).projects)).find(p => p.name === 'alpha').testing;
@@ -578,7 +578,7 @@ const going = await testingOf();
 ok(going && going.cmd === 'npm test cards' && typeof going.by === 'string' && !('id' in going)
    && Math.abs(going.since - Date.now() / 1000) < 60,
    `...and the row says what is running, by whom and since when, without the id (${JSON.stringify(going)})`);
-// The dashboard says it where the app reads it (R99): on the registry's
+// The dashboard says it where the app reads it: on the registry's
 // payload, at the head of the Tests view before the last run's numbers,
 // and on the project's row as the poll draws it.
 const reg = await page.evaluate(async () => (await (await fetch('/api/tests?project=alpha')).json()).running);

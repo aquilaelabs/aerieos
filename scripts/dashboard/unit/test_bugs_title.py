@@ -1,6 +1,6 @@
 """A bug's title is one line of at most bugs.MAX_SHORT characters, and a longer one is
 refused with where the rest goes, not cut: cutting it lost whatever followed,
-often the half that said why (B621)."""
+often the half that said why."""
 import json
 import os
 import shutil
@@ -42,7 +42,7 @@ class Title(unittest.TestCase):
 
 class EditHistory(unittest.TestCase):
     """A bug edit's History names the fields that moved, not every one the
-    form sent (B42), and an edit that moved nothing leaves no line."""
+    form sent, and an edit that moved nothing leaves no line."""
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)

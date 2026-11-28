@@ -20,7 +20,7 @@ nodes = dash.load("nodes", dash.beside(py))
 
 
 def _seen(rows):
-    """What a session asking through the relay may read (B727): its space's
+    """What a session asking through the relay may read: its space's
     own nodes (its node, Also works on, the hosting-only ones) and every
     node only for an owner's or an administrator's seat, as the Nodes page
     narrows them; a person at the controller reads them all."""
@@ -80,7 +80,7 @@ def list_():
 
 
 def _agent(n):
-    """The agent a node runs beside the row (B9): its version, and
+    """The agent a node runs beside the row: its version, and
     "update due" when it is not the one this controller ships, which is
     what Update agent on the Nodes page fixes."""
     if n["kind"] != "agent":
@@ -124,11 +124,11 @@ def labels():
 
 
 def enroll_token():
-    """A node's enrollment token for a setup scripted from a shell (R84):
+    """A node's enrollment token for a setup scripted from a shell:
     the row and the token Enroll node's Just a token makes, printed once.
     Its run user is --user's, bb by default. --own makes the row the
     controller's own machine, which nodes/install-controller.sh enrolls on a
-    controller installed bare metal (R90). --pins prints, a line each after
+    controller installed bare metal. --pins prints, a line each after
     the token, the words the provisioner is handed with it, as the Enroll
     script carries them (nodes.enroll_pins): the release key the node pins,
     and the digest and the signature its first agent is held to."""

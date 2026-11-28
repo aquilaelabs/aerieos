@@ -1,4 +1,4 @@
-"""Where a node's store or mount may go (R120): the controller refuses a
+"""Where a node's store or mount may go: the controller refuses a
 system directory before anybody presses Apply and the agent refuses it
 whatever it is told, from two copies of one list, held equal here."""
 import os

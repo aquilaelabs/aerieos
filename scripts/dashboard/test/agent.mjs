@@ -23,7 +23,7 @@ const LOAD_AGENT = `import sys; sys.path.insert(0, ${JSON.stringify(`${REPO}/scr
 // What a node runs: the zip the controller ships (aerieos_agent/bundle.py).
 const agentZip = () => execFileSync('python3', ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); '
   + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED], { maxBuffer: 64 << 20 });
-// Under aerie tests coverage (R76) every python this file starts, the agent it
+// Under aerie tests coverage every python this file starts, the agent it
 // runs and the module it drives in-process alike, counts the agent's
 // functions into its own file: PID is each process's own, so a self-update's
 // successor and every snippet get a file apiece. Set once, inherited by all.
@@ -32,7 +32,7 @@ if (process.env.BB_COVERAGE_DIR){
   process.env.BB_COVERAGE_SUITE = 'agent';
   process.env.BB_COVERAGE_AS = 'scripts/agent/aerieos_agent';   // the copy's modules count as the tree's
 }
-// A node's toolchains live under <store>/<node id> (R196), so every fixture
+// A node's toolchains live under <store>/<node id>, so every fixture
 // written INTO a store goes there, while the store's own path (the setting)
 // stays the share. Set once the node's id is minted, below.
 let SCOPE = '';
@@ -103,7 +103,7 @@ await section("and the download the provisioner does, with the enroll token", as
 // a JSON list the same verbs edit, and netplan as a log of what was applied.
 // Neither needs root; what the agent does with them is what is under test.
 const SANDBOX_STATE = `${DIR}/sandbox-mounts.json`;
-// A card of its own for the agent to find (R102): a sysfs tree with an
+// A card of its own for the agent to find: a sysfs tree with an
 // NVIDIA display device bound to nouveau, and a modinfo that finds a
 // module only once the stand-in bb-sandbox has "installed" one, so the
 // census reads the same on any box the suite runs on.
@@ -313,10 +313,10 @@ if a[0] == "funnel":
     json.dump(d, open(st, "w")); sys.exit(0)
 sys.exit(2)
 `, { mode: 0o755 });
-// The node's screen relay (R133): its terminals' one port, a free one of
+// The node's screen relay: its terminals' one port, a free one of
 // its own here, since a real node's 7684 may be this machine's.
 const SCREEN_PORT = 17684 + Math.floor(Math.random() * 1000);
-// A terminal through the controller, as the page opens one (R133): its
+// A terminal through the controller, as the page opens one: its
 // screen, what is typed into it, and the reason it closes with.
 const { connect: wsConnect } = createRequire(import.meta.url)(`${REPO}/apps/vscode/lib/ws.js`);
 const termRun = async (arg, type, hdr, answer) => {
@@ -341,11 +341,11 @@ const termRun = async (arg, type, hdr, answer) => {
 // The stub docker's own state, so the agent's compose reaches the same fake
 // daemon the controller's runner does; a real node needs nothing here.
 // The fixture node's /workspace: a directory of its own, where its agent
-// makes the synced copy of each project bound to it (R163), from this
+// makes the synced copy of each project bound to it, from this
 // harness's controller, as a real node does.
 const SHARE = `${DIR}/agentworkspace`;
 mkdirSync(SHARE, { recursive: true });
-// A home of its own (B248): a non-root agent installs a coding agent into
+// A home of its own: a non-root agent installs a coding agent into
 // its account's home, and with the runner's own the stub installers below
 // wrote ~/.local/bin/codex and claude into a real person's home.
 mkdirSync(`${DIR}/agenthome`, { recursive: true });
@@ -363,7 +363,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   BUILDERBOT_IDLE_UNIT: '1',
   // The Claude Code installer, stood in for: the real one fetches a binary.
   BUILDERBOT_CLAUDE_INSTALLER: `${DIR}/bin/claude-installer`,
-  // ...and Codex CLI's (R95 step 2), which leaves a stub codex in the
+  // ...and Codex CLI's, which leaves a stub codex in the
   // account's ~/.local/bin that prints its version.
   BUILDERBOT_CODEX_INSTALLER: `${DIR}/bin/codex-installer`,
   BUILDERBOT_AGENTS_DIR: `${DIR}/agents-pinned`,
@@ -372,7 +372,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   BUILDERBOT_TAILSCALE_BIN: `${DIR}/bin/tailscale`,
   BUILDERBOT_RUNNER_DIR: `${DIR}/runner`, BUILDERBOT_RUNNER_TARBALL: `${DIR}/runner.tar.gz`,
   // The runner's unit is written by the agent and driven with systemctl,
-  // both stood in for here (R247 step 5: never the runner's own svc.sh).
+  // both stood in for here (never the runner's own svc.sh).
   BUILDERBOT_UNIT_DIR: `${DIR}/units`, BUILDERBOT_SYSTEMCTL_BIN: `${DIR}/bin/runner-systemctl`,
   BUILDERBOT_ACT_RUNNER_BIN: `${DIR}/bin/act_runner`,
   BUILDERBOT_SANDBOX_BIN: `${DIR}/bin/bb-sandbox`, BB_SANDBOX_STATE: SANDBOX_STATE,
@@ -387,7 +387,7 @@ await section("builderbot-agent enroll writes node.json, mode 0600", async () =>
     out = execFileSync('python3', [AGENT, 'enroll', '--controller', URL,
       '--token', minted.token, '--user', process.env.USER || 'builder',
       '--store', `data=${DIR}/agentdata`, '--store', `toolchains=${DIR}/agenttoolchains`,
-      // Where a dev instance's data goes on this node (R17 step 2). The same
+      // Where a dev instance's data goes on this node. The same
       // directory the suite blocks a bind in below, because it is now the
       // NODE that says where that is rather than the controller's
       // BB_DEV_DATA_DIR.
@@ -411,7 +411,7 @@ await section("builderbot-agent enroll writes node.json, mode 0600", async () =>
   ok(n.state === 'online' && n.reported.cpu > 0 && n.reported.hostname
      && n.agent.version === ships.version && n.agent.digest === ships.digest,
      `the row is online with the census, and runs the agent this controller ships (${n.agent.version})`);
-  // Whether a session there sees only its own project (R35), in the
+  // Whether a session there sees only its own project, in the
   // helper's own answer: an agent that is not root cannot build a view.
   ok(n.reported.isolation && n.reported.isolation.sessions === false && /root/.test(n.reported.isolation.why || ''),
      `...and says whether its sessions are kept to their own space, and why not (${JSON.stringify(n.reported.isolation)})`);
@@ -454,7 +454,7 @@ const agentOut = openSync(AGENT_LOG_FILE, 'a');
 const AGENT_RUN = `${DIR}/agent-run/builderbot-agent`;
 mkdirSync(`${DIR}/agent-run`, { recursive: true });
 writeFileSync(AGENT_RUN, agentZip());
-// let: a build that dies as it starts is started again below, as the service would (R241).
+// let: a build that dies as it starts is started again below, as the service would.
 let agent = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
 const agentLog = () => { try { return readFileSync(AGENT_LOG_FILE, 'utf8'); } catch { return ''; } };
 try {
@@ -473,7 +473,7 @@ try {
 
   // ---- the session half (roadmap #24) ----------------------------------------
   // On its first hello the agent fetches the bb bundle the controller ships,
-  // unpacks it into the toolchain store, and sets up its terminals (R133):
+  // unpacks it into the toolchain store, and sets up its terminals:
   // bb-tty from that bundle, opened by the screen relay on its one port
   // for each terminal the controller sends. The census then says so, which
   // is what the controller opens a session there on the strength of.
@@ -494,7 +494,7 @@ try {
       fetch(`http://127.0.0.1:${SCREEN_PORT}/term?a=x&t=0&s=x`).then(r => r.status).catch(() => null), 15000, 300);
     ok(unsigned >= 400 && unsigned < 500, `...and the relay answers on that port, refusing a terminal nobody signed (${unsigned})`);
     const st = JSON.parse(readFileSync(NODE_JSON, 'utf8'));
-    const store = `${st.stores.toolchains}/${SCOPE}`;   // the node's scope in it (roadmap R19)
+    const store = `${st.stores.toolchains}/${SCOPE}`;   // the node's scope in it
     ok(existsSync(`${store}/.bb/current/scripts/aerie`)
        && lstatSync(`${store}/.bb/current`).isSymbolicLink(),
        'the toolchain store carries a .bb/current link at the newest bundle, for a shell at the console');
@@ -517,7 +517,7 @@ print(len(t)); print(t.splitlines()[0]); print('uninstall)' in t)
       ok(Number(tool[0]) > 5000 && /^#!/.test(tool[1]) && tool[2] === 'True',
          `the agent lifts bb-sandbox out of the provisioner's heredoc whole, uninstall verb included (${tool.join(' | ').slice(0, 80)})`);
     }
-    // B377: the helper a new bundle carries goes in with the bundle. The
+    // The helper a new bundle carries goes in with the bundle. The
     // loop refreshes it before its hello and the bundle arrives after, so
     // it waited ten minutes for the next hello, and a session restarted in
     // between lost what the new helper keeps. Driven in process: a hello
@@ -557,7 +557,7 @@ print(json.dumps({'moved': case('sha256:old', 'sha256:new'), 'same': case('sha25
          `a bundle that moved has its helper installed in the same hello, straight after it is taken (${r.moved.join(', ')})`);
       ok(!r.same.includes('helper'), `...and one that did not move installs nothing (${r.same.join(', ')})`);
     }
-    // The loop's hello takes its census beside the loop (B380): the
+    // The loop's hello takes its census beside the loop: the
     // census asks the slow questions right after a full-length work poll,
     // and the loop stood still for it, so a node whose census took longer
     // than fifty seconds read as not answering on every project row for
@@ -623,7 +623,7 @@ print(json.dumps({'first': first, 'second': second, 'said': said, 'now': now, 'f
          && r.first_of_process && r.said[3] === null && r.dropped,
          `the loop's hello waits for a census taken beside it and says hello with it; one asked for again lets a pending census go and takes its own beside the loop; the process's first is said at once (${said})`);
     }
-    // B167: the distribution's own root ttyd is switched off by the agent on
+    // The distribution's own root ttyd is switched off by the agent on
     // a managed node, not only by a provisioner run that may never come
     // again; left alone when it is already off, and never on a guest.
     {
@@ -654,7 +654,7 @@ os.unlink(stamp)
       ok(r.off[0] === false && r.off[1].length === 0 && r.guest[0] === false && r.guest[1].length === 0,
          '...and leaves it alone when it is already off, and on a guest, whose services are its owner\'s');
     }
-    // B538: a unit installed before B107 kept systemd's default KillMode, and
+    // A unit installed by an older agent kept systemd's default KillMode, and
     // needrestart's restart of it after an upgrade ended every session. The
     // agent writes the drop-in and needrestart's exception itself, once.
     {
@@ -692,10 +692,10 @@ print(json.dumps({'first': first, 'again': case('process'), 'guest': case('contr
       ok(r.again[0].length === 0 && JSON.stringify(r.again[1]) === '["show","show"]' && r.guest[0].length === 0,
          '...once: a unit that already stops only itself and a needrestart already told are left as they are, and a guest is never touched');
     }
-    // R27's refresh, run against the bundle's real layout: bb is at
+    // The refresh, run against the bundle's real layout: bb is at
     // <store>/.bb/current/scripts/aerie. The agent looked for .bb/current/bb,
     // which no bundle has, and returned in silence, so no idle session's
-    // token was ever refreshed (B335). A stand-in bb records what it was
+    // token was ever refreshed. A stand-in bb records what it was
     // handed, for each live session the controller named.
     {
       const said = execFileSync('python3', ['-c', `
@@ -723,8 +723,7 @@ print(json.dumps(open(seen).read().splitlines() if os.path.exists(seen) else [])
          `the agent hands each live session's fresh token to the bundle's own bb, found where the bundle keeps it (${said})`);
     }
     // ...and a keep that fails is said in the agent's log, once an hour per
-    // session: it was silent, so a token ran out with nothing saying why
-    // (B419).
+    // session: it was silent, so a token ran out with nothing saying why.
     {
       const said = execFileSync('python3', ['-c', `
 import importlib.util, json, os, tempfile
@@ -754,7 +753,7 @@ print(json.dumps({"logged": logged, "report": a.keep_report()}))
          && report.ok === 0,
          `...and kept for the hello, which carries it to the controller: the journal was the only place it went (B419) (${JSON.stringify(report).slice(0, 160)})`);
     }
-    // The session's view (R35): the helper travels in the bundle, and what
+    // The session's view: the helper travels in the bundle, and what
     // the agent writes for it is one rule for one command, the layout, and a
     // respawn that runs again only a launcher it recognizes.
     {
@@ -806,7 +805,7 @@ print(json.dumps({
       ok(out.iso.sessions === false && /root/.test(out.iso.why),
          `an agent that is not root says its sessions are not kept to their space, and why (${out.iso.why})`);
     }
-    // Each session kept to its own project's network (R79). The halves that
+    // Each session kept to its own project's network. The halves that
     // need no root, driven directly: the resolvers a session's namespace can
     // reach, the layout file, the addresses each session may reach from what
     // the controller says its project owns, the sets as one transaction, the
@@ -1104,7 +1103,7 @@ print(json.dumps(sorted(os.listdir(d))))
                     BB_TOKEN: short, BB_PROJECT: 'alpha', XDG_CACHE_HOME: cache,
                     BB_ACCOUNT_UID: 'u_0000abcd' };
       execFileSync('bash', [`${REPO}/scripts/aerie`, 'roadmap'], { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
-      // Under the account's id (B159): the cache folder is shared between
+      // Under the account's id: the cache folder is shared between
       // accounts on a node, so the uid is what keeps one account's token out
       // of another's session.
       const kept = existsSync(`${cache}/builderbot/u/u_0000abcd/project/alpha/token`)
@@ -1131,10 +1130,10 @@ print(json.dumps(sorted(os.listdir(d))))
     ok(nobody.status === 401, 'a token that does not verify gets nothing');
 
     // ---- a Claude login belongs to one account on one MACHINE ---------------
-  // The grant never travels (R47). Every failure this had came from one
+  // The grant never travels. Every failure this had came from one
   // OAuth pair living on several machines: a refresh rotates the refresh
   // token, so two copies sign each other out (bug #64), and a machine that
-  // was away holds one the server has retired (B100). Each machine is signed
+  // was away holds one the server has retired. Each machine is signed
   // in for itself, from its own row, and keeps the grant it alone refreshes.
   //
   // So what crosses the wire is one sentence and no secret: "this account is
@@ -1174,7 +1173,7 @@ print(json.dumps(sorted(os.listdir(d))))
     await api({ email: 'tester@example.com', plan: 'max', signed_in: true });
 
     // The other coding agents say theirs the same way, from the same check,
-    // into their own record (R95 step 3): never Claude's.
+    // into their own record: never Claude's.
     const agentsAt = async () => (await (await fetch(URL.replace(/\/$/, '') + '/api/status', { headers: auth })).json()).agent_auth || {};
     const cx = await api({ agent: 'codex', email: 'tester@example.com', plan: 'plus', signed_in: true });
     ok(cx.ok && (await agentsAt()).codex?.nodes?.[minted.id]?.email === 'tester@example.com'
@@ -1245,7 +1244,7 @@ print(json.dumps(sorted(os.listdir(d))))
     ok(anon.status === 403, 'a token for the space alone cannot speak for an account');
 
     // ...and the AGENT can say it too, on its heartbeat, without a session
-    // having to run (B104): a node signed in with nothing running reads as
+    // having to run: a node signed in with nothing running reads as
     // signed in on its row, and a sign-out made there shows without one.
     const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
     const nodeTok = JSON.parse(readFileSync(NODE_JSON, 'utf8')).token;
@@ -1261,7 +1260,7 @@ print(json.dumps(sorted(os.listdir(d))))
     ok(!(minted.id in await where()),
        '...and a heartbeat saying that home holds no credential takes it off again');
     // The node's sessions, sent the moment one changes rather than on the
-    // heartbeat's turn (the operator, 25 Sep): who has a session where and
+    // heartbeat's turn: who has a session where and
     // whether it is working, read back cheaply from /api/live, with the
     // revs token `live` moving so the page knows to ask.
     {
@@ -1274,7 +1273,7 @@ print(json.dumps(sorted(os.listdir(d))))
       const tok = async () => (await get('/api/revs?p=')).live;
       // The suite's own agent is running and heartbeats its own report of
       // this node's sessions, which can land between a tell and the reads
-      // after it (B427): idle, read, busy, read, and once more when a
+      // after it: idle, read, busy, read, and once more when a
       // heartbeat came between, which leaves the token as the agent had it.
       let busy = {}, moved = false;
       for (let tries = 0; tries < 3 && !moved; tries++){
@@ -1321,7 +1320,7 @@ print(json.dumps(sorted(os.listdir(d))))
       // the controller does not answer, and lets the first call after it
       // comes back through without a wait. It used to weigh a second thing,
       // the project's CLAUDE.md block being from another window; that went
-      // with the block (R63 step 3), so this is the whole of the rule now.
+      // with the block, so this is the whole of the rule now.
       {
         const gt = `${DIR}/gatetree`; mkdirSync(gt, { recursive: true });
         const cache = `${DIR}/gatecache`; mkdirSync(cache, { recursive: true });
@@ -1332,7 +1331,7 @@ print(json.dumps(sorted(os.listdir(d))))
             { input: '{"tool_name":"Bash"}', encoding: 'utf8', env: genv(extra), stdio: ['pipe', 'pipe', 'pipe'] });
           return { code: 0, err: '' };
         } catch (e) { return { code: e.status, err: String(e.stderr) }; } };
-        // u/_none: this env names no account, and the gate is per account (B159).
+        // u/_none: this env names no account, and the gate is per account.
         const fresh = () => rmSync(`${cache}/builderbot/u/_none/project/alpha/gate`, { force: true });
         let r = gate({});
         ok(r.code === 0, `with the controller up, a tool call goes through (${r.code} ${r.err.slice(0, 60)})`);
@@ -1352,8 +1351,8 @@ print(json.dumps(sorted(os.listdir(d))))
         ok(r.code === 0 && !/not answering/.test(r.err),
            `a token the controller refuses is not a controller that is down (${r.code}: ${r.err.slice(0, 50)})`);
         // A controller address typed by hand without its scheme parses with
-        // no host at all, and every bb verb died on a TypeError traceback
-        // (B179). It is an answer now, naming the setting.
+        // no host at all, and every bb verb died on a TypeError traceback.
+        // It is an answer now, naming the setting.
         {
           const said = execFileSync('python3', ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); import bbapi, json; print(json.dumps(bbapi.call("/api/status")))',
             `${REPO}/scripts/lib`], { encoding: 'utf8', env: { ...process.env, BB_CONTROLLER: 'controller.lan:7680' } });
@@ -1387,7 +1386,7 @@ print(json.dumps(sorted(os.listdir(d))))
       // The dispatch reads `exit $rc` rather than `exit 0`: it was the second
       // for a long time and still propagated, because bb runs under set -e
       // and the failing relay aborted before reaching it. Pinned here because
-      // that is an accident to rely on, and B154 is the report that it might
+      // that is an accident to rely on, and it might
       // not hold.
       const refused = bbOnNode(['roadmap', 'done', '99999']);
       ok(/^FAILED 1:/.test(refused) && /no item R99999 on this list/.test(refused),
@@ -1397,7 +1396,7 @@ print(json.dumps(sorted(os.listdir(d))))
       bbOnNode(['roadmap', 'rm', String(num), 'test']);
       // aerie git: git's network half from a node runs on the controller, with
       // the keys that live only there (docs/nodes.md §20, rule 2), in a
-      // repository of the controller's own (B148). The fixture's origin is
+      // repository of the controller's own. The fixture's origin is
       // an ssh address nobody holds a key for, so git itself answers, which
       // is the proof that git ran there and not on the "node".
       const ls = bbOnNode(['git', 'ls-remote', 'origin']);
@@ -1410,7 +1409,7 @@ print(json.dumps(sorted(os.listdir(d))))
          `...and an option that would run a program on the controller, or a verb that is not the network half, is refused before git sees it (${
            [exec, conf, other].map(x => x.replace(/\s+/g, ' ').slice(0, 60)).join(' | ')})`);
       // A rule's check is a command a session may write, so it runs on the
-      // machine the session is on and never on the controller (B152). The
+      // machine the session is on and never on the controller. The
       // controller's relayed run carries BB_RELAYED; a local one does not.
       bbOnNode(['rules', 'add', 'relayprobe', 'where a check runs', '--check', 'echo relayed=${BB_RELAYED:-no}']);
       // Run from a BUNDLE-SHAPED copy, not from the checkout: bb beside its
@@ -1479,14 +1478,14 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(/test \(Claude Code\)\s+src\/picker\.py\s+\[pick\]/.test(work) && noteOut === '',
          `an edit's note from the node is what aerie work reads here, symbol guessed and file relative to the tree, the agent named (${
            (work.split('\n').find(l => /picker/.test(l)) || '').trim()})`);
-      // The notes are per account and agent (R95): the same person's Codex
+      // The notes are per account and agent: the same person's Codex
       // session about to edit that file is told their Claude session has it.
       const codexNote = execFileSync('python3', [`${REPO}/scripts/dashboard/bb-work-note`, 'alpha', 'ignored'],
         { input: JSON.stringify({ tool_input: { file_path: '/workspace/alpha/src/picker.py', old_string: 'x' } }),
           encoding: 'utf8', env: { ...nodeEnv, BB_AGENT: 'codex' }, stdio: ['pipe', 'pipe', 'pipe'] });
       ok(/has src\/picker\.py open: test \(Claude Code\)/.test(codexNote),
          `...and one person's Codex session is told their own Claude session has the file, by agent (${codexNote.slice(0, 120)})`);
-      // ---- the house rules reach a session on a node (B686, R200) -------
+      // ---- the house rules reach a session on a node -------
       // The note's answer and the prompt's seen carry the named rules the
       // controller's store fires, the hooks remember what this conversation
       // was told so a summary can say it again, and the Bash guard refuses
@@ -1597,7 +1596,7 @@ print(json.dumps(sorted(os.listdir(d))))
           s => s.node === 'agentbox' && s.name === 'claude-beta'), 45000, 500);
       ok(!!back, 'a session started on its launcher is listed on the node');
       // Saving a setting with the box ticked ENDS the session rather than
-      // respawning the pane under it (the operator's call, 12 Sep): the
+      // respawning the pane under it: the
       // change lands when the Claude button starts one, which resumes the
       // conversation, instead of arriving in a tab nobody is looking at.
       const r = await api('/api/prefs', { project: 'beta', restart: true });
@@ -1615,7 +1614,7 @@ print(json.dumps(sorted(os.listdir(d))))
     // the LAUNCHER into a pane running something else, so it checked first;
     // ending a session named for the project needs no such guard, and the
     // path it takes is the Sessions card's kill, which never had one. And
-    // whichever agent it is (R95 step 16): a ChatGPT session here, which
+    // whichever agent it is: a ChatGPT session here, which
     // kept what it started with while only Claude's was ended.
     {
       const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
@@ -1766,7 +1765,7 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(fin?.state === 'failed' && /refused: a reboot is root's/.test(fin.log || '') && /sudo reboot/.test(fin.log || ''),
          `...which an agent that is not root refuses, naming the command (${fin?.state}: ${(fin?.log || '').trim().slice(0, 80)})`);
     }
-    // The NVIDIA driver row (R102), end to end with the real agent: the
+    // The NVIDIA driver row, end to end with the real agent: the
     // census reads the card, where its driver stands and what apt offers;
     // a branch picked on the row is a name of the toolchain job, which the
     // agent runs as bb-sandbox gpu-driver install PACKAGE; the hello after
@@ -1797,7 +1796,7 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(/nvidia-driver-610 is installed.*remove it first/.test(other.error || ''), `another branch waits for this one to be removed (${other.error})`);
       // The display, now that the driver is on the machine (it was refused
       // before, above): set up below as its own system job.
-      // The GPU display (R20): a system job the agent answers with bb-sandbox
+      // The GPU display: a system job the agent answers with bb-sandbox
       // gpu, whose words are the job's, and whose state line the next hello
       // carries into the census, so the row says what the machine found.
       {
@@ -1848,8 +1847,8 @@ print(json.dumps(sorted(os.listdir(d))))
       // census is still being taken says its own hello with the driver gone,
       // and the older census was then said on top of it with the driver still
       // there, the next hello ten minutes off, so the row read "waiting" to
-      // the end of the wait below (B483; the agent lets that census go since,
-      // B851). The hello the check asked for is still waited for first: the
+      // the end of the wait below (the agent lets that census go since).
+      // The hello the check asked for is still waited for first: the
       // agent logs each one it says.
       await until(() => {
         const l = agentLog(), at = l.lastIndexOf('hello again: the GPU driver check refreshed apt');
@@ -1955,12 +1954,11 @@ print(json.dumps(sorted(os.listdir(d))))
       // it is moving off. The move above copied the previous store's contents
       // in, so on a machine where that store had any (which is every node,
       // and not the controller) `art` was not empty and the agent said so,
-      // correctly. The test asserted the cleanup without arranging for it
-      // (B84).
+      // correctly. The test asserted the cleanup without arranging for it.
       rmSync(`${DIR}/pre/a1/a2/art`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       mkdirSync(`${DIR}/pre/a1/a2/art`, { recursive: true });
-      // ...and the store it goes back to, for the same reason the other way
-      // (B754): the first move off the node's default store copied what that
+      // ...and the store it goes back to, for the same reason the other way:
+      // the first move off the node's default store copied what that
       // held into agentartifacts, and the move above left it there (nothing
       // is ever deleted from a store moved off), so on a node whose default
       // store had files (the CI runner's) the move back was refused as a
@@ -1980,7 +1978,7 @@ print(json.dumps(sorted(os.listdir(d))))
 
       // Put it back, so what follows runs against the stores it expects,
       // proving the three rules on the way. A folder of files that are not
-      // the store's own (the operator's `pre`) is never copied into (R120):
+      // the store's own (the operator's `pre`) is never copied into:
       // the agent refuses and the store stays where it was.
       const backCfg = { mounts: [{ type: 'nfs', source: 'nas:/mnt/user/appdata', path: '/mnt/appdata' },
                                  { type: 'virtiofs', source: 'projects', path: '/srv/projects', ro: true }],
@@ -2001,7 +1999,7 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(br?.state === 'succeeded' && /using what is already there as asked/.test(br.log || ''),
          `...while a move asked to keep its data where it is repoints without a copy (${br?.state})`);
       // And a target that already is this node's store is used as it is
-      // with no keep saved (B661): the copy made agenttoolchains2 a toolchain
+      // with no keep saved: the copy made agenttoolchains2 a toolchain
       // store holding this node's own folder, so the agent says so itself
       // at apply time instead of refusing the files the store put there.
       await api('/api/v1/nodes', { action: 'config', id: minted.id,
@@ -2055,8 +2053,8 @@ print(json.dumps(sorted(os.listdir(d))))
 
     // ---- the terminal goes to the node (roadmap #24, phase 10b) --------------
     // alpha is bound to agentbox now, whose census says its session half is
-    // up, and whose agent makes alpha's synced copy in its own /workspace
-    // (R163): once it says the copy is ready, a terminal on alpha opens on
+    // up, and whose agent makes alpha's synced copy in its own /workspace:
+    // once it says the copy is ready, a terminal on alpha opens on
     // agentbox, carried signed to its screen relay, with the account, its
     // name and a session token among bb-tty's words.
     {
@@ -2119,7 +2117,7 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(said === `W:${uid}:test:1:bbs:node:current/scripts/aerie`,
          `a space shell on alpha opens on agentbox as the account, with its name, the owner mark, a session token, the node's role and its bb through .bb/current (${
            said || sh.why || sh.out.slice(-160)})`);
-      // ...and the pair it was given is kept against the node (R288 step 7),
+      // ...and the pair it was given is kept against the node,
       // so its heartbeat may be handed a fresh token for it and for no other.
       const asked = existsSync(`${DIR}/state/sessions-asked.json`) ? JSON.parse(readFileSync(`${DIR}/state/sessions-asked.json`, 'utf8')) : {};
       ok(Object.values(asked).some(m => (m || {})[`${uid}/alpha`] > 0),
@@ -2127,7 +2125,7 @@ print(json.dumps(sorted(os.listdir(d))))
       const root = await term('shell');
       ok(root.status === 400 && OPENS.test(root.body),
          'the workspace shell stays on this container');
-      // A Claude session runs on a node and nowhere else (R47): this
+      // A Claude session runs on a node and nowhere else: this
       // container carries no Claude Code, so a project with no node is
       // refused, with the sentence saying what to do rather than opening a
       // conversation that could not build anything.
@@ -2137,7 +2135,7 @@ print(json.dumps(sorted(os.listdir(d))))
          `a space with no node is refused a session, and told why (${
            (nonode.body || '').slice(0, 60)})`);
       // Bound to a node that cannot take one yet: the sandbox's session
-      // half is up but it reports no synced copy of the project (R163), so
+      // half is up but it reports no synced copy of the project, so
       // the button waits with the reason and the proxy says the same rather
       // than starting a session on a tree that is not there.
       const sandbox = (await api('/api/v1/nodes')).nodes.find(n => n.name === 'sandbox');
@@ -2158,7 +2156,7 @@ print(json.dumps(sorted(os.listdir(d))))
          '...and asking for it on this container anyway changes nothing');
       // A shell follows the node for the same reason a session does (the
       // tree is that machine's copy), so a node that cannot take one takes
-      // neither. That is unchanged; what R47 changed is the NO-node case.
+      // neither. What differs is the NO-node case.
       const shellRefused = await term('shell:beta');
       ok(shellRefused.status === 503 && /being copied to sandbox/.test(shellRefused.body),
          '...and a shell on that space follows the node, so it is refused too');
@@ -2177,7 +2175,7 @@ print(json.dumps(sorted(os.listdir(d))))
     ok(fin && fin.state === 'succeeded' && /hi from the tree/.test(fin.log) && /workspace .*jobs\/j_/.test(fin.log),
        `the agent materializes the snapshot and runs there (${fin?.state}${fin?.state === 'succeeded' ? '' : ': ' + (fin?.error || '') + ' | ' + (fin?.log || '').slice(-400).replace(/\n/g, ' / ')})`);
     ok(fin && /\n0\n/.test(fin.log), '...dist/ stays behind: the snapshot carries the tree, not the shelf');
-    // B200: a one-second read does not queue behind a long job. This node runs
+    // A one-second read does not queue behind a long job. This node runs
     // one job at a time, and Test (uname, through the agent) used to wait for
     // that one slot like a build would, time out, and be reported as an agent
     // that "did not report back" on a machine that was healthy and busy.
@@ -2203,7 +2201,7 @@ print(json.dumps(sorted(os.listdir(d))))
     // on the node, and the light lane takes it beside a build, so a look
     // during a job is asked of the node and comes back fresh: it used to be
     // the kept listing, marked stale, which on a shared node was most of the
-    // time and through every change made from the tab (B664, 11 Oct).
+    // time and through every change made from the tab.
     {
       await api('/api/prefs', { project: 'ep.silon', node: minted.id });
       const first = await api(`/api/docker?node=${minted.id}`);
@@ -2414,7 +2412,7 @@ print(json.dumps(sorted(os.listdir(d))))
     // aerie run and aerie build, from a session's shell
     const port = new globalThis.URL(URL).port;
     // The harness may itself run inside a session, whose BB_TOKEN bb would
-    // take over the test account's password (B412).
+    // take over the test account's password.
     const env = { ...process.env, DASHBOARD_AUTH: 'test:test', DASHBOARD_PORT: port, BB_TOKEN: '',
                   DASHBOARD_STATE: `${DIR}/state`, BB_PROJECT: 'alpha', CLAUDECODE: '1' };
     const out = execFileSync('bash', [`${REPO}/scripts/aerie`, 'run', '--node', 'agentbox', '--', 'sh', '-c', 'echo hi from aerie run'],
@@ -2436,7 +2434,7 @@ print(json.dumps(sorted(os.listdir(d))))
          `on a node, aerie run runs here, and --node naming another machine goes to the controller instead of running here (${other.trim().split('\n').pop().slice(0, 90)})`);
       // ...and aerie build there puts what the outputs name into dist/ under
       // the project and its version, the name the briefing asks shipped
-      // output to carry, so a session need not copy it by hand (R104).
+      // output to carry, so a session need not copy it by hand.
       // A version needs a repository with a commit, which this fixture's
       // alpha is not: made one for the check and put back after it. Without
       // one the file keeps its own name, which the check below it holds.
@@ -2519,7 +2517,7 @@ print(json.dumps(sorted(os.listdir(d))))
     }, 30000, 500);
     ok(renewed !== null, `...and the terminals' environment is made again from the changed store (${madeBefore} -> ${renewed})`);
     // An install that fails on the node says why on its row, as one on the
-    // controller does (B211). The reason was only in the job's log before:
+    // controller does. The reason was only in the job's log before:
     // the row went back to unticked and said nothing, and the graphics
     // recipe's 404 was found with aerie jobs rather than on the tab. The
     // fixture node installs everything it is asked for, so the words are
@@ -2564,7 +2562,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // The store's own directories decide what is installed there, not the
     // census's placement summary, which named six toolchains and called four
     // installed toolchains missing on the operator's shared toolchain store.
-    // With something in each: an empty directory is no toolchain (B674).
+    // With something in each: an empty directory is no toolchain.
     mkdirSync(`${PK}/zig`, { recursive: true });
     writeFileSync(`${PK}/zig/zig`, '');
     mkdirSync(`${PK}/android/ndk/30.0`, { recursive: true });
@@ -2597,7 +2595,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(view && view.items.find(i => i.name === 'playwright')?.installed === false,
        '...and a playwright directory without its module reads as not installed, so Install is offered (the row said installed and offered nothing)');
     // Check for updates, which is a job on the node rather than a question
-    // the controller answers about its own store (R67). Proven end to end
+    // the controller answers about its own store. Proven end to end
     // because the controller reads the answer out of the job's LOG, which is
     // the one part no unit test can stand in for: the agent runs
     // `aerie toolchains check`, bb prints a TSV line per recipe, and the rows
@@ -2658,7 +2656,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
        `a recipe's system packages are named for the owner on a node the agent does not administer (${
          (sfin?.log || '').match(/needs system packages[^\n]*/)?.[0]?.slice(0, 90)})`);
     // ...and the same libraries reported by the census as unmet for the
-    // recipe the store holds (roadmap R51), without a build having to fail
+    // recipe the store holds, without a build having to fail
     // on them, and installable on their own by a sysdeps job. This agent
     // does not administer the machine, so the job refuses and names them.
     const unmet = await until(async () => {
@@ -2701,7 +2699,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
          (sfin?.log || '').slice(-300).replace(/\n/g, ' / ')})`);
   }
 
-  // ---- test workers: the node's setting, in every job's environment (R81) --
+  // ---- test workers: the node's setting, in every job's environment --
   // Set on the row, it reaches node.json by the next hello and every job
   // there carries it as BB_TEST_WORKERS; unset, the node's own cores do.
   {
@@ -2739,7 +2737,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(off.ok && cleared, '...and 0 reaches it the same way');
   }
 
-  // ---- the CI runners on the node, one per git host (phase 7, R53) ----------
+  // ---- the CI runners on the node, one per git host (phase 7) ----------
   {
     const GH = 'github.com-example-org', GT = 'git.example.test-3000-example-org';
     const runnerOf = (n, slot) => (n.reported.services?.runners || []).find(r => r.slot === slot);
@@ -2792,7 +2790,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
        && !/--token/.test(calls) && !/svc /.test(calls),
        'config.sh gets the minted token in its environment and never on its command line, the node\'s name, the default labels plus its own name, and the runner\'s own svc.sh is never run');
     // The unit is the agent's, from GitHub's template: the runner's folder is
-    // the jobs account's, and root ran svc.sh from it (R247 step 5).
+    // the jobs account's, and root ran svc.sh from it.
     const unitName = existsSync(`${DIR}/runner/${GH}/.service`) ? readFileSync(`${DIR}/runner/${GH}/.service`, 'utf8').trim() : '';
     const unitText = unitName && existsSync(`${DIR}/units/${unitName}`) ? readFileSync(`${DIR}/units/${unitName}`, 'utf8') : '';
     const sysctl = existsSync(`${DIR}/runner-systemctl.log`) ? readFileSync(`${DIR}/runner-systemctl.log`, 'utf8') : '';
@@ -2807,7 +2805,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
        'the runner\'s .env points its workflows\' archive step at the data store, and the directory is there');
     // The rest of that file is the node's job environment: without it a CI
     // job's PATH was the bare system's, and the browser suite skipped with
-    // exit 0 on every run (bug B74).
+    // exit 0 on every run.
     ok(/^SDK_ROOT=.*(agenttoolchains|fakeshare\/toolchains)\/n_[0-9a-f]+$/m.test(renv)
        && /^PATH=.*(agenttoolchains|fakeshare\/toolchains)/m.test(renv)
        && /^ANDROID_HOME=.*\/android$/m.test(renv) && /^BB_CI_LOG_DIR=/m.test(renv),
@@ -2837,7 +2835,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
     ok(/^agentbox$/m.test(labels) && /^gpu$/m.test(labels) && /^builderbot$/m.test(labels),
        'aerie ci-labels lists the node runner\'s labels beside this box\'s own');
-    // A second runner on the same node, for a Gitea (R53): the same fold, a
+    // A second runner on the same node, for a Gitea: the same fold, a
     // different host. The picker says which when the address is a private
     // host the catalog has never seen; act_runner registers with a token the
     // controller fetches from that host, every label takes :host so a job
@@ -2912,7 +2910,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(i2 && /already on this node \(6 bytes\)/.test(i2.log),
        '...and the next run of the same build fetches nothing: the node uses its copy');
     const cli = execFileSync('bash', [`${REPO}/scripts/aerie`, 'emu', 'list'],
-      // ...with no token of the harness's own session leaking in (B412).
+      // ...with no token of the harness's own session leaking in.
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: { ...process.env, DASHBOARD_AUTH: 'test:test', BB_TOKEN: '',
         DASHBOARD_PORT: new globalThis.URL(URL).port, DASHBOARD_STATE: `${DIR}/state`, BB_PROJECT: 'alpha' } });
     ok(/aerie emu list on agentbox/.test(cli) && /API levels with a system image here/.test(cli) && /succeeded/.test(cli),
@@ -3054,7 +3052,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const st = execFileSync('python3', [AGENT_RUN, 'status'], { env: agentEnv, encoding: 'utf8' });
     ok(st.length > 0 && new RegExp(minted.id).test(st), `\`builderbot-agent status\` names the node (${st.trim().split('\n')[0].slice(0, 80)})`);
 
-    // ---- a bad build cannot strand the node (R241) ---------------------------
+    // ---- a bad build cannot strand the node ---------------------------
     // The update above left the file it replaced beside the new one, and the
     // new one was on trial until its controller answered it.
     ok(existsSync(`${AGENT_RUN}.prev`) && !existsSync(`${AGENT_RUN}.trial`)
@@ -3078,10 +3076,10 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
        `a build that cannot be loaded is refused by the node before it is installed (${bfin?.state}: ${(bfin?.error || '').slice(0, 90)})`);
     // Live is the agent's held poll being open, which it is again a moment
     // after the job's result is posted: read at once under a whole run's
-    // load, the node was between the two (seen 15 Nov, twice).
+    // load, the node was between the two (twice).
     // ...and the trial's files gone, which the agent clears as it goes on:
     // the third sighting read the node live and failed on what the line did
-    // not say (B824), so each is waited for and said.
+    // not say, so each is waited for and said.
     const left = () => [`${AGENT_RUN}.new`, `${AGENT_RUN}.trial`].filter(f => existsSync(f)).map(f => f.split('.').pop());
     const still = await until(async () => { const n = await nodeById(minted.id); return n.live && !left().length ? n : null; }, 20000)
       || await nodeById(minted.id);
@@ -3177,10 +3175,10 @@ echo "stub-installed" >> "${DIR}/claude-installer.log"
 `, { mode: 0o755 });
     // The record says the session half is up before Install is pressed: the
     // store change above asked for a hello, whose census is taken beside the
-    // loop now rather than before the next job is taken (B644), so for a few
+    // loop now rather than before the next job is taken, so for a few
     // seconds the row is behind the machine.
     await until(async () => (await nodeById(minted.id))?.reported?.session?.up ? true : null, 30000);
-    // From the Library, where Claude Code is a card (R145, R95, R170).
+    // From the Library, where Claude Code is a card.
     const cu = await api('/api/agents', { action: 'install', node: minted.id, agent: 'claude' });
     ok(cu.ok && /^j_/.test(cu.job), `Install on Claude Code's card in the Library queues the claude-update job on this node (${cu.job || cu.error})`);
     const cfin = await jobEnd(cu.job, { ms: 60000, step: 200 });
@@ -3190,7 +3188,7 @@ echo "stub-installed" >> "${DIR}/claude-installer.log"
        `...and says what runs afterwards, or why nothing does (${(cfin?.log || '').trim().split('\n').slice(-1)[0]?.slice(0, 90)})`);
   }
 
-  // ---- Codex CLI installed by the real agent (agentcode.py, R95 step 2) ----
+  // ---- Codex CLI installed by the real agent (agentcode.py) ----
   // The same row and the same shape of job as Claude Code's: the vendor's
   // installer stood in for, the version asked for handed to it, and the
   // binary it leaves read back, which the census then reports.
@@ -3338,7 +3336,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // A bind directory that is there already is somebody's (a container's
     // config directory, a tree an administrator chowned on request) and is
     // left as it is: handing every mount source to the agent's account on
-    // each rebuild broke the containers that owned them (B315). Only one
+    // each rebuild broke the containers that owned them. Only one
     // this step makes is given to the session account.
     {
       const made = await api('/api/devapp', { project: 'ep.silon', action: 'new', instance: 'kept', node: minted.id });
@@ -3432,10 +3430,10 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     await page.waitForSelector('#pane0 .bar .mchead .ndstate.ok', { timeout: 15000 });
     const row = await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`,
                                  e => e.textContent.replace(/\s+/g, ' '));
-    // Its facts a grid (R218 step 26): the account jobs run as is one.
+    // Its facts a grid: the account jobs run as is one.
     const runsAs = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .ndfacts .fact`,
       fs => fs.find(f => f.querySelector('dt').textContent === 'Jobs run as')?.querySelector('dd').textContent || '');
-    // The node's name is the Machines header's, in its picker (R177), not
+    // The node's name is the Machines header's, in its picker, not
     // the row's.
     const picked = await page.$eval('.pane .bar #ndPick', s => s.selectedOptions[0]?.textContent || '');
     // Its state is one pill beside the header's picker (the operator, 17
@@ -3460,15 +3458,15 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     const went = await page.evaluate(() => ({ kind: tabOf(panes[0])?.kind, node: document.querySelector('#pane0 .bar #ndPick')?.value, hash: location.hash }));
     ok(went.kind === 'nodes' && went.node === minted.id && went.hash.startsWith('#/machines/nodes'),
        `the header's state pill opens the node's own page from another group's page (${JSON.stringify(went)})`);
-    // Each session kept to its own project's network (R79): a switch in the
+    // Each session kept to its own project's network: a switch in the
     // row's Sessions section, a draft until the section's Save (the rule
-    // apply-not-onchange: it wrote itself on the click at first, the
-    // operator, 24 Sep). The node hears it on its next poll and keeps it in
+    // apply-not-onchange: it wrote itself on the click at first).
+    // The node hears it on its next poll and keeps it in
     // node.json with what each project owns there, and says whether it can,
     // which this agent, not root, cannot: said under the switch in red.
     {
       // Every session is kept to its own project's network on every node,
-      // with no switch since R146 (the operator, 26 Oct): the row's
+      // with no switch: the row's
       // Sessions section carries no session-network checkbox, and the
       // node's census says whether it can keep them, and why not here.
       const sw = `.nodestab .ndrow[data-node="${minted.id}"] [data-k="sessnet"]`;
@@ -3539,7 +3537,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
   // retires the row when the job succeeds. Runner deregistration was
   // exercised above; none is left here to deregister.
   {
-    // Refused while a session runs there (the operator, 11 Oct): the shell
+    // Refused while a session runs there: the shell
     // the block above killed in tmux is on the record until the agent's
     // next heartbeat says it is gone, so that is waited for first.
     const left = ((await api('/api/status')).sessions || []).filter(s => s.node === 'agentbox');
@@ -3564,7 +3562,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     ok((await api('/api/v1/nodes')).nodes.some(n => n.id === minted.id), '...and Undrain brings a retired row back, for what follows');
   }
 
-  // ---- released agents against this controller (R241) ---------------------
+  // ---- released agents against this controller ---------------------
   // The window's promise, run and not only declared: the agent of the oldest
   // release an install still upgrades from, and of the newest one, each as
   // its release built it, enrolls here, dials in, is seen as behind, takes
@@ -3638,7 +3636,7 @@ await section("aerie nodes shows liveness", async () => {
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/agentbox/.test(out) && /agent/.test(out),
      'aerie nodes lists the agent node');
-  // ...with the agent it runs on the row, and one node in full (B9).
+  // ...with the agent it runs on the row, and one node in full.
   const row = out.split('\n').find(l => /agentbox/.test(l)) || '';
   ok(/ · agent \d+\.\d+\.\d+/.test(row), `...naming the agent it runs (${row.trim()})`);
   const one = execFileSync('bash', ['scripts/aerie', 'nodes', 'show', 'agentbox'],
@@ -4040,7 +4038,7 @@ await section("the agent's version is WINDOW.BUILD", async () => {
   const win = /^(\d+\.\d+)\./.exec(av)?.[1] || '';
   const proj = readFileSync(`${REPO}/VERSION`, 'utf8').trim();
   const minor = proj.split('.').slice(0, 2).join('.');
-  // ...or the minor a branch builds towards (R112: VERSION stays at the
+  // ...or the minor a branch builds towards (VERSION stays at the
   // last release until the bump, and a version line one minor up is what a
   // dev build reads), never further.
   const ahead = `${minor.split('.')[0]}.${+minor.split('.')[1] + 1}`;
@@ -4051,11 +4049,11 @@ await section("the agent's version is WINDOW.BUILD", async () => {
        win} against ${minor} from VERSION ${proj})`);
   // The agent's is the only other copy of the window there is. There used
   // to be a second, the CLAUDE.md template's BUILDERBOT:ENV:WINDOW line, and
-  // it went with the block itself (R63 step 3): a session's briefing is
+  // it went with the block itself: a session's briefing is
   // assembled per session now, so nothing is copied anywhere to fall out of
   // window. tools/version-stamp moves what is left.
 
-  // ---- the sessions are not the agent's unit to kill (B107) --------------
+  // ---- the sessions are not the agent's unit to kill --------------
   // systemd's default KillMode takes every process in the unit's cgroup on a
   // stop, and the agent's cgroup holds the terminals, the tmux servers
   // under them and the Claude sessions inside those, so Update agent ended every

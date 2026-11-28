@@ -1,5 +1,5 @@
 """The three clients that reach the controller from a node read its pin the
-same way (R243; the audit of 13 Nov): the agent's (controller.py), a
+same way: the agent's (controller.py), a
 session's aerie (lib/bbapi.py) and the root session helper's own
 (nodes/bb-session, which imports nothing a session could change, so the
 three cannot be one module). A node enrolled by a public hostname is given

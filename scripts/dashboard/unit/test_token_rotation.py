@@ -1,4 +1,4 @@
-"""A node's token rotated (R135 step 4): an agent that rotates is handed a
+"""A node's token rotated: an agent that rotates is handed a
 fresh token each hello, held pending until it is first used, which makes it
 the node's and retires the old one; the old one is still taken for a grace,
 for calls already on their way, and presented after it means a copy of the
@@ -37,7 +37,7 @@ class Rotation(unittest.TestCase):
         self.assertIn("node", nodes.authenticate(self.first), "the old one within its grace")
 
     def test_a_relay_key_is_derived_from_the_token_and_kept_in_memory_alone(self):
-        # R288: an agent that says so takes the key derived from its token,
+        # An agent that says so takes the key derived from its token,
         # which the controller learns from the node's own call; the hash in
         # the database is never it.
         derived = dict(CENSUS, relay={"tls": "", "once": True, "derived": True})
@@ -54,7 +54,7 @@ class Rotation(unittest.TestCase):
         self.assertEqual(nodes.screen_key(self.nid), nodes.relay_key(new), "...and it moves with the token in use")
 
     def test_a_runner_s_tokens_go_only_to_the_job_installing_it(self):
-        # R288 step 7: a stolen node token mints no runner registration.
+        # A stolen node token mints no runner registration.
         self.assertFalse(nodes.runner_job_on(self.nid, "gh", "registration"))
         self.assertFalse(nodes.runner_job_on(self.nid, "gh", "remove"))
 
@@ -74,7 +74,7 @@ class Rotation(unittest.TestCase):
         self.assertTrue(nodes.runner_job_on(self.nid, "gh", "remove"))
 
     def test_no_token_is_handed_out_while_a_move_is_armed(self):
-        # B935: the move's bundle carries the token this node holds now, so a
+        # The move's bundle carries the token this node holds now, so a
         # new one handed out after it was packed would be one the new home
         # never saw.
         was = nodes.move_armed
@@ -86,7 +86,7 @@ class Rotation(unittest.TestCase):
         self.assertIn("token", self.hello(), "...and handed out again once it is not")
 
     def test_two_calls_with_a_new_token_at_once_leave_it_live(self):
-        # B570: the second of two calls that both read the new token as
+        # The second of two calls that both read the new token as
         # pending retired it (it was live by then) and gave it the grace's
         # expiry; three minutes on the node had no credential left.
         from unittest import mock
@@ -103,7 +103,7 @@ class Rotation(unittest.TestCase):
             self.assertIn("node", nodes.authenticate(new), "still the node's an hour on")
 
     def test_two_threads_with_a_new_token_at_once_are_one_after_the_other(self):
-        # R227 step 14: the read and the write it decides are one
+        # The read and the write it decides are one
         # transaction, so of two calls arriving together one finds the token
         # pending and the other finds it live; the token before is retired
         # once, with one grace, and the new one carries no expiry.
@@ -159,7 +159,7 @@ class Rotation(unittest.TestCase):
         self.assertEqual([r["id"] for r in rows], [self.nid])
 
     def test_a_node_turned_away_says_so_until_it_is_back(self):
-        # B569: the page said quiet for two days while the agent was refused.
+        # The page said quiet for two days while the agent was refused.
         nodes._exec("UPDATE tokens SET state = 'revoked' WHERE node_id = ?", (self.nid,))
         self.assertEqual(nodes.authenticate(self.first), {"error": "credential revoked"})
         rows = [r for r in nodes.token_attention() if r["kind"] == "node-refused"]
@@ -181,8 +181,8 @@ class Rotation(unittest.TestCase):
 
 
 class Restored(unittest.TestCase):
-    """A controller restored from a backup older than a node's last hellos
-    (the operator, 6 Nov): the node offers its month of tokens newest first,
+    """A controller restored from a backup older than a node's last hellos:
+    the node offers its month of tokens newest first,
     and the one the restored record holds takes it back with a fresh token;
     nothing about it reads as a stolen copy."""
     def setUp(self):
@@ -213,7 +213,7 @@ class Restored(unittest.TestCase):
         self.assertIsNone(nodes.recover_token(self.nid, self.past), "the past it offered is retired by the fresh one")
 
     def test_a_retired_token_ahead_of_the_live_one_is_passed_over(self):
-        # B759: the node offers a token this record retired before the one it
+        # The node offers a token this record retired before the one it
         # still holds live (the newest it handed out, kept behind by a node
         # that went back a token at a move's new home).
         live = self.past[0]
@@ -222,7 +222,7 @@ class Restored(unittest.TestCase):
         self.assertTrue(fresh and fresh.startswith("bbn_"), "the live one further down takes it back")
 
     def test_a_sweep_reaches_past_its_first_chunk_and_a_stranger_does_not_use_it_up(self):
-        # B721: the agent offers its month 200 a call, back to back; the
+        # The agent offers its month 200 a call, back to back; the
         # second call was always refused, so a token past the newest 200
         # never brought a node back.
         self.restore()

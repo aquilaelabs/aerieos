@@ -1,5 +1,5 @@
 """bb-tty reads a node's grant at its top level, before most of its
-functions are defined (B329): a function called there that the file defines
+functions are defined: a function called there that the file defines
 further down is 'command not found' and the terminal ends before it starts.
 This holds the grant's block to the functions defined above it."""
 import os

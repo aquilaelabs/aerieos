@@ -1,5 +1,5 @@
-"""An unlock that gives up less (R158 step 5), and a key of the person's
-own (R157).
+"""An unlock that gives up less, and a key of the person's
+own.
 
 What the controller holds of a person's key store, and for how long:
 
@@ -271,9 +271,9 @@ def forget_token(uid, fid):
 
 def handout(uid, project, fid, why="", by="", host="", login=""):
     """The path git's helper reads the opened token from, for `project`:
-    RUN_DIR/<uid>/<project>, written now from token(), or "" when there is
+    RUN_DIR/<uid>/<project>, written now from token, or "" when there is
     nothing to hand out."""
-    # The lock held from the opening to the file (B547): a Lock landing
+    # The lock held from the opening to the file: a Lock landing
     # between them shredded the handouts and this then wrote one with no
     # window left to shred it, there until a restart.
     with _lock:

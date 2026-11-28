@@ -1,4 +1,4 @@
-"""Connected services (R294 step 9, the connections rule in
+"""Connected services (the connections rule in
 docs/design-language.md): the one list of every credential this install
 holds for an outside service, but a person's own, which is theirs alone and
 listed on their Profile. Each row says what it is, whose it is (the

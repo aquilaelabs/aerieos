@@ -1,14 +1,14 @@
 """Behind `aerie login --list` (cmd_login in bb): every account this machine is
 signed in to Claude as, as JSON, changing nothing. The agent asks for it
-and carries the answer up on its heartbeat (B104). Read from the files
+and carries the answer up on its heartbeat. Read from the files
 rather than from `claude auth status`, for every account on the box at
 once.
 
 BB_USERS_DIR is the directory the accounts' homes are under.
 
-Each row carries the other coding agents' sign-ins too (R95 step 3), under
+Each row carries the other coding agents' sign-ins too, under
 `agents`, every one read the same way from what its row in the agents'
-table or its pack's manifest says of its sign-in (who_of, R234 step 6):
+table or its pack's manifest says of its sign-in (who_of):
 Codex CLI's from its auth.json (the account the id token names, never the
 token), Copilot CLI's from its config (the GitHub login it last signed in
 as), and so on. `forget` is the sign-out of a program with none of its own.
@@ -38,11 +38,11 @@ def _claims(jwt):
         return {}
 
 
-# Where a node keeps the coding agents' sign-ins sealed (R126, the agent's
+# Where a node keeps the coding agents' sign-ins sealed (the agent's
 # tokens.py): a seal there is a sign-in, its header saying whose, though the
 # home's own file is a link to a copy that is only open while the account
 # works here. Read as root, as this runs on a node.
-# Under AerieOS's own name where the node has it (R204), else the one before.
+# Under AerieOS's own name where the node has it, else the one before.
 SEAL_DIR = ("/var/lib/aerieos" if os.path.isdir("/var/lib/aerieos") else "/var/lib/builderbot") + "/tokens"
 # ...and where the copy a terminal opens is kept while the account works
 # here (the agent's OPEN_DIR), which the home's file is a link to.
@@ -53,7 +53,7 @@ def closed_seal(home, rel, agent):
     """Whether the home's sign-in file `rel` is the node's link to an opened
     copy that is not open now, with a seal behind it as far as can be told
     from here. The node takes that link away once no seal is left (the
-    agent's link_left, B386), so where the seal cannot be looked at, as by
+    agent's link_left), so where the seal cannot be looked at, as by
     the account itself, the link is the sign-in: a check run as the account
     read it as signed out, and the page offered a sign-in to somebody signed
     in. Where the seals can be read, a seal that is gone is a sign-out."""
@@ -80,7 +80,7 @@ def sealed_of(home, agent):
             blob = f.read(8192)
     except OSError:
         return None
-    # Either format (B407): BBTOK2 since 0.9 (X25519, R158 step 3), BBTOK1
+    # Either format: BBTOK2 since 0.9 (X25519), BBTOK1
     # from a node before; the header line is the same shape in both.
     magic = next((m for m in (b"BBTOK2\n", b"BBTOK1\n") if blob.startswith(m)), None)
     if magic is None:
@@ -118,7 +118,7 @@ def _jwt_email(d, depth=0):
 
 def pack_flows():
     """{agent: its adapter} for the packs' coding agents that describe a
-    sign-in's flow (R233 step 6): the link, what its screens ask, and the
+    sign-in's flow: the link, what its screens ask, and the
     file under the home its sign-in is kept in. A shipped agent's name is
     never a pack's, and a kept file that is not a plain path under the home
     is no row. The packs are the bundle's (agentids.pack_rows), where a pack
@@ -170,13 +170,13 @@ def _at(d, path):
 def who_of(home, agent, a):
     """Who this account is signed in to a coding agent as here, {email,
     plan}, or None: one reading for every agent, from what its row or its
-    pack says of its sign-in (signin.flow, R234 step 6). The file the
+    pack says of its sign-in (signin.flow). The file the
     sign-in is kept in, or the one `who.file` names beside it; the address
     and the plan at the keys `who` gives, a token on the way opened to its
     claims; with no keys given, the address any token in it names. A file
     that names nobody is the account `who.named` says, or its provider's.
     None only when there is no sign-in: a file that could not be read is
-    {"error": why}, which nobody reads as a sign-out (B236)."""
+    {"error": why}, which nobody reads as a sign-out."""
     flow = a["signin"]["flow"]
     who = flow.get("who") or {}
     whose = who.get("named") or f"{str(a.get('provider') or '').strip()[:60] or agent} account"
@@ -185,7 +185,7 @@ def who_of(home, agent, a):
         with open(os.path.join(home, who.get("file") or flow["kept"]), "rb") as f:
             data = f.read(1 << 20)
     except FileNotFoundError:
-        # Sealed, its copy not open now (R126): still a sign-in, and one
+        # Sealed, its copy not open now: still a sign-in, and one
         # whose seal cannot be read here is unread, never signed out.
         got = sealed_of(home, agent)
         if got and got["email"]:
@@ -270,7 +270,7 @@ def signins():
 
 def mcp_of(home):
     """The MCP servers each coding agent of this account's is set up with
-    here (R95 step 15), by name only: a server's settings can carry its own
+    here, by name only: a server's settings can carry its own
     keys, and nothing here reads them. Claude Code's from ~/.claude.json,
     Codex's from its config.toml ([mcp_servers.NAME]), Copilot's from its
     mcp-config.json. {agent: [names]}, an agent with none left out."""

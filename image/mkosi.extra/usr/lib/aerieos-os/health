@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The health check a trial slot waits on (R161 step 2): the dashboard
+# The health check a trial slot waits on: the dashboard
 # answering on its port and the node's agent running, within ten minutes of
 # the boot; then the slot is marked good (slot good) and stays. A boot that
 # never gets here is counted by GRUB, and the second such boot goes back to
@@ -7,7 +7,7 @@
 set -euo pipefail
 SLOT="${BB_OS_SLOT:-/usr/lib/aerieos-os/slot}"
 WORK="${BB_OS_WORK:-/var/lib/aerieos-os}"
-# A boot that GRUB brought back to the slot before (R161 step 2): said in a
+# A boot that GRUB brought back to the slot before: said in a
 # file the census reports until the next update, and the mark cleared.
 if [ "$(bash "$SLOT" fell-back 2>/dev/null)" = yes ]; then
     mkdir -p "$WORK"
@@ -20,7 +20,7 @@ PORT="${PORT:-7680}"
 # Healthy is the controller's own health answer, 200, which it gives once
 # it is past its state gate and its store answers, three times running
 # (fifteen seconds) with the agent up: never an error, a held start or a
-# page answering for a moment (B471, R191 step 5).
+# page answering for a moment.
 streak=0
 for i in $(seq 1 120); do
     code="$(curl -s -o /dev/null -m 3 -w '%{http_code}' "http://127.0.0.1:${PORT}/api/v1/healthz" 2>/dev/null || true)"
@@ -42,7 +42,7 @@ said="not healthy within ten minutes: the dashboard answered '${code:-nothing}',
 # This boot is the slot on trial: restart, so GRUB counts it and the second
 # such boot goes back to the slot before by itself. Left running, a machine
 # with no screen sat on a slot that did not work, the dashboard that would
-# offer a restart being what was broken (B471).
+# offer a restart being what was broken.
 if bash "$SLOT" status 2>/dev/null | grep -q '^trial:' \
         && [ "$(bash "$SLOT" current 2>/dev/null)" = "$(bash "$SLOT" next 2>/dev/null)" ]; then
     echo "$said; slot $(bash "$SLOT" current) is on trial, so this machine restarts and GRUB counts the boot" >&2

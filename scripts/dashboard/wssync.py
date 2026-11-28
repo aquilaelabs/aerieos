@@ -1,5 +1,5 @@
-"""A node's projects as a synced copy (R162), the one way a node holds them:
-no node mounts the controller's disk (R163).
+"""A node's projects as a synced copy, the one way a node holds them:
+no node mounts the controller's disk.
 
 The controller's copy stays the original. A node holds each project bound
 to it as a local copy under /workspace, and its
@@ -58,7 +58,7 @@ SKIP_DIRS = {"node_modules", ".gradle", "__pycache__", ".venv", "venv", ".next",
              ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 # ...and what is out by where it is: Claude Code's worktrees for its own
 # agents, each a checkout whose .git file the controller refuses, so syncing
-# them held the project behind and aerie git push with it (B68).
+# them held the project behind and aerie git push with it.
 SKIP_UNDER = (".claude/worktrees",)
 TMP = ".bbsync-"
 MAX_FILE = 512 * 1024 * 1024
@@ -72,7 +72,7 @@ _scanned = {}             # project -> monotonic time of the last scan
 _conflicts = []           # [{project, path, kept_as, node, at}], newest last
 _moved = threading.Condition()   # notified on every change: a device's long poll waits on it
 
-# A person's device (R270, R272): its id is "dev:" and the device's id, in
+# A person's device: its id is "dev:" and the device's id, in
 # the place a node's id goes. The device route has already checked that its
 # person may edit the project (the editor's door, ftp.access_for), so the
 # node scope does not apply; .git is never served to one or taken from one,
@@ -133,10 +133,10 @@ def skipped(rel):
 # A second account's worktree of a project (session_dir in lib/common.sh):
 # its own sync unit beside the project, named for where it lives under the
 # projects root, so it reaches every node holding the project and comes back
-# from the one it was made on (B615). A dot directory, so no project scan
+# from the one it was made on. A dot directory, so no project scan
 # meets it.
-# ...or one of its agents' other than Claude's (u_xxxxxxxx-codex, R95), or a
-# slot past the first (u_xxxxxxxx-2, u_xxxxxxxx-codex-2, R143): the
+# ...or one of its agents' other than Claude's (u_xxxxxxxx-codex), or a
+# slot past the first (u_xxxxxxxx-2, u_xxxxxxxx-codex-2): the
 # account's all the same, so the uid is still the group a check reads.
 WT_UNIT = re.compile(r"\.worktrees/([A-Za-z0-9][A-Za-z0-9._-]*)/(u_[0-9a-f]{8})(?:-[a-z]+)?(?:-[2-9])?")
 
@@ -147,7 +147,7 @@ def _worktrees():
 
 def worktree_of(unit):
     """(project, uid, folder) for a worktree's unit name, else None: the
-    folder is the uid, or the uid and its agent (u_xxxxxxxx-codex, R95)."""
+    folder is the uid, or the uid and its agent (u_xxxxxxxx-codex)."""
     m = WT_UNIT.fullmatch(unit or "")
     return (m.group(1), m.group(2), unit.rsplit("/", 1)[1]) if m else None
 
@@ -391,7 +391,7 @@ def _row_out(r):
 
 def may(nid, project, write=False):
     """Why this node may not sync the project, or "". A project a bound
-    project reads comes down to the node read-only (R163): it may be read,
+    project reads comes down to the node read-only: it may be read,
     never written. A worktree is its project's: read and written by the
     nodes the project is bound to, and no other."""
     wt = worktree_of(project)
@@ -459,7 +459,7 @@ def _all_projects():
     return [p for p in _names() if _there(p)]
 
 
-# The controller's own look at the copies the nodes hold (B643, 11 Oct): a
+# The controller's own look at the copies the nodes hold: a
 # change made straight in a project here, not through a verb that scans, is
 # found by this every LOOK_EVERY seconds and announced to the nodes holding
 # it in their held work request. Before, each node asked `since` for every
@@ -510,14 +510,14 @@ def projects(nid):
     conf = (nodes.node(nid) or {}).get("config") or {}
     mode = conf.get("workspace") or "sync"
     if mode != "sync":
-        # Off its synced copy (R164): nothing held, and the clean-up the
+        # Off its synced copy: nothing held, and the clean-up the
         # page asked for, by its token, until the node answers it.
         return {"mode": "off", "projects": {}, "reads": {}, "clean": str(conf.get("clean") or "")}
     own = bound_projects(nid)
     return {"mode": mode, "projects": {p: rev_of(p) for p in own}
             | {u: rev_of(u) for p in own for u in worktrees_of(p)},
             "reads": {p: rev_of(p) for p in read_projects(nid)},
-            # Leaving (R164): kept in step as ever, so what is waiting goes up.
+            # Leaving: kept in step as ever, so what is waiting goes up.
             "leaving": bool(conf.get("leaving"))}
 
 
@@ -618,7 +618,7 @@ def _conflict_name(rel, who):
     return (d + "/" if d else "") + base
 
 
-# What a node may not write into git's own directory (B618): the controller
+# What a node may not write into git's own directory: the controller
 # runs git in every project tree (the status poll, the Git view, a relayed
 # aerie version), and git runs what its config and hooks name. A key here is
 # one whose value is a program, or that points git somewhere else. Matched
@@ -637,7 +637,7 @@ def git_config_danger(path, have=None):
     pointed git elsewhere, as "key", or "" when there is none. Read by git
     itself, which runs nothing to read a file; one it cannot read is
     refused, since a config git cannot parse is not one to hand it.
-    `have` is the config already here (B732): a key and value git already
+    `have` is the config already here: a key and value git already
     runs from this tree, the project's own credential helper the controller
     wrote, is not planted by a node sending it back, so only what the file
     adds to that counts."""
@@ -691,7 +691,7 @@ def _refused(nid, project, rel, why):
 
 def git_guard(rel, link):
     """Why a node's write to `rel` (a symlink to `link`, or a file) is refused
-    before it is read, or "" (B618). Nothing in .git/hooks, no .git file at
+    before it is read, or "". Nothing in .git/hooks, no .git file at
     a tree's top (it names another directory as the repository), no link
     inside .git, and no link anywhere that climbs out of the project."""
     parts = rel.split("/")
@@ -712,7 +712,7 @@ def git_guard(rel, link):
     return ""
 
 
-# Removals a node sends in one call (B789): after a git gc packs the loose
+# Removals a node sends in one call: after a git gc packs the loose
 # objects, a tick holds thousands, and one request each took many minutes.
 GONE_MAX = 1000
 
@@ -771,7 +771,7 @@ def put(nid, project, q, stream, length):
     target = root / rel
     # Judged where it really lands, not as the path reads: a link to "."
     # then a link under it to ".." put the project's parent in reach, every
-    # other project's tree read and written through it (B531).
+    # other project's tree read and written through it.
     if not _inside(root, target.parent) or (link and not _inside(root, os.path.join(os.path.realpath(target.parent), link))):
         _refused(nid, project, rel, "a path or a link that leads out of the space")
         return {"error": "a path or a link that leads out of the space is not synced"}, 403
@@ -797,9 +797,9 @@ def put(nid, project, q, stream, length):
             if left:
                 return {"error": "the body ended early"}, 400
             sha = h.hexdigest()
-            # A git config file is read before it can land (B618): one that
+            # A git config file is read before it can land: one that
             # sets a key naming a program is refused, the rest go through.
-            # Unless it is the one already here (B732): the controller writes
+            # Unless it is the one already here: the controller writes
             # the project's own credential helper into its config and the
             # sync carries that down, so the node sending the same bytes back
             # is handing git nothing it did not have, and refusing it left
@@ -830,7 +830,7 @@ def put(nid, project, q, stream, length):
             # git's index is a cache of the tree it was written beside, and
             # the node's tree is where the work is: its index wins a
             # disagreement, since one kept here instead put the node's index
-            # back to before its own commit (B617), and a conflict copy of an
+            # back to before its own commit, and a conflict copy of an
             # index is no use to anybody.
             if base != cur and rel.split("/")[-2:] != [".git", "index"] \
                     and not (rel.startswith(".git/worktrees/") and rel.endswith("/index")):

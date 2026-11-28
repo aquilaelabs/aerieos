@@ -77,35 +77,35 @@ STORE_TOOLCHAINS=/var/lib/aerieos/toolchains
 STORE_CACHE=/var/lib/aerieos/cache
 STORE_ARTIFACTS=/var/lib/aerieos/artifacts
 # What a dev instance KEEPS on this node: its databases, its uploads, the
-# caches its containers write. A store like the other four (R17 step 2), so
+# caches its containers write. A store like the other four, so
 # the node reports its headroom and the Storage section edits it here.
 STORE_APPDATA=/var/lib/aerieos/appdata
 # --remove and its --yes, off unless asked; read before the checks run.
 REMOVE=0; YES=""
 declare -a SHARES=() NFS=()
 CHECK_ONLY=0
-# --wg-conf FILE: the node reaches the controller through WireGuard (R161),
+# --wg-conf FILE: the node reaches the controller through WireGuard,
 # with the config the Nodes tab's enroll script carries.
 WG_CONF=""
-# --reach public: the controller is a hostname a tunnel from home publishes
-# (R170); the agent verifies it by the system's CAs.
+# --reach public: the controller is a hostname a tunnel from home publishes;
+# the agent verifies it by the system's CAs.
 REACH=""
-# --door cloudflared|tailscale: a door in for SSH (R174), switched on and
+# --door cloudflared|tailscale: a door in for SSH, switched on and
 # off from the node's row: cloudflared publishing port 22 at --door-host
 # with the tunnel token in --door-secret, or Tailscale joining a tailnet
 # with the auth key in it and answering ssh there. --door-close22 drops
 # public port 22 once the door is up.
 DOOR=""; DOOR_HOST=""; DOOR_SECRET=""; DOOR_CLOSE22=0
-# --firewall: a hosting-only box takes in 80 and 443 and nothing else
-# (R93), its containers' published ports included; port 22 as the door
-# leaves it. --feature ID (R91): one of bb-sandbox's features installed
+# --firewall: a hosting-only box takes in 80 and 443 and nothing else,
+# its containers' published ports included; port 22 as the door
+# leaves it. --feature ID: one of bb-sandbox's features installed
 # once the node is enrolled; --firewall is --feature firewall.
 FIREWALL=0
 declare -a FEATURES_WANT=()
 # --machine HASH: the script was made for a node that enrolled from one
-# machine (R177), and runs on that one alone.
+# machine, and runs on that one alone.
 MACHINE=""
-# --beside-controller: the controller is on this machine too (R90).
+# --beside-controller: the controller is on this machine too.
 BESIDE_CONTROLLER=0
 
 usage() {
@@ -301,8 +301,8 @@ remove_if_asked() {
     exit 0
 }
 
-# Sourced for its core (BB_PROVISION_LIB=1) by nodes/install-controller.sh
-# (R90): the family, the init, the services, the pre-flight and the package
+# Sourced for its core (BB_PROVISION_LIB=1) by nodes/install-controller.sh:
+# the family, the init, the services, the pre-flight and the package
 # helpers are defined and the machine is read, and nothing is asked of the
 # options, nothing is checked against root and nothing is installed; the
 # installer does those itself. Run, it is the whole provisioner, as always.
@@ -355,7 +355,7 @@ done
 # ...but not a GUEST's: that footprint is one directory and one user unit in
 # somebody's own home, taken away by guest_run below without root. The managed
 # remove asks for root and would refuse here, which is what it did when this
-# was walked (R23 step 2).
+# was walked.
 [ "${GUEST:-0}" = 1 ] || remove_if_asked ${YES:+--yes}
 # One without the other is a typo, and the enrollment would fail an hour of
 # apt later. Said now.
@@ -386,7 +386,7 @@ if [ -n "$DOOR" ]; then
     [ "${GUEST:-0}" != 1 ] || { echo "--door installs a service, which needs root, and a guest node runs without it" >&2; exit 1; }
     [ "$DOOR" != cloudflared ] || [ -n "$DOOR_HOST" ] || { echo "--door cloudflared needs --door-host HOST, the public hostname set on the tunnel" >&2; exit 1; }
 fi
-# The machine this script was made for (R177): the same fingerprint the
+# The machine this script was made for: the same fingerprint the
 # agent reports, so a script copied to another box stops here, before it
 # changes anything there.
 machine_id() {
@@ -688,7 +688,7 @@ PY
 #
 # Any other answer is no answer: an agent from before the verb says unknown
 # command and exits 64, and a machine that lost its agent and kept its
-# record has none to ask (B669). Then the node's record says what it
+# record has none to ask. Then the node's record says what it
 # pinned. With no key pinned the agent goes in on the digest, as it always
 # did. With one pinned, this script makes the check itself, the signature
 # under the pinned key (release_sig_ok), and the agent goes in only when
@@ -750,7 +750,7 @@ agent_swap() {
     return 0
 }
 
-# ---- a GUEST node: somebody's own machine (roadmap R23) ---------------------
+# ---- a GUEST node: somebody's own machine ---------------------
 #
 # The managed shape below owns the box: it makes accounts, installs docker,
 # writes fstab and netplan and a firewall rule, and the controller edits all
@@ -760,7 +760,7 @@ agent_swap() {
 # A guest is the other class. Everything AerieOS puts here lives in ONE
 # directory and ONE service unit, both removable in a line, and the controller
 # changes nothing outside them: Storage and Network refuse on a guest node and
-# say why (the per-verb gate, 6 Sep). No root is used or asked for, which is
+# say why (the per-verb gate). No root is used or asked for, which is
 # also what stops this reaching anything it should not.
 #
 # Deliberately the same footprint provision-macos.sh lays down, in systemd's
@@ -775,7 +775,7 @@ guest_remove() {
     local foot unit
     foot="$(guest_foot)"; unit="$(guest_unit)"
     # Only a folder this laid down: BUILDERBOT_HOME left set to a home or
-    # to / would otherwise be deleted whole (B517).
+    # to / would otherwise be deleted whole.
     case "${foot%/}" in ""|/|"${HOME%/}"|/home|/root) warn "BUILDERBOT_HOME is ${foot:-empty}, which is not the agent's own folder: nothing removed"; exit 1 ;; esac
     if [ -e "$foot" ] && [ ! -f "$foot/node.json" ] && [ ! -e "$foot/bin" ]; then
         warn "${foot} does not look like the agent's folder (no node.json or bin in it): nothing removed"; exit 1
@@ -838,7 +838,7 @@ guest_run() {
     local hdr want
     hdr="$(mktemp)"
     # Tried again on a transient answer: a stick's first boot asks its own
-    # dashboard the moment it answers at all, and once got a 500 (B747).
+    # dashboard the moment it answers at all, and once got a 500.
     pinned_at "$CONTROLLER" "${CTL_KEY:-}"
     curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${PIN_URL%/}/api/v1/agent/download" -o "${agent}.new" \
@@ -918,7 +918,7 @@ EOF
 # because provisioning a container as a Docker host has no working version to
 # fall back to.
 # in_container: the test, as a function, since install-controller.sh refuses
-# a container by the same one (R90).
+# a container by the same one.
 in_container() {
     [ -f /.dockerenv ] || [ -f /run/.containerenv ] \
         || grep -qs -E '(docker|lxc|containerd)' /proc/1/cgroup 2>/dev/null
@@ -967,7 +967,7 @@ ID=""; ID_LIKE=""; PRETTY_NAME=""; VERSION_ID=""; VERSION_CODENAME=""; UBUNTU_CO
 # whole of what is wrong rather than the first thing.
 # The families this script has been run on for real: Debian's (Ubuntu
 # 24.04 and 26.04, Debian 13), RHEL's (Rocky, Alma, CentOS Stream, Fedora),
-# Arch's and openSUSE's (R97's walk, 21 Oct). The others are
+# Arch's and openSUSE's. The others are
 # written to each family's tools and never run (dev, in the dashboard's
 # word), so they need --dev to proceed, and a run that works is what moves
 # one onto this list.
@@ -995,7 +995,7 @@ case "$_ids" in
         fi ;;
 esac
 # The family's own file: the one beside this script, which the enroll script
-# built from the dashboard puts there for the system picked there (R204),
+# built from the dashboard puts there for the system picked there,
 # else this repository's for the detected family, for a hand run from a
 # checkout. A picked family that is not this machine's is refused by name:
 # a script built for Ubuntu does nothing to a Rocky machine but say so.
@@ -1037,7 +1037,7 @@ is_vm() {
     else grep -qi hypervisor /proc/cpuinfo 2>/dev/null; fi
 }
 # The services, whichever init runs this machine: the core's, never a family
-# file's, since every family has one of these three (B166: the split into
+# file's, since every family has one of these three (the split into
 # family files took them out and put them nowhere).
 # svc_enable NAME: a service the DISTRIBUTION ships (docker, the guest
 # agent), started now and at boot, whichever init runs this machine.
@@ -1148,7 +1148,7 @@ EOF
     esac
 }
 
-# --- AerieOS's own names on a machine provisioned before it had them (R204) --
+# --- AerieOS's own names on a machine provisioned before it had them --
 # /etc/builderbot, /var/lib/builderbot and the builderbot-agent service
 # become /etc/aerieos, /var/lib/aerieos and aerieos-agent here, by a person
 # running this script on the machine, and nowhere else: an agent whose
@@ -1238,7 +1238,7 @@ names_old_service() {
 # operator should know, and is repeated at the end.
 # preflight: every check, said whole, and an exit when the machine cannot be
 # provisioned (or is of a family not run for real, without --dev). The
-# controller's installer runs the same one first (R90).
+# controller's installer runs the same one first.
 CHECK_FAILED=0
 WARNINGS=()
 preflight() {
@@ -1308,7 +1308,7 @@ esac
 if [ -f /sys/fs/cgroup/cgroup.controllers ]; then chk ok "cgroups v2"
 elif [ -d /sys/fs/cgroup/memory ]; then chk warn "cgroups v1: Docker still runs, but current distributions and the emulator's memory accounting expect v2"
 # OpenRC mounts them with its cgroups service, which Alpine's cloud image
-# leaves off until something asks (R97's walk): started below, before Docker.
+# leaves off until something asks: started below, before Docker.
 elif [ "$INIT" = openrc ] && [ -x /etc/init.d/cgroups ]; then chk warn "cgroups are not mounted yet: OpenRC's cgroups service mounts them, and it is started below"
 else chk fail "no cgroup filesystem is mounted, so Docker cannot start containers here"; fi
 if grep -qw overlay /proc/filesystems 2>/dev/null || modprobe -n overlay 2>/dev/null; then chk ok "overlay filesystem"
@@ -1502,7 +1502,7 @@ docker_suite() {
 }
 
 # Sourced for the core: everything above is defined and read, and nothing
-# below runs (R90).
+# below runs.
 if [ "${BB_PROVISION_LIB:-0}" = 1 ]; then
     return 0
 fi
@@ -1537,7 +1537,7 @@ if is_vm; then
         || warn "the qemu guest agent did not install, so the host will pull the plug instead of shutting this VM down"
 fi
 
-# --- the tunnel to the controller (R161) ------------------------------------
+# --- the tunnel to the controller ------------------------------------
 # Before anything that has to reach the controller, and before an hour of
 # Docker: a tunnel that does not come up is said now. The config is the one
 # the person's router made, narrowed by the Nodes tab to route the
@@ -1570,7 +1570,7 @@ if [ -n "$WG_CONF" ]; then
     fi
     printf '   up as %s; %s answers through it\n' "$WG_ADDR" "$CONTROLLER"
 fi
-# Through a public hostname (R170): nothing to bring up here, since the
+# Through a public hostname: nothing to bring up here, since the
 # tunnel is at home; that the hostname answers, with a certificate the
 # system trusts, is checked now rather than after an hour of Docker.
 if [ "$REACH" = public ]; then
@@ -1603,7 +1603,7 @@ if [ "$REACH" = public ]; then
     printf '   %s answers\n' "$CONTROLLER"
 fi
 
-# --- a door in for SSH (R174) ------------------------------------------------
+# --- a door in for SSH ------------------------------------------------
 # A tunnel client of the operator's choice, installed and started here, and
 # from then on the node's row switches it on and off (the agent's door
 # system job). The secret goes into the service's own files, root's, and
@@ -1777,7 +1777,7 @@ if [ "$DOOR" = cloudflared ]; then
     elif [ ! -s /etc/cloudflared/env ]; then
         warn "no tunnel token: the door's secret left the enroll script once it ran; make a new script on the Nodes page"; exit 1
     fi
-    # A run again with no new token (B657): the door is up on the token it
+    # A run again with no new token: the door is up on the token it
     # has, and the session running this may be riding it, so it is left
     # running; restarted, it took the session and this script with it.
     if [ -z "$(door_secret)" ] && [ -f /etc/systemd/system/cloudflared.service ] && systemctl is-active --quiet cloudflared; then
@@ -1856,7 +1856,7 @@ stamp_daemon() {
 }
 have_jq() { command -v jq >/dev/null 2>&1; }
 
-# The fence (R110 step 4): everything AerieOS runs here (its containers,
+# The fence: everything AerieOS runs here (its containers,
 # and the agent with the sessions and jobs it starts) inside one cgroup
 # whose memory stops short of the machine's, so a runaway build or app is
 # killed inside it and the system itself keeps running. The reserve left
@@ -1892,7 +1892,7 @@ UNIT
             install -d -m 0755 /etc/local.d
             cat > "/etc/local.d/${FENCE}.start" <<START
 #!/bin/sh
-# AerieOS's fence (R110): its containers' cgroup, kept short of the machine.
+# AerieOS's fence: its containers' cgroup, kept short of the machine.
 mkdir -p /sys/fs/cgroup/${FENCE}
 echo "+memory +pids" > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
 echo ${max} > /sys/fs/cgroup/${FENCE}/memory.max
@@ -1932,7 +1932,7 @@ write_fence && fenced=1
 stamped=""
 if [ "$BESIDE_CONTROLLER" = 1 ]; then
     # The controller's own machine is not a box to be wrecked, and the
-    # manager's root-on-the-far-side actions are not for it (R90): the
+    # manager's root-on-the-far-side actions are not for it: the
     # fence, yes; the sandbox's label, no.
     printf '   not stamped as a sandbox: the controller is on this machine\n'
 elif stamp_daemon; then
@@ -1947,9 +1947,9 @@ if [ -n "$stamped" ]; then
     else say "stamped this daemon as AerieOS's sandbox"; fi
 fi
 
-# The journal kept across boots (R185): a fresh VPS keeps it in memory only,
+# The journal kept across boots: a fresh VPS keeps it in memory only,
 # so after a crash `aerie logs --node NAME --crash` met "No journal boot entry
-# found for the specified boot (-1)" on a hosting node (11 Oct). A drop-in rather
+# found for the specified boot (-1)" on a hosting node. A drop-in rather
 # than an edit of journald.conf, so the distribution's own file is left as it
 # was; journald restarted only when the drop-in is new.
 keep_journal() {
@@ -1990,7 +1990,7 @@ authorize() {
     }
     home="$(getent passwd "$who" | cut -d: -f6)"
     # Root writes here, in a home the account writes: a link in its place
-    # would take root's append and chown wherever it points (B510).
+    # would take root's append and chown wherever it points.
     if [ -L "$home/.ssh" ] || [ -L "$home/.ssh/authorized_keys" ]; then
         echo "${home}/.ssh or its authorized_keys is a symbolic link: the key is not added; make them plain and run this again" >&2
         exit 1
@@ -2012,7 +2012,7 @@ keep_account() {
     grep -qx "$1" "$KEPT_ACCOUNTS" 2>/dev/null || echo "$1" >> "$KEPT_ACCOUNTS"
 }
 # ...and each one this script makes, the moment it makes it: what Uninstall
-# deletes is this list, never a name it guessed (B516).
+# deletes is this list, never a name it guessed.
 MADE_ACCOUNTS=/etc/aerieos/made-accounts
 made_account() {
     install -d -m 0755 /etc/aerieos
@@ -2034,7 +2034,7 @@ fi
 if [ "$BESIDE_CONTROLLER" = 1 ]; then
     # Docker is root on this machine, and root here holds the controller's
     # state: the job account stays out, as the session account does
-    # everywhere (R90, the wall). Taken out if a run before put it in.
+    # everywhere (the wall). Taken out if a run before put it in.
     if id -nG "$USER_NAME" | tr ' ' '\n' | grep -qx docker; then
         gpasswd -d "$USER_NAME" docker >/dev/null 2>&1 || true
     fi
@@ -2105,7 +2105,7 @@ elif [ "$SESSION_NAME" = "$USER_NAME" ]; then
 elif id -u "$SESSION_NAME" >/dev/null 2>&1 && [ ! -f /etc/aerieos/node.json ]; then
     # Already an account here, and not one AerieOS made: somebody's, and
     # maybe one that can sudo, which a session never may (a cloud image's own
-    # account, R97's walk). Left as it is; sessions wait for another name.
+    # account). Left as it is; sessions wait for another name.
     keep_account "$SESSION_NAME"
     warn "${SESSION_NAME} is already an account on this machine, and not one AerieOS made"
     printf '   run again with --session-user NAME, a name that is not taken (bbsession, say), or none\n'
@@ -2152,13 +2152,13 @@ else
     # shellcheck disable=SC2046
     pkg $(pkg_names session) >/dev/null 2>&1 \
         || warn "tmux, jq or git did not install; sessions will not start until they do"
-    # A display for aerie capture reel (R95): not fatal, since a node without one still
+    # A display for aerie capture reel: not fatal, since a node without one still
     # builds and tests; aerie capture reel --display says what is missing.
     # shellcheck disable=SC2046
     pkg $(pkg_names reel) >/dev/null 2>&1 \
         || warn "Xvfb, xdotool or xdpyinfo did not install; aerie capture reel --display needs them"
     # Claude Code is not installed here: the Library does it on
-    # purpose, so whoever enrolls a node sees what is put on it (R145), and a
+    # purpose, so whoever enrolls a node sees what is put on it, and a
     # session refuses to start until it is there.
     # A login shell as this account gets what a dashboard session gets: the
     # role, the controller's address, and bb from the bundle the agent keeps
@@ -2229,10 +2229,10 @@ cat > "$BBSANDBOX_TMP" <<'BBSANDBOX'
 # system jobs only because it enrolled as a sandbox, and `list --json` is the
 # whole of what it reads back. The docker account cannot run this at all.
 # `gpu` installs the NVIDIA driver and a headless X server on the card, so
-# an emulator here renders on it (R20); `gpu-display` is that server's unit.
+# an emulator here renders on it; `gpu-display` is that server's unit.
 set -euo pipefail
 
-# AerieOS's own names (R204), made to answer on a machine that still has the
+# AerieOS's own names, made to answer on a machine that still has the
 # folders under the name before: a link for each, added, nothing moved (the
 # Enroll script is what makes them the folders themselves).
 for pair in /etc/aerieos:/etc/builderbot /var/lib/aerieos:/var/lib/builderbot; do
@@ -2398,7 +2398,7 @@ mount_one() {
     # mount's own words are kept for the refusal below: swallowed, a mount
     # the server would not allow this host read the same as a client that
     # was not there, and a RedHat node's first Storage apply said only
-    # that nothing mounted (B704).
+    # that nothing mounted.
     said=""
     if [ "$n" -eq 0 ]; then
         said="$(mount "$path" 2>&1 >/dev/null || true)"
@@ -2803,7 +2803,7 @@ EOF
 # one there, not root, not one that was here before AerieOS (somebody's own,
 # home and all: it took the session account's name on a cloud image), and
 # one this script made where it has kept that list (a node provisioned
-# before the list keeps the old reading, B516). With say, a kept one is said.
+# before the list keeps the old reading). With say, a kept one is said.
 account_goes() {
     id -u "$1" >/dev/null 2>&1 || return 1
     [ "$(id -u "$1")" != 0 ] || return 1
@@ -2830,7 +2830,7 @@ account_goes() {
 # and everything on the shares, which other nodes may be using. Runners are
 # not deregistered on their forge here: the Nodes tab's Uninstall does that
 # first, while the agent can still ask the controller for the tokens.
-# What goes is in three rings (the operator, 11 Oct), the first always and
+# What goes is in three rings, the first always and
 # the other two asked for: --stores takes the stores on this disk (the
 # toolchains, the caches, the artifacts, a dev instance's data, the synced
 # project copies) and /var/lib/aerieos; --configured undoes what was set
@@ -2854,7 +2854,7 @@ cmd_uninstall() {
     done
     # The session account node.json names; an older node.json that names
     # none had builder, while one enrolled with --session-user none has
-    # none at all, and its machine's own builder is not ours (B516).
+    # none at all, and its machine's own builder is not ours.
     session_user="$(python3 -c 'import json; d = json.load(open("/etc/aerieos/node.json")); print(d["session_user"] if "session_user" in d else "builder")' 2>/dev/null || true)"
     store_dirs="$(python3 -c 'import json; print(" ".join(sorted(set(str(v) for v in (json.load(open("/etc/aerieos/node.json")).get("stores") or {}).values() if str(v).startswith("/")))))' 2>/dev/null || true)"
     for p in $(ours); do
@@ -2880,9 +2880,9 @@ cmd_uninstall() {
         [ "$a" = uninstall ] || die "left as it was"
     fi
     say "stopping the agent and the session port's rule"
-    # The GPU display's unit too (B394): left enabled, a machine AerieOS
+    # The GPU display's unit too: left enabled, a machine AerieOS
     # had left still started an Xorg on the card at every boot.
-    # Under both names (R204): a node not yet met by the Enroll script since
+    # Under both names: a node not yet met by the Enroll script since
     # the rename still runs the ones before.
     local units="aerieos-agent aerieos-session-ports builderbot-agent builderbot-session-ports"
     [ "$configured" = 1 ] && units="$units builderbot-gpu-display builderbot-gpu-nodes"
@@ -2902,7 +2902,7 @@ cmd_uninstall() {
         done
     fi
     have systemctl && systemctl daemon-reload >/dev/null 2>&1 || true
-    # The sessions' firewall and their own networks (R79): every one of them,
+    # The sessions' firewall and their own networks: every one of them,
     # whatever ran here, so nothing of the isolation outlives the agent.
     have nft && nft delete table inet builderbot_session >/dev/null 2>&1 || true
     have nft && nft delete table inet builderbot_sessnet >/dev/null 2>&1 || true
@@ -2940,7 +2940,7 @@ cmd_uninstall() {
     fi
     # Only the accounts that go below have their processes ended: one that
     # was here before AerieOS is somebody's own, and may be the very shell
-    # running this uninstall (B895).
+    # running this uninstall.
     say "ending the accounts' processes"
     for u in "$session_user" "$DOCKER_USER"; do
         account_goes "$u" || continue
@@ -2969,7 +2969,7 @@ cmd_uninstall() {
         fi
         rm -f "$f"
     fi
-    # The fence (R110 step 4): Docker's parent for it out of daemon.json,
+    # The fence: Docker's parent for it out of daemon.json,
     # then the slice or the boot script and the agent's OpenRC limit.
     if [ -f /etc/docker/daemon.json ] && have jq && grep -q '"cgroup-parent": *"/\?builderbot.slice"' /etc/docker/daemon.json; then
         f="$(mktemp)"
@@ -2991,9 +2991,9 @@ cmd_uninstall() {
     done
     say "removing AerieOS's files"
     # The session account's sudo rule first: it is the one grant here that
-    # reaches root, and it must not outlive the helper it names (R35).
+    # reaches root, and it must not outlive the helper it names.
     rm -f /etc/sudoers.d/builderbot-session /etc/bb-session.conf /usr/local/sbin/bb-session
-    # ...and the job account's, for a tool pack's install steps (R234).
+    # ...and the job account's, for a tool pack's install steps.
     rm -f /etc/sudoers.d/builderbot-netcut /usr/local/sbin/bb-netcut
     [ "$configured" = 1 ] && rm -f /etc/X11/builderbot-gpu.conf /run/builderbot-gpu-display
     if [ "$stores" = 1 ]; then
@@ -3003,14 +3003,14 @@ cmd_uninstall() {
             # A mountpoint is a share's, never emptied from here...
             mountpoint -q "$p" 2>/dev/null && continue
             # ...nor a store inside a share, which other nodes may use; and
-            # nothing is followed into a mount below it (B509).
+            # nothing is followed into a mount below it.
             case "$(findmnt -no FSTYPE -T "$p" 2>/dev/null)" in
                 nfs|nfs4|cifs|smb3|virtiofs|9p|fuse.sshfs|fuse.rclone)
                     warn "$p is on a share and stays: remove it there if no other node uses it"; continue ;;
             esac
             rm -rf --one-file-system "$p"
         done
-        # The folder itself, whichever name is the link to it (R204), then both names.
+        # The folder itself, whichever name is the link to it, then both names.
         rm -rf --one-file-system "$(readlink -f /var/lib/aerieos 2>/dev/null || echo /var/lib/aerieos)"
         rm -rf --one-file-system /var/lib/aerieos /var/lib/builderbot
     else
@@ -3018,7 +3018,7 @@ cmd_uninstall() {
     fi
     # Without --doors the port 22 rule and the hosting firewall stay, and
     # their units read their rules from this folder at every boot: those
-    # two files stay with them, and the rest of the folder goes (B894).
+    # two files stay with them, and the rest of the folder goes.
     local keep_door=() f
     if [ "$doors" != 1 ]; then
         for f in door-22.nft hosting-fw.nft; do [ -f "/etc/aerieos/$f" ] && keep_door+=(! -name "$f"); done
@@ -3040,7 +3040,7 @@ cmd_uninstall() {
             rm -f /usr/local/bin/ttyd
         fi
     fi
-    # The tunnel to the controller last (R161): an uninstall pressed on the
+    # The tunnel to the controller last: an uninstall pressed on the
     # Nodes tab arrived through it, and the job reports back through it.
     if [ -f /etc/wireguard/bb.conf ]; then
         say "taking down the WireGuard tunnel to the controller"
@@ -3052,7 +3052,7 @@ cmd_uninstall() {
     exit 0
 }
 
-# --- the GPU display (R20) -------------------------------------------------
+# --- the GPU display -------------------------------------------------
 # The emulator's -gpu host needs GLES from the host driver, and NVIDIA's EGL
 # will not hand out a display without an X server carrying its own GLX
 # module: Xvfb has none and falls through to Mesa's llvmpipe, software by a
@@ -3085,12 +3085,12 @@ gpu_card() {
 # apt, waiting for its lock: the machine's own apt (the daily update, an
 # unattended upgrade, a toolchain's system packages) may hold it at the
 # moment a press arrives, and a removal failed on exactly that on the dev
-# node (30 Sep). Up to five minutes for the holder to finish, and apt-get
+# node. Up to five minutes for the holder to finish, and apt-get
 # itself told to wait as long for the lock. An unattended upgrade is found
 # by its command line, not its name: Ubuntu keeps a helper of nearly the
 # same name (unattended-upgrade-shutdown) running from boot to shutdown,
 # whose fifteen-character name is the upgrade's own, and waiting on that
-# made every apt call here five minutes long (B403).
+# made every apt call here five minutes long.
 apt_idle() {
     local i
     for i in $(seq 1 100); do
@@ -3102,8 +3102,8 @@ apt_idle() {
     return 0
 }
 apt_get() { apt_idle; apt-get -o DPkg::Lock::Timeout=300 "$@"; }
-# The distribution's NVIDIA driver, from apt: its card in the Library
-# (R102), and nothing else installs it.
+# The distribution's NVIDIA driver, from apt: its card in the Library,
+# and nothing else installs it.
 gpu_install_driver() {
     # GPU_DRIVER_PKG, where the caller set one, is the metapackage of the
     # branch to install (nvidia-driver-610-open) rather than the one the
@@ -3147,8 +3147,8 @@ cmd_gpu() {
         return 0
     fi
     say "card: $card"
-    # The display runs on NVIDIA's driver and does not install it (the
-    # operator, 30 Sep): the driver is the Library's card, the one
+    # The display runs on NVIDIA's driver and does not install it:
+    # the driver is the Library's card, the one
     # place it is installed, so a machine has it because somebody chose to.
     if [ -z "$(gpu_driver_version)" ]; then
         gpu_state "needs the driver: install the NVIDIA driver from the Library with this node picked first"
@@ -3193,7 +3193,7 @@ EOF
         say "the driver is installed and takes the card at the next boot (nouveau holds it now): Reboot on this node's row, and the display comes up on its own"
     fi
 }
-# The emulator off the card (R102): the display's unit stopped and
+# The emulator off the card: the display's unit stopped and
 # disabled, the driver and the device nodes left as they are, so sessions
 # may still compute on the card. Its state line says it was switched off,
 # which is not the same as down.
@@ -3207,7 +3207,7 @@ cmd_gpu_off() {
 cmd_gpu_display() {
     local bus b d f busid pid reason=""
     # Asked before nvidia-smi, which tries to load the driver for a card that
-    # is not there (B168).
+    # is not there.
     if [ -z "$(gpu_card)" ]; then
         gpu_state "down: no NVIDIA card on this machine; the driver is installed for one that is gone (remove it on the Installed page)"
         return 1
@@ -3282,7 +3282,7 @@ EOF
     return 1
 }
 
-# --- the NVIDIA driver as a card in the Library (R102) ------------------------
+# --- the NVIDIA driver as a card in the Library ------------------------
 # The driver alone, installed from the Library and removed on the
 # Installed page, apart from the emulator's display. It is the machine's and not the toolchain store's: its
 # kernel module is built for this machine's kernel and its libraries must
@@ -3342,7 +3342,7 @@ cmd_gpu_nodes() {
     local dev n=0 i=0 major
     # No card, no module to load: every try at it writes "No NVIDIA GPU
     # found" to the console, which a machine whose card went elsewhere
-    # showed at every boot (B168).
+    # showed at every boot.
     if [ -z "$(gpu_card)" ]; then
         say "no NVIDIA card on this machine; no device nodes to make"
         return 0
@@ -3486,7 +3486,7 @@ cmd_gpu_driver() {
     esac
 }
 
-# --- the NVIDIA container toolkit as a card in the Library (R102) -------------
+# --- the NVIDIA container toolkit as a card in the Library -------------
 # What lets a container on this machine use the card: NVIDIA's runtime hook,
 # which hands the driver's libraries and the device nodes to a container
 # that asks for a GPU. Ubuntu and Debian do not carry it, so it comes from
@@ -3494,7 +3494,7 @@ cmd_gpu_driver() {
 # away again on removal; Docker is told about the runtime and reloads its
 # configuration, which it takes a runtime from without stopping a container.
 # A restart would stop every one, and those with no restart policy stay
-# down after it (the dev node's own, 30 Sep), so it is the fallback only
+# down after it (the dev node's own), so it is the fallback only
 # where a reload did not take. The machine's own, like the driver it needs.
 NVCT_LIST=/etc/apt/sources.list.d/nvidia-container-toolkit.list
 # The key as NVIDIA publishes it, armored: apt reads an .asc named by
@@ -3662,7 +3662,7 @@ cmd_gpu_container() {
     esac
 }
 
-# --- features (R91) ---------------------------------------------------------
+# --- features ---------------------------------------------------------
 # What a node has beyond the base, each an install and a remove, run by the
 # provisioner's flag at enrollment and by the agent's `feature` system job
 # from the Nodes page: one copy, so the two ways cannot drift. A marker
@@ -3740,7 +3740,7 @@ vmhost_pkgs() {
         alpine:x86_64) echo "qemu-system-x86_64 qemu-img libvirt-daemon libvirt-qemu ovmf xorriso dnsmasq virtiofsd" ;;
     esac
 }
-# A VM's shared folder (R100) through virtiofsd, which libvirt runs as root
+# A VM's shared folder through virtiofsd, which libvirt runs as root
 # and which hands the guest's uids straight through: a file root wrote in
 # the VM was root's in the project, and the VM's own account could write
 # nothing. libvirt starts this in its place: every uid in the VM writes as
@@ -3795,9 +3795,9 @@ feature_vmhost() {
     case "$1" in
         state) [ -f "$FEATURES_DIR/vmhost" ] && echo installed || echo absent ;;
         install)
-            # Beside the controller (R165 step 1) the VMs run through the
+            # Beside the controller the VMs run through the
             # root agent: the job account stays out of libvirt's group, which
-            # is root on that machine (R90 step 14), below.
+            # is root on that machine, below.
             # No /dev/kvm is a machine that cannot run a VM at speed: a VM
             # whose host does not pass virtualization through, or a box with
             # it off in the firmware. Said, not emulated (tens of times slower).
@@ -3830,7 +3830,7 @@ feature_vmhost() {
             # 0755 so libvirt's own account reaches the disks it is handed.
             # On the controller's own machine the root agent writes them, so
             # they are root's: the jobs account's, a link it left there had
-            # root write over the file it named (B552).
+            # root write over the file it named.
             vmown="$DOCKER_USER"
             { [ "$BESIDE_CONTROLLER" = 1 ] || [ -s /etc/bb-session.wall ]; } && vmown=root
             install -d -m 0755 -o "$vmown" /var/lib/aerieos/vms /var/lib/aerieos/vms/images /var/lib/aerieos/vms/disks
@@ -3866,7 +3866,7 @@ feature_vmhost() {
             say "VM host removed${added:+ ($(printf '%s' "$added" | wc -w) packages it had added)}; what was here before it stays" ;;
     esac
 }
-# The hosting-only box closed on itself (R93): 80 and 443 in, and port 22
+# The hosting-only box closed on itself: 80 and 443 in, and port 22
 # as the door left it. Docker's published ports are DNAT'd in prerouting
 # and never reach the input hook, so a compose that publishes 0.0.0.0:5432
 # was open to the world whatever the input rules said: the forward chain
@@ -3947,7 +3947,7 @@ UNIT
             say "firewall off: this box takes in what its other rules allow" ;;
     esac
 }
-# The IOMMU on the kernel's command line (R116 step 4): what passing a PCI
+# The IOMMU on the kernel's command line: what passing a PCI
 # device or a whole USB controller to a VM needs. One marked block in the
 # bootloader's defaults, written by whichever of grubby, GRUB's defaults,
 # extlinux or systemd-boot the machine boots by, and taken out the same way;
@@ -3968,7 +3968,7 @@ feature_iommu() {
             say "IOMMU: $args on the kernel's command line"
             install -d -m 0755 "$FEATURES_DIR"
             # AerieOS's GRUB ends every entry with aerie_args from its
-            # environment block, which its slot tool sets (B703).
+            # environment block, which its slot tool sets.
             if [ -x "$AERIEOS_SLOT" ] && bash "$AERIEOS_SLOT" current >/dev/null 2>&1; then
                 # shellcheck disable=SC2086 # the arguments, one word each
                 bash "$AERIEOS_SLOT" args $args || die "the boot's arguments could not be written to GRUB's environment"
@@ -4012,7 +4012,7 @@ feature_iommu() {
             say "IOMMU off at the next restart" ;;
     esac
 }
-# The NVIDIA card to a VM (R207 step 3): bound to vfio-pci from boot by its
+# The NVIDIA card to a VM: bound to vfio-pci from boot by its
 # ids, so the host's driver never takes it and a VM's start finds it free;
 # every function of the card (its sound beside it) goes with it. A file in
 # modprobe.d, which AerieOS's /etc overlay keeps across boots; nvidia and
@@ -4046,7 +4046,7 @@ grub_regen() {
     elif have grub-mkconfig; then grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1
     else return 1; fi
 }
-# The installed edition's parts as the own node's features (R56 step 2):
+# The installed edition's parts as the own node's features:
 # storage (ZFS, mergerfs, SnapRAID and SMART for the Storage page's pools and
 # array) and shares (Samba and NFS), each installed with exactly its
 # packages and removed with them, their services the machine's own, run by
@@ -4143,7 +4143,7 @@ feature_shares() {
             feature_pkgs shares remove "" "shares" ;;
     esac
 }
-# ups (R164 step 3): NUT in standalone mode on a USB UPS (usbhid-ups, the
+# ups: NUT in standalone mode on a USB UPS (usbhid-ups, the
 # driver nearly every one answers), its monitor shutting the machine down
 # cleanly on a low battery; the Power section reads it. The files are
 # written once, ours, and left alone where a person changed them.
@@ -4184,8 +4184,8 @@ cmd_feature() {
 }
 
 case "${1-}" in
-    # The menu only when asked for by name, and only at a terminal (the
-    # operator, 11 Oct): a bare bb-sandbox reached from a run of the enroll
+    # The menu only when asked for by name, and only at a terminal:
+    # a bare bb-sandbox reached from a run of the enroll
     # script opened it on a VPS's console, where its keys did not work and
     # the run could not go on. The enroll script and the Nodes tab are the
     # way to configure a node; this is the by-hand fallback.
@@ -4219,7 +4219,7 @@ BBSANDBOX
 install -d -m 0755 /usr/local/sbin
 install -m 0750 "$BBSANDBOX_TMP" /usr/local/sbin/bb-sandbox
 rm -f "$BBSANDBOX_TMP"
-# ...and under AerieOS's own name (R204): aerie-sandbox runs it, with the
+# ...and under AerieOS's own name: aerie-sandbox runs it, with the
 # same arguments. The file stays where the units and the agent look for it.
 printf '#!/bin/sh\n# AerieOS'"'"'s tool for this machine, under its own name: bb-sandbox, as installed.\nexec /usr/local/sbin/bb-sandbox "$@"\n' > /usr/local/sbin/aerie-sandbox
 chmod 0750 /usr/local/sbin/aerie-sandbox
@@ -4310,16 +4310,16 @@ AGENT=/usr/local/sbin/aerieos-agent
 # control-group: a stop takes every process in the cgroup with it, and the
 # agent's cgroup holds the terminals it opens, the tmux servers under them and
 # the Claude sessions inside those. So pressing Update agent ended every
-# conversation on the machine, mid-work, with nothing said (B107). The
+# conversation on the machine, mid-work, with nothing said. The
 # agent's own shutdown already stops what is its to stop: its terminals, and now
 # its jobs. KillMode=process makes systemd's half match that.
 AGENT_KILLMODE='KillMode=process'
 # ...and a build the kernel kills for memory is the build's end, not the
 # agent's: systemd's default OOMPolicy stops the whole unit, and every
-# session's builds, suites and emulator are in it (R271).
+# session's builds, suites and emulator are in it.
 [ "$INIT" = systemd ] && AGENT_KILLMODE="${AGENT_KILLMODE}
 OOMPolicy=continue"
-# The agent in the fence (R110 step 4) with the sessions and jobs it starts,
+# The agent in the fence with the sessions and jobs it starts,
 # and first for the kernel to take if the machine itself runs out: it comes
 # back by Restart=always, where the system's own services may not.
 if [ "$INIT" = systemd ] && [ -n "${fenced:-}" ]; then
@@ -4333,12 +4333,12 @@ if [ -n "$CONTROLLER" ]; then
     say "agent: enrolling with ${CONTROLLER}"
     # shellcheck disable=SC2046
     pkg $(pkg_names python)
-    # The sealed sign-ins' cryptography (R158 step 3): X25519 and
+    # The sealed sign-ins' cryptography: X25519 and
     # ChaCha20-Poly1305 from the family's package of the cryptography library.
     # shellcheck disable=SC2046
     pkg $(pkg_names pycrypto)
     hdr="$(mktemp)"
-    # Tried again on a transient answer (B747), as the own node's download is.
+    # Tried again on a transient answer, as the own node's download is.
     pinned_at "$CONTROLLER" "${CTL_KEY:-}"
     curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${PIN_URL%/}/api/v1/agent/download" -o "${AGENT}.new" \
@@ -4353,7 +4353,7 @@ if [ -n "$CONTROLLER" ]; then
     agent_proved "${AGENT}.new" "$want" || { rm -f "${AGENT}.new"; exit 1; }
     chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
     svc_stop aerieos-agent
-    # ...and under the name it had before (R204): never two agents on one
+    # ...and under the name it had before: never two agents on one
     # node.json, each handing the controller the other's replaced token.
     svc_stop builderbot-agent
     "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" --user "$USER_NAME" \
@@ -4363,7 +4363,7 @@ if [ -n "$CONTROLLER" ]; then
         --store "data=${STORE_DATA}" --store "toolchains=${STORE_TOOLCHAINS}" \
         --store "cache=${STORE_CACHE}" --store "artifacts=${STORE_ARTIFACTS}" \
         --store "appdata=${STORE_APPDATA}"
-    # The tunnel into the node's own record (R161): the agent binds the
+    # The tunnel into the node's own record: the agent binds the
     # screen relay to its address there, and reports it.
     if [ -n "$WG_ADDR" ]; then
         node_record_set tunnel "$WG_ADDR" >/dev/null
@@ -4425,7 +4425,7 @@ fi
 elif [ -f /etc/aerieos/node.json ]; then
     # Enrolled on an earlier run. A machine that lost the agent itself keeps its
     # identity and takes it back here, as an AerieOS root from before /usr/local
-    # lasted did at every boot (B669). The agent does NOT keep itself current
+    # lasted did at every boot. The agent does NOT keep itself current
     # (the dashboard's Update button queues that as a job, and nothing runs
     # it unasked), so a re-run here is the console path to the same thing:
     # fetch what the controller ships with this node's own token, and the
@@ -4483,7 +4483,7 @@ elif [ -f /etc/aerieos/node.json ]; then
         say "agent: sessions now run as ${SESSION_NAME:-nobody}; restarting the agent"
         svc_restart aerieos-agent 2>/dev/null || true
     fi
-    # A node still running under the name before (R204), met by a re-run
+    # A node still running under the name before, met by a re-run
     # with no token: the same agent, the same record, under the new service.
     # The old one is stopped first; where the controller could not be asked
     # for the agent just now, the one installed is what the new name runs.
@@ -4495,7 +4495,7 @@ elif [ -f /etc/aerieos/node.json ]; then
     names_old_service
 fi
 
-# --- the features asked for (R91) -------------------------------------------
+# --- the features asked for -------------------------------------------
 # Each through bb-sandbox's own install, the one the Nodes page's Features
 # section runs later: after the enrollment, so a run that cannot enroll
 # leaves the machine as it found it, and a feature that cannot go on here

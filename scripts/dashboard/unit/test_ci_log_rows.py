@@ -1,5 +1,5 @@
 """aerie ci-log's list of the kept logs, once a release's tag keeps one log
-for several jobs (R206): the lint, the unit tier and the browser suites run
+for several jobs: the lint, the unit tier and the browser suites run
 before anything is built to publish, each adds its part under the first's
 head, and the run reads as its worst job's result, where the first job to
 finish said only how it went itself."""

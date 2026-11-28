@@ -1,4 +1,4 @@
-"""config/release-signers (R199): who may sign a release, in every install.
+"""config/release-signers: who may sign a release, in every install.
 The audit of 20 Nov found the file held no key, no install carried it (the
 Dockerfile copied the two key files beside it and not this one, and the
 bare-metal layout and the OS image are made from those lines), and the

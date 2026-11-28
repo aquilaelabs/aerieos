@@ -183,12 +183,12 @@ def _at_or_before(project, sha, tag):
 def _ours(project, sha):
     """A stamp's commit that this branch's history holds: one a rewrite left
     on no branch still resolves, and is in no tag's history either, which read
-    as after every release (B700)."""
+    as after every release."""
     return bool(sha) and _at_or_before(project, sha, "HEAD")
 
 
 def _commits(project, bug):
-    """The commits the notebook says fixed `bug` (R255), the ones this branch
+    """The commits the notebook says fixed `bug`, the ones this branch
     holds."""
     return [c[:7] for c in bug.get("commits") or [] if isinstance(c, str) and _ours(project, c)]
 
@@ -311,7 +311,7 @@ _LINE_SHAS = re.compile(r"\s*\((?:[0-9a-f]{7,40}(?:,\s*)?)+\)\s*$")
 
 
 def _tied(where, bug):
-    """Whether a line the bug is tied to in the notebook (R255: aerie
+    """Whether a line the bug is tied to in the notebook (aerie
     changelog link, the row's Tie to a line) is in the changelog: a tie is an
     answer itself."""
     ties = {_words(t) for t in bug.get("changelog") or [] if isinstance(t, str)} - {""}

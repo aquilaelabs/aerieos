@@ -1,4 +1,4 @@
-"""The settings' secrets sealed under the install key (R135): the tunnel's and
+"""The settings' secrets sealed under the install key: the tunnel's and
 Cloudflare's tokens kept as ciphertext in settings.json once the install has
 a key, those kept open before sealed at start, opened only for the code that
 uses them, still said to be set on the Settings page, and read as unset by an

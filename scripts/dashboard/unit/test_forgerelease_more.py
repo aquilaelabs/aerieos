@@ -1,4 +1,4 @@
-"""forgerelease.py on Gitea and GitLab (R124), against stand-ins for their
+"""forgerelease.py on Gitea and GitLab, against stand-ins for their
 APIs on a local port: the release made with the changelog's notes, the
 signed build attached the way each forge takes one (a multipart upload on
 Gitea; on GitLab a generic package the release links to), the project's own

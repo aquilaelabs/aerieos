@@ -1,5 +1,5 @@
 """The markup languages AerieOS reads and writes, in the standard library
-alone (R167): JSON, TOML and XML through python's own modules, YAML as the
+alone: JSON, TOML and XML through python's own modules, YAML as the
 subset anything here writes (block mappings and sequences, scalars, quoted
 strings, `|` text blocks), and Markdown by its headings. One reader for the
 notebook's records coming back in (records.py) and for the code map, which

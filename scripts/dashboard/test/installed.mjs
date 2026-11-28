@@ -1,4 +1,4 @@
-// The Installed page (R172): under Machines beside Nodes and Storage, one
+// The Installed page: under Machines beside Nodes and Storage, one
 // node picked, what the Library put there by kind, each row opening on
 // what the catalog's card does not show: an agent's sign-in, a toolchain's
 // path and system packages, a service's Configure from its config block
@@ -31,7 +31,7 @@ ok(await page.evaluate(() => inst.rows.filter(r => r.kind === 'agent' && !r.inst
 ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.every(b => b.dataset.instkind === 'service')) && await page.$('.doc .installedtab [data-libact]') === null,
    'nothing installs from here but a configured service: the Library installs');
 
-// ---- an agent's page: its sign-in (R181 step 2) -------------------------
+// ---- an agent's page: its sign-in -------------------------
 await section("an agent's page", async () => {
   const CL = '.doc .installedtab .irow[data-irow="agent:claude-code"]';
   ok(await page.$eval(CL, r => !r.querySelector('.idetail') && r.querySelector('[data-instopen]')?.textContent.trim() === 'Open'),
@@ -78,7 +78,7 @@ await section("the model router's page", async () => {
      '...the field empties with "type to replace" in its place, and Install comes live');
   const st = await page.evaluate(async () => (await (await fetch('/api/router?node=' + encodeURIComponent(instNode))).json()));
   ok(st.providers?.anthropic === true && st.custom?.[0]?.name === 'groq', 'what the row saved is the router\'s own record');
-  // Connected services (R294 step 9): the key saved is listed, shared by
+  // Connected services: the key saved is listed, shared by
   // spaces, with who added it, and never its value.
   {
     const conn = await page.evaluate(async () => (await (await fetch('/api/connections')).json()));
@@ -108,7 +108,7 @@ await section("the model router's page", async () => {
      'the Library\'s card for it offers Install now and draws no Configure of its own');
 });
 
-// ---- nginx and the Scanners are services too (R264) ------------------------
+// ---- nginx and the Scanners are services too ------------------------
 // Installed from their cards in the Library, as the router is; on Installed
 // once they are on the node, where Open leads to each one's own page.
 await section("nginx and the Scanners are services", async () => {
@@ -162,7 +162,7 @@ await section("a pack that brings a coding agent sits with the agents", async ()
                   says: signin(row).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
                   plain: signin({ ...row, group: undefined }), away: signin({ ...row, installed: false }) };
     // One whose pack says how it signs in is signed in here, as a shipped
-    // agent is (R233 step 6): the card by what the flow says of itself, a
+    // agent is: the card by what the flow says of itself, a
     // field for a code pasted back, the code itself for one typed on the
     // provider's page.
     agentsAdopt([{ id: 'kite', name: 'Kite', product: 'Kite CLI', command: 'kite', provider: 'Example', signin: true }]);
@@ -227,7 +227,7 @@ await page.evaluate(() => { nodesList = null; nodesStale = true; instNode = ''; 
 await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
 
 // ---- an install's receipt ----------------------------------------------------
-// What a pack's install left on a node (R234; the operator, 13 Nov: what it
+// What a pack's install left on a node (what it
 // downloads from somewhere else had no paper trail): the manifest commit the
 // copy came from, when, how many files and how big, one hash over them all,
 // and each thing the receipt shows that a person would act on.
@@ -279,7 +279,7 @@ await section("an install's receipt", async () => {
   ok(said.stale.length === 2 && /^WARN This copy is from an earlier manifest: the one kept now is bbbbbbbbbbbb\. Install again takes what that one installs\.$/.test(said.stale[1]),
      `...a copy from an earlier manifest than the one kept now says so, and what to do (${said.stale[1]})`);
   // ...and its row and its Library card say it where the state is read,
-  // with Install again to press (B799): it read installed, nothing to press.
+  // with Install again to press: it read installed, nothing to press.
   const rows = await page.evaluate(() => {
     const r = { kind: 'toolchain', name: 'zig', label: 'Zig', installed: true, pack: null,
                 receipt: { commit: 'a'.repeat(40), tree: '1'.repeat(64), stale: 'b'.repeat(40) } };
@@ -309,7 +309,7 @@ await section("an install's receipt", async () => {
   ok(/^It declares what it downloads, each held to its sha256 before its steps run with no network: dl\/hexkit\.tgz from https:\/\/example\.com\/hexkit\.tgz \(abababababab\)\.$/.test(said.seen[0])
      && /^It declares no downloads: what its install steps fetch is not checked/.test(said.seen[1]) && said.seen[2] === '',
      `...and Look says what it declares it downloads, or that it declares none, before it is added (${JSON.stringify(said.seen)})`);
-  // Pack format 5 (R267): a download may be held by its publisher's
+  // Pack format 5: a download may be held by its publisher's
   // signature and be for one platform, a pack may declare that it downloads
   // nothing, and an installer that fetches the rest by itself says so.
   ok(/each held to its sha256 or its publisher's signature before its steps run with no network: dl\/hexkit\.tgz from https:\/\/example\.com\/hexkit\.tgz \(abababababab\) on linux\/amd64; dl\/tern\.tar\.xz from https:\/\/example\.com\/tern\.tar\.xz \(signed, key tern\.asc\)\.$/.test(said.seen[3])

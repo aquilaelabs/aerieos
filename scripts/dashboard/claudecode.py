@@ -4,7 +4,7 @@ Claude Code is one of the coding agents agentcode.py keeps: its version on
 each node, what the latest is, and its install, update and removal are that
 module's, asked for "claude". What no other agent has is here. A session
 needs Claude Code, so a node without it holds its spaces' starts and says
-where it is installed (R145: the Library installs it on purpose, never the
+where it is installed (the Library installs it on purpose, never the
 provisioner), and the status payload carries each node's version against
 the latest for the page.
 """
@@ -42,12 +42,12 @@ def holds(reap=False):
     """{node id: why} while no session can start on a node's Claude Code:
     while it is being updated (the project rows start them again after),
     and where it is not installed at all, which the Library
-    does on purpose (R145: the provisioner no longer installs it).
+    does on purpose (the provisioner no longer installs it).
 
     reap: only the holds that end a session already running, for the
     sweep. Not installed is not one: a running session shows it was there,
     so the reading is stale or wrong, and the sweep ended the harness's
-    sessions every second on it (B540); agentcode.remove ends them itself."""
+    sessions every second on it; agentcode.remove ends them itself."""
     out = {}
     for n in _agent_nodes():
         if agentcode.updating(n["id"], "claude"):

@@ -1,7 +1,7 @@
 """A job on a node whose agent is not root runs with a HOME it can write:
 the agent's own, or one under the data store where the uid has none (a
 container started as a bare number), where npm stopped on uv_os_homedir
-(B145, diagnostics #122)."""
+(diagnostics #122)."""
 import os
 import sys
 import tempfile

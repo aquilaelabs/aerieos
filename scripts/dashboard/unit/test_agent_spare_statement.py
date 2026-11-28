@@ -1,5 +1,5 @@
-"""A node that pinned the release key pins its spare by itself (R267 step
-16). A release's build signs, with the release key itself, a statement that
+"""A node that pinned the release key pins its spare by itself.
+A release's build signs, with the release key itself, a statement that
 names the spare, under a line of its own: tools/sign-agent.py writes it into
 agent.sig when the key it signs with is the first one
 config/aerieos-release.pub names and the file names a spare, and --check
@@ -46,7 +46,7 @@ def pair():
 
 # Lines no build signs with any more, kept here to show they pass as nothing:
 # the spare's word without its build (never taken), and the second signature
-# over root's tools alone (R267 step 28).
+# over root's tools alone.
 SPARE_V1 = b"aerieos release spare v1\n"
 TOOLS_V1 = b"aerieos root tools v1\n"
 

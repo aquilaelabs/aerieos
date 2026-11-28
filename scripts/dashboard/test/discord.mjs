@@ -1,4 +1,4 @@
-// A space's Discord server (R293), against the harness's stand-in for
+// A space's Discord server, against the harness's stand-in for
 // Discord's API (discord-stub.py): connected in the space's settings with a
 // bot's token that is never shown again, pulled into deploy/discord.yml,
 // planned with each change a person allows marked, applied by a person,

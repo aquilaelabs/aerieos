@@ -1,5 +1,5 @@
-// Every Linux system Enroll node offers, walked on a real machine (roadmap
-// R97 step 5): for each, a VM made a node on a real VM host, then what a
+// Every Linux system Enroll node offers, walked on a real machine:
+// for each, a VM made a node on a real VM host, then what a
 // node does (toolchains, features, nginx, storage, a project synced, a
 // terminal), then Uninstall and the VM gone. What the vetted note in
 // systems.py says was walked is what this runs, so a change to the
@@ -68,7 +68,7 @@ for (const os of SYSTEMS){
   ok(made.ok, `[${os}] a VM made a node (${made.error || made.domain})`);
   if (!made.ok) continue;
   // Failed at once, not after 45 minutes, when the VM never takes an
-  // address (R107: Gentoo's image sat at its boot loader, and the walk
+  // address (Gentoo's image sat at its boot loader, and the walk
   // waited the whole time): its Screen on the VMs page shows why.
   const started = Date.now();
   let stuck = '';
@@ -95,7 +95,7 @@ for (const os of SYSTEMS){
     for (const [action, want] of [['install', true], ['remove', false]]){
       await api('/api/toolchains', { action, names: ['node'], node: nid });
       const d = await wait(async () => { const t = await api(`/api/toolchains?node=${nid}`); return t.job?.running ? null : t; }, 30 * 60000);
-      // An item says whether it is installed (B194: it has no state).
+      // An item says whether it is installed (it has no state).
       const it = (d?.items || []).find(i => i.name === 'node');
       ok(it?.installed === want, `[${os}] a toolchain ${action}s (${it ? `installed ${it.installed}${it.version ? ` ${it.version}` : ''}` : 'no node item'}${d?.job?.errors ? `; ${JSON.stringify(d.job.errors).slice(0, 200)}` : ''})`);
     }
@@ -111,7 +111,7 @@ for (const os of SYSTEMS){
       const up = !!x?.state?.running;
       ok(!!x && up === (action === 'deploy'), `[${os}] nginx ${action === 'deploy' ? 'runs as a container there' : 'comes off again'}${x && up !== (action === 'deploy') ? ` (running ${up})` : ''}`);
     }
-    // The Features section's installs where they apply (R107 step 3): VM
+    // The Features section's installs where they apply: VM
     // host where the machine has /dev/kvm (a VM made on a host that passes
     // virtualization through), the IOMMU on an Intel or AMD machine, each
     // installed and removed as a system job; the hosting firewall is a
@@ -148,8 +148,8 @@ for (const os of SYSTEMS){
       }
       ok(true, `[${os}] the hosting firewall does not apply here: this node runs sessions, and a GPU driver needs a card (${rep.gpu_card ? 'one reported' : 'none reported'})`);
     }
-    // Its disks measured on the Storage page (R107: storage, as R97's step
-    // 2 named): Measure now runs, and the page lists the node's filesystems.
+    // Its disks measured on the Storage page:
+    // Measure now runs, and the page lists the node's filesystems.
     const meas = await api('/api/v1/nodes', { action: 'storage', id: nid });
     if (meas.job) await wait(async () => ['succeeded', 'failed', 'canceled'].includes((await api(`/api/v1/jobs?id=${meas.job}`)).state), 10 * 60000, 5000);
     const st = await wait(async () => {
@@ -165,7 +165,7 @@ for (const os of SYSTEMS){
     ok(!!synced, `[${os}] ${PROJECT} syncs there`);
     ok(/README|\.git/.test(await exec(nid, ['sh', '-c', `ls -a /workspace/${PROJECT}`])), `[${os}] ...and its files are on the machine`);
     // What a terminal there would be, asked plainly: one that opens is told
-    // to ask for its websocket. node:http, not fetch (B196).
+    // to ask for its websocket. node:http, not fetch.
     const page = await new Promise(res => get(`${CTL}/termws?arg=sh:1:${PROJECT}`, { headers: { Authorization: auth } }, r => {
       let b = ''; r.setEncoding('utf8'); r.on('data', c => { b += c; }); r.on('end', () => res(b)); r.on('error', e => res(String(e)));
     }).on('error', e => res(String(e))));

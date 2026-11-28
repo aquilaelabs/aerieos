@@ -1,4 +1,4 @@
-"""Docker apps in the catalog (R170 step 7): an app entry's folder fetched at
+"""Docker apps in the catalog: an app entry's folder fetched at
 the commit the signed index pins, its archive's sha256 checked; bbapp.json
 and compose.yml read from it and the compose held to a person's own app's
 rules; kept with the entry's tier and pin, so New container offers it; and

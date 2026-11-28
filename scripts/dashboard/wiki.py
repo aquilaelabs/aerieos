@@ -1,4 +1,4 @@
-"""A project's wiki (R112): pages a person or Claude writes, kept by the
+"""A project's wiki: pages a person or Claude writes, kept by the
 controller, readable on the notebook's Wiki view and through `aerie wiki`.
 
 Kept as a git repository of the controller's own under STATE/wiki/PROJECT,
@@ -117,7 +117,7 @@ def _env():
 def _git(project, *args, timeout=60, check=True, env=None):
     # A wiki pulled from a forge may hold links: checked out as plain files
     # naming their target, never as links a save would write through
-    # (/config/users.json), and no hook of its own runs (B532).
+    # (/config/users.json), and no hook of its own runs.
     r = subprocess.run(["git", "-c", "core.symlinks=false", "-c", "core.hooksPath=/dev/null",
                         "-C", str(repo(project)), *args], capture_output=True, text=True,
                        timeout=timeout, check=False, env=env or _env())

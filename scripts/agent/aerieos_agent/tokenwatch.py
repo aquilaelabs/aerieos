@@ -1,4 +1,4 @@
-"""Who reads a coding agent's token on this node (R125 step 6).
+"""Who reads a coding agent's token on this node.
 
 Where accounts run as their own users, an account's sign-ins are files in its
 home that only it and root can open. Root cannot be kept out by a file mode,
@@ -29,7 +29,7 @@ TOKENS = dict(os.path.split(row["kept"]) for row in SIGNINS.values())
 def watched():
     """{folder under a home: the file in it that is a sign-in}: the shipped
     agents', and the file each pack's agent keeps its own in, where its pack
-    says (R233 step 6)."""
+    says."""
     out = dict(TOKENS)
     for row in pack_signins().values():
         folder, name = os.path.split(row["kept"])

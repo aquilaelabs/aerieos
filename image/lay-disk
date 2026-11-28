@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One disk laid out as AerieOS (R160 steps 1 and 2): the partitions of
+# One disk laid out as AerieOS: the partitions of
 # image/partitions.sh, GRUB for UEFI and BIOS with the menu, slot A written
 # from a root squashfs with its kernel and initrd beside it on the ESP, slot
 # B left for the first update, and the data partition made with /var's
@@ -80,7 +80,7 @@ install -d "$MNT/aerieos/a" "$MNT/aerieos/b"
 install -m 0644 "$KERNEL" "$MNT/aerieos/a/vmlinuz"
 install -m 0644 "$INITRD" "$MNT/aerieos/a/initrd"
 install -m 0644 "$RELEASE" "$MNT/aerieos/a/release"
-# aerieos.env (R161 step 12): the lines a boot hands the controller
+# aerieos.env: the lines a boot hands the controller
 # (usr/lib/aerieos-os/env), laid at a fixed 4 KiB behind a marker line so
 # the stick maker writes a person's --set lines into these same bytes while
 # the image streams, and nothing writes a FAT by hand on any system. A line
@@ -89,14 +89,14 @@ install -m 0644 "$RELEASE" "$MNT/aerieos/a/release"
     head -c 4096 /dev/zero | tr '\0' ' '; } | head -c 4095; printf '\n'
 } > "$MNT/aerieos.env"
 [ "$(stat -c %s "$MNT/aerieos.env")" = 4096 ] || die "aerieos.env is not its 4 KiB"
-# aerieos/firstboot.json (R161 step 8): a prepared configuration the
+# aerieos/firstboot.json: a prepared configuration the
 # first boot applies, 64 KiB behind its marker line, blank here: a stick
 # maker's --config writes the JSON into these bytes, and the first boot
 # blanks them again once it has taken it.
 { { printf 'AERIE-FIRSTBOOT-1\n'; head -c 65536 /dev/zero | tr '\0' ' '; } | head -c 65535; printf '\n'
 } > "$MNT/aerieos/firstboot.json"
 [ "$(stat -c %s "$MNT/aerieos/firstboot.json")" = 65536 ] || die "firstboot.json is not its 64 KiB"
-# aerieos/catalog-mirror.bin (R169 step 6): a mirror of the vetted
+# aerieos/catalog-mirror.bin: a mirror of the vetted
 # catalog for a machine with no network, 64 MiB behind its marker line and
 # a length line of zeros here: a stick maker's --mirror writes the archive
 # into these bytes, and each boot hands a filled one to the controller.

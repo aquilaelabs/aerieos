@@ -1,4 +1,4 @@
-"""bb-session and the agent's folder under its two names (R204): the folder
+"""bb-session and the agent's folder under its two names: the folder
 is /var/lib/aerieos or, on a machine provisioned before that name,
 /var/lib/builderbot, with the other name a link to it. The layout names the
 stores under one and the runner's folder under the other, so the plan reads

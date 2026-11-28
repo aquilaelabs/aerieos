@@ -1,5 +1,5 @@
 """A System container on a node: one compose file, written and built as
-AerieOS's own (R171, R180).
+AerieOS's own.
 
 nginx (nginxproxy.py) and the model router (router.py) are each one compose
 file generated from what their module keeps, written through
@@ -17,7 +17,7 @@ never a written container, so of this file they use the name and the
 directory slug alone.
 
 `containers`, `devactions` and `devapp` are handed to each function as the
-server hands them to the two modules, so a test passes its own; hands()
+server hands them to the two modules, so a test passes its own; hands
 is those three for a caller that was handed none.
 """
 import re
@@ -79,7 +79,7 @@ def deploy(nid, name, text, containers, devactions, devapp, node_list, first=Non
         devapp.forget_container(name)
     if first:
         first()
-    # AerieOS's own (R180): System's, which no picker sets.
+    # AerieOS's own: System's, which no picker sets.
     r = containers.create_container(name, text(), "", node=nid, for_project=devapp.SYSTEM)
     if r.get("error"):
         return r

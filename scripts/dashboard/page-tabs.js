@@ -1,7 +1,6 @@
 // Tabs: what one is called and the address its terminal is reached at, the
 // kinds of tab there are, the titles kept for a screen reader, a menu somebody has open, opening,
-// focusing, hiding and pinning one, and a terminal in a window of its own
-// (R8).
+// focusing, hiding and pinning one, and a terminal in a window of its own.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
 // pure declarations, nothing runs at load. What runs at load is
@@ -30,10 +29,10 @@ function sessionLabels(){
   // prefixed Claude session is still a Claude session.
   const of = s => { const b = tmuxBase(s.name), ag = agentOfSession(b);
     return ag ? ag.agent.name + ": " + projLabel(projFor(ag.stem) ?? ag.stem)
-           // A container's shell (R218 step 4) by the container, not by a
+           // A container's shell by the container, not by a
            // directory on the host it says nothing about.
            : b.startsWith("ctr-") ? "in " + b.slice(4)
-           // A project's directory by the name it is shown under (B64):
+           // A project's directory by the name it is shown under:
            // one reused after a delete is numbered on disk, not on screen.
            : s.cwd ? "sh: " + projLabel(baseOf(s.cwd))
            : "sh: " + s.name; };
@@ -100,7 +99,7 @@ function nextShell(proj){
 const bootFor = arg => {
   const proj = agentOfArg(arg)?.project || "";
   const row = (state?.projects || []).find(p => p.name === proj);
-  // The boot of the node the argument names (R82), else the primary's.
+  // The boot of the node the argument names, else the primary's.
   const picked = (arg.match(/:n:([A-Za-z0-9_-]+)/) || [])[1];
   const onNode = picked ? (row?.session_nodes || []).find(x => x.id === picked)?.boot : "";
   return onNode || row?.session_boot || state?.boot || "";
@@ -108,7 +107,7 @@ const bootFor = arg => {
 // A tab's words as its terminal opens with them: the argument, and the boot
 // stamped on a Claude session's.
 const termArg = arg => agentOfArg(arg) && bootFor(arg) ? `${arg}:b:${bootFor(arg)}` : arg;
-// A tab on a page of its own: a VM's screen (R99), noVNC's own page speaking
+// A tab on a page of its own: a VM's screen, noVNC's own page speaking
 // to this controller's relay for that VM, scaled to the dock's size; any
 // other, AerieOS's terminal page (terminal.html), for a tab popped out.
 const tabUrl = (arg, label) => arg.startsWith("screen:")
@@ -152,7 +151,7 @@ const dur = s =>
 // beside the row icons, which come ten thousand lines later (bug #27).
 const TOOL_ICONS = {
   // A book, open at the spine: the row's notebook button and the notebook
-  // tab wear the same one (the operator, 25 Sep: the ticked list did not
+  // tab wear the same one (the ticked list did not
   // read as a book, and the tab looked to have no icon at all).
   notebook: `<svg viewBox="0 0 16 16" aria-hidden="true">
     <path d="M8 4.2C6.8 3.1 5 2.8 2.6 3v9.4c2.4-.2 4.2.1 5.4 1.2 1.2-1.1 3-1.4 5.4-1.2V3C11 2.8 9.2 3.1 8 4.2z"/>
@@ -161,7 +160,7 @@ const TOOL_ICONS = {
   toolchains: `<svg viewBox="0 0 16 16" aria-hidden="true">
     <path d="M2.5 5.2 8 2.6l5.5 2.6v5.6L8 13.4l-5.5-2.6z"/>
     <path d="M2.5 5.2 8 7.8l5.5-2.6"/><path d="M8 7.8v5.6"/></svg>`,
-  // A prompt's chevron and cursor in a box: a coding agent at work (R95).
+  // A prompt's chevron and cursor in a box: a coding agent at work.
   agents: `<svg viewBox="0 0 16 16" aria-hidden="true">
     <rect x="2" y="2.5" width="12" height="11" rx="1.6"/><path d="M4.8 6.2l2.2 1.8-2.2 1.8"/><path d="M8.6 10.4h2.8"/></svg>`,
   // A handset with a play mark on its screen: a phone that is software.
@@ -190,19 +189,19 @@ const TOOL_ICONS = {
     <path d="M2.5 5.5h7.5"/><path d="M8 3.3l2.2 2.2L8 7.7"/>
     <path d="M13.5 10.5H6"/><path d="M8.2 8.3L6 10.5l2.2 2.2"/>
     <rect x="11" y="2.5" width="2.5" height="11" rx="0.6"/></svg>`,
-  // A magnifier over lines of code, for the Scanners page (R145).
+  // A magnifier over lines of code, for the Scanners page.
   scanners: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="3.8"/><path d="M9.3 9.3L13.5 13.5"/><path d="M4.8 5.8h3.4M4.8 7.6h2.2"/></svg>`,
   // A screen inside a screen: a machine run on a machine, for the VMs page.
   vms: `<svg viewBox="0 0 16 16" aria-hidden="true">
     <rect x="1.5" y="2.5" width="13" height="9" rx="1.2"/><rect x="4.5" y="5" width="7" height="4" rx="0.6"/>
     <path d="M5.5 14h5"/><path d="M8 11.5V14"/></svg>`,
-  // A ledger's lines, for the Audit page (R158 step 8).
+  // A ledger's lines, for the Audit page.
   audit: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10v11H3z"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>`,
-  // Two points joined, for the Network page (R165 step 4).
+  // Two points joined, for the Network page.
   network: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="8" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.8 7.2 10.2 4.8M5.8 8.8l4.4 2.4"/></svg>`,
-  // A box with its one light, for This machine (R90 step 8).
+  // A box with its one light, for This machine.
   machine: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="1"/><path d="M5 12.5v1.5M11 12.5v1.5M5 6.5h3"/><circle cx="11" cy="6.5" r=".8"/></svg>`,
-  // A clock, for the Schedules page (R117).
+  // A clock, for the Schedules page.
   keys: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="8" r="2.5"/><path d="M7.5 8H14M11.5 8v2.5M13.5 8v2"/></svg>`,
   debug: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5a2.5 2.5 0 0 1 5 0v4a2.5 2.5 0 0 1-5 0z"/><path d="M8 7v5M3 6.5h2.5M10.5 6.5H13M3 10h2.5M10.5 10H13M6 3.5 5 2M10 3.5 11 2"/></svg>`,
   schedules: `<svg viewBox="0 0 16 16" aria-hidden="true">
@@ -222,34 +221,34 @@ const TABKINDS = {
               icon: TOOL_ICONS.notebook,
               render: (i, t) => renderNotebookInto(i, t.arg), live: "always",
               // Shown again: its tokens asked for now, since the poll left a
-              // notebook not on show out (R228 step 10) and may be a few
+              // notebook not on show out and may be a few
               // seconds from its next tick.
               open: () => pollRevs() },
-  // The Library (R170): one list of everything an AerieOS installs or
+  // The Library: one list of everything an AerieOS installs or
   // runs, for one node; its own read, the node list, and the sign-in,
   // which rides the status poll (an agent's row carries it).
   library:  { multi: false, label: () => "Library",
               icon: TOOL_ICONS.toolchains,
               render: (i) => renderLibraryInto(i), live: () => `${readRev("library")}/${readRev("nodes")}/${signinRev()}`,
               open: () => loadLibrary() },
-  // What is installed on a node (R172): the Library's read kept to what is
+  // What is installed on a node: the Library's read kept to what is
   // there, its own node, and the sign-in, which rides the status poll.
   installed: { multi: false, label: () => "Installed",
               icon: TOOL_ICONS.nodes,
               render: (i) => renderInstalledInto(i), live: () => `${readRev("installed")}/${readRev("nodes")}/${signinRev()}`,
               open: () => loadInstalled() },
-  // A machine's files (R224): its roots through its agent, its own node.
+  // A machine's files: its roots through its agent, its own node.
   files:     { multi: false, label: () => "Files",
               icon: TOOL_ICONS.nodes,
               render: (i) => renderFilesInto(i), live: () => `${readRev("files")}/${readRev("nodes")}`,
               open: () => loadFiles() },
-  // A Library entry's own page (R183): its one row of the Library, read on
-  // its own (R256), opened by its Details and named for the entry.
+  // A Library entry's own page: its one row of the Library, read on
+  // its own, opened by its Details and named for the entry.
   entry:     { multi: false, label: () => entryLabel(),
               icon: TOOL_ICONS.toolchains,
               render: (i) => renderEntryInto(i), live: () => `${readRev("entry")}/${readRev("nodes")}/${entryKey}`,
               open: () => { if (!entryLib) loadEntry(); } },
-  // An installed thing's own page (R181 step 2): Installed's read, one row
+  // An installed thing's own page: Installed's read, one row
   // of it, opened by a press and named for the thing.
   thing:     { multi: false, label: () => thingLabel(),
               icon: TOOL_ICONS.nodes,
@@ -261,26 +260,26 @@ const TABKINDS = {
               icon: TOOL_ICONS.emulator,
               render: (i) => renderEmulatorInto(i), live: () => `${readRev("emulator")}/${readRev("nodes")}`,
               open: () => loadEmulator() },
-  // The Notifications page (R218 step 6): the account's record, read on
+  // The Notifications page: the account's record, read on
   // open, and the asks, which ride the phone payload, on every draw.
-  // Help (R258): the docs' list on open, each doc read when it is opened.
+  // Help: the docs' list on open, each doc read when it is opened.
   help:     { multi: false, label: () => "Help",
               render: (i) => renderHelpInto(i), live: () => readRev("help"),
               open: () => loadHelp() },
   notices:  { multi: false, label: () => "Notifications",
               render: (i) => renderNoticesInto(i), live: "always",
               open: () => loadNotices() },
-  // Home (R218 step 5): its own read on open, and the poll's rows on every
+  // Home: its own read on open, and the poll's rows on every
   // draw, painted only when they changed.
   home:     { multi: false, label: () => "Home",
               render: (i) => renderHomeInto(i), live: "always",
               open: () => homeOpen() },
-  // The chat (R250 step 2): the dock's Chat tab, the list and the open
+  // The chat: the dock's Chat tab, the list and the open
   // conversation, read on open and on the chat revision.
   chat:     { multi: false, label: () => "Chat",
               render: (i) => renderChatInto(i), live: "always",
               open: () => loadChat() },
-  // Sessions (R250 step 1): the status poll's sessions, painted only when
+  // Sessions: the status poll's sessions, painted only when
   // they changed.
   sessions: { multi: false, label: () => "Sessions",
               render: (i) => renderSessionsInto(i), live: "always" },
@@ -317,12 +316,12 @@ const TABKINDS = {
               icon: TOOL_ICONS.nginx,
               render: (i) => renderNginxInto(i), live: () => `${readRev("nginx")}/${readRev("nodes")}`,
               open: () => loadNginx() },
-  // The Scanners page (R145): AerieOS's own scanners on each node.
+  // The Scanners page: AerieOS's own scanners on each node.
   scanners: { multi: false, label: () => "Scanners",
               icon: TOOL_ICONS.scanners,
               render: (i) => renderScannersInto(i), live: () => `${readRev("scanners")}/${readRev("nodes")}/${readRev("jobs")}`,
               open: () => loadScanners() },
-  // The VMs page (R91): its records, and the census a node's hello carries.
+  // The VMs page: its records, and the census a node's hello carries.
   vms:      { multi: false, label: () => "VMs",
               icon: TOOL_ICONS.vms,
               render: (i) => renderVmsInto(i), live: () => `${readRev("vms")}|${vmView}|${vmsNode}|${vmsChip}|${vmsSearch}|${dmSpacesKey()}`,
@@ -347,7 +346,7 @@ const TABKINDS = {
               render: (i) => renderJobsInto(i), live: () => readRev("jobs"),
               open: () => loadJobs() },
   // A phone and a CI runner are tools of their own again, each with a node
-  // picker (R121, the operator 4 Oct): inside a node's page they were hard
+  // picker: inside a node's page they were hard
   // to find, and the Nodes tab is a machine's configuration.
   phone:    { multi: false, label: () => "Phone",
               icon: TOOL_ICONS.phone,
@@ -357,12 +356,12 @@ const TABKINDS = {
               icon: TOOL_ICONS.runner,
               render: (i) => renderRunnerInto(i), live: () => `${readRev("nodes")}/${(state?.node_runners || []).length}`,
               open: () => loadNodes() },
-  // The install key and what is kept under it (R154).
+  // The install key and what is kept under it.
   keys:     { multi: false, label: () => "Keys",
               icon: TOOL_ICONS.keys,
               render: (i) => renderKeysInto(i), live: () => readRev("keys"),
               open: () => loadKeys() },
-  // Who did what to this install (R158 step 8).
+  // Who did what to this install.
   audit:    { multi: false, label: () => "Audit",
               icon: TOOL_ICONS.audit,
               render: (i) => renderAuditInto(i), live: () => readRev("audit"),
@@ -383,7 +382,7 @@ const TABKINDS = {
   settings: { multi: false, label: () => "Controller settings",
               render: (i) => renderSettingsInto(i), live: settingsLive,
               // ...and an armed move read again, whose clock stops while
-              // another page is on show (R228 step 10).
+              // another page is on show.
               open: () => { loadApps(); if (moveData?.prepared && !moveTimer) loadMove(); } },
   users:    { multi: false, label: () => "Users",
               render: (i) => renderUsersInto(i), live: () => readRev("users"),
@@ -401,7 +400,7 @@ const TABKINDS = {
               // report appearing with an OLD stamp: the exact shape of a
               // stale copy: moves it nowhere, and the tab never heard.
               // ...and its own counter, which a load and a filter move
-              // (B756: the Files page's took its place in a rename).
+              // (the Files page's took its place in a rename).
               live: () => `${state?.reports_mtime ?? ""}:${
                 (state?.reports_ages || []).map(r => r.name + (r.stale ? "!" : ""))
                   .join(",")}:${readRev("findings")}`,
@@ -416,7 +415,7 @@ const identity = t => t.kind === "term" ? "tmux:" + sessionOf(t.arg)
                     : TABKINDS[t.kind] && !TABKINDS[t.kind].multi ? t.kind
                     : t.kind + ":" + t.arg;
 
-// No tooltips (the operator, 11 Oct: a hover box was clipped by the pane it
+// No tooltips (a hover box was clipped by the pane it
 // sat in, and a phone has no hover). The words a `title` carries are kept for
 // a screen reader and never drawn: an element with no text of its own (an
 // icon button, a swatch, a field) is named by them, and one with text is
@@ -436,12 +435,12 @@ function untitleIn(root){
   root.querySelectorAll("[title]").forEach(el => { if (!(el instanceof SVGElement)) untitle(el); });
 }
 
-// A ? and its words in a tooltip beside it (the operator, 26 Oct, where on
+// A ? and its words in a tooltip beside it (where on
 // 11 Oct they were a line on the page: a tooltip then was clipped by the
 // pane it sat in and a phone never showed one). Fixed to the window, so no
 // pane clips it, under the ? or above it near the screen's foot, inside the
 // screen's edges; a press on the ? (a tap on a phone) opens and shuts it,
-// never a hover (the operator, 26 Oct: a press works on a phone too), and a
+// never a hover (a press works on a phone too), and a
 // press elsewhere, Escape or a scroll shuts it. One at a time.
 let helpAt = null;
 function helpShow(h){
@@ -492,15 +491,15 @@ function openMenu(){
 let menuTimer = null;
 // Whether `root` must be left alone for now; with no root, whether anything
 // must. Saying yes is also a promise to come back, which is the timer.
-// ...and an action bar's More menu (R210) holds a redraw the same way: a
+// ...and an action bar's More menu holds a redraw the same way: a
 // repaint while it is open drew the row again with the menu shut, under
 // the finger that had just opened it.
 function openPopup(){
   return openMenu() || document.querySelector(".actmenu:not([hidden])");
 }
 // ...and so does a box being answered on a card's back (askInline, a pop-out):
-// it is not in the markup, so a redraw took it and what was typed (the operator,
-// 2 Nov: every rename on a card's back was thrown out by a poll).
+// it is not in the markup, so a redraw took it and what was typed
+// (every rename on a card's back was thrown out by a poll).
 function cardBox(root){ return root.querySelector(".pcback .askline, .pcpop"); }
 function menuHolds(root){
   const m = openPopup();
@@ -559,8 +558,8 @@ function renderGuarded(spec, i, t){
   }
 }
 
-// A box being typed in keeps the caret across its page's redraw (B156,
-// B158): the page writes the box again with what was typed (each page keeps
+// A box being typed in keeps the caret across its page's redraw:
+// the page writes the box again with what was typed (each page keeps
 // its fields' values), but the focus stayed on the box the redraw threw
 // away, so the next keys went nowhere, and a paste landing in that moment
 // was lost. Found by id, so only a box the page names; given back only when
@@ -632,15 +631,15 @@ function openTab(spec){
   // had just opened.
   if (agentOfArg(t.arg) && t.boot === undefined)
     t.boot = bootFor(t.arg);
-  // A terminal goes to the dock and anything else is the page on show
-  // (R218 step 4): there is no strip and no second pane to choose.
+  // A terminal goes to the dock and anything else is the page on show:
+  // there is no strip and no second pane to choose.
   dockPlace(t);
   show(t);
 }
 
 // Each terminal tab is a full xterm.js over its own websocket. Past a point the page stops being usable and the container is
 // carrying sessions nobody is reading, so refuse rather than degrade.
-// Only terminals count (R78): a document tab is a draw from state and costs
+// Only terminals count: a document tab is a draw from state and costs
 // nothing to keep, so a Nodes tab beside twelve shells was never the load
 // the cap is about. The count is this account's own strip, which is what
 // `tabs` is: the layout is kept per account on the server.
@@ -667,7 +666,7 @@ function show(t){
   // was not the one its pane showed, and running it here as well opened
   // every tab twice: two node listings, two phone probes, and with the
   // Docker manager's own load behind them, three listings of one daemon
-  // for one press, each one a set of reads on the node (B210).
+  // for one press, each one a set of reads on the node.
   if (!openedNow.has(t.id)) TABKINDS[t.kind]?.open?.();
   // Only when it is a different project's: switching back to a notebook must
   // not reload it, or whatever is staged in it goes.
@@ -728,7 +727,7 @@ function dropTab(id){
   render();
 }
 
-// ---- a terminal in its own window (R8) ------------------------------------
+// ---- a terminal in its own window ------------------------------------
 
 // tmux attaches many clients to one session by design; what it does not do
 // is size a session for two of them, so the tab here must not stay a live

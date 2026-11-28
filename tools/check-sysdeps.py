@@ -163,7 +163,7 @@ def index(manager, urls, fresh):
 
 
 # The provisioner family each package manager is the column of, in the
-# controller's own package list (config/controller-packages.tsv, R90).
+# controller's own package list (config/controller-packages.tsv).
 FAMILY_OF = {"apt": "deb", "dnf": "rhel", "pacman": "arch", "zypper": "suse", "apk": "alpine"}
 
 
@@ -232,7 +232,7 @@ def main(argv):
 
 def main_controller(fresh):
     """`--controller`: the controller's own list, per family column, against
-    the same indexes (R90 step 2)."""
+    the same indexes."""
     lists, bad = controller_lists(), 0
     for manager, releases in RELEASES.items():
         entries = lists.get(manager) or []

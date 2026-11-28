@@ -1,5 +1,5 @@
 """The audit's digest of a mutation's parameters is keyed by the install's
-own key (B726): a plain sha256 of a body holding one short secret could be
+own key: a plain sha256 of a body holding one short secret could be
 guessed offline by anyone reading the audit; keyed, the same parameters
 still read as the same digest on this install."""
 import hashlib

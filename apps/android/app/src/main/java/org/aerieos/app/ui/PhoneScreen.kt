@@ -1,4 +1,4 @@
-// This phone (R114): connecting it to a node and lending it to a project,
+// This phone: connecting it to a node and lending it to a project,
 // from the phone, in place of typing its address, port and code into the
 // dashboard's Phone tab. PhonePair.kt does the finding and the pairing; this
 // is the screen that walks a person through it and shows where it stands.

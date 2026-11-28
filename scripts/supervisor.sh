@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
 # PID 1 payload (running as `builder`), or a bare-metal install's main
-# process under systemd (running as its account, R90): the same loop either
+# process under systemd (running as its account): the same loop either
 # way, since a `systemctl stop` is the SIGTERM a `docker stop` is.
 #
 # Keeps the container alive and owns the graceful shutdown below. Neither CI
 # nor a Claude session runs here any more: every runner is on a node
-# (docs/nodes.md phase 7) and so is every session (R47), and the emulator left
+# (docs/nodes.md phase 7) and so is every session, and the emulator left
 # with them (ccce6ee). So what a stop has to be careful with is the terminals,
 # and nothing here is slow.
 #
@@ -42,7 +42,7 @@ set -euo pipefail
 # container; recreating its terminal would produce a new session wearing the old
 # one's name, which is exactly the confusion the tab pruning already avoids.
 SESSION_DIR="${DASHBOARD_STATE:-/config}/sessions"
-# A constant, not a setting (roadmap R29): nobody had a reason to change it,
+# A constant, not a setting: nobody had a reason to change it,
 # and a variable that nobody changes is five places to keep in step.
 SESSION_LINES=2000
 
@@ -79,7 +79,7 @@ shutdown() {
     # A few seconds, and only for the dashboard: it writes its state on the
     # way out. There is nothing else slow here. This used to wait up to 90s
     # for an emulator to power off, and the emulator left the controller in
-    # ccce6ee, so the wait was for a process that cannot be running (B177).
+    # ccce6ee, so the wait was for a process that cannot be running.
     local t0 waited grace=5
     t0=$(date +%s)
     log "shutdown: stopping cleanly"
@@ -112,7 +112,7 @@ trap shutdown TERM INT
 # and docker matches names case-sensitively. Such a host exports HOST_CONTAINERNAME;
 # fall back to the hostname elsewhere.
 CONTAINER_NAME="${HOST_CONTAINERNAME:-${HOSTNAME:-}}"
-# ...and on a controller installed bare metal (R90) there is no container to
+# ...and on a controller installed bare metal there is no container to
 # exec into: the installer's bb on the PATH runs as the controller's account,
 # with its env file, for anybody who may sudo.
 if [ "${BB_INSTALL:-}" = bare-metal ]; then
@@ -135,7 +135,7 @@ $(find "$WORKSPACE" -maxdepth 1 -mindepth 1 -type d -printf '      %p\n' 2>/dev/
 EOF
 
 # Stay in the foreground and watch the dashboard: nothing restarted it when it
-# died, and the container read healthy as long as this loop ran (B282). It is
+# died, and the container read healthy as long as this loop ran. It is
 # started again through its own hook, which starts only what is not listening,
 # at most five times an hour: a server that cannot start is said once in the
 # log rather than retried forever. The sleep is a background job waited on, so

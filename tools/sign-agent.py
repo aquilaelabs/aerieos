@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Sign what a build sends its nodes with AerieOS's release key (R227 step 1,
-R267 step 6).
+"""Sign what a build sends its nodes with AerieOS's release key.
 
 A node that pinned the release key takes an agent update only when a
 signature under it covers the update's digest, and the bundle it fetches
@@ -119,7 +118,7 @@ def _pub():
 
 def public_keys():
     """The keys the committed file names: the one the builds sign with, then
-    its spare (R232). A node pins both, so a build signed by either is taken."""
+    its spare. A node pins both, so a build signed by either is taken."""
     return _pub()[0]
 
 

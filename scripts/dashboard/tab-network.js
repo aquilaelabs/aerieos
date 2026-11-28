@@ -1,14 +1,14 @@
 "use strict";
-// The Network page (R165 step 4, the Controller group): how this controller
+// The Network page (the Controller group): how this controller
 // is reached, in every edition: the address the page is at and its port,
 // what it is served over (the Connection group, with its certificate and
 // Let's Encrypt), the addresses the nodes dial in from, and Reach from
 // outside (the home tunnel), the last two groups moved here out of
-// Controller settings (the operator, 22 Oct). The groups are Settings'
+// Controller settings. The groups are Settings'
 // own builders (tab-settings.js settingsSections), drawn here under this
 // page's own list, so a field saves the way it always did. The machine's
 // own ports, a bridge, bonds and VLANs are the installed edition's half,
-// on This machine's Network section. Chrome from docSurface(); the hard
+// on This machine's Network section. Chrome from docSurface; the hard
 // rules are uniform.mjs's.
 
 const NETWORK_GROUPS = ["connection", "tunnel"];

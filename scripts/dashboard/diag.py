@@ -240,7 +240,7 @@ def errors(n=40, scan=4000):
     return out[-n:]
 
 
-# The controller's own log, read whole (the operator, 24 Nov: a session
+# The controller's own log, read whole (a session
 # granted the diagnostics read every fault but not what the controller said
 # around it, so a sign-in a node reported gone could only be guessed at).
 # One stream of one start: the dashboard's own output in full, the boot log
@@ -287,8 +287,8 @@ def reports_now(n=40):
     first, when each was made. Their
     words were redacted when they were stored. One that carries its
     reporter's conversation names the file it is in, which the downloaded
-    diagnostics carry beside this report rather than inside it (the
-    operator, 2 Oct: a conversation is often megabytes)."""
+    diagnostics carry beside this report rather than inside it
+    (a conversation is often megabytes)."""
     return [r | {"when": _ago(r.get("at"))}
             | ({"conversation": r["conversation"] | {"file": f"conversations/report-{r['id']}.txt"}}
                if r.get("conversation") else {})

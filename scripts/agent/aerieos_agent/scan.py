@@ -1,4 +1,4 @@
-"""A scan job (R145): the node's own scanners over the projects whose node
+"""A scan job: the node's own scanners over the projects whose node
 this is, each SARIF sent up to the controller.
 
 The controller's Scanners page deployed a compose project of the three
@@ -7,7 +7,7 @@ is this job: the compose file written again beside the plan so what runs
 is what the page says, each scanner run once as `compose run --rm` with
 the node's copy of every listed project mounted read-only at /src/NAME,
 and each report uploaded as `scan-put`, tagged with the projects it covers.
-Nothing of the controller's is mounted here (R163): the report goes up
+Nothing of the controller's is mounted here: the report goes up
 the agent's own API as a synced file does.
 """
 import contextlib

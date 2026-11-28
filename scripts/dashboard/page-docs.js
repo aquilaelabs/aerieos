@@ -26,16 +26,16 @@
 //
 // Returns null when the pane is gone (a tab closed under a slow fetch), so
 // callers bail with `if (!d) return;` instead of drawing into nothing.
-// The node switcher every node-scoped tab wears (R121, the operator 4 Oct):
+// The node switcher every node-scoped tab wears:
 // the same label, the same place (the bar's left, verbs at its right) and the
 // same list on Toolchains, the Emulator, the Phone and the CI runner. A node
 // that cannot be picked for this tab says why in its option, and a quiet one
 // says so. `why(n)` is "" for one that can. `stated`: the page says the
 // node's state beside the picker (a group header's pill), so the node on
 // show is its name alone there, where "draconis (qui..." was cut off beside
-// a pill already saying NOT ANSWERING (the operator, 18 Nov); the others in
+// a pill already saying NOT ANSWERING; the others in
 // the list still say so, which is where it helps the choice.
-// `nodes` null is the page's placeholder (R218, the operator 18 Oct: a
+// `nodes` null is the page's placeholder (a
 // placeholder drawn by the page's own code, so it cannot drift from it):
 // the same label and word, the picker's box shimmering.
 function nodePick(id, nodes, cur, why = () => "", {stated = false} = {}){
@@ -48,8 +48,8 @@ function nodePick(id, nodes, cur, why = () => "", {stated = false} = {}){
   }).join("")}</select></label>`;
 }
 
-// What a list, a grid or a page is waiting with (R218 step 15, the operator
-// 16 Oct): shapes laid out the way its content will land, shimmering, where
+// What a list, a grid or a page is waiting with:
+// shapes laid out the way its content will land, shimmering, where
 // a "loading…" line said the same in words. Still a .loading, so everything
 // that knew a placeholder knows this one: a draw fades in what replaces it,
 // the poll's failure notice writes its words over it, a suite waits for it
@@ -78,13 +78,13 @@ function skel(shape = "rows", n = 0, said = "loading…"){
   return `<${tag} class="loading skel sk-${esc(shape)}"><span class="sk-said">${esc(said)}</span>${inner()}</${tag}>`;
 }
 
-// ...and a page that knows its own shape better than that (R218 step 16, the
-// operator 16 Oct): what never changes on it (its headings, a tile's label,
+// ...and a page that knows its own shape better than that:
+// what never changes on it (its headings, a tile's label,
 // a table's head, a form's labels) drawn for real, and only the values on
-// their way shimmering. skTpl() keeps it a .loading, with the word for a
-// screen reader; skv() is one value inline, as wide as a typical one in em
+// their way shimmering. skTpl keeps it a .loading, with the word for a
+// screen reader; skv is one value inline, as wide as a typical one in em
 // ("ctl" for a field's control, the height of one);
-// skRows() rows inside a real section or card.
+// skRows rows inside a real section or card.
 function skv(em = 5, cls = ""){ return `<i class="skv${cls ? " " + esc(cls) : ""}" data-style="width:${Number(em) || 5}em"></i>`; }
 // A question asked in a box under a row (consistency pass J3: a bug's
 // close or delete, a roadmap item's drop): the question and what follows
@@ -116,22 +116,22 @@ function dropBox(at, {q, sub = "", placeholder = "", max = 1000, verb, tone = "p
 
 // A running job's Abort, the same on every page that has one (consistency
 // pass J11): while its stop is on the way it is dead and wears the ring in
-// its word's place, its size kept, saying Stopping to a screen reader (the
-// operator, 22 Nov: a word that changed grew the button). `attrs` is the
+// its word's place, its size kept, saying Stopping to a screen reader
+// (a word that changed grew the button). `attrs` is the
 // page's own data key, `title` what stopping keeps.
 function abortBtn(attrs, aborting, title = ""){
   return `<button type="button" ${attrs}${title ? ` title="${esc(title)}"` : ""}${runAttr(aborting, "Stopping")}>Abort</button>`;
 }
 // A press the server queued behind what is running, said one way on every
-// page (the operator, 22 Nov: a press that can be queued says so): `what`
+// page (a press that can be queued says so): `what`
 // the press set going, `behind` what it waits for.
 function queuedSaid(what, behind){
   return `${what}: queued behind ${behind}, and starts once that has ended`;
 }
-// A button whose work runs, drawn so (the operator, 22 Nov: a running word
+// A button whose work runs, drawn so (a running word
 // grew its button): its own word kept, so its size is, dead, the ring in
 // the word's place, and `saying` (Installing, Checking for updates) what a
-// screen reader hears of it while it runs. drawn() applies it (runShow).
+// screen reader hears of it while it runs. drawn applies it (runShow).
 // "" where nothing runs, for a button drawn the same way either way.
 function runAttr(running, saying){
   return running ? ` disabled data-running="${esc(saying)}"` : "";
@@ -156,8 +156,8 @@ function skTpl(html, {said = "loading…", live = false} = {}){
 // A placeholder's sections open as the page will open them once it is drawn
 // (oneOpen): at a desk every section of the page stands open, a fold on
 // purpose shut as given; on a phone one does, the one this visit of the page
-// last opened, else the first that is not a fold on purpose (the operator,
-// 24 Nov: a phone's placeholder stood every section open, and all but one
+// last opened, else the first that is not a fold on purpose
+// (a phone's placeholder stood every section open, and all but one
 // folded away as the page came).
 function skOpen(html){
   if (!html.includes("<details")) return html;
@@ -177,7 +177,7 @@ function skOpen(html){
   return t.innerHTML;
 }
 
-// A bar button's words at both widths (the operator, 18 Oct: the node
+// A bar button's words at both widths (the node
 // picker and a page's buttons on one line on a phone). On a phone the short
 // form shows; where it is the start of the long one the rest is a span a
 // phone hides, so the button's text is still the whole label everywhere.
@@ -186,8 +186,8 @@ function barSaid(full, short){
     : `<span class="lng">${esc(full)}</span><span class="shrt">${esc(short)}</span>`;
 }
 // ---- the first paint, shaped like the page the address names ----------------
-// What a reload shows until the first snapshot lands (the operator, 17 Oct:
-// a refresh on Projects showed full-width rows, no rail and no bar). The
+// What a reload shows until the first snapshot lands
+// (a refresh on Projects showed full-width rows, no rail and no bar). The
 // rail's groups, inert until drawRail replaces them; the pane's bar as the
 // page will wear it (its group's tools, or a project's header and its view
 // strip); and the page's own shape in a document's frame. Its own class
@@ -217,7 +217,7 @@ function bootPage(hash){
       ${bootView(view) || `<div class="nbview"><div class="field">${skRows(5)}</div></div>`}</div></div>`;
     return {rail: key, bar: `<div class="bar proj">${bar}</div>`, body: `<div class="skstack">${body}</div>`};
   }
-  // A group's header over its sub-nav (R177, R178): the picker's
+  // A group's header over its sub-nav: the picker's
   // placeholder, the state pill's shimmer, the Machines group's two
   // actions dead.
   bar = ["machines", "build", "containers"].includes(key)
@@ -237,12 +237,12 @@ function bootPage(hash){
       <span class="actbar"><button type="button" class="ic" disabled>${BIN}</button><button type="button" class="primary" disabled>New space</button></span>`,
       `<div class="field pgridband"><div class="pgrid">${Array.from({length: 6}, (_, j) => skProjectCard(j)).join("")}</div></div>`);
   // The rest: their rows in a floating card, as the pages draw them at a
-  // desk (their exact first paints are R218's templates step).
+  // desk.
   else body = doc("", `<div class="field"><div class="sk-card skrows">${skRows(6)}</div></div>`);
   return {rail: key, bar, body: `<div class="skstack">${body}</div>`, tool};
 }
 
-// A project's card on its way, in the card's own parts (R138, R141): its
+// A project's card on its way, in the card's own parts: its
 // name, its id and node, a repository or two by name and branch, and its
 // actions at the foot as the card draws them, dead until it lands.
 function skProjectCard(j = 0){
@@ -255,7 +255,7 @@ function skProjectCard(j = 0){
 }
 
 // A notebook view at the first paint is its own markup from the notebook's
-// template, its shapes in it as a press shows them (B865: a reload on the
+// template, its shapes in it as a press shows them (a reload on the
 // Roadmap drew five plain rows, then the view's head and list): inert, and
 // without its ids, which belong to the notebook the page builds. A view
 // whose markup is drawn by its loader (Settings) keeps the rows.
@@ -274,8 +274,8 @@ function bootView(view){
 
 // ...and in it, the page's own placeholder where it has one: the page drawn
 // by its own render into the boot's frame (doc "boot") with nothing loaded
-// yet, which is what a page opened by a press shows while it waits (the
-// operator, 18 Oct: a reload showed a placeholder of its own and then the
+// yet, which is what a page opened by a press shows while it waits
+// (a reload showed a placeholder of its own and then the
 // page's). A page that cannot draw before the first status read keeps the
 // boot's shape.
 function bootOwn(root, tool){
@@ -357,7 +357,7 @@ function optionList(items, cur){
     return `<option value="${esc(v)}"${String(v) === String(cur ?? "") ? " selected" : ""}>${esc(l)}</option>`;
   }).join("");
 }
-// A word the page needs, asked in a box in the row (R256 step 4) where
+// A word the page needs, asked in a box in the row where
 // window.prompt was: its label, the field, Cancel and OK, under the control
 // that asked; Enter is OK and Escape is Cancel. Resolves with what was typed,
 // trimmed, or null. One at a time: a second ask takes the first one's place,
@@ -376,10 +376,10 @@ function askInline(after, {label, value = "", ok = "OK", options = [], allowEmpt
     box.className = "field askline";
     // The page's own while it is open: a redraw of the surface it is in
     // (a card's back, a group's head) leaves it where it is, with what is
-    // typed in it (R244).
+    // typed in it.
     box.setAttribute("data-own", "");
     // With options, the field is one to type in and a pulldown of every
-    // option at once (the operator, 26 Oct: a datalist hinted only once
+    // option at once (a datalist hinted only once
     // something was typed): its chevron opens the whole list, typing narrows
     // it, and a press on one fills the field.
     const list = options.length ? `askopts${++seq}` : "";
@@ -431,7 +431,7 @@ function comboWire(box, inp, options){
         i === at ? ' class="on"' : ""} tabindex="-1">${esc(o)}</button>`).join("")
       : `<span class="combonone">none yet: what is typed is a new one</span>`);
     // Taken on the click, a press and its release on the one option, so a
-    // press that holds to scroll the list takes nothing (B404); the press
+    // press that holds to scroll the list takes nothing; the press
     // itself only keeps the field's focus, whose blur would shut the list.
     ul.querySelectorAll("[data-combo]").forEach(b => {
       b.onpointerdown = e => e.preventDefault();
@@ -463,12 +463,12 @@ function comboWire(box, inp, options){
   }};
 }
 
-// A pointer to another page is a link to it (R256 step 2): the address that
+// A pointer to another page is a link to it: the address that
 // page answers at, so a press goes there as the rail does and Back returns.
 const PAGE_AT = {nodes: "#/machines/nodes", installed: "#/machines/installed", storage: "#/machines/storage", docker: "#/containers", jobs: "#/jobs",
   library: "#/build/library", users: "#/people/users", roles: "#/people/roles", machine: "#/controller/machine",
   clusters: "#/machines/clusters"};
-// A page this account may not open is its words and no link (B114): the
+// A page this account may not open is its words and no link: the
 // address of one a grant forbids landed on the group's first page instead.
 function pageLink(page, words, hash = PAGE_AT[page]){
   if (!railAllows(page)) return esc(words);
@@ -485,13 +485,13 @@ function docSurface(i, kind){
   const el = $("doc" + i);
   if (!el) return null;
   if (!el.classList.contains("flush")) el.classList.add("flush");
-  // Kept when this page is already drawn here (R218 step 10): built afresh on
+  // Kept when this page is already drawn here: built afresh on
   // every draw, a page drawn by the poll was born again each time, its list
   // fading in as if it had just arrived, its scroll and whatever was under
   // the pointer lost, though nothing in it had changed. A draw that changes
-  // nothing now writes nothing: the list goes through patch(),
+  // nothing now writes nothing: the list goes through patch,
   // and the bar and the foot are patched only where what they say moved, a
-  // picker or a search in the bar kept as it is (R244).
+  // picker or a search in the bar kept as it is.
   let box = el.firstElementChild;
   if (!box || el.children.length !== 1 || !box.classList.contains("doctab") || !box.classList.contains(`${kind}tab`)
       || !box.querySelector(":scope > .doclist")){
@@ -519,9 +519,9 @@ function docSurface(i, kind){
            setFoot(html){ slot(foot, html); } };
 }
 
-// ---- a form (R301) ----------------------------------------------------------
-// Every form is this one part, as every page is docSurface (the operator, 27
-// Nov: a form's buttons touched the field above them and hung past its edge,
+// ---- a form ----------------------------------------------------------
+// Every form is this one part, as every page is docSurface
+// (a form's buttons touched the field above them and hung past its edge,
 // pointed out many times; a site builder's form block owns its own insides).
 // The part owns what a page used to arrange for itself: the fields on the
 // grid (.fgrid), their room, and the foot, 16px under the last field with the
@@ -635,14 +635,14 @@ function docSection(kind, id, title, status, body, {cls = "", open, loud = false
   const key = `${kind}:${id}`;
   const turned = loud && !sectLoud[key];
   sectLoud[key] = loud;
-  // Open unless somebody shut it, at every width (the operator, 8 Oct: too
+  // Open unless somebody shut it, at every width (too
   // much was hidden in folds).
   const isOpen = turned || (key in sectOpen ? sectOpen[key] : (open !== undefined ? open : true));
   // `prime`: the section a view is opened for (Artifacts' Files), open by
   // default beside the first on a desktop. `data-set`: its caller said open
   // or shut, which a default never overrules.
   // `cls` is the status's tone; `sectCls` the section's own (svcro: read
-  // without the grant that changes it, R277).
+  // without the grant that changes it).
   return `<details class="sect${sectCls ? " " + sectCls : ""}" data-sect="${esc(key)}"${isOpen ? " open" : ""}${turned ? " data-lead" : ""}${prime ? " data-prime" : ""}${open !== undefined ? " data-set" : ""}${fold ? " data-fold" : ""}${item ? " data-item" : ""}>
     <summary><span class="t">${esc(title)}</span>${
       status ? `<span class="sst${cls ? " " + cls : ""}">${esc(status)}</span>` : ""}</summary>
@@ -650,11 +650,11 @@ function docSection(kind, id, title, status, body, {cls = "", open, loud = false
   </details>`;
 }
 // ---- a page of settings: its sections a list beside the one picked ----
-// The operator, 16 Oct: a page that is a run of settings sections (a
+// A page that is a run of settings sections (a
 // project's Settings, Controller settings, Profile) reads as a list of them,
 // each with what is in it, beside the one picked, the Roles page's shape;
 // on a phone the list, then the section sliding in over it, its head the
-// way back (a chevron before its name; the operator, 19 Oct: a Back button
+// way back (a chevron before its name: a Back button
 // of its own was a row spent over a head that never folds), and the list
 // sliding back. `root` holds the sections (details.sect) as
 // children; `key` keeps which is picked; `says` is each section's line
@@ -703,7 +703,7 @@ function splitDraw(root){
   const st = SPLIT[o.key];
   // ...and not one with nothing in it to show: a settings group none of
   // whose fields is on show is drawn as nothing (.rngroup's own rule), and
-  // listed it opened on an empty pane (B813).
+  // listed it opened on an empty pane.
   const empty = d => d.matches(".rngroup") && !d.querySelector(RN_SHOWN);
   const all = [...root.querySelectorAll(o.sel)].filter(d => !d.classList.contains("fghost")), shown = all.filter(d => !d.hidden && !empty(d));
   // The one picked, or the first shown while it is hidden (its list being
@@ -720,7 +720,7 @@ function splitDraw(root){
     drawHTML(nav, html); nav.dataset.drawn = html;
     nav.querySelectorAll("[data-spick]").forEach(b => b.onclick = () => {
       // The section on show pressed again at a desk is no change: nothing
-      // drawn again, no fade (B317). On a phone the list stands in its place,
+      // drawn again, no fade. On a phone the list stands in its place,
       // so a press there still opens it.
       // It is still the one open, which a narrower window shows in place of
       // the list.
@@ -810,17 +810,17 @@ function sectJump(g){
   // A surface's own sections, which each have a title of their own: a fold
   // repeated once per row of a list (the Docker tab's Ports and mounts, one
   // per container) is the row's, and seventeen of them made a bar of
-  // seventeen links all called the same (the operator, 8 Oct).
-  // Sections alone (the operator, 23 Oct): a page's chips pick its groups
+  // seventeen links all called the same.
+  // Sections alone: a page's chips pick its groups
   // (the Containers page's projects), and the jump bar is for its sections.
   // A section drawn per item (`item`: a disk, a key) is picked by the page's
-  // chips instead, and is not one to jump to (the operator, 23 Oct: big
+  // chips instead, and is not one to jump to (big
   // chips for what changes, small pills for what does not).
   const titleOf = o => o.querySelector(":scope > summary .t")?.textContent || "";
   // Drawn again when one of its sections shows or goes: a section that
   // shows once its read lands (a space's People, Nodes, Discord, Running
-  // sessions) had no chip, the bar having been drawn at the door's opening
-  // (B1188). A draw that changes nothing writes nothing, so this is quiet.
+  // sessions) had no chip, the bar having been drawn at the door's opening.
+  // A draw that changes nothing writes nothing, so this is quiet.
   if (!g._jumpObs && window.MutationObserver){
     let soon = false;
     g._jumpObs = new MutationObserver(() => { if (soon) return; soon = true;
@@ -831,10 +831,10 @@ function sectJump(g){
   all.forEach(o => { seen[titleOf(o)] = (seen[titleOf(o)] || 0) + 1; });
   const mine = all.filter(o => seen[titleOf(o)] === 1);
   const have = g.querySelector(":scope .sectjump");
-  // Two or more (the operator, 23 Oct: every page with more than one). One
+  // Two or more (every page with more than one). One
   // the page's markup drew (Settings') is hidden rather than taken out: its
   // markup still has it, and a list missing a child the markup drew reads
-  // as another writer's at the next draw, which is then written whole (R244).
+  // as another writer's at the next draw, which is then written whole.
   if (mine.length < 2){
     if (have && have.__markup && !patchOwn(have)){ if (!have.hidden) have.hidden = true; }
     else have?.remove();
@@ -842,7 +842,7 @@ function sectJump(g){
   }
   const bar = have || document.createElement("nav");
   if (bar.hidden) bar.hidden = false;
-  // The code's own, which a patched surface leaves where it is (R244).
+  // The code's own, which a patched surface leaves where it is.
   if (!have) bar.setAttribute("data-own", "");
   // In a dialog every line is a .field band (the design's dialog layout).
   // Written only where it moved: this runs after every draw, and a poll that
@@ -852,8 +852,8 @@ function sectJump(g){
   if (bar.getAttribute("aria-label") !== "sections") bar.setAttribute("aria-label", "sections");
   const html = mine.map((o, i) => `<a href="#" data-jump="${i}">${esc(titleOf(o))}</a>`).join("");
   if (bar.innerHTML !== html) drawHTML(bar, html);
-  // At the top, before the surface's first section of any kind (the
-  // operator, 25 Oct: pills at the top of a page and nowhere else); before
+  // At the top, before the surface's first section of any kind
+  // (pills at the top of a page and nowhere else); before
   // its first jump target it stood mid-page under the sections its chips
   // pick (Storage's disks).
   const top = sectsOf(g)[0] || mine[0];
@@ -867,7 +867,7 @@ function sectJump(g){
 // A section gone to from outside it (its jump bar's link, a door that names
 // it) opens as a press on its summary does: sliding, and on a phone the one
 // open before sliding shut as it opens (soleOpen); a jump only opened it, so
-// a phone stood two open (the operator, 26 Nov). Brought to the top once the
+// a phone stood two open. Brought to the top once the
 // folds have moved, since a scroll at once aimed where it stood before the
 // one above it shut.
 function sectGoTo(d, {smooth = true} = {}){
@@ -881,10 +881,10 @@ function sectGoTo(d, {smooth = true} = {}){
   else Promise.all(moving.map(a => a.finished.catch(() => {}))).then(go);
 }
 // Every section is open by default at a desk and several stand open there
-// (the operator, 8 Oct: too much was hidden in folds); a long surface has a
+// (too much was hidden in folds); a long surface has a
 // jump bar (sectJump). On a phone one section is open at a time on every
-// folded surface, as the notebook's views do: opening one shuts the others
-// (the operator, 11 Oct, R184), so the page is never a stack of open folds
+// folded surface, as the notebook's views do: opening one shuts the others,
+// so the page is never a stack of open folds
 // to scroll. Among siblings only: a section's own folds (a page's rules
 // inside Pages) take turns among themselves and never close the section
 // holding them.
@@ -892,7 +892,7 @@ const sectLast = new WeakMap();     // a group -> the key of the section last op
 // ...and the same by the group's NAME (the sections' key prefix, "nodes" for
 // nodes:health and the rest): a redraw between a press and the next draw
 // replaces the group's element, and a WeakMap keyed on the old one forgot
-// the press, so the draw opened the prime section instead (B723).
+// the press, so the draw opened the prime section instead.
 const sectLastByName = new Map();
 const sectGroupName = g => (sectsOf(g)[0]?.dataset.sect || "").split(":")[0] || "";
 function sectRemember(g, key){
@@ -906,7 +906,7 @@ function sectRecall(g){
   return have && have[0] === sectVisit ? have[1] : undefined;
 }
 // A group is a view, a tab, a fold holding folds, or a dialog box that says
-// it holds sections (`data-sects`: the project settings, the operator 7 Oct).
+// it holds sections (`data-sects`: the project settings).
 function sectGroup(d){ return d.parentElement?.closest("details.sect, .nbview, .doctab, [data-sects]") || null; }
 const sectRuled = g => !!g?.closest?.(".nb, .doctab, [data-sects]");
 // Its sections in the order drawn, those a person can see: a settings group
@@ -914,7 +914,7 @@ const sectRuled = g => !!g?.closest?.(".nb, .doctab, [data-sects]");
 const sectsOf = g => [...g.querySelectorAll("details.sect")]
   .filter(o => sectGroup(o) === g && getComputedStyle(o).display !== "none");
 // A section at a page's level on a desk: it stands open and does not fold
-// (the operator, 18 Oct: no section collapses on a desktop; on a phone they
+// (no section collapses on a desktop; on a phone they
 // take turns, one open, the page opening on its first). Not a fold on
 // purpose (data-fold), one inside a row (a container's Log) or inside
 // another section, nor a dialog's.
@@ -924,7 +924,7 @@ function sectFixed(d){
 }
 // Which visit of a page the remembered pick belongs to: a page opened anew
 // opens on its first section on a phone, a redraw within the visit keeps
-// the one somebody opened (the operator, 18 Oct: always starting with the
+// the one somebody opened (always starting with the
 // top section).
 let sectVisit = 0;
 function sectNewVisit(){ sectVisit++; }
@@ -933,7 +933,7 @@ const sectDefault = o => !(o.dataset.sect && o.dataset.sect in sectOpen) && !o.h
 // What a group remembers when a hand shut the one that stood open on a
 // phone: none, for the rest of this visit of the page. The next draw's oneOpen
 // opened the top one again with no motion, so a section shut by a press
-// sprang open a moment later (the operator, 25 Nov: smooth everywhere; R285).
+// sprang open a moment later (smooth everywhere).
 const SECT_NONE = "\u0000none";
 function soleShut(d){
   const g = sectGroup(d);
@@ -949,7 +949,7 @@ function soleOpen(d){
   // Recorded now, not when the slide ends: a repaint landing mid-slide read
   // the one sliding shut as still open and kept it over the one just opened.
   if (d.dataset.sect) sectOpen[d.dataset.sect] = true;
-  // On a phone the others shut as this one opens (R184); a desk keeps them.
+  // On a phone the others shut as this one opens; a desk keeps them.
   // Shut by the rule, not by a hand: nothing is recorded for them, so a desk
   // this page is widened to shows them open again as it always did, and the
   // press mark comes off so the toggle their slide fires records nothing.
@@ -981,7 +981,7 @@ function keepOpen(d){
 // stands open unless somebody shut it. On a phone one stands open: the one
 // last opened by a hand or a draw, else the one the view is for (prime),
 // else the first; the rest are shut without a slide, since a draw is not a
-// press (R184).
+// press.
 function oneOpen(g){
   if (!sectRuled(g)) return;
   const mine = sectsOf(g);
@@ -1005,8 +1005,8 @@ function oneOpen(g){
 }
 // A button that is doing something says so until the repaint replaces it:
 // grayed, and wearing the verb with an animated ellipsis. Pair with
-// pressing(): that disables for the round trip, this says what for.
-// An action bar's More (R210): the primary verbs stay on the bar and the
+// pressing: that disables for the round trip, this says what for.
+// An action bar's More: the primary verbs stay on the bar and the
 // rest go behind one button, whose menu opens under it. `items` are the
 // bar's own button strings in their order, destructive last; an empty one is
 // skipped, a single leftover is drawn inline (a menu of one is a detour),
@@ -1014,12 +1014,12 @@ function oneOpen(g){
 // table's buttons column, whose width is the ⋯'s whatever the row offers.
 // `face` names another press for it where the verbs are of one kind (a +
 // for what makes something new), and `dead` draws it so when they all are.
-// wireMore() wires the button; the page's one click listener (page-boot.js)
+// wireMore wires the button; the page's one click listener (page-boot.js)
 // shuts every open menu.
 function actMore(items, always = false, {glyph = DOTS, said = "More", title = "the rest of what can be done to it", dead = false} = {}){
   const have = items.filter(Boolean);
   if (have.length < (always ? 1 : 2)) return have.join("");
-  // ⋯, as a project's header has it (the operator, 17 Oct): the rest of a
+  // ⋯, as a project's header has it: the rest of a
   // row's verbs behind one small press, named for a screen reader.
   return `<span class="more"><button type="button" class="moreb" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(said)}"
       title="${esc(title)}"${dead ? " disabled" : ""}>${glyph}</button>
@@ -1033,8 +1033,8 @@ function wireMore(root){
     if (open){ m.hidden = false; b.setAttribute("aria-expanded", "true"); floatAt(m, b); }
   });
 }
-// A menu over the page, never inside what holds its button (the operator,
-// 18 Oct: a card's ⋯ in Archived was cut off at the fold's foot): at a desk
+// A menu over the page, never inside what holds its button
+// (a card's ⋯ in Archived was cut off at the fold's foot): at a desk
 // under its button and lined up with it, above it when it would pass
 // the screen's foot, at every width: the page's menus. Fixed to the screen, measured
 // against whatever box holds it as its frame (a scheme's glass makes one),
@@ -1087,11 +1087,11 @@ function floatPlace(m, anchor){
   const head = document.querySelector("body > header")?.getBoundingClientRect();
   const area = anchor?.closest?.(".doc")?.getBoundingClientRect();
   const ceil = Math.max(head?.height ? head.bottom : 0, area?.height ? area.top : 0);
-  // At its button on a phone too (the operator, 18 Oct: a bottom sheet was
+  // At its button on a phone too (a bottom sheet was
   // the bottom bar's More's, not a menu's), as wide as the screen allows.
   // A button under the dock or over the page's bar (the row scrolled past
   // the pane's edge) is brought into the pane first, or the menu was a
-  // 40px strip with its items out of reach (B419).
+  // 40px strip with its items out of reach.
   let a = anchor.getBoundingClientRect();
   if (a.bottom > foot || a.top < ceil){
     anchor.scrollIntoView({block: "center", inline: "nearest"});
@@ -1111,7 +1111,7 @@ function floatPlace(m, anchor){
   const left = Math.max(8, Math.min((a.left + a.right) / 2 < innerWidth / 2 ? a.left : a.right - w, innerWidth - w - 8));
   const top = up ? Math.max(ceil + 8, aTop - 4 - Math.min(h, room)) : aBottom + 4;
   // Its entrance moves the way it opened: up into place above its button,
-  // down into place below it (the operator, 18 Oct).
+  // down into place below it.
   m.classList.toggle("up", up);
   m.style.left = (left - o.left) + "px";
   m.style.top = (top - o.top) + "px";
@@ -1132,8 +1132,8 @@ function floatFollow(){
     floatPlace(m, a);
   });
 }
-// A press on a card that opens its project's page (the operator, 18 Oct:
-// the whole card, not only its name): anywhere but one of its controls,
+// A press on a card that opens its project's page
+// (the whole card, not only its name): anywhere but one of its controls,
 // its menu, its swatches or its chooser, and not the end of selecting text.
 function cardPress(e){
   if (e.target.closest("button, a, input, select, textarea, label, .actmenu, .pcpop, .resumemenu")) return false;
@@ -1146,8 +1146,8 @@ function closeMore(){
   });
 }
 
-// A bar where the thing running reports an honest measure of its own (the
-// operator, 8 Nov: SnapRAID's percentage, an upload's bytes sent), under the
+// A bar where the thing running reports an honest measure of its own
+// (SnapRAID's percentage, an upload's bytes sent), under the
 // word that says what runs; "" for anything that reports none, since a bar
 // that guesses is a lie with a scale on it (the progress rule). `said` is
 // "45%, 120 MB/s" or a number 0..100.
@@ -1157,7 +1157,7 @@ function pctBar(said, label = "progress"){
   return `<progress class="pbar" max="100" value="${Math.max(0, Math.min(100, m))}" aria-label="${esc(label)}"></progress>`;
 }
 
-// ---- tiles, facts, tables, charts and chips (R216, R218, the 2.0 language)
+// ---- tiles, facts, tables, charts and chips (the 2.0 language)
 // Three shapes every document tab draws the same way, held by the design's
 // rules tiles, facts and chips and measured by uniform.mjs.
 
@@ -1174,11 +1174,11 @@ function segPick(ids, on){
 }
 
 
-// A page's head (the operator, 25 Oct; R274, 23 Nov): what the page is
+// A page's head: what the page is
 // about with its state as pills, then one status line of what is news
 // (statusLine), and the buttons about it on an action bar. Each part only
 // when the page has it. A fact that is not news is not in a page's head: it
-// is said beside what it describes, or not at all (the operator, 23 Nov: a
+// is said beside what it describes, or not at all (a
 // Details fold was one more kind of heading on pages that each have their
 // own). A page about one thing (a machine, the install key, how this
 // controller is reached) says `about` and its facts are its body's grid.
@@ -1193,7 +1193,7 @@ function pageHead({title = "", pills = "", line = [], facts = [], about = false,
     actions ? `<div class="actbar">${actions}</div>` : ""}</div>`;
 }
 
-// A page's status line (R274, the operator 23 Nov: the tiles and the facts
+// A page's status line (the tiles and the facts
 // made pages busier than they are): what the page is about now, as short
 // phrases on one line joined by a dot, quiet but for a phrase that wants
 // doing, which wears --warn or --bad. A part is {text} or {value, label,
@@ -1210,8 +1210,8 @@ function statusLine(parts, bare = false){
   const line = `<div class="pgline">${ps.map(one).join('<span class="sep" aria-hidden="true"> · </span>')}</div>`;
   return bare ? line : `<div class="field">${line}</div>`;
 }
-// What a surface's numbers were, a row of tiles, are its status line now
-// (R274): each tile a phrase, its number first and what it counts after it.
+// What a surface's numbers were, a row of tiles, are its status line now:
+// each tile a phrase, its number first and what it counts after it.
 // Kept by its name for the pages and the notebook's glance that call it; a
 // tile flagged `omit`, a number that is always the same, is still left out.
 function statTiles(tiles){
@@ -1220,7 +1220,7 @@ function statTiles(tiles){
 // What a placeholder passes where a value will go (statTiles, a page's own
 // builders): drawn as a shimmer in the real markup.
 const GHOST = Object.freeze({ghost: true});
-// A notebook view's glance (R109, the a-notebook/views rule): the band under
+// A notebook view's glance (the a-notebook/views rule): the band under
 // its control row, in the Containers page's order: the numbers the view is
 // about as tiles, then its status line, words alone (`said`, markup) with the
 // buttons those words are about at its right. Painted only when it changed,
@@ -1232,7 +1232,7 @@ const GHOST = Object.freeze({ghost: true});
 // projects, each settles as the last one did), else what its markup
 // declares on its .nbglance (data-tiles, data-said) for a first open. The
 // markup is the one place a view's waiting shape is written, so it cannot
-// drift from a view's own code (the operator, 22 Oct); templates.mjs holds
+// drift from a view's own code; templates.mjs holds
 // both. A glance a view has drawn for real, empty included, is never
 // overdrawn: an empty roadmap kept placeholder tiles over its empty state.
 const glanceSeen = {};
@@ -1246,7 +1246,7 @@ function glanceWaiting(el){
   // where it has one, as viewGlance does, so the row's buttons wait beside
   // the words under the tiles. With the slot empty a row of a button or two
   // shares the tiles' line, and the buttons rode up beside the tiles while
-  // the view waited, dropping under them as it landed (the operator, 18 Nov).
+  // the view waited, dropping under them as it landed.
   const slot = el.closest(".nbview")?.querySelector(":scope > .nbhead > .nbsaidslot");
   if (slot){
     const wrote = patch(el, tiles);
@@ -1254,8 +1254,8 @@ function glanceWaiting(el){
   }
   return patch(el, tiles + (said ? viewSaid(skel("word")) : ""));
 }
-// What a view has to say beside its tiles, in the notice voice (the operator,
-// 25 Oct: no loose words at a page's top): an error in red, a warning in
+// What a view has to say beside its tiles, in the notice voice
+// (no loose words at a page's top): an error in red, a warning in
 // gold, a state in the note's color, its buttons on the notice's own bar. A
 // bare .notice is gold, so a state passed with no tone is a note: the
 // Artifacts view's "the code base as a zip" read as a warning.
@@ -1268,8 +1268,8 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
   if (!el) return false;
   const html = Array.isArray(tiles) ? statTiles(tiles) : tiles || "";
   // A view whose control row holds only buttons keeps its status line on
-  // that row, the words at its left and the buttons at its right (the
-  // operator, 29 Oct: a button never on a line of its own), in the row's
+  // that row, the words at its left and the buttons at its right
+  // (a button never on a line of its own), in the row's
   // own slot, which this paints and nothing else does.
   const slot = el.closest(".nbview")?.querySelector(":scope > .nbhead > .nbsaidslot");
   let wrote;
@@ -1286,7 +1286,7 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
 // with the error's words, in red.
 function glanceBad(el, what, err){ return viewGlance(el, [], esc(what + ": " + err), "", "bad"); }
 
-// What a card's settings are, read (the operator's concept, 17 Oct): one
+// What a card's settings are, read: one
 // wrapping line of pills, each its label in the quiet voice and its value,
 // a pill with no label a state on its own (Starts on boot).
 function factPills(pairs, cls = ""){
@@ -1309,7 +1309,7 @@ function factGrid(pairs, cls = ""){
       v === GHOST ? skv(8) : opt && opt.html ? v : esc(String(v))}</dd></div>`).join("")}</dl>`;
 }
 
-// ---- tables (R218 step 8, the design's tables rule) -----------------------
+// ---- tables (the design's tables rule) -----------------------
 // A list whose rows are all the same shape is a table: a header line naming
 // the columns over rows whose first line holds the same columns, so a value
 // is found by looking down a column rather than by reading every row. Each
@@ -1325,14 +1325,14 @@ function tblTracks(cols){
   return cols.map(c => c.w || "minmax(0,1fr)").join(" ");
 }
 // The table around its rows, the header line first.
-// Cards or a list, as their pictures at every width (the operator, 18 Oct on
-// a phone, 26 Oct at a desk): four tiles, and lines; the word is the
+// Cards or a list, as their pictures at every width:
+// four tiles, and lines; the word is the
 // button's name and its title says what each shows. `attr` is the data-
 // attribute the page's wiring reads (data-dmview, data-vmview).
 const VIEW_ICON_CARDS = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
 const VIEW_ICON_LIST = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg>`;
-// A pulldown in a bar or a row is as wide as its longest answer (the
-// operator, 18 Nov; page-overrides.css keeps it from stretching). A base
+// A pulldown in a bar or a row is as wide as its longest answer
+// (page-overrides.css keeps it from stretching). A base
 // select (page-skin.css) is as wide as the answer chosen, so the width is
 // set here from what it measures: itself with its longest answer chosen
 // and nothing sizing it, then put back as it was, its choice and its style.
@@ -1345,8 +1345,8 @@ let pickFitDue = 0;
 let pickInk = null;
 // A group header's node picker is as wide as the name it shows, measured
 // here in every browser: left to size itself it was cut short with room
-// beside it (bb-sand… on a phone in Firefox, the operator, 19 Nov; in
-// WebKit too, B1018), each engine keeping a different room for the closed
+// beside it (bb-sand… on a phone in Firefox; in
+// WebKit too), each engine keeping a different room for the closed
 // picker's arrow at the header's larger face. The name's ink, its own
 // padding, and room for the arrow whatever draws it; the header's own
 // max-width still lets it give way to the pill beside it.
@@ -1416,7 +1416,7 @@ function tblLine(cols, cells, tag = "div", cls = "", attrs = ""){
     c.num ? " num" : ""}${c.act ? " act" : ""}"${i && !c.act && c.label ? ` data-th="${esc(c.label)}"` : ""}>${cells[i] ?? ""}</span>`).join("")}</${tag}>`;
 }
 
-// ---- charts (R218 step 9, the design's charts rule) -----------------------
+// ---- charts (the design's charts rule) -----------------------
 // Where a number moves: an hour's line chart on a node's page and a
 // sparkline beside a running container's number, drawn inline with no
 // library. One series to a chart, so no legend: the caption names it. The
@@ -1443,7 +1443,7 @@ function sparkSvg(vals, max = 100, label = ""){
 // said, `max` the scale's top. Its id keeps the crosshair where it was
 // across the redraw a new sample brings.
 const CHART_SPAN = 3600;
-// A longer span (R164 step 4, This machine's Reporting): the same chart
+// A longer span (This machine's Reporting): the same chart
 // over six hours, a day, a week or a month, its axis and caption words
 // for the span, the hour's chart unchanged.
 const CHART_SPANS = {"6h": [6 * 3600, "the last six hours", ["6 h ago", "3 h", "now"]], day: [86400, "the last day", ["a day ago", "12 h", "now"]],
@@ -1460,7 +1460,7 @@ function hourChart(id, title, pts, fmt = v => `${Math.round(v)}%`, max = 100, sp
   // a slope. Measured against the slow end of its spacing, not the middle:
   // a busy node reports in bursts seconds apart and an idle one at the
   // poll, so three of the median broke every idle stretch, which is where
-  // the load sits low, into dots (the operator, 16 Oct).
+  // the load sits low, into dots.
   const gaps = p.slice(1).map((x, i) => x[0] - p[i][0]).sort((a, b) => a - b);
   const slow = gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * 0.9))] : 60;
   const runs = [[p[0]]];
@@ -1555,8 +1555,8 @@ function saveVerbs({save, revert, dead = false}){
 // (consistency batch J: nine foots put the action before Cancel, two
 // without type="button"). `cancel` is the Cancel or Done button, `acts`
 // what follows it, the filled one last, and `lead` what sits at the left.
-// A dialog that switches between panes keeps one size whichever is on show
-// (the operator, 26 Oct): each pane is drawn in turn before a frame is
+// A dialog that switches between panes keeps one size whichever is on show:
+// each pane is drawn in turn before a frame is
 // painted, and the box is held at the tallest, never past its own
 // max-height; what fills in later (a node list, a file read) scrolls inside
 // it rather than growing it. On a phone the box is the whole screen on
@@ -1574,7 +1574,7 @@ function holdPanes(box, keys, show, cur){
   box.style.boxSizing = "border-box";
   box.style.height = held + "px";
   // ...its buttons at the held box's foot, as on a phone, rather than under
-  // a shorter pane with the rest of the height empty below them (R273).
+  // a shorter pane with the rest of the height empty below them.
   box.classList.add("held");
   return held;
 }
@@ -1618,7 +1618,7 @@ function chipBar(groups, on, attr, all){
   return chips ? `<div class="field"><div class="chips" data-chips="${esc(attr)}">${chips}</div></div>` : "";
 }
 // A row of chips keeps where it was scrolled across the redraws a press or
-// a poll brings (the operator, 22 Oct: pressing a chip far along the row
+// a poll brings (pressing a chip far along the row
 // sent it back to its start): its scroll kept by the row's attribute as it
 // moves, and put back on the row drawn in its place.
 const chipScroll = {};
@@ -1627,7 +1627,7 @@ function chipsScrolled(e){
   if (c?.matches?.(".chips[data-chips]")) chipScroll[c.dataset.chips] = c.scrollLeft;
   if (c?.matches?.(".chips, .hscroll")) chipsEdge(c);
 }
-// Which ends of a row of chips have more past them (the operator, 23 Oct: on
+// Which ends of a row of chips have more past them (on
 // a desk a row that ran off the edge had no way along but a trackpad): .chl
 // and .chr, which draw the arrow at that end and fade it.
 function chipsEdge(c){
@@ -1636,7 +1636,7 @@ function chipsEdge(c){
   c.classList.toggle("chr", max > 1 && c.scrollLeft < max - 1);
 }
 function chipsEdges(root = document){
-  // ...and a row of sub-tabs that may run off its edge (the operator, 29 Oct).
+  // ...and a row of sub-tabs that may run off its edge.
   root.querySelectorAll?.(".chips, .hscroll").forEach(chipsEdge);
 }
 // A press on an end's arrow moves the row most of its width that way. The
@@ -1693,13 +1693,13 @@ function chipsBack(root){
     }
   }
 }
-// Chips by release (the operator, 21 Oct: the Roadmap's by an item's target,
+// Chips by release (the Roadmap's by an item's target,
 // Bugs' by the version a report was seen in): [{key, label, count}], one per
 // X.Y.Z that verOf gives, oldest first, then `none` with what has none.
 const relOf = v => (String(v || "").match(/^v?(\d+\.\d+\.\d+)/) || [])[1] || "";
 function versionChips(rows, verOf, none){
   const n = new Map();
-  // `verOf` may give several (an item and its steps' own, R108): the row
+  // `verOf` may give several (an item and its steps' own): the row
   // counts once under each.
   for (const r of rows)
     for (const k of new Set([].concat(verOf(r)).map(v => relOf(v) || "none"))) n.set(k, (n.get(k) || 0) + 1);
@@ -1712,7 +1712,7 @@ function versionChips(rows, verOf, none){
 // Whether a row is under the release chip in force ("" is All).
 const inRelease = (v, on) => !on || (on === "none" ? !relOf(v) : relOf(v) === on);
 // The chips alone, for a band that holds more than them (a list's search
-// beside them, R254 step 1): "" when fewer than two groups have anything,
+// beside them): "" when fewer than two groups have anything,
 // but for one that holds less than the whole, which narrows all the same.
 // `all` is All's count where the groups overlap (a branch both Active and
 // Yours), the groups' sum otherwise. `allWord` names the first chip where a
@@ -1744,7 +1744,7 @@ function chipBand(box, html, attr, scope, items, pick){
   return drew;
 }
 // Whether a row answers a list's search: its number, with its letter or
-// bare (B12, R12 or 12), or any of its words, case aside. An empty search
+// bare (R12 or 12), or any of its words, case aside. An empty search
 // is all. `q` comes trimmed and in lower case, `prefix` is the letter in
 // lower case, and `words` gives the row's words only when a search asks.
 function idOrWords(prefix, id, words, q){

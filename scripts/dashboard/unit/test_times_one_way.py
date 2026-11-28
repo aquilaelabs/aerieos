@@ -1,6 +1,6 @@
 """Every time the page shows goes through fmtTime (page-state.js), so a
-person's own time zone, or the one their browser picked, reaches all of them
-(R294 step 8): ten places formatted a date themselves and showed it in the
+person's own time zone, or the one their browser picked, reaches all of them:
+ten places formatted a date themselves and showed it in the
 device's zone whatever was picked."""
 import re
 import unittest

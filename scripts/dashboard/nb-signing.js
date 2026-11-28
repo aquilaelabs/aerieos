@@ -1,8 +1,8 @@
-// The notebook's Signing view: a project's Android keys (R106), in its Ship
-// group after VMs (R103, the operator 22 Oct: a section of Settings was not
+// The notebook's Signing view: a project's Android keys, in its Ship
+// group after VMs (a section of Settings was not
 // where somebody looking for the keys a build is signed with looked). One
 // classic script beside index.html (docs/nodes.md §13): one file per
-// notebook view (R60). A factory makeNotebook calls per notebook, drawing its
+// notebook view. A factory makeNotebook calls per notebook, drawing its
 // own markup into its own clone: nothing here is lent between two places.
 
 "use strict";
@@ -21,7 +21,7 @@ const fileB64 = f => new Promise((ok, bad) => {
   r.readAsDataURL(f);
 });
 
-// How the controller keeps a project's keys (R111 step 2), the Signing
+// How the controller keeps a project's keys, the Signing
 // view's status line: sealed under the install's key, kept open
 // for want of one, or sealed under one this controller does not have.
 const AT_REST = {
@@ -42,7 +42,7 @@ function nbSigningView({$, nb, project}){
   let nodeWhy = "";                             // what keeps the project's node from working on a key (signing.signer)
   let atRest = "";                              // sealed, open, mixed or locked (signing.at_rest)
   let draft = {}, mapDraft = {}, fresh = [], lockOpen = false, pw = {}, adding = false, gen = 0;
-  let keyPick = "";                             // the key the chips picked, "" for all (R122)
+  let keyPick = "";                             // the key the chips picked, "" for all
 
   function loadSigning(){
     return reading(`${project}:signing`, async () => {
@@ -53,7 +53,7 @@ function nbSigningView({$, nb, project}){
       }catch(e){ glanceBad($("sgHint"), "signing", e); return; }
       if (mine !== gen) return;
       if (j.error){
-        // The server's own words, where the keys would be (R255 step 4).
+        // The server's own words, where the keys would be.
         keys = null;
         viewGlance($("sgHint"), []);
         $("sgAdd").innerHTML = ""; $("sgActs").innerHTML = "";
@@ -86,12 +86,12 @@ function nbSigningView({$, nb, project}){
       : k ? `${word}: ${esc(k.alias)} <span class="dim">${esc(signFp(k.sha256))}${k.generated ? ", generated" : ""}</span>`
       : `${word}: none`;
     const never = k && !d.remove && !d.file && route === "sideload" && !k.backed_up;
-    // Rotation (R106 step 7): what this key was rotated to or from, and the
+    // Rotation: what this key was rotated to or from, and the
     // keys it could hand an app to.
     const retired = route === "sideload" && k?.retired_for, rotated = route === "sideload" && k?.rotated_from;
     const targets = !why && route === "sideload" && k && !retired ? Object.entries(keys)
       .filter(([n, s]) => n !== key && s.sideload && !s.sideload.retired_for && !s.sideload.rotated_from).map(([n]) => n) : [];
-    // What a role does not give is not drawn (the operator, 21 Oct): an
+    // What a role does not give is not drawn: an
     // account that may not change the keys reads them.
     const acts = why ? "" : `
         ${locked || d.open ? `<button type="button" class="link" data-signopen>${d.open ? "Never mind" : k ? "Replace" : "Upload one"}</button>` : ""}
@@ -128,10 +128,10 @@ function nbSigningView({$, nb, project}){
     if (!keys) return;
     const names = keyNames();
     const held = Object.values(keys).filter(s => SIGN_ROUTES.some(([r]) => s[r])).length;
-    // The glance (R109): the keys held and the apps mapped to one, none
+    // The glance: the keys held and the apps mapped to one, none
     // while it holds no key, whose empty state is said where the keys are.
     const mappedN = Object.values({...map, ...mapDraft}).filter(k => k !== null).length;
-    // ...and under them how the controller keeps them (R111 step 2).
+    // ...and under them how the controller keeps them.
     // With none held, the words that say so share the control row with its
     // buttons, as the other views' status lines do (a button never on a
     // line of its own), short enough to keep the row one control high.
@@ -141,7 +141,7 @@ function nbSigningView({$, nb, project}){
       !held ? (why ? "" : "no key yet: aerie sign uses the ones kept here")
         : AT_REST[atRest] || "", "", held ? {open: "warn", locked: "bad"}[atRest] || "" : "");
     // Import a backup and New key, the view's adds, the control row's
-    // actions with New key the primary (a-notebook/views, R109), the form
+    // actions with New key the primary (a-notebook/views), the form
     // either opens unrolling under the row.
     patch($("sgActs"), why ? "" : `<button type="button" id="sgImp" data-add="import" aria-expanded="${adding === "import"}"${
         locked ? "" : ` disabled title="no key can be added until the backups have a password"`}><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="${adding === "key"}">New key</button>`);
@@ -149,9 +149,9 @@ function nbSigningView({$, nb, project}){
       : adding === "key" ? `<div class="field">${formBox({fields: [
           formField("sgNewName", "The new key's name", `<input id="sgNewName" autocomplete="off" spellcheck="false" placeholder="watch">`)],
           foot: [`<button type="button" id="sgAddCancel">Cancel</button>`, `<button type="button" class="primary" id="sgNewGo">Add it</button>`]})}</div>`
-      // A backup brought back (R103, the operator 22 Oct): Download
+      // A backup brought back: Download
       // backup's zip carries its alias, and its password unless it was
-      // wrapped under a project's backup password (R111), which is then
+      // wrapped under a project's backup password, which is then
       // typed here, as a bare keystore's is; the key and the slot default
       // to the backup's.
       : adding === "import" ? `<div class="field">${formBox({fields: [
@@ -163,7 +163,7 @@ function nbSigningView({$, nb, project}){
             {wide: true, hint: "A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with."})],
           foot: [`<button type="button" id="sgAddCancel">Cancel</button>`, `<button type="button" class="primary" id="sgImpGo" disabled>Import</button>`]})}</div>`
       : "");
-    // The backup password (the operator, 1 Oct): the project's owner's to
+    // The backup password: the project's owner's to
     // set, and every download's to give, AerieOS's owner's included.
     const lock = `<div class="field"><div class="rnsign rnsignlock">
       <div>Backup password: ${locked ? "set" : "none"}</div>
@@ -203,7 +203,7 @@ function nbSigningView({$, nb, project}){
         formField("sgMapPkg", "An app's package", `<input id="sgMapPkg" autocomplete="off" spellcheck="false" placeholder="com.example.app">`),
         formField("sgMapKey", "Signs with", `<select id="sgMapKey">${names.map(k => `<option>${esc(k)}</option>`).join("")}</select>`)],
         foot: [`<button type="button" id="sgMapGo">Map it</button>`]})}</div>`;
-    // Releases (R106): a release's APK is built unsigned in CI and signed
+    // Releases: a release's APK is built unsigned in CI and signed
     // on the project's node with the sideload key its app maps to; which key that is, what
     // would stop it, and how the newest went.
     const r = rel || {};
@@ -226,18 +226,18 @@ function nbSigningView({$, nb, project}){
       const s = keys[key] || {}, n = SIGN_ROUTES.filter(([r]) => s[r]).length;
       return n ? `${n} of 2` : "none";
     };
-    // Patched (R244): a key's name, a password or an alias being typed stays
+    // Patched: a key's name, a password or an alias being typed stays
     // when a release's signing moves the view.
     patch($("sgBox"),
       // The keys are the project's, as many as it has: big chips pick one,
-      // the small pills are for the view's own sections (R122). The chips
-      // come first and the view's own boxes under them (the operator, 26 Oct).
+      // the small pills are for the view's own sections. The chips
+      // come first and the view's own boxes under them.
       chipBar(names.map(key => ({key, label: key === "default" ? "Default key" : key, count: null})),
               names.includes(keyPick) ? keyPick : "", "data-sgkey")
       // What holds it back, in the notice voice; what it knows, as a head's
-      // facts (the operator, 25 Oct: no loose words at a view's top). A key is
+      // facts (no loose words at a view's top). A key is
       // checked and made on the project's node, never here: what keeps that
-      // node from it is said in its words (B232).
+      // node from it is said in its words.
       + (why ? `<div class="field"><div class="notice warn">${esc(why)}</div></div>` : "")
       + (why ? "" : (tool ? "" : `<div class="field"><div class="notice warn sgnode">${esc(nodeWhy)}</div></div>`))
       + docSection("signing", "lock", "Backup password", locked ? "set" : "none", lock, {cls: locked ? "" : "warn"})
@@ -328,7 +328,7 @@ function nbSigningView({$, nb, project}){
     const lo = $("sgLockOpen");
     if (lo) lo.onclick = () => { lockOpen = !lockOpen; drawSigning(); };
     const lg = $("sgLockGo");
-    // Wakes once what it sends makes sense (the operator, 18 Oct): the two
+    // Wakes once what it sends makes sense: the two
     // new ones alike and a password in them, or, with one set, both empty to
     // take it off; and the one now typed when there is one.
     const lockReady = () => {

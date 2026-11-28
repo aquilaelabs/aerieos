@@ -1,4 +1,4 @@
-"""The file explorer (R224): the controller's fileexplorer.py talking to the
+"""The file explorer: the controller's fileexplorer.py talking to the
 agent's files.py over the screen relay's port, as they do on a node. The
 roots read from a census; a listing, a read and a ranged read, an upload,
 a folder made, a rename, a delete into the trash; and the refusals: a path
@@ -73,7 +73,7 @@ class Files(unittest.TestCase):
         fileexplorer.configure(node=lambda nid: self.node if nid == "n_1" else None, host=lambda nid: "127.0.0.1",
                                key=lambda nid: self.key, audit=lambda *a: self.audits.append(a),
                                connect=lambda host, port, pin, timeout=15: socket.create_connection((host, port), timeout=timeout),
-                               # Every request carries a value of its own, as the node asks (R288).
+                               # Every request carries a value of its own, as the node asks.
                                subject=lambda what, nonce: f"{what}.{nonce}" if nonce else str(what))
 
     def act(self, op, **kw):

@@ -1,4 +1,4 @@
-"""Bugs, commits and changelog lines tied in the notebook (R255): a bug keeps
+"""Bugs, commits and changelog lines tied in the notebook: a bug keeps
 the commits that fixed it and the words of the lines that answer it, never a
 number in the public file; its row finds each line and the release that
 carried it, a line reworded, merged or saved from the editor keeps its bugs,

@@ -77,11 +77,11 @@ def _inflate(row):
     return row
 
 
-# One read of the record per request (the operator, 17 Oct: pages took
+# One read of the record per request (pages took
 # seconds to load). The status read asked for the same node rows dozens of
 # times, once per project per node and again for each of the bell's sources,
 # and every ask queued on the store's one lock behind the agents' writes:
-# inside held(), each is read once and handed out as a copy.
+# inside held, each is read once and handed out as a copy.
 _held = threading.local()
 
 
@@ -134,7 +134,7 @@ def _node_list(all=False):
     # exactly that, which is what the operator kept seeing.
     for j in _rows("SELECT id, node, type, spec, state, step, started FROM jobs WHERE "
                    "state IN ('queued', 'assigned', 'running')"):
-        # Its step and when it started ride along (the operator, 8 Nov): a
+        # Its step and when it started ride along: a
         # page holding its steps behind the job says what runs and how long.
         entry = {"id": j["id"], "type": j["type"], "state": j["state"], "step": (j["step"] or "")[:60], "started": j["started"] or 0}
         inflight.setdefault(j["node"], []).append(entry)
@@ -148,10 +148,10 @@ def _node_list(all=False):
             entry["apply"] = sp.get("apply", "")
             busy[j["node"]] = {"id": j["id"], "what": sp.get("apply", ""),
                                # A store move waiting for the node to be quiet
-                               # (R120 step 7) says so, not "applying".
+                               # says so, not "applying".
                                "quiet": bool(sp.get("quiet")), "state": j["state"],
                                "slot": str((sp.get("config") or {}).get("slot") or ""),
-                               # Which feature and which way (R91), for its row.
+                               # Which feature and which way, for its row.
                                "feature": str((sp.get("config") or {}).get("id") or "") if sp.get("apply") == "feature" else "",
                                "op": str((sp.get("config") or {}).get("op") or "") if sp.get("apply") == "feature" else ""}
         except (ValueError, AttributeError):
@@ -469,7 +469,7 @@ project_nodes = None
 
 def first_up(nids):
     """(node id, fell_over_from): the first of a project's node set that is
-    online and live, the primary first (R82 step 6). The primary when it is
+    online and live, the primary first. The primary when it is
     up, or when none is, so a refusal still names the node the project is
     set to; else the first that is, with the primary it stood in for."""
     nids = [n for n in (nids or []) if n]
@@ -486,8 +486,8 @@ def node_for():
     """The node the Containers page opens on when nobody has picked one, and
     nothing more: not a default that work falls to. A project's containers
     go to the project's node, and a project with no node has nowhere to
-    send, since there is no primary docker manager (the operator, 25 Sep,
-    after every new project landed on the newest enrolled node).
+    send, since there is no primary docker manager
+    (after every new project landed on the newest enrolled node).
 
     Derived from the projects: the node most of them are bound to, so the
     tab opens where the work is. With nothing bound anywhere, the newest
@@ -504,7 +504,7 @@ def node_for():
             if live:
                 return sorted(live, key=lambda nid: (-bound[nid], have[nid]["created"]))[0]
         # The newest node whose census says docker runs there, else the newest
-        # the manager has somewhere to send to (B113). An address is not a
+        # the manager has somewhere to send to. An address is not a
         # daemon: a Mac enrolled as a guest, with ssh and no docker, would
         # otherwise be the host of every instance nobody bound to a node. The
         # census is what the node last said about itself, so nothing is asked
@@ -557,7 +557,7 @@ def _bump():
 
 
 # The heartbeat's numbers alone (cpu, memory, store headroom): what the Nodes
-# page draws and nothing else does, so a token of their own (R218 step 10).
+# page draws and nothing else does, so a token of their own.
 _sample_rev = [0]
 HEARTBEAT_NEWS = ("published", "sessions", "sync", "sync_drain", "sync_clean", "held")
 
@@ -568,7 +568,7 @@ def sample_rev():
 
 # A node's containers changing, by the fingerprint its heartbeat carries:
 # the Containers page re-reads on it, so a container that crashed or that a
-# shell started is on the page with no Refresh (the operator, 17 Oct).
+# shell started is on the page with no Refresh.
 _ctr_rev = [0]
 
 
@@ -643,10 +643,10 @@ def node_update(principal, node_id, fields):
             # socket is not something this container mounts by default.
             return {"error": "the local node cannot be a docker host"}
         if own_machine(n) and "docker-host" in caps:
-            # Nor the controller's own machine, installed bare metal (R90):
+            # Nor the controller's own machine, installed bare metal:
             # its job account stays out of the docker group, since docker is
             # root there and root holds the controller's state. Its containers
-            # are the root agent's (B743), which this capability has no say in.
+            # are the root agent's, which this capability has no say in.
             return {"error": "this machine is the controller's own: its containers run through its root agent, "
                              "and the wall keeps docker from the node's accounts"}
         sets.append("capabilities = ?"); args.append(json.dumps(caps))
@@ -655,7 +655,7 @@ def node_update(principal, node_id, fields):
                  for k, v in list(fields["labels"].items())[:24]}
         sets.append("labels = ?"); args.append(json.dumps(clean))
     if "check_versions" in fields:
-        # Its own version check's cadence (R176): the Library's answers for
+        # Its own version check's cadence: the Library's answers for
         # this node, asked daily, weekly (the default), monthly or never.
         v = str(fields["check_versions"] or "")
         if v not in ("daily", "weekly", "monthly", "off"):
@@ -678,7 +678,7 @@ def node_update(principal, node_id, fields):
         if not on and ((n.get("config") or {}).get("tunnel") or {}).get("kind") == "public":
             # Enrolled through a public hostname, it is a public box by
             # construction: off, its next hello would hand it the bb
-            # bundle, session tokens and FTP (R92).
+            # bundle, session tokens and FTP.
             return {"error": f"{n['name']} reaches this controller through a public hostname, so it "
                              "hosts containers only; enroll it again on the LAN or a VPN to run sessions"}
         cfg = dict(n.get("config") or {}, host_only=True)
@@ -695,7 +695,7 @@ def node_update(principal, node_id, fields):
 
 
 def node_storage_measure(principal, node_id):
-    """The Storage page's Measure now (R169): a job the agent answers by
+    """The Storage page's Measure now: a job the agent answers by
     walking its disks at once rather than at the next hour, then a hello
     with the result."""
     n = node(node_id)
@@ -713,7 +713,7 @@ def node_storage_measure(principal, node_id):
 
 
 def node_avd_remove(principal, node_id, project, uid, name):
-    """The Storage page's Remove on a project's phone (R123): a job the
+    """The Storage page's Remove on a project's phone: a job the
     agent runs, which checks the names again and refuses a phone that is
     running."""
     n = node(node_id)
@@ -737,7 +737,7 @@ def node_avd_remove(principal, node_id, project, uid, name):
 
 
 def node_discard(principal, node_id):
-    """A row that never enrolled, taken off outright (the operator, 11 Oct):
+    """A row that never enrolled, taken off outright:
     its script was discarded, so there is no history to keep and no
     machine to tell. Only a waiting row; an enrolled node is retired."""
     n = node(node_id)
@@ -756,7 +756,7 @@ def node_state(principal, node_id, state):
     """Drain and undrain, plus retire, which is what Remove means: rows
     are history and an id is never reused, so a removed node keeps its row
     and leaves every list (door 1)."""
-    # disabled (the operator, 11 Oct): enrolled and configured still, its
+    # disabled: enrolled and configured still, its
     # agent dialing in, but off every picker, refused to a project's set,
     # and handed no work or session until Enable; what Drain is for a
     # reboot, this is for a machine kept but not offered.
@@ -883,7 +883,7 @@ def _addr(n):
     return ""
 
 
-# The relay's keys (R288): an HMAC of each node token, worked out from the
+# The relay's keys: an HMAC of each node token, worked out from the
 # token as the node presents it (authenticate) and kept in this process's
 # memory alone, {node id: {token id: key}}. Nothing on disk signs a relay
 # request, so a copy of the database or of /config opens no terminal; after a
@@ -916,7 +916,7 @@ def screen_key(node_id):
     """The key a relay request to this node (a VM's screen, a terminal, its
     files) is signed with: the key derived from its live token, held in
     memory; "" for a node with none, or not heard from since this start.
-    An agent from before R288 takes the token's stored hash alone, inside
+    An older agent takes the token's stored hash alone, inside
     the agent's window."""
     rows = _rows("SELECT id, secret_hash FROM tokens WHERE node_id = ? AND kind = 'node' AND state = 'live' "
                  "ORDER BY created DESC LIMIT 1", (node_id,))
@@ -956,7 +956,7 @@ def _hash(secret):
     return hashlib.sha256(secret.encode()).hexdigest()
 
 
-# What a token is, in a column of its own (R227 step 14; the revoked column
+# What a token is, in a column of its own (the revoked column
 # carried all four as 0, 1, 2 and 3 until migration 0008, and a statement
 # written for two of them, revoked = 0, passed over the other two: a pending
 # token outlived the enrollment that was to end every token before it).
@@ -974,7 +974,7 @@ def _token_mint(kind, node_id, ttl=None, state=TOKEN_LIVE):
     return tid, TOKEN_PREFIX[kind] + secret
 
 
-# A node's token rotated (R135 step 4): each hello of an agent that rotates is
+# A node's token rotated: each hello of an agent that rotates is
 # answered with a fresh token, held PENDING until the node first uses it,
 # which makes it the node's token and RETIRES the one before. A retired token
 # is still taken for GRACE_S, for calls that were already on their way; after
@@ -990,7 +990,7 @@ def rotate_token(node_id):
     A pending one it never used is dropped; retired ones older than a month
     are forgotten."""
     now = int(time.time())
-    # One transaction (R227 step 14): the pending one dropped and its
+    # One transaction: the pending one dropped and its
     # successor made together, born pending, so no moment holds two pending
     # tokens or a new one that is live before the node has used it.
     with db.transaction():
@@ -1008,11 +1008,11 @@ def rotate_token(node_id):
 
 def _refused(node_id, why):
     """A node's agent turned away, kept on its row so the page says why it
-    is quiet (B569): the agent asked every five minutes for two days with
+    is quiet: the agent asked every five minutes for two days with
     its token expired while the Nodes page said only quiet. Written at most
     once a minute; its next good hello takes it off."""
-    # Read and written under the store's lock, the row read afresh (R228
-    # step 6): a hello, a heartbeat or a session report landing between this
+    # Read and written under the store's lock, the row read afresh:
+    # a hello, a heartbeat or a session report landing between this
     # read and its write was written over, the census with it.
     with _lock:
         n = _node(node_id) if node_id else None
@@ -1036,12 +1036,12 @@ _recover_at = {}
 
 def recover_token(node_id, bearers, peer=""):
     """A node this controller no longer knows by its newest token, taken
-    back by an older one it still holds (the operator, 6 Nov: a controller
+    back by an older one it still holds (a controller
     restored from a backup re-adopts every node still there): the node's
     tokens of the last month offered newest first, the first this record
     knows and has not retired decides. One live or pending is the node's own: a fresh
     token answers, minted as a hello's rotation is. One it holds retired is
-    passed over, since a newer one may follow (B759); one revoked ends the
+    passed over, since a newer one may follow; one revoked ends the
     search with nothing, never the alarm a stolen copy raises, since a node
     offering its own past is not a copy. The tokens
     themselves are offered, never their hashes, which the record keeps and a
@@ -1049,7 +1049,7 @@ def recover_token(node_id, bearers, peer=""):
 
     An agent offers its month (up to 9000) a few hundred a call, back to
     back, so the limit is on how many one address offers for one node in
-    twenty seconds, not on calls (B721: the second call of a sweep was
+    twenty seconds, not on calls (the second call of a sweep was
     always refused, and a node never reached past its newest 200). Kept per
     address, so a stranger naming a node cannot use up the node's own, and
     only for a node this record has. The bearer, or None."""
@@ -1071,7 +1071,7 @@ def recover_token(node_id, bearers, peer=""):
     for b in offered:
         if not isinstance(b, str) or not b.startswith(pre):
             continue
-        # What the row says and the check made on it, as one (R227 step 14).
+        # What the row says and the check made on it, as one.
         with db.transaction():
             rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = 'node'", (_hash(b[len(pre):]),))
             if not rows:
@@ -1080,7 +1080,7 @@ def recover_token(node_id, bearers, peer=""):
             if t["node_id"] != node_id or t["state"] == TOKEN_REVOKED:
                 return None
             # A retired one is passed over: the node holds a newer one this
-            # record may know further down its list (B759: a token a move's new
+            # record may know further down its list (a token a move's new
             # home handed out sat ahead of the one this record still held live).
             if t["state"] == TOKEN_RETIRED:
                 continue
@@ -1093,7 +1093,7 @@ def recover_token(node_id, bearers, peer=""):
 
 def refused_unknown(node_id):
     """A hello whose token this controller has no record of, from an agent
-    that says which node it is (B652): its credential went with a /config
+    that says which node it is: its credential went with a /config
     restored from before its last hellos, and it is turned away every five
     minutes with nothing on its row to say so. Kept on the row only when the
     node is quiet anyway (no good hello in ten minutes), so a stranger
@@ -1113,8 +1113,8 @@ def _token_reused(t):
     # Every one, live, pending and retired: a pending token the copy was
     # handed must not come alive later.
     _exec("UPDATE tokens SET state = ? WHERE node_id = ? AND kind = 'node'", (TOKEN_REVOKED, nid))
-    # Read and written under the store's lock, the row read afresh (R228
-    # step 6): a hello, a heartbeat or a session report landing between this
+    # Read and written under the store's lock, the row read afresh:
+    # a hello, a heartbeat or a session report landing between this
     # read and its write was written over, the census with it.
     with _lock:
         n = _node(nid)
@@ -1143,10 +1143,10 @@ def authenticate(bearer):
     if not kind:
         return {"error": "not an AerieOS token"}
     # The row read and whatever its state then makes of it, as one
-    # transaction (R227 step 14): each statement was its own commit, so two
+    # transaction: each statement was its own commit, so two
     # of an agent's calls carrying its new token at once each read it pending
-    # and each retired the live one, the second catching the first's (B570,
-    # mended afterwards by handing a live token its life back).
+    # and each retired the live one, the second catching the first's
+    # (mended afterwards by handing a live token its life back).
     with db.transaction():
         t = _token_checked(kind, bearer[len(TOKEN_PREFIX[kind]):])
     if t.get("error"):
@@ -1174,7 +1174,7 @@ def _token_checked(kind, secret):
         return {"error": "unknown token"}
     t = rows[0]
     if kind == "node" and t["state"] == TOKEN_PENDING:
-        # Its first use (R135 step 4): this token is the node's now, and
+        # Its first use: this token is the node's now, and
         # the one before retires with its grace. The one coming live comes
         # live with no expiry: only an enroll token's time and a retired
         # one's grace carry one.
@@ -1211,7 +1211,7 @@ def revoke_tokens(node_id, kinds=("node", "enroll")):
 
 def own_machine(n):
     """Whether a node is the machine the controller itself runs on, a
-    controller installed bare metal enrolling itself (R90): an ordinary
+    controller installed bare metal enrolling itself: an ordinary
     agent row in every other way, and marked as this machine."""
     return bool(n) and n.get("kind") == "agent" and bool((n.get("config") or {}).get("own"))
 
@@ -1226,10 +1226,10 @@ def only_this_machine():
 def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host_only=False, nginx=False, door=None,
                 existing=None, own=False, system=""):
     """Add node, agent kind: a pending row and the one token that fills it.
-    With `existing` (R177), no row: a node already here gets a new enroll
+    With `existing`, no row: a node already here gets a new enroll
     token, its config brought to the answers, and the row's id and state
     kept, so the script can be run again on that same machine (the
-    agent's machine fingerprint, which enroll() holds it to).
+    agent's machine fingerprint, which enroll holds it to).
 
     The row exists BEFORE the machine does, which is the operator's view of
     "waiting for enrollment" (a line on the tab with the command to paste),
@@ -1238,7 +1238,7 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
     ask for. The id is minted now and kept; a token that expires unused
     leaves a pending row the tab offers to remove, never a reused id.
 
-    With `own` (R90), the row is the controller's own machine, installed
+    With `own`, the row is the controller's own machine, installed
     bare metal: builds and sessions, its containers run by the root agent
     (its job account is out of the docker group), and each session in a
     network of its own from its first hello, since the wall a session there
@@ -1269,7 +1269,7 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
         _touch(existing, principal, "node-enroll-mint", {"token": tid, "again": True})
         return {"ok": True, "id": existing, "token": secret, "again": True,
                 "expires": int(time.time()) + ENROLL_TTL}
-    # One name, one node (the operator, 11 Oct): a second script made with
+    # One name, one node: a second script made with
     # a name that is already a row's, waiting or enrolled, is refused rather
     # than a second row. A waiting row gets its script again from Enroll
     # script on the row, or is discarded.
@@ -1288,24 +1288,24 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
         "labels": {"disposable": "true"},
         "agent": {}, "reported": {}, "routing": {},
         # The node's address in a tunnel, from the config the script
-        # carries (R161): what the controller refuses all but the agent's
+        # carries: what the controller refuses all but the agent's
         # own API from, before the node has said anything itself.
         "config": {"user": user, **({"tunnel": tunnel} if tunnel else {}),
-                   # Its projects as a synced copy (R162), the one way a node
-                   # holds them: no node mounts the controller's disk (R163).
+                   # Its projects as a synced copy, the one way a node
+                   # holds them: no node mounts the controller's disk.
                    "workspace": "sync",
                    # Hosting only from its first hello (a cloud box enrolled
                    # to run containers): no code, sessions or bb, ever.
                    **({"host_only": True} if host_only else {}),
-                   # nginx put on it once it has enrolled (R171, ON_ENROLL).
+                   # nginx put on it once it has enrolled (ON_ENROLL).
                    **({"nginx": True} if nginx else {}),
-                   # The door in for SSH the script sets up (R174): its kind
+                   # The door in for SSH the script sets up: its kind
                    # and name, so the row knows before the machine reports.
                    **({"door": door} if door else {}),
-                   # The system its script was built for (R210): what a
+                   # The system its script was built for: what a
                    # script made again for the row is built for too.
                    **({"system": system} if system else {}),
-                   # The controller's own machine (R90).
+                   # The controller's own machine.
                    **({"own": True, "session_net": True} if own else {})},
     })
     tid, secret = _token_mint("enroll", nid, ENROLL_TTL)
@@ -1315,7 +1315,7 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
 
 
 def system_of(n):
-    """The system a node's script is built for (R210): the one recorded on
+    """The system a node's script is built for: the one recorded on
     its row at mint, else the one its census names, else the default."""
     import systems
     cfg = n.get("config") or {}
@@ -1325,7 +1325,7 @@ def system_of(n):
 
 
 def row_answers(n, origin=""):
-    """Enroll node's questions as the row answers them (R210): what an
+    """Enroll node's questions as the row answers them: what an
     enrolled node's Enroll script builds from, with no dialog. The
     controller's address is the browser's own, as the dialog fills it,
     unless the node reaches a public hostname, which the row names; the
@@ -1344,12 +1344,12 @@ def row_answers(n, origin=""):
 
 
 def enroll_script(principal, req):
-    """Enroll node's questions answered, as one script to download (R161,
-    enrollscript.py): checked before anything is minted, so a config that
+    """Enroll node's questions answered, as one script to download
+    (enrollscript.py): checked before anything is minted, so a config that
     cannot be used leaves no pending row; then the row and its token, and
     the provisioner with the answers inside. Nothing of it is kept here."""
     ho = req.get("host_only") is True
-    # Again, for a node that is here (R177): the row's answers where the
+    # Again, for a node that is here: the row's answers where the
     # request leaves them out, its secrets never (the node keeps them),
     # and the script bound to the machine the node reported.
     again = node(field(req, "node")) if field(req, "node") else None
@@ -1358,9 +1358,9 @@ def enroll_script(principal, req):
     # Again for a machine only once there is one: a pending node never ran
     # its script, so the new one is a first enrollment under the same row,
     # its secrets asked for and carried, and its words those of a first
-    # (B637: it said "run it again on the same machine", "no secret").
+    # (it said "run it again on the same machine", "no secret").
     enrolled = bool(again) and again.get("state") != "pending"
-    # The row's own answers (R210): Enroll script on an enrolled node's row
+    # The row's own answers: Enroll script on an enrolled node's row
     # sends `as_row` and the address the browser reached the controller by,
     # and the script is built from what the row was enrolled with, the
     # Features section's Enroll again being where an answer is changed.
@@ -1375,15 +1375,15 @@ def enroll_script(principal, req):
         return ans
     # On the LAN or behind WireGuard the node dials this controller's own
     # port: named as https with the pin of its key where that port answers
-    # a handshake under it at the address given (R267 step 15). A public
+    # a handshake under it at the address given. A public
     # hostname is the name's certificate, by the system's authorities.
     if ans["reach"] != "public":
         url, pin = tls_reach(ans["controller"])
         ans = ans | {"controller": url, "controller_pin": pin}
-    # No walk on record yet (R48): reaching the controller through WireGuard
+    # No walk on record yet: reaching the controller through WireGuard
     # and a Tailscale SSH door are dev features until each is proved and
     # written down. A public hostname and the cloudflared door are in daily
-    # use (the operator, 20 Oct).
+    # use.
     if (ans["reach"] == "wireguard" or ans.get("door") == "tailscale") \
             and not (forges and forges.unvetted_ok and forges.unvetted_ok()):
         return {"error": "reaching the controller through WireGuard, and a Tailscale SSH door, are dev features: "
@@ -1411,7 +1411,7 @@ def enroll_script(principal, req):
     u = urllib.parse.urlparse(ans["controller"])
     port = u.port or (443 if u.scheme == "https" else 80)
     machine = ((again or {}).get("reported") or {}).get("machine") or ""
-    # Its stores as it reports them (B658): a script run again had handed
+    # Its stores as it reports them: a script run again had handed
     # the provisioner nothing, and the node came back on the defaults.
     stores = {role: s.get("path") for role, s in (((again or {}).get("reported") or {}).get("stores") or {}).items()
               if isinstance(s, dict) and s.get("path")} if enrolled else {}
@@ -1427,7 +1427,7 @@ def enroll_script(principal, req):
 
 
 # What runs once a node has enrolled, each handed its id (the nginx tab's
-# deploy for a node the Enroll dialog ticked it on, R171): filled by the
+# deploy for a node the Enroll dialog ticked it on): filled by the
 # server, run after the row is online, each on its own so one's failure
 # never costs the enrollment.
 ON_ENROLL = []
@@ -1440,7 +1440,7 @@ def enroll(auth, census, addr, version="", digest="", user=""):
     n = node(nid)
     if not n or n["state"] == "retired":
         return {"error": "this node is not waiting for enrollment"}
-    # A node enrolling again (R177) is held to the machine it enrolled
+    # A node enrolling again is held to the machine it enrolled
     # from: the fingerprint its census reports against the one on the row.
     # Said before the token is burned, so the right machine can still use it.
     had = (n.get("reported") or {}).get("machine") or ""
@@ -1474,8 +1474,8 @@ def enroll(auth, census, addr, version="", digest="", user=""):
             fn(nid)
         except Exception as e:  # noqa: BLE001 (said, never the enrollment's failure)
             print(f"[nodes] after enrolling {nid}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
-    # The node's first token on the disk before the node holds it (R227 step
-    # 7): lost with the log, the machine is enrolled as far as it knows and
+    # The node's first token on the disk before the node holds it:
+    # lost with the log, the machine is enrolled as far as it knows and
     # unknown here, with no older token to come back by.
     db.through()
     return {"ok": True, "node_id": nid, "token": secret,
@@ -1531,7 +1531,7 @@ def agent_newer(n):
 # that watches for any of it waits a poll window per thing it watches, and
 # three of them were the slowest intervals in the suite. Nothing else sets it.
 POLL_S = int(os.environ.get("BB_NODE_POLL") or 25)
-# What a held poll waits on (R228 step 24): a lock of its own, not the
+# What a held poll waits on: a lock of its own, not the
 # store's. It was a condition on the store's one lock, so each poll scanned
 # the queue holding it, and every wake had every node's poll scan in turn
 # while each status read and audit row waited behind them. A wake is
@@ -1555,7 +1555,7 @@ def _notify():
 def _await_wake(gen, seconds):
     """Wait up to `seconds` for a wake past the one numbered `gen` (read
     before the look that found nothing). A job's end wakes (job_result),
-    so whoever waits on one hears it when it lands (R228 step 23)."""
+    so whoever waits on one hears it when it lands."""
     if seconds <= 0:
         return
     with _wake:
@@ -1577,7 +1577,7 @@ def _scan_lock(node_id):
     with _scanning_lock:
         return _scanning.setdefault(node_id, threading.Lock())
 
-# The last hour of samples per node, for its charts (R218 step 9, docs/
+# The last hour of samples per node, for its charts (docs/
 # nodes.md §9), and of each running container's on an agent node, sampled
 # once a minute by the agent: memory only, and lost on restart, which is the
 # honest scope: the row keeps the current sample in the DB, and history
@@ -1597,8 +1597,8 @@ def _mb(v):
     try:
         return max(0, int(v))
     except (TypeError, ValueError, OverflowError):
-        # OverflowError: json.loads takes Infinity, and int() of it raises
-        # (B180). A number no disk has is no number.
+        # OverflowError: json.loads takes Infinity, and int of it raises.
+        # A number no disk has is no number.
         return 0
 
 
@@ -1608,7 +1608,7 @@ PCI_ADDR_RE = re.compile(r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]")
 
 
 def _vm_usb(rows):
-    """The USB devices a VM holds as its node names them (R116): vendor,
+    """The USB devices a VM holds as its node names them: vendor,
     product, serial, port and name, whitelisted field by field."""
     out = []
     for r in (rows or [])[:8] if isinstance(rows, list) else []:
@@ -1621,11 +1621,11 @@ def _vm_usb(rows):
     return out
 
 def _vm_hw(hw):
-    """A VM's hardware as its node reported it (R100), kept to its shapes."""
+    """A VM's hardware as its node reported it, kept to its shapes."""
     hw = hw if isinstance(hw, dict) else {}
     net = str(hw.get("net") or "")
     kind, _, name = net.partition(":")
-    # The network as the node read it (R219 step 4): its space's, the LAN, a
+    # The network as the node read it: its space's, the LAN, a
     # bridge or a libvirt network by name; anything else its space's.
     ok = net == "lan" or (kind in ("br", "net") and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", name)
                           and not name.startswith("bbvm-"))
@@ -1649,7 +1649,7 @@ def _vm_hw(hw):
     return out
 
 
-# An installer ISO's name on a node (R99), as the agent's ISO_RE.
+# An installer ISO's name on a node, as the agent's ISO_RE.
 VM_ISO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.iso")
 
 
@@ -1661,7 +1661,7 @@ CENSUS_STRINGS = ("os", "docker", "docker_id", "gpu", "hostname", "git")
 
 
 def _c_machine(c, out):
-    # The machine's fingerprint (R177): what a re-enrollment is held to.
+    # The machine's fingerprint: what a re-enrollment is held to.
     if re.fullmatch(r"[0-9a-f]{32}", str(c.get("machine") or "")):
         out["machine"] = str(c["machine"])
 
@@ -1695,12 +1695,12 @@ def _c_stores(c, out):
                 # cache's number beside Clear cache. None when not measured.
                 "used_mb": _mb(s.get("used_mb")),
                 # The node's own directory in the store: linux-x86_64,
-                # darwin-arm64 (roadmap R19).
+                # darwin-arm64.
                 "scope": re.sub(r"[^A-Za-z0-9_-]", "", str(s.get("scope") or ""))[:40]}
 
 
 def _c_tunnel(c, out):
-    # The tunnel the node reaches the controller through (R161): its kind,
+    # The tunnel the node reaches the controller through: its kind,
     # its address there, and whether the interface is up.
     t = c.get("tunnel") if isinstance(c.get("tunnel"), dict) else {}
     if t.get("addr") and re.fullmatch(r"[0-9.]{7,15}", str(t["addr"])):
@@ -1718,7 +1718,7 @@ def _c_toolchain_versions(c, out):
 
 
 def _c_tokseal(c, out):
-    # The coding agents' sign-ins sealed there (R126): the agent's public
+    # The coding agents' sign-ins sealed there: the agent's public
     # half for this boot and each seal's R with what its login said of
     # itself, all public. Hex held to the group's width.
     tk = c.get("tokseal") if isinstance(c.get("tokseal"), dict) else None
@@ -1730,7 +1730,7 @@ def _c_tokseal(c, out):
             # Every agent the node seals a sign-in for: the four shipped
             # (base.SIGNINS) and a pack's, named as a pack's agent may be
             # (base.pack_signins). Kept to claude and codex, Grok's and
-            # Copilot's seals never reached a terminal's open (B902).
+            # Copilot's seals never reached a terminal's open.
             for ag, v in list(seals.items())[:24]:
                 if re.fullmatch(r"[a-z][a-z0-9]{1,15}", str(ag)) and isinstance(v, dict) and re.fullmatch(r"[0-9a-f]{1,520}", str(v.get("R") or "")):
                     sealed.setdefault(acct, {})[ag] = {"R": v["R"], "K": re.sub(r"[^0-9a-f]", "", str(v.get("K") or ""))[:24],
@@ -1741,7 +1741,7 @@ def _c_tokseal(c, out):
 
 
 def _c_toolchain_verified(c, out):
-    # How each was checked when it was installed (R137): the algorithm, or
+    # How each was checked when it was installed: the algorithm, or
     # none, and where the publisher said it.
     tv = c.get("toolchain_verified") if isinstance(c.get("toolchain_verified"), dict) else {}
     out["toolchain_verified"] = {str(k)[:40]: {"algo": str(v.get("algo") or "")[:8], "where": str(v.get("where") or "")[:200]}
@@ -1755,7 +1755,7 @@ RECEIPT_WHY_MAX = 300
 
 
 def _c_toolchain_receipts(c, out):
-    # What each pinned install left behind (R234): the commit it came from,
+    # What each pinned install left behind: the commit it came from,
     # one sha256 over every file that landed, how many and how big, when,
     # and the tree the same commit made there before where it was another;
     # what its steps ran with (cut, open, or online: the entry kept the
@@ -1778,13 +1778,13 @@ def _c_toolchain_receipts(c, out):
 
 def _c_store_dirs(c, out):
     # Kept only when the agent sent one: a listing that is there and empty
-    # is a store with nothing in it (B671), a key that is absent is a node
+    # is a store with nothing in it, a key that is absent is a node
     # that has not said, and the Installed page reads the two apart.
     sd = c.get("store_dirs") if isinstance(c.get("store_dirs"), dict) else None
     if sd is not None:
         out["store_dirs"] = {k: [str(x)[:60] for x in (sd.get(k) or [])[:64]]
                              for k in ("top", "android", "incomplete", "roots")}
-        # ...and the versions under android's families (B712), kept only
+        # ...and the versions under android's families, kept only
         # when the agent lists them (a node with a toolchain store): the
         # Library reads a version a project pins against this, and a
         # node that cannot say must not read as a store that lacks it.
@@ -1821,24 +1821,24 @@ def _c_toolchains(c, out):
 
 
 def _c_docker_ip(c, out):
-    # The address docker binds published ports to by default (R190).
+    # The address docker binds published ports to by default.
     out["docker_ip"] = str(c.get("docker_ip") or "")[:40]
 
 
 def _c_docker_gid(c, out):
-    # ...and its docker group's id (R86), passed to a compose as BB_DOCKER_GID.
+    # ...and its docker group's id, passed to a compose as BB_DOCKER_GID.
     g = c.get("docker_gid")
     out["docker_gid"] = g if isinstance(g, int) and not isinstance(g, bool) and 0 <= g < 2**31 else None
 
 
 def _c_internet(c, out):
-    # ...and whether it reaches the internet (R82); None where the report's
+    # ...and whether it reaches the internet; None where the report's
     # answer is not one.
     out["internet"] = c.get("internet") if isinstance(c.get("internet"), bool) else None
 
 
 def _c_store_ro(c, out):
-    # ...and whether its toolchain store is read-only to it (R85).
+    # ...and whether its toolchain store is read-only to it.
     out["store_ro"] = c.get("store_ro") is True
 
 
@@ -1848,7 +1848,7 @@ def _c_store_noexec(c, out):
 
 
 def _c_features(c, out):
-    # The features bb-sandbox installs and removes (R91), each not installed
+    # The features bb-sandbox installs and removes, each not installed
     # where the report says nothing usable of it.
     fe = c.get("features") if isinstance(c.get("features"), dict) else {}
     vm = fe.get("vmhost") if isinstance(fe.get("vmhost"), dict) else {}
@@ -1858,20 +1858,20 @@ def _c_features(c, out):
     sh = fe.get("shares") if isinstance(fe.get("shares"), dict) else {}
     out["features"] = {"vmhost": {"installed": vm.get("installed") is True, "kvm": vm.get("kvm") is True,
                                   "libvirt": re.sub(r"[^0-9.]", "", str(vm.get("libvirt") or ""))[:20],
-                                  # A kernel built without KVM (R97's walk, openSUSE).
+                                  # A kernel built without KVM (openSUSE).
                                   **({"nokvm": "kernel"} if vm.get("nokvm") == "kernel" else {}),
-                                  # A shared folder's virtiofsd (R100), which an
+                                  # A shared folder's virtiofsd, which an
                                   # install from before it did not bring.
                                   **({"virtiofs": vm["virtiofs"] is True} if "virtiofs" in vm else {})},
                        "firewall": {"installed": fw.get("installed") is True},
-                       # The IOMMU on the kernel's command line (R116 step 4):
+                       # The IOMMU on the kernel's command line:
                        # put there by AerieOS, and on now, which a restart
                        # and the firmware decide.
                        "iommu": {"installed": io.get("installed") is True, "on": io.get("on") is True},
                        "storage": {k: sto.get(k) is True for k in ("installed", "zfs", "mergerfs", "snapraid", "smart")},
                        "shares": {k: sh.get(k) is True for k in ("installed", "smb", "nfs")},
                        "ups": {k: (fe.get("ups") or {}).get(k) is True for k in ("installed", "nut")} if isinstance(fe.get("ups"), dict) else {},
-                       # The NVIDIA card marked for a VM (R207 step 3): the
+                       # The NVIDIA card marked for a VM: the
                        # marker, whether vfio-pci holds it now, its ids.
                        "gpuvm": {"installed": (fe.get("gpuvm") or {}).get("installed") is True, "bound": (fe.get("gpuvm") or {}).get("bound") is True,
                                  "cards": int((fe.get("gpuvm") or {}).get("cards") or 0) if str((fe.get("gpuvm") or {}).get("cards") or 0).isdigit() else 0,
@@ -1879,7 +1879,7 @@ def _c_features(c, out):
 
 
 def _c_disks(c, out):
-    # The machine's disks (R162 step 1), each to its shape: a name, a model,
+    # The machine's disks, each to its shape: a name, a model,
     # a serial, a size, what each partition holds, SMART's three facts.
     if isinstance(c.get("disks"), list):
         word = lambda v, n: re.sub(r"[^\w .,:/()+-]", "", str(v or ""))[:n]  # noqa: E731
@@ -1903,7 +1903,7 @@ def _c_disks(c, out):
 
 
 def _c_shares(c, out):
-    # ...and its shares (R162 step 1): a name, a path, SMB's and NFS's halves.
+    # ...and its shares: a name, a path, SMB's and NFS's halves.
     if isinstance(c.get("shares"), list):
         sw = lambda v, n: re.sub(r"[^\w .,:/()*@+-]", "", str(v or ""))[:n]  # noqa: E731
         out["shares"] = []
@@ -1922,7 +1922,7 @@ def _c_shares(c, out):
 
 
 def _c_pools(c, out):
-    # ...and its ZFS pools (R162 step 1): name, sizes, health, the members
+    # ...and its ZFS pools: name, sizes, health, the members
     # by layout, the last scrub and the errors line, each to its shape.
     if isinstance(c.get("pools"), list):
         pw = lambda v, n: re.sub(r"[^\w .,:;/()'@+-]", "", str(v or ""))[:n]  # noqa: E731
@@ -1942,19 +1942,19 @@ def _c_pools(c, out):
 
 
 def _c_pools_importable(c, out):
-    # ...and the pools on its disks another machine made (R163 step 1).
+    # ...and the pools on its disks another machine made.
     if isinstance(c.get("pools_importable"), list):
         out["pools_importable"] = [{"name": str(x["name"]), "id": str(x.get("id") or "")[:24] if str(x.get("id") or "").isdigit() else "",
                                     "state": re.sub(r"[^\w -]", "", str(x.get("state") or ""))[:16],
                                     "said": re.sub(r"[^\w .,:;/()'@+-]", "", str(x.get("said") or ""))[:200],
-                                    # Last used by another system and never exported (B938).
+                                    # Last used by another system and never exported.
                                     "elsewhere": x.get("elsewhere") is True}
                                    for x in c["pools_importable"][:16]
                                    if isinstance(x, dict) and re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", str(x.get("name") or ""))]
 
 
 def _c_snapshots(c, out):
-    # ...and its snapshots per pool (R162 step 5): counts by kind, the newest.
+    # ...and its snapshots per pool: counts by kind, the newest.
     if isinstance(c.get("snapshots"), dict):
         out["snapshots"] = {}
         for pool, v in list(c["snapshots"].items())[:32]:
@@ -1970,7 +1970,7 @@ def _c_snapshots(c, out):
 
 
 def _c_array(c, out):
-    # ...and its array (R162 step 2): the disks by slot with their room,
+    # ...and its array: the disks by slot with their room,
     # the merged tree, and SnapRAID's last sync, scrub and check.
     if isinstance(c.get("array"), dict):
         ar = c["array"]
@@ -1990,7 +1990,7 @@ def _c_array(c, out):
         if out["array"] and isinstance(ar.get("moves"), list):
             out["array"]["moves"] = [{"share": aw(x.get("share"), 63), **{k: aw(x.get(k), 32) for k in ("land", "from", "to")}}
                                      for x in ar["moves"][:128] if isinstance(x, dict)]
-        # The last full parity check (R163 step 15), kept only from an agent that has it.
+        # The last full parity check, kept only from an agent that has it.
         if out["array"] and isinstance(ar.get("verify"), dict):
             v = ar["verify"]
             out["array"]["verify"] = {k: mb(v.get(k)) for k in ("at", "found", "fixed", "unfixed")} | {
@@ -1998,13 +1998,13 @@ def _c_array(c, out):
 
 
 def _c_console(c, out):
-    # ...and whether its console takes a password (R194, AerieOS).
+    # ...and whether its console takes a password (AerieOS).
     if isinstance(c.get("console"), dict) and c["console"]:
         out["console"] = {k: c["console"].get(k) is True for k in ("os", "set", "open")}
 
 
 def _c_adopted(c, out):
-    # ...and what it adopted of another NAS (R163 step 8): each mount, its
+    # ...and what it adopted of another NAS: each mount, its
     # filesystem, read-only or not and mounted now, the merged trees, and
     # the parity disk left alone.
     if isinstance(c.get("adopted"), dict) and c["adopted"]:
@@ -2012,17 +2012,17 @@ def _c_adopted(c, out):
         aw = lambda v, n: re.sub(r"[^\w .,:;/()'@%+-]", "", str(v or ""))[:n]  # noqa: E731
         out["adopted"] = {
             "from": aw(ad.get("from"), 16), "writable": ad.get("writable") is True,
-            # Whether its array is taken over (R163 step 3); its presence says the agent has the verb.
+            # Whether its array is taken over; its presence says the agent has the verb.
             **({"taken": ad.get("taken") is True} if "taken" in ad else {}),
             "at": ad["at"] if isinstance(ad.get("at"), int) and not isinstance(ad.get("at"), bool) else 0,
             "mounts": [{"where": aw(m.get("where"), 120), "fs": aw(m.get("fs"), 8), "ro": m.get("ro") is True, "mounted": m.get("mounted") is True}
                        for m in (ad.get("mounts") or [])[:64] if isinstance(m, dict)],
             "merged": {aw(k, 120): v is True for k, v in list((ad.get("merged") or {}).items())[:4]} if isinstance(ad.get("merged"), dict) else {},
             "parity": [aw(x, 32) for x in (ad.get("parity") or [])[:2]],
-            # The folders at the top of its merged tree (R163 step 13).
+            # The folders at the top of its merged tree.
             "folders": [str(x) for x in (ad.get("folders") or [])[:128]
                         if isinstance(x, str) and re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*", x)]}
-        # ...and what its Docker and libvirt said ran (R163 steps 10, 11).
+        # ...and what its Docker and libvirt said ran.
         ap = ad.get("apps") if isinstance(ad.get("apps"), dict) else {}
         if ap:
             dk = ap.get("docker") if isinstance(ap.get("docker"), dict) else {}
@@ -2038,13 +2038,13 @@ def _c_adopted(c, out):
 
 
 def _c_timezone(c, out):
-    # The machine's time zone (R161 step 3), a name under zoneinfo.
+    # The machine's time zone, a name under zoneinfo.
     if isinstance(c.get("timezone"), str):
         out["timezone"] = re.sub(r"[^A-Za-z0-9_+./-]", "", c["timezone"])[:64]
 
 
 def _c_store_backups(c, out):
-    # ...and its backups' last runs (R162 step 5), each to its shape.
+    # ...and its backups' last runs, each to its shape.
     if isinstance(c.get("store_backups"), list):
         mb = lambda v: int(v) if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 0  # noqa: E731
         out["store_backups"] = [{"id": re.sub(r"[^a-z0-9_]", "", str(b.get("id") or ""))[:16], "name": str(b["name"]), "last_at": mb(b.get("last_at")),
@@ -2054,7 +2054,7 @@ def _c_store_backups(c, out):
 
 
 def _c_ext_mounts(c, out):
-    # ...and its other disks and shares (R162 step 4), each to its shape.
+    # ...and its other disks and shares, each to its shape.
     if isinstance(c.get("ext_mounts"), list):
         out["ext_mounts"] = [{"id": re.sub(r"[^a-z0-9_]", "", str(m.get("id") or ""))[:16], "name": str(m["name"]), "kind": str(m.get("kind") or "")[:4],
                               "mounted": m.get("mounted") is True, "present": m.get("present") is True,
@@ -2064,7 +2064,7 @@ def _c_ext_mounts(c, out):
 
 
 def _c_ups(c, out):
-    # ...and its UPS (R164 step 3) and its own packages' updates, each to its shape.
+    # ...and its UPS and its own packages' updates, each to its shape.
     if isinstance(c.get("ups"), dict) and c["ups"]:
         up = c["ups"]
         num = lambda k: int(up[k]) if isinstance(up.get(k), int) and not isinstance(up.get(k), bool) and 0 <= up[k] <= 10 ** 7 else None  # noqa: E731
@@ -2081,13 +2081,13 @@ def _c_host_updates(c, out):
 
 
 def _c_spindown(c, out):
-    # ...and its disks' spin-down in minutes (R164 step 3), 0 for never.
+    # ...and its disks' spin-down in minutes, 0 for never.
     if isinstance(c.get("spindown"), int) and not isinstance(c.get("spindown"), bool) and c["spindown"] in SPINDOWN_MINUTES:
         out["spindown"] = c["spindown"]
 
 
 def _c_os_image(c, out):
-    # AerieOS on the machine (R160 step 4): the image's version and
+    # AerieOS on the machine: the image's version and
     # snapshot, the slot this boot came from and the one GRUB boots next.
     if isinstance(c.get("os_image"), dict) and c["os_image"].get("version"):
         o = c["os_image"]
@@ -2096,13 +2096,13 @@ def _c_os_image(c, out):
                      "built": re.sub(r"[^0-9TZ:-]", "", str(o.get("built") or ""))[:24],
                      "slot": o.get("slot") if o.get("slot") in ("a", "b") else "",
                      "next": o.get("next") if o.get("next") in ("a", "b") else "",
-                     # On trial, and a fallback said (R161 step 2).
+                     # On trial, and a fallback said.
                      "trial": o.get("trial") is True,
                      "fell_back": re.sub(r"[^\w .,:;()'-]", "", str(o.get("fell_back") or ""))[:200]}
 
 
 def _c_os_kept(c, out):
-    # The older versions kept on its boot menu, and whether this boot is one (R201).
+    # The older versions kept on its boot menu, and whether this boot is one.
     if isinstance(c.get("os_kept"), dict) and (c["os_kept"].get("versions") or c["os_kept"].get("booted")):
         vs = c["os_kept"].get("versions")
         num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 0  # noqa: E731
@@ -2113,7 +2113,7 @@ def _c_os_kept(c, out):
 
 
 def _c_os_stick(c, out):
-    # A stick boot (R161 step 10): its system pool, whether docker and the
+    # A stick boot: its system pool, whether docker and the
     # VMs may run yet, what still lives on the stick, what it has written.
     if isinstance(c.get("os_stick"), dict) and c["os_stick"].get("stick") is True:
         s = c["os_stick"]
@@ -2122,13 +2122,13 @@ def _c_os_stick(c, out):
                            "ready": s.get("ready") is True,
                            "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects", "secrets")],
                            "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb")),
-                           # A folder of the machine's own as the projects folder (R163).
+                           # A folder of the machine's own as the projects folder.
                            "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",
                            "projects_bound": s.get("projects_bound") is True,
                            "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else "",
                            # Pools holding another install's folder, set aside if picked.
                            "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16],
-                           # The id its system pool is marked with (B939).
+                           # The id its system pool is marked with.
                            "install_id": str(s.get("install_id") or "") if re.fullmatch(r"[0-9a-f]{32,64}", str(s.get("install_id") or "")) else "",
                            "other_marks": {str(k)[:200]: str(v) for k, v in list((s.get("other_marks") or {}).items())[:16]
                                            if isinstance(k, str) and k.startswith("/") and re.fullmatch(r"[0-9a-f]{32,64}", str(v))}
@@ -2138,7 +2138,7 @@ def _c_os_stick(c, out):
 
 
 def _c_vms_other(c, out):
-    # The domains its libvirt has that AerieOS did not make (R165 step 1):
+    # The domains its libvirt has that AerieOS did not make:
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
         out["vms_other"] = [{"name": str(v["name"]), "state": re.sub(r"[^a-z ]", "", str(v.get("state") or ""))[:20],
@@ -2149,7 +2149,7 @@ def _c_vms_other(c, out):
 
 
 def _c_vms(c, out):
-    # ...and the VMs it runs (R91), each as libvirt says, with the room their
+    # ...and the VMs it runs, each as libvirt says, with the room their
     # disks have: whitelisted field by field like the rest.
     if isinstance(c.get("vms"), list):
         out["vms"] = []
@@ -2163,16 +2163,16 @@ def _c_vms(c, out):
                                "mem_mb": int(v["mem_mb"]) if isinstance(v.get("mem_mb"), int) else 0,
                                "snapshots": [str(x)[:41] for x in (v.get("snapshots") or [])[:32]
                                              if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,40}", str(x))],
-                               # Its screen, and an installer's ISO in its drive (R99).
+                               # Its screen, and an installer's ISO in its drive.
                                "screen": v.get("screen") is True,
                                # Its hardware beyond size and whether it starts with
-                               # its host (R100), whitelisted field by field.
+                               # its host, whitelisted field by field.
                                "autostart": v.get("autostart") is True,
                                "hw": _vm_hw(v.get("hw")),
                                # The USB devices it was given from the node's
-                               # page (R116), as they were named.
+                               # page, as they were named.
                                "usb": _vm_usb(v.get("usb")),
-                               # What its guest agent says (R110 step 8): hostname,
+                               # What its guest agent says: hostname,
                                # OS, kernel, addresses, who is signed in, every
                                # filesystem, whitelisted field by field.
                                **({"guest": _vm_guest(v["guest"])} if isinstance(v.get("guest"), dict) else {}),
@@ -2186,14 +2186,14 @@ def _c_vm_pool(c, out):
 
 
 def _c_vm_host(c, out):
-    # ...and what a VM there could be given (R100).
+    # ...and what a VM there could be given.
     vh = c.get("vm_host") if isinstance(c.get("vm_host"), dict) else None
     if vh:
         hex_ = lambda x: str(x or "")[:8] if re.fullmatch(r"0x[0-9a-f]{1,6}", str(x or "")) else ""  # noqa: E731
         out["vm_host"] = {
             "cpus": [[int(c) for c in pr[:4] if isinstance(c, int)] for pr in (vh.get("cpus") or [])[:256] if isinstance(pr, list)],
             # ...each USB device with what names it again and what the host
-            # does with it (R116): its serial, its port, its speed, the
+            # does with it: its serial, its port, its speed, the
             # driver holding it, the controller it hangs off, and the use.
             "usb": [{"vendor": hex_(u.get("vendor")), "product": hex_(u.get("product")),
                      "name": re.sub(r"[^\w .,:()+/-]", "", str(u.get("name") or ""))[:80],
@@ -2208,12 +2208,12 @@ def _c_vm_host(c, out):
             "pci": [{"addr": str(d.get("addr")), "class": hex_(d.get("class")), "vendor": hex_(d.get("vendor")),
                      "device": hex_(d.get("device")), "group": re.sub(r"\D", "", str(d.get("group") or ""))[:6],
                      "driver": re.sub(r"[^\w-]", "", str(d.get("driver") or ""))[:30],
-                     # What the host itself needs of it (R116 step 4), in words.
+                     # What the host itself needs of it, in words.
                      "host": re.sub(r"[^\w .,:()+/-]", "", str(d.get("host") or ""))[:120]}
                     for d in (vh.get("pci") or [])[:64]
                     if isinstance(d, dict) and PCI_ADDR_RE.fullmatch(str(d.get("addr")))],
             "iommu": vh.get("iommu") is True,
-            # The host's bridges and libvirt networks a VM can be put on (R219 step 4).
+            # The host's bridges and libvirt networks a VM can be put on.
             "bridges": [str(x) for x in (vh.get("bridges") or [])[:32]
                         if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))
                         and not re.fullmatch(r"docker\d+|br-[0-9a-f]{12}|bbvm-.*", str(x))],
@@ -2224,7 +2224,7 @@ def _c_vm_host(c, out):
 
 
 def _c_vm_isos(c, out):
-    # ...and the installer ISOs fetched onto it (R99).
+    # ...and the installer ISOs fetched onto it.
     if isinstance(c.get("vm_isos"), list):
         out["vm_isos"] = [{"name": str(i["name"]), "mb": int(i.get("mb") or 0) if isinstance(i.get("mb"), int) else 0}
                           for i in c["vm_isos"][:64]
@@ -2280,7 +2280,7 @@ def channel_said(n):
 
 def _c_bundle_refused(c, out):
     # The bundle it refused and keeps refusing (the agent's
-    # release.may_keep_bundle, R267 step 6): which one, by its digest, and
+    # release.may_keep_bundle): which one, by its digest, and
     # why in the node's own words, kept to what prints. Absent while it
     # refuses none, and whenever what it sent names no digest.
     b = c.get("bundle_refused")
@@ -2289,7 +2289,7 @@ def _c_bundle_refused(c, out):
 
 
 def _c_root_off(c, out):
-    # Root commands switched off at its own console (R227 step 2).
+    # Root commands switched off at its own console.
     out["root_off"] = c.get("root_off") is True
 
 
@@ -2302,7 +2302,7 @@ def _c_file_work(c, out):
 
 
 def _c_gpu(c, out):
-    # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
+    # The GPU: the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
     for k in ("gpu_card", "gpu_display", "gpu_amd"):
         if c.get(k):
@@ -2310,11 +2310,11 @@ def _c_gpu(c, out):
 
 
 def _c_gpu_driver(c, out):
-    # Where the NVIDIA driver stands (R102): installed for this kernel,
+    # Where the NVIDIA driver stands: installed for this kernel,
     # loaded now, and which driver has the card, for the driver's
     # row in the Library and on the Installed page.
     # Kept without a card too when the agent says it was left for one that
-    # has gone (nocard), so its row can remove it (B168).
+    # has gone (nocard), so its row can remove it.
     gd = c.get("gpu_driver")
     if isinstance(gd, dict) and (c.get("gpu_card") or gd.get("nocard")):
         clean = lambda v, n=60: re.sub(r"[^A-Za-z0-9._~+:-]", "", str(v or ""))[:n]  # noqa: E731
@@ -2331,7 +2331,7 @@ def _c_gpu_driver(c, out):
 
 
 def _c_gpu_container(c, out):
-    # ...and the container toolkit (R102): the version installed, what apt
+    # ...and the container toolkit: the version installed, what apt
     # would move it to, and whether Docker lists the nvidia runtime.
     gc = c.get("gpu_container")
     if isinstance(gc, dict) and (c.get("gpu_card") or gc.get("nocard")):
@@ -2342,7 +2342,7 @@ def _c_gpu_container(c, out):
 
 
 def _c_sound(c, out):
-    # The sound it has (R107): ALSA's cards, real and virtual apart, and the
+    # The sound it has: ALSA's cards, real and virtual apart, and the
     # sound server installed.
     snd = c.get("sound")
     if isinstance(snd, dict):
@@ -2359,7 +2359,7 @@ def _c_administers(c, out):
 
 
 def _c_isolation(c, out):
-    # Whether a session there sees only its own project (R35), in the
+    # Whether a session there sees only its own project, in the
     # helper's own answer, and why not. Absent until the node has said,
     # which the row says as unknown rather than as a no.
     iso = c.get("isolation")
@@ -2369,7 +2369,7 @@ def _c_isolation(c, out):
 
 def _c_session_net(c, out):
     # ...and whether each session there reaches only its own project's
-    # containers (R79): whether the node can, why not, whether it is in
+    # containers: whether the node can, why not, whether it is in
     # force, how many sessions have a network of their own, and what went
     # wrong setting it up. Empty before its first look, which the row reads
     # as not told.
@@ -2379,7 +2379,7 @@ def _c_session_net(c, out):
                               "wanted": bool(sn.get("wanted")), "active": bool(sn.get("active")),
                               "sessions": int(sn.get("sessions") or 0) if str(sn.get("sessions") or 0).isdigit() else 0,
                               "error": str(sn.get("error") or "")[:300]}
-        # ...and the containers' table (R178), the same words.
+        # ...and the containers' table, the same words.
         ct = sn.get("ctr")
         if isinstance(ct, dict) and ct:
             out["session_net"]["ctr"] = {"wanted": bool(ct.get("wanted")), "can": bool(ct.get("can")),
@@ -2389,8 +2389,8 @@ def _c_session_net(c, out):
 
 
 def _c_sysdeps(c, out):
-    # Which held recipes need system packages the machine lacks (roadmap
-    # R51): the family and, per recipe, the package names, both bounded.
+    # Which held recipes need system packages the machine lacks:
+    # the family and, per recipe, the package names, both bounded.
     sd = c.get("sysdeps") if isinstance(c.get("sysdeps"), dict) else {}
     unmet = sd.get("unmet") if isinstance(sd.get("unmet"), dict) else {}
     out["sysdeps"] = {
@@ -2401,7 +2401,7 @@ def _c_sysdeps(c, out):
 
 
 def _c_storage(c, out):
-    # What the disks hold (R169, the agent's storage.py): the last hourly
+    # What the disks hold (the agent's storage.py): the last hourly
     # walk, bounded, for the Storage tab; the tab folds projects an account
     # may not see into one total (storage.py here).
     st = c.get("storage") if isinstance(c.get("storage"), dict) else {}
@@ -2435,7 +2435,7 @@ def _c_storage(c, out):
                        "root": str((st.get("docker") or {}).get("root") or "")[:200],
                        "fs": str((st.get("docker") or {}).get("fs") or "")[:200]},
             "slow": [str(x)[:200] for x in (st.get("slow") or [])[:16]],
-            # Each project's phones (R123), for the page's Remove.
+            # Each project's phones, for the page's Remove.
             "phones": [{"project": str(p.get("project") or "")[:100], "uid": str(p.get("uid") or "")[:20],
                         "name": str(p.get("name") or "")[:80], "mb": mb(p.get("mb")), "running": bool(p.get("running")),
                         "ran": mb(p.get("ran")) or 0, "snap_mb": mb(p.get("snap_mb")) or 0}
@@ -2453,7 +2453,7 @@ def _c_mounts(c, out):
                 "stale": bool(m.get("stale")),
                 # What mount said when it failed: the server's own reason,
                 # or the agent's for a stale handle, which ends on what to
-                # do and ran past 200, so the row read 'then Apply s' (B914).
+                # do and ran past 200, so the row read 'then Apply s'.
                 # Long enough for either, and cut at a word when it is not.
                 "error": _words_upto(str(m.get("error") or ""), 400)})
 
@@ -2469,7 +2469,7 @@ def _words_upto(s, n):
 
 
 def _c_door(c, out):
-    # The door in for SSH (R174), as the machine has it: its kind, its
+    # The door in for SSH, as the machine has it: its kind, its
     # name, whether the client is there and whether it is up.
     dr = c.get("door") if isinstance(c.get("door"), dict) else {}
     if dr.get("kind") in ("cloudflared", "tailscale"):
@@ -2495,7 +2495,7 @@ def _c_services(c, out):
             "unit": re.sub(r"[^A-Za-z0-9._@-]", "", str(ar.get("unit") or ""))[:120],
             "labels": [re.sub(r"[^A-Za-z0-9._-]", "", str(x))[:40]
                        for x in (ar.get("labels") or [])[:16] if str(x)]}
-    # One runner per git host (R53).
+    # One runner per git host.
     listed = sv.get("runners") if isinstance(sv.get("runners"), list) else []
     runners = [one_runner(x) for x in listed[:16] if isinstance(x, dict)]
     out["services"] = {"runners": runners}
@@ -2509,13 +2509,13 @@ def _c_services(c, out):
 
 
 def _c_files(c, out):
-    # The file explorer's port (R224): its presence says the agent serves it.
+    # The file explorer's port: its presence says the agent serves it.
     if isinstance(c.get("files"), dict):
         out["files"] = {"port": _mb(c["files"].get("port")) or 0}
 
 
 def _c_relay(c, out):
-    # How that port is spoken to (R243): the sha256 of the certificate the
+    # How that port is spoken to: the sha256 of the certificate the
     # node made for itself, which is the only one the controller then takes
     # there (relay_of), and whether it takes a signed request once. A report
     # is kept key by key, so one not named here never reached relay_of: the
@@ -2537,10 +2537,10 @@ def _c_session(c, out):
     if isinstance(se, dict):
         out["session"] = {
             "up": bool(se.get("up")),
-            # The screen relay's port, which its terminals (R133) and its
+            # The screen relay's port, which its terminals and its
             # VMs' screens come in on: 7684 but in the suite.
             "screen": _mb(se.get("screen")) or 0,
-            # The container terminal (R218 step 4), as the docker account;
+            # The container terminal, as the docker account;
             # false from a node that could not set it up, with why.
             "ctr": bool(se.get("ctr")),
             "ctr_why": str(se.get("ctr_why") or "")[:120],
@@ -2549,11 +2549,11 @@ def _c_session(c, out):
             # None is "not probed", read as unknown rather than read-only:
             # a /workspace the agent could not test is not one it found
             # closed. Said in aerie diag; no gate reads it since the synced
-            # copy is the node's own directory (R163).
+            # copy is the node's own directory.
             "writable": None if "writable" not in se else bool(se.get("writable")),
             "claude": str(se.get("claude") or "")[:40],
             # ...and each other coding agent's version as it printed it,
-            # under the agent table's census key (R95).
+            # under the agent table's census key.
             **{a.reported: str(se.get(a.reported) or "")[:40] for a in agents.installable() if a.id != "claude"},
             "bundle": str(se.get("bundle") or "")[:80],
             # The agent's own sentence for a half that is down (no session
@@ -2564,15 +2564,15 @@ def _c_session(c, out):
             # a session THERE (bb-tty compares against the machine it runs
             # on); the row hands it to the page per project.
             "boot": re.sub(r"[^0-9.]", "", str(se.get("boot") or ""))[:40],
-            # Accounts as their own users (R125): how far the move is.
+            # Accounts as their own users: how far the move is.
             "accounts": {"users": _mb((se.get("accounts") or {}).get("users")) or 0,
                          "moved": _mb((se.get("accounts") or {}).get("moved")) or 0,
                          "waiting": _mb((se.get("accounts") or {}).get("waiting")) or 0,
                          "error": str((se.get("accounts") or {}).get("error") or "")[:160]}
                         if isinstance(se.get("accounts"), dict) else {},
             # Seconds since the machine booted. Finite: json.loads takes
-            # Infinity and NaN, and int() of either
-            # raised, failing the node's whole hello (B180).
+            # Infinity and NaN, and int of either
+            # raised, failing the node's whole hello.
             "up_s": max(-1, int(se["up_s"])) if isinstance(se.get("up_s"), (int, float))
                     and math.isfinite(se["up_s"]) else None}
 
@@ -2710,7 +2710,7 @@ def _census(c):
             out[k] = str(c[k])[:120]
     # One field the machine sent in a shape its cleaner does not take (a
     # list where a dict goes, a word where a number does) is left out and
-    # said once, never the whole hello refused with it (B904).
+    # said once, never the whole hello refused with it.
     for keys, clean in CENSUS:
         was = dict(out)
         try:
@@ -2752,8 +2752,8 @@ STORE_DENY_UNDER = ("/bin/", "/boot/", "/dev/", "/etc/", "/lib/", "/lib32/",
                     "/lib64/", "/libx32/", "/proc/", "/root/", "/run/",
                     "/sbin/", "/sys/", "/usr/", "/var/run/",
                     "/var/lock/", "/var/spool/", "/var/cache/")
-# ...and a folder of its own under /var/log is a place for one (the operator,
-# 23 Oct), though /var/log itself is not. Held equal on both sides by
+# ...and a folder of its own under /var/log is a place for one,
+# though /var/log itself is not. Held equal on both sides by
 # unit/test_store_paths.py.
 
 
@@ -2805,12 +2805,12 @@ def _clean_config(cfg):
             path = "/mnt/" + tail
         if not path.startswith("/") or " " in path or ":" in path:
             return None, f"a mountpoint must be an absolute path without spaces: {path!r}"
-        # ...and never over a system directory (R120): a share mounted on
+        # ...and never over a system directory: a share mounted on
         # /etc hides the machine's own configuration until it is unmounted.
         if (why := store_path_ok(path, "a mount point")):
             return None, f"the mount at {path}: {why}"
         if path.rstrip("/") == "/workspace" or path.startswith("/workspace/"):
-            # The node's own synced copy of its projects is there (R163): a
+            # The node's own synced copy of its projects is there: a
             # mount would cover it, and no node mounts the controller's disk.
             return None, "/workspace holds this node's synced copy of its spaces; nothing is mounted there"
         if kind not in MOUNT_TYPES:
@@ -2834,7 +2834,7 @@ def _clean_config(cfg):
             return None, f"the {role} store: {why}"
         stores[role] = path[:200]
     out["stores"] = stores
-    # The stores whose path changes without their data coming along (R120):
+    # The stores whose path changes without their data coming along:
     # the person was asked, and said start it empty.
     out["keep"] = sorted({str(r) for r in (cfg.get("keep") if isinstance(cfg.get("keep"), list) else [])
                           if r in STORE_ROLES})
@@ -2847,15 +2847,15 @@ def _clean_config(cfg):
             return None, f"a static address is written with its prefix, like 10.0.0.12/24, not {addr!r}"
         if gw and not _IP.match(gw):
             return None, f"the gateway is an address, not {gw!r}"
-        # str(): a hand-made request's [1] raised on .strip() instead of
-        # being told a resolver is an address (B181).
+        # str: a hand-made request's [1] raised on .strip instead of
+        # being told a resolver is an address.
         dns = [str(d).strip() for d in (net.get("dns") if isinstance(net.get("dns"), list)
                                         else str(net.get("dns") or "").split(",")) if str(d).strip()]
         for d in dns:
             if not _IP.match(d):
                 return None, f"a resolver is an address, not {d!r}"
         n.update(address=addr, gateway=gw, dns=dns[:4])
-    # Static routes (the operator, 7 Oct), in either mode: a network beyond
+    # Static routes, in either mode: a network beyond
     # this one and the router that reaches it, as {to, via} or "TO via VIA".
     routes = []
     for r in net.get("routes") or []:
@@ -2926,7 +2926,7 @@ LOG_STREAMS = {
     # The journal where there is one; on an OpenRC or runit node, the file
     # the provisioner has its service write (/var/log/aerieos-agent.log),
     # which read nothing at all before. Under both names the service has
-    # had (R204): a node the Enroll script has not met since still runs the
+    # had: a node the Enroll script has not met since still runs the
     # one before, and one it has met keeps the journal of both.
     "agent": {"what": "the agent's own journal: what it did, and why a job failed",
               "argv": ["sh", "-c", "if command -v journalctl >/dev/null 2>&1; "
@@ -2943,12 +2943,12 @@ LOG_STREAMS = {
                "argv": ["tail", "-n", "{lines}", "{data}/runner.log"],
                "unit_argv": ["journalctl", "-u", "{unit}", "--no-pager",
                              "-n", "{lines}"]},
-    # The node's nginx (R171), where the nginx tab put one: what each request
+    # The node's nginx, where the nginx tab put one: what each request
     # it routed met, which is what a session chasing a 502 on a route to its
-    # container wants (R182). The container's name is the node's (nginx_for).
+    # container wants. The container's name is the node's (nginx_for).
     "nginx": {"what": "the node's nginx: each request it routed and what the proxy met",
               "argv": ["docker", "logs", "--tail", "{lines}", "{nginx}"], "nginx": True},
-    # The box itself (R183): this boot's whole journal, the kernel ring, and
+    # The box itself: this boot's whole journal, the kernel ring, and
     # the previous boot's last lines, which is where a panic's words are.
     "system": {"what": "the system journal of this boot, every unit",
                "argv": ["journalctl", "--system", "--no-pager", "-n", "{lines}"]},
@@ -2984,7 +2984,7 @@ def node_turn_limit(principal, node_id, limit):
 
 
 def node_vm_of(node_id, host_id):
-    """A node that is a VM AerieOS made on another node (R91 step 14),
+    """A node that is a VM AerieOS made on another node,
     said on its row; retired with the VM."""
     n = node(node_id)
     if not n:
@@ -2995,7 +2995,7 @@ def node_vm_of(node_id, host_id):
 
 
 def node_vm_lan(principal, node_id, on):
-    """Whether this node's VMs may reach its LAN (R91 step 8): off, they
+    """Whether this node's VMs may reach its LAN: off, they
     reach the internet, the controller and their own project's network; on,
     the rest of the network too. An administrator's, heard at once."""
     n = node(node_id)
@@ -3030,37 +3030,37 @@ def node_root_asks(principal, node_id, on):
 
 
 def account_users_on(nid):
-    """Each account a Unix user of its own on this node (R125): on wherever
+    """Each account a Unix user of its own on this node: on wherever
     sessions run, which is every node but a hosting-only one."""
     return not host_only(nid)
 
 
 def token_seal_on(nid):
-    """The coding agents' sign-ins sealed on this node (R126): on wherever
+    """The coding agents' sign-ins sealed on this node: on wherever
     sessions run, as long as this controller has an install key to make
     each account's sealing key from (a fresh install makes one at its first
     start)."""
     return account_users_on(nid) and bool(can_seal and can_seal())
 
 
-# Each account's public key for sealing on a node (R126): the server's,
+# Each account's public key for sealing on a node: the server's,
 # made from the install key (tokenkeys.py). nid -> {uid: hex}, or {} where
 # the controller has no install key and so cannot ever open a seal.
 token_pubs = None
-# The accounts' SMB passwords for the controller's own machine (R164 step
-# 1): users.smb_users, and the resolver of a share's names (users.smb_resolve).
+# The accounts' SMB passwords for the controller's own machine:
+# users.smb_users, and the resolver of a share's names (users.smb_resolve).
 smb_users = None
-pack_config = None         # nid -> [{pack, store, values, env}] (R172, packconfig.for_node)
-pack_people = None         # nid -> [{uid, pack, env}] (R172 step 5, packconfig.for_people)
+pack_config = None         # nid -> [{pack, store, values, env}] (packconfig.for_node)
+pack_people = None         # nid -> [{uid, pack, env}] (packconfig.for_people)
 smb_resolve = None
-# The reporting's intake (history.add), on the controller's own machine's samples (R164 step 4).
+# The reporting's intake (history.add), on the controller's own machine's samples.
 history_add = None
-# The other disks and shares the own machine mounts (extmounts.wanted, R162 step 4).
+# The other disks and shares the own machine mounts (extmounts.wanted).
 ext_mounts = None
-# ...and the backups it copies (storebackups.wanted, R162 step 5), with its scheduled names for the bell.
+# ...and the backups it copies (storebackups.wanted), with its scheduled names for the bell.
 store_backups = None
 backup_summary = None
-# ...and the passphrases of its encrypted pools (poolkeys.wanted, R162 step 3), given what is unlocked.
+# ...and the passphrases of its encrypted pools (poolkeys.wanted), given what is unlocked.
 pool_keys = None
 pool_keys_set = None
 # ...and how many of a node's seals are under a key before today's.
@@ -3071,7 +3071,7 @@ can_seal = None
 
 def root_off(n):
     """The sentence a node that runs no root command refuses with, or "":
-    its own console's word (aerieos-agent root-asks off, R227 step 2), which
+    its own console's word (aerieos-agent root-asks off), which
     nothing here turns back on. Said before a person is asked to allow
     one, and before a schedule or an administrator sends one."""
     if n and (n.get("reported") or {}).get("root_off"):
@@ -3091,11 +3091,11 @@ def root_refused(n):
 
 
 def ports_local_on(node_id):
-    """Whether published ports on this node bind to 127.0.0.1 by default
-    (R190): the config says, and a hosting-only node has it unless switched
+    """Whether published ports on this node bind to 127.0.0.1 by default:
+    the config says, and a hosting-only node has it unless switched
     off, since that is the node reached over the internet, where a port
     published on every address is open to the world and not only to its
-    nginx (the operator, 11 Oct). A compose that names an address
+    nginx. A compose that names an address
     (0.0.0.0:PORT:80) publishes where it says, switch or no switch."""
     n = node(node_id) or {}
     conf = n.get("config") or {}
@@ -3105,7 +3105,7 @@ def ports_local_on(node_id):
 
 
 def node_ports_local(principal, node_id, on):
-    """The switch (R190), an administrator's like the rest of the config
+    """The switch, an administrator's like the rest of the config
     plane; the next hello carries it to the agent, which writes docker's
     daemon.json and restarts docker once."""
     n = node(node_id)
@@ -3123,8 +3123,8 @@ def node_ports_local(principal, node_id, on):
 
 
 def session_net_on(node_id):
-    """Whether each session on a node is kept to its own project's network
-    (R79): on wherever sessions run; a hosting-only node runs none."""
+    """Whether each session on a node is kept to its own project's network:
+    on wherever sessions run; a hosting-only node runs none."""
     n = node(node_id) or {}
     return not host_only(n)
 
@@ -3134,14 +3134,14 @@ def session_net_nudge():
     so what the controller says each project owns there reaches it within a
     poll: after a container changes hands, or an instance comes or goes."""
     for n in node_list():
-        # ...and every one keeps its containers apart (R178), whose map moves
+        # ...and every one keeps its containers apart, whose map moves
         # with the same changes.
         if n.get("kind") == "agent":
             ask_hello(n["id"])
 
 
 def node_test_workers(principal, node_id, n):
-    """How many workers a test run on this node may use (R81): 0 means the
+    """How many workers a test run on this node may use: 0 means the
     node's own core count. Handed to every test job there as
     BB_TEST_WORKERS, for the project's test command and AerieOS's own
     harness to read. An administrator's, like the rest of the config plane;
@@ -3236,7 +3236,7 @@ def node_log_read(principal, asking_id, target_id, stream="agent", lines=200,
     argv = [x.format(**fills) for x in spec["argv"]]
     why = (f"{project or asking_id} reads {tgt['name']}'s "
            f"{stream} log, granted in its settings' Debug, not asked for here")
-    # Light (B654): a read of a few hundred lines, beside whatever holds the
+    # Light: a read of a few hundred lines, beside whatever holds the
     # node's slot, rather than behind it.
     return root_wait(principal, target_id, argv, why=why, timeout=LIGHT_S, light=True)
 
@@ -3298,8 +3298,8 @@ def node_runner_forget(principal, node_id, slot):
 
 def runner_job_on(node_id, slot, kind):
     """Whether this node is running the job that installs its runner `slot`
-    now, or for a "remove" token the one that installs or removes it (R288
-    step 7): a runner's tokens are handed only to that job, so a stolen node
+    now, or for a "remove" token the one that installs or removes it:
+    a runner's tokens are handed only to that job, so a stolen node
     token mints none."""
     for r in _rows("SELECT spec FROM jobs WHERE node = ? AND type = 'system' AND state IN ('assigned', 'running')",
                    (node_id,)):
@@ -3352,7 +3352,7 @@ def node_runner(principal, node_id, slot, want, labels=None, token=False, pins=N
                          "registers with (http is accepted for a forge on your own network)"}
     pin = (pins or {}).get(forge) if want else None
     if want and not pin:
-        # What a person reads, with no source path in it (B1100).
+        # What a person reads, with no source path in it.
         return {"error": "this build of AerieOS pins no download for that git host's runner, so none is fetched"}
     # The runner's own labels unless new ones are typed with this press.
     labs = runner_labels_for(n, labels if isinstance(labels, list) else ar.get("labels")) if want else []
@@ -3370,10 +3370,10 @@ def node_runner(principal, node_id, slot, want, labels=None, token=False, pins=N
 
 def tunnel_addr(n):
     """A node's address in the tunnel it reaches the controller through,
-    '' for one on the LAN: what its enroll script was made with (R161).
+    '' for one on the LAN: what its enroll script was made with.
     Never what the node reports: every address here is refused all but the
     agent's API, and a node that named loopback would lock out every bb
-    call (R92)."""
+    call."""
     t = ((n.get("config") or {}).get("tunnel") or {}).get("addr") or ""
     return t if re.fullmatch(r"[0-9.]{7,15}", t) else ""
 
@@ -3391,12 +3391,12 @@ def tunnel_addrs():
 
 
 def tunnel_hosts():
-    """Every hostname a node reaches the controller at through a tunnel
-    (R170), read again at most every five seconds like tunnel_addrs."""
+    """Every hostname a node reaches the controller at through a tunnel,
+    read again at most every five seconds like tunnel_addrs."""
     now = time.monotonic()
     if now - _tunnels["at"] > 5 or "hosts" not in _tunnels:
         # A retired node's too: removing a box in an incident must not
-        # open the dashboard on the name it was reached at (R92).
+        # open the dashboard on the name it was reached at.
         rows = node_list()
         _tunnels.update(at=now, addrs=frozenset(a for a in (tunnel_addr(n) for n in rows) if a),
                         hosts=frozenset(h for h in (tunnel_host(n) for n in rows) if h))
@@ -3412,21 +3412,21 @@ def tunnel_host(n):
 
 
 def own_tunnel_edge(has_ray, peer):
-    """Whether a request came through the controller's own Cloudflare tunnel
-    (R176): Cloudflare's Cf-Ray, from this machine's loopback, which is where
+    """Whether a request came through the controller's own Cloudflare tunnel:
+    Cloudflare's Cf-Ray, from this machine's loopback, which is where
     the controller's cloudflared asks. Cf-Ray alone is every request
-    Cloudflare proxies, a dashboard put behind it under its own name too
-    (B137)."""
+    Cloudflare proxies, a dashboard put behind it under its own name too.
+    """
     return bool(has_ray) and str(peer or "") in ("127.0.0.1", "::1")
 
 
 def tunnel_refuses(addr, path, host="", edge=False):
     """Why a request from `addr` for `path` is refused, or "": a node that
     reaches the controller through a tunnel is answered on the agent's own
-    API and nothing else (R161), so the tunnel open on a machine somebody
+    API and nothing else, so the tunnel open on a machine somebody
     else may own reaches no login, no page and no other account's API.
     `host` is the request's Host header and `edge` whether it carries a
-    tunnel edge's own headers (R170): through a tunnel every request comes
+    tunnel edge's own headers: through a tunnel every request comes
     from the tunnel's local end, so the hostname a node was enrolled at is
     the mark instead. A header can only narrow what its writer gets,
     never widen it, which is why one is read here at all."""
@@ -3442,7 +3442,7 @@ def tunnel_refuses(addr, path, host="", edge=False):
 
 def route_host(node_id):
     """The host a published port on this node is reached at from the LAN:
-    its address in the tunnel it dials through (R161), else the address the
+    its address in the tunnel it dials through, else the address the
     node last dialed in from. '' for local and the unknown."""
     n = node(node_id)
     if not n or n["kind"] == "local":
@@ -3498,7 +3498,7 @@ def agent_back(b):
 
 def went_back(n):
     """Why this node went back from the agent this controller ships, where
-    it did (R241): the build is not sent to it again unasked. "" otherwise."""
+    it did: the build is not sent to it again unasked. "" otherwise."""
     b = (n.get("agent") or {}).get("back") if n else None
     if not isinstance(b, dict) or b.get("digest") != agent_file()["digest"]:
         return ""
@@ -3605,7 +3605,7 @@ def agent_stale(n):
     mine = (n.get("agent") or {}).get("version") or "?"
     if newer == "window":
         return f"{n['name']} runs agent {mine}, newer than this controller works with"
-    # One that will not take this build is told what keeps it (B1108): a
+    # One that will not take this build is told what keeps it: a
     # press of Update agent, or a wait for the controller's own, could only
     # be refused there.
     held = build_refused(n)
@@ -3637,7 +3637,7 @@ def bundle_refused(n, serving=None):
         return ""
     if b["digest"] != (serving or bundle_digest()):
         return ""
-    # One phrase on a page (the operator, 20 Nov: the row was a paragraph,
+    # One phrase on a page (the row was a paragraph,
     # with the first characters of the keys the node takes): an agent that
     # sent its whole refusal is read up to where that phrase ended.
     why = str(b.get("why") or "")
@@ -3692,7 +3692,7 @@ def session_bundle_wait(nid, ask=None, limit=45, nap=time.sleep):
     """The node, once its terminals run the bundle this controller serves
     or it is plain they will not: asked to check in now (`ask`), it takes
     the new one within a poll, waited for here up to `limit` seconds rather
-    than refusing with "try again in a minute" (B746). No wait at all for a
+    than refusing with "try again in a minute". No wait at all for a
     node that is not due one (session_bundle_due), and the wait ends the
     moment it reports that it refused this bundle."""
     n = node(nid)
@@ -3738,10 +3738,10 @@ def attention(project_nodes):
             continue
         mine = agent_window((n.get("agent") or {}).get("version") or "")
         auto = bool(mine) and mine == agent_window(ours["version"])
-        # Inside a window the controller updates it once the node is idle
-        # (R253): the row says so, and says why when its last try failed.
+        # Inside a window the controller updates it once the node is idle:
+        # the row says so, and says why when its last try failed.
         last = next((j for j in jobs_for(node_id=n["id"], n=5, type="self-update")), None) if auto else None
-        # It took the update and went back to the agent it had (R241): said,
+        # It took the update and went back to the agent it had: said,
         # and no longer the controller's to send by itself.
         back = went_back(n)
         # It takes only a signed release and this build is not one: held, and
@@ -3773,7 +3773,7 @@ def _vm_guest(g):
 def floor_mb(floor_gb, total_mb):
     """The room a disk keeps, in MB: the floor, or a tenth of the disk where
     that is less, so a 16 GB VM is not short of room from the day it is
-    made (R110)."""
+    made."""
     return min(floor_gb * 1024, int((total_mb or 0) * 0.1)) if total_mb else floor_gb * 1024
 
 
@@ -3782,7 +3782,7 @@ ROOM_WHAT = {"docker": "Docker's images and build cache", "root": "its root file
 
 
 def room_short(nid, floor_gb, roles=("docker", "root"), need_mb=0):
-    """Why work on `nid` would run out of disk, or "" (R110): the first of
+    """Why work on `nid` would run out of disk, or "": the first of
     `roles` the node says (a disk, or a store) under the floor, or under
     `need_mb` where that is more (what the project's last build took).
     Docker's for a container build, the data store's for a project's build
@@ -3808,7 +3808,7 @@ def room_short(nid, floor_gb, roles=("docker", "root"), need_mb=0):
 
 def homes_full(nid, pct=90):
     """Whether the filesystem holding the accounts' homes on `nid` is past
-    `pct` used and a phone there is not running (R129): where the room
+    `pct` used and a phone there is not running: where the room
     keeper's phones-idle job has something to give back."""
     st = ((node(nid) or {}).get("reported") or {}).get("storage") or {}
     fs = (st.get("homes") or {}).get("fs") or ""
@@ -3818,12 +3818,12 @@ def homes_full(nid, pct=90):
     return False
 
 
-# Set by server.py (R110): the floor in GB a build or test on a node is held
+# Set by server.py: the floor in GB a build or test on a node is held
 # to, 0 for none (Controller settings, Room).
 room_floor_gb = lambda: 0  # noqa: E731
 
-# Room on a node (R110), each node's own where its page sets one (R294 step
-# 7): Controller settings' values are every node's default, so a small board
+# Room on a node, each node's own where its page sets one:
+# Controller settings' values are every node's default, so a small board
 # and a big server are not held to one number, and Nodes Write on a node
 # reaches its own. Each a whole number in its range; none is the default.
 ROOM_KEYS = {"room_floor_gb": (1, 1000), "room_mem_pct": (50, 99), "container_mem_gb": (0, 1024)}
@@ -3846,7 +3846,7 @@ def room_floor_for(n):
 
 
 def node_room(principal, node_id, req):
-    """A node's own room (R294 step 7): each of ROOM_KEYS that `req` names, a
+    """A node's own room: each of ROOM_KEYS that `req` names, a
     whole number in its range, or "" or null for the install's again."""
     node_ = node(node_id)
     if not node_:
@@ -3879,7 +3879,7 @@ def node_room(principal, node_id, req):
 
 
 def last_took(project):
-    """What the project's last build or test took on its node (R110 step 7):
+    """What the project's last build or test took on its node:
     {workspace, cache (bytes, or None), node, at}, from the room line the
     agent adds to a job's outputs, or {} before one has said."""
     for r in _rows("SELECT node, ended, outputs FROM jobs WHERE project = ? AND type = 'exec' "
@@ -3897,8 +3897,8 @@ def last_took(project):
 
 
 def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
-    """The bell's rows for a node short of room (R110, the operator, 22
-    Oct): a live agent node whose root filesystem, Docker's or a store has
+    """The bell's rows for a node short of room:
+    a live agent node whose root filesystem, Docker's or a store has
     less free than `floor_gb`, or whose memory has stayed at `mem_pct` or
     more over its last ten minutes of samples, each the install's where the
     node sets none of its own (room_of). One row per node, naming
@@ -3924,13 +3924,13 @@ def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
             seen.add((free, total))
             short.append({"what": (label(role) if label else role), "free_gb": round(free / 1024, 1),
                           "total_gb": round(total / 1024, 1)})
-        # ...and its VMs (R110 step 6): one whose own disk is `vm_pct` full
+        # ...and its VMs: one whose own disk is `vm_pct` full
         # as its guest agent says, and the pool their disks grow into, under
         # what VM create keeps free there.
         rep = n.get("reported") or {}
         for v in rep.get("vms") or []:
             vn = v["name"].removeprefix("bbvm-")
-            # Every filesystem its guest agent names (R110 step 8).
+            # Every filesystem its guest agent names.
             fss = (v.get("guest") or {}).get("fs") or []
             for mount, used, total in fss:
                 if total and used * 100 >= total * vm_pct:
@@ -3963,7 +3963,7 @@ def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
 
 
 def held_attention(uid, admin):
-    """The bell's rows for the sessions an outage stopped (R251): one per
+    """The bell's rows for the sessions an outage stopped: one per
     session a node's gates held, for that session's account or an
     administrator, keyed by the hold so Dismiss puts away this one and not
     the next. A node that is away is skipped: its Resume could not land."""
@@ -3982,7 +3982,7 @@ def held_attention(uid, admin):
 
 
 # An agent behind this controller inside its window is updated by the
-# controller itself as soon as its node is idle (R253): an agent that is behind
+# controller itself as soon as its node is idle: an agent that is behind
 # takes no job but its own update, so every session's job on that node was
 # refused until somebody pressed Update agent, after every controller update.
 # Safe to do unasked: the self-update refuses while other jobs run and
@@ -4015,8 +4015,8 @@ def auto_update(nid):
     mine = agent_window((n.get("agent") or {}).get("version") or "")
     if not mine or mine != agent_window(agent_file()["version"]):
         return None
-    # A build this node went back from is a person's to send again (the
-    # operator, 13 Nov): no loop of update, fail and go back.
+    # A build this node went back from is a person's to send again:
+    # no loop of update, fail and go back.
     if went_back(n):
         return None
     # ...and so is one this node refuses for want of a release's signature:
@@ -4039,7 +4039,7 @@ def node_update_agent(principal, node_id):
     (door 4). The agent replaces itself in place and re-execs, so nothing on
     the node restarts and no running job is interrupted; it refuses while
     other jobs run. The operator presses it, and auto_update does inside a
-    window once the node is idle (R253)."""
+    window once the node is idle."""
     n = node(node_id)
     if not n:
         return {"error": "no such node"}
@@ -4050,7 +4050,7 @@ def node_update_agent(principal, node_id):
         return {"error": "this controller ships no agent"}
     if (n.get("agent") or {}).get("digest") == ours["digest"]:
         return {"ok": True, "current": True, "version": ours["version"]}
-    # Not sent where the node would refuse it (B1108): the job could only
+    # Not sent where the node would refuse it: the job could only
     # fail there, and its failure said less than this.
     held = build_refused(n)
     if held:
@@ -4197,7 +4197,7 @@ def build_refused(n):
     """What keeps this node from taking the build this controller ships, in
     a few words, or "" where nothing is known to: what the lines that say a
     node is behind say in place of Update agent, which that node could only
-    refuse (B1108). Only an unsigned build is known before it is sent (a
+    refuse. Only an unsigned build is known before it is sent (a
     node that checks signatures and does not allow unsigned builds at its
     console); a signature is the node's to judge, and one it did not accept
     is held after its answer (unsigned_refused)."""
@@ -4313,8 +4313,8 @@ def runner_labels_known():
 
 
 def node_in_use(n):
-    """Why a node cannot be disabled or un-enrolled now (the operator, 11
-    Oct): its Claude sessions and the containers running there, which the
+    """Why a node cannot be disabled or un-enrolled now:
+    its Claude sessions and the containers running there, which the
     person ends and brings down first. "" when it is quiet."""
     rep = n.get("reported") or {}
     # The sessions the card lists: an account's (u_<uid>~name), the way
@@ -4364,17 +4364,17 @@ def lockdown_over(n):
     return bool(at) and n.get("state") != "retired" and time.time() - at > LOCKDOWN_GRACE_S
 
 
-# The features a node's Features section installs and removes (R91), as
+# The features a node's Features section installs and removes, as
 # bb-sandbox's FEATURE_IDS and the agent's census name them.
 FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
 FEATURE_NAMES = {"vmhost": "VM host", "firewall": "the hosting firewall", "iommu": "the IOMMU", "gpuvm": "the NVIDIA card to a VM",
                  "storage": "storage", "shares": "shares", "ups": "the UPS"}
-# The installed edition's own (R56 step 2): on the controller's own machine alone.
+# The installed edition's own: on the controller's own machine alone.
 OWN_FEATURES = ("storage", "shares", "ups")
 
 
 def node_feature(principal, node_id, fid, op):
-    """Install or remove one of a node's features (R91): a system job the
+    """Install or remove one of a node's features: a system job the
     agent answers with bb-sandbox's own feature install, the one the enroll
     script's flag ran, so a feature not picked at enrollment is added from
     the node's page afterwards. Refused here with the reason the page
@@ -4385,13 +4385,13 @@ def node_feature(principal, node_id, fid, op):
     if fid not in FEATURES or op not in ("install", "remove"):
         return {"error": f"no such feature verb: {op} {fid}"}
     name = FEATURE_NAMES[fid]
-    # The installed edition's parts (R56 step 2) are the controller's own
+    # The installed edition's parts are the controller's own
     # machine's, before any other gate: another node is told whose they are.
     if fid in OWN_FEATURES and not own_machine(n):
         return {"error": f"{name} is the controller's own machine's (the installed edition's part): {n['name']} is another node"}
-    # The controller's own machine takes VM host too (R165 step 1): there
+    # The controller's own machine takes VM host too: there
     # the VMs run through the root agent and the jobs account stays out of
-    # libvirt's group, which is root on that machine (R90 step 14).
+    # libvirt's group, which is root on that machine.
     rep = n.get("reported") or {}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']} was not provisioned as a managed node with its agent as root, so {name} cannot be "
@@ -4406,7 +4406,7 @@ def node_feature(principal, node_id, fid, op):
     if op == "install" and fid == "vmhost" and not (fe.get("vmhost") or {}).get("kvm"):
         return {"error": f"{n['name']} has no /dev/kvm, so VMs would run in software, tens of times slower: on a VM, "
                          "its host passes virtualization through (CPU mode host-passthrough, nested KVM on)"}
-    # The card to a VM (R207 step 3) wants a card: the census names one.
+    # The card to a VM wants a card: the census names one.
     if fid == "gpuvm" and op == "install" and not rep.get("gpu_card"):
         return {"error": f"no NVIDIA card on {n['name']} (none in what it reported), so there is no card to give a VM"}
     if fid == "iommu" and not str(rep.get("arch") or "").startswith(("x86_64", "amd64")):
@@ -4416,7 +4416,7 @@ def node_feature(principal, node_id, fid, op):
                          "reaches sessions on"}
     # ...and one whose machine runs no sessions: the switch alone leaves the
     # session account and its ports, which the machine's helper then refused
-    # with exit 1 after the job had been queued (R97's walk, 21 Oct).
+    # with exit 1 after the job had been queued.
     if op == "install" and fid == "firewall" and ((n.get("reported") or {}).get("session") or {}).get("up"):
         return {"error": "this machine still runs sessions, so the firewall would shut the ports the controller "
                          "reaches them on: it is for a node enrolled hosting-only (Enroll node, sessions off)"}
@@ -4424,7 +4424,7 @@ def node_feature(principal, node_id, fid, op):
 
 
 def node_storage_snapshot(principal, node_id, req):
-    """A snapshot of a pool on the controller's own machine (R162 step 5):
+    """A snapshot of a pool on the controller's own machine:
     taken now (and the oldest of its kind pruned past what is kept), a
     dataset rolled back to one (its name typed again), or one destroyed;
     a system job on its node. The schedules are the Schedules page's, made
@@ -4473,7 +4473,7 @@ def node_storage_snapshot(principal, node_id, req):
 
 
 ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "moves", "destroy")
-# A share's places on an array taken over (R163): where its new files land,
+# A share's places on an array taken over: where its new files land,
 # and the mover's from and to; a pool by name, or the array.
 MOVE_SHARE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
 MOVE_PLACE = re.compile(r"array|[a-z][a-z0-9_-]{0,31}")
@@ -4510,7 +4510,7 @@ def _disk_ids(known, names):
     """Each named disk as the census showed it to the person (its by-id link
     and serial), for the agent to hold the name to: a kernel name can move
     to another disk between the pick and the job (a stick plugged in, a
-    reboot), and the wipe would land on whichever disk took it (B527)."""
+    reboot), and the wipe would land on whichever disk took it."""
     return {d: {"by_id": str(known[d].get("by_id") or ""), "serial": str(known[d].get("serial") or "")}
             for d in names if d in known}
 
@@ -4521,7 +4521,7 @@ def _adopted_pools(ad):
 
 
 def node_storage_array(principal, node_id, req):
-    """The array on the controller's own machine (R162 step 2): made of
+    """The array on the controller's own machine: made of
     data disks and one or two parity disks, a disk added or a slot's disk
     replaced, SnapRAID's sync, scrub and check run now, or the array
     destroyed (the word typed again; the disks keep their files); a system
@@ -4595,7 +4595,7 @@ def node_storage_array(principal, node_id, req):
             return {"error": "destroying the array takes the word array typed again"}
         cfg["confirm"] = "array"
     elif action == "takeover":
-        # An adopted array taken over as SnapRAID's (R163 step 3): what was
+        # An adopted array taken over as SnapRAID's: what was
         # adopted, its parity disk on the machine; a dry run first.
         ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
         if have.get("data"):
@@ -4611,7 +4611,7 @@ def node_storage_array(principal, node_id, req):
         if not cfg["dry"] and str(req.get("confirm") or "") != "parity":
             return {"error": "taking the array over overwrites the old parity: it takes the word parity typed"}
         if not cfg["dry"]:
-            # The agent asks for the word itself (B718), as destroy's does.
+            # The agent asks for the word itself, as destroy's does.
             cfg["confirm"] = "parity"
         # Each share's places (where its new files land, the mover's from
         # and to): as the person set them on the takeover, else from the
@@ -4639,7 +4639,7 @@ def node_storage_array(principal, node_id, req):
         if not cfg["moves"]:
             return {"error": "no share's places to set"}
     elif action == "verify":
-        # Check parity (R163 step 15), and with `correct` the blocks that
+        # Check parity, and with `correct` the blocks that
         # differ written back.
         cfg["correct"] = req.get("correct") is True
     why = _reachable(n)
@@ -4651,7 +4651,7 @@ def node_storage_array(principal, node_id, req):
 
 
 def node_console(principal, node_id, password, clear=False):
-    """A console password for AerieOS's screen (R194): hashed here
+    """A console password for AerieOS's screen: hashed here
     (SHA-512 crypt, by openssl, so neither the job nor its record holds the
     password itself), sent to the machine's agent, which makes the admin
     account from it at every boot. clear takes it away."""
@@ -4675,7 +4675,7 @@ def node_console(principal, node_id, password, clear=False):
         if r.returncode != 0 or not re.fullmatch(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}", h):
             return {"error": "the password could not be hashed here (openssl passwd -6)"}
         cfg["hash"] = h
-    # Under the lock as every system change is (B1022): a node locked to its
+    # Under the lock as every system change is: a node locked to its
     # own console has its console's password set there; Unlock is on its page.
     why = _reachable(n)
     if why:
@@ -4689,7 +4689,7 @@ ADOPT_FS = ("xfs", "btrfs", "zfs")
 
 def _degraded_why(what):
     """Why nothing may write to the old array, or "": the stick's plan names
-    a disk the old system marked disabled or missing (B940), whose files may
+    a disk the old system marked disabled or missing, whose files may
     live only in its parity; the old system rebuilds it first."""
     import firstboot
     bad = (firstboot.adopt_want(firstboot.kept_config()) or {}).get("degraded") or []
@@ -4703,7 +4703,7 @@ def _degraded_why(what):
 def _takeover_gaps_why(adopted):
     """Why the takeover waits, or "": a data disk the stick's plan names that
     is not adopted here (not on this machine, or set apart as encrypted),
-    whose only protection is the old parity the takeover formats (B948)."""
+    whose only protection is the old parity the takeover formats."""
     import firstboot
     aw = firstboot.adopt_want(firstboot.kept_config()) or {}
     have = {str(m.get("where") or "").rsplit("/", 1)[-1] for m in (adopted or {}).get("mounts") or [] if isinstance(m, dict)}
@@ -4736,7 +4736,7 @@ def _adopt_want(req):
                 or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))) \
                 or (x.get("disk_id") and not ok_id(x.get("disk_id"))):
             return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid, or disk_id for one the old system kept in its cache slot}"
-        # ...found by its disk where no pool record names its UUID (B625).
+        # ...found by its disk where no pool record names its UUID.
         pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or ""),
                       **({"disk_id": str(x["disk_id"])} if x.get("disk_id") else {})})
     if len(data) > 30 or len(parity) > 2 or len(pools) > 8 or not (data or pools):
@@ -4747,7 +4747,7 @@ def _adopt_want(req):
 
 def node_storage_adopt(principal, node_id, req):
     """Another NAS's array and pools taken as they are on the controller's
-    own machine (R163 step 8): a dry run that says every mount, the
+    own machine: a dry run that says every mount, the
     adoption itself (data disks read-only unless writable is asked, parity
     never touched, pools writable, the old paths kept), or Release, which
     unmounts and forgets them; a system job on its node, nothing formatted
@@ -4817,7 +4817,7 @@ pool_keys_offer = pool_keys_forget = None
 
 
 def node_storage_key(principal, node_id, req):
-    """An encrypted pool's key (R162 step 3): unlock (the passphrase typed
+    """An encrypted pool's key: unlock (the passphrase typed
     after a boot, handed to the agent once), keep (the passphrase kept
     sealed here from now on) or forget (asked after every boot from now
     on); the own machine's, an administrator's."""
@@ -4844,7 +4844,7 @@ def node_storage_key(principal, node_id, req):
 
 
 def node_storage_share(principal, node_id, req):
-    """A share on the controller's own machine (R162 step 1): set (SMB,
+    """A share on the controller's own machine: set (SMB,
     NFS or both, on a folder under a pool's mount) or removed, a system job
     on its node whose root agent writes AerieOS's own two files whole and
     tells Samba and NFS to read again. Refused anywhere else, and without
@@ -4859,7 +4859,7 @@ def node_storage_share(principal, node_id, req):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot serve a share"}
     sh = (rep.get("features") or {}).get("shares") or {}
     action = str(req.get("share") or "")
-    # Many at once (R163 step 9): an adopted system's shares, each checked
+    # Many at once: an adopted system's shares, each checked
     # as one alone is; one that does not pass is left out with why.
     if action == "set-many":
         rows, skipped = [], []
@@ -4910,7 +4910,7 @@ def _share_cfg(sh, req):
         if nfs.get("on") and not sh.get("nfs"):
             return None, "no NFS server on the machine yet: install Shares on its Features section first"
         users = [str(u).strip() for u in (smb.get("users") or []) if isinstance(u, str) and str(u).strip()]
-        # An account's name or role:NAME to the Unix users Samba is told (R164 step 1).
+        # An account's name or role:NAME to the Unix users Samba is told.
         if smb_resolve and users:
             users, why = smb_resolve(users)
             if why:
@@ -4938,7 +4938,7 @@ def _share_cfg(sh, req):
 
 
 def relay_of(node_id):
-    """How a node's relay port is spoken to (R243): {pin, once}, the words
+    """How a node's relay port is spoken to: {pin, once}, the words
     relaytls.connect and termws.node take. `pin` is the sha256 of the
     certificate its agent made and reported, the only one the controller
     then takes there, empty for a node that has none (a machine with neither
@@ -4951,7 +4951,7 @@ def relay_of(node_id):
 
 def relay_derived(node_id):
     """Whether a node's relay takes the key derived from its token alone
-    (R288, screen_key), as its agent reports."""
+    (screen_key), as its agent reports."""
     return bool((((node(node_id) or {}).get("reported") or {}).get("relay") or {}).get("derived"))
 
 
@@ -4973,8 +4973,8 @@ def smb_named():
 
 
 def smb_shares_for(uid):
-    """The SMB shares on the controller's own machine a person reaches (R164
-    step 1), for Profile: {host, address, rows: [{name, ro, guest, tm}]} with
+    """The SMB shares on the controller's own machine a person reaches,
+    for Profile: {host, address, rows: [{name, ro, guest, tm}]} with
     the address to map each by, or None where no own machine serves any."""
     me = "bbu-" + uid[2:] if re.fullmatch(r"u_[0-9a-f]{8}", str(uid or "")) else ""
     for n in node_list():
@@ -5000,7 +5000,7 @@ POOL_LAYOUTS = {"single": 1, "mirror": 2, "raidz1": 3, "raidz2": 4}
 
 
 def node_storage_pool(principal, node_id, req):
-    """A ZFS pool on the controller's own machine (R162 step 1): a system
+    """A ZFS pool on the controller's own machine: a system
     job on its node, whose root agent runs zpool from its table with each
     argument checked here first and again there; the disks named must be
     ones the machine's census lists and none the system's. Refused anywhere
@@ -5044,7 +5044,7 @@ def node_storage_pool(principal, node_id, req):
             if known[d].get("system"):
                 return {"error": f"{d} is the system disk, which never goes into a pool"}
         cfg.update(layout=layout, disks=disks, wipe=req.get("wipe") is True, ids=_disk_ids(known, disks))
-        # Native encryption (R162 step 3): the passphrase goes to the key
+        # Native encryption: the passphrase goes to the key
         # record (kept sealed here, or asked after every boot), never into
         # the job; the hello hands it to the agent before the job runs.
         if action == "create" and req.get("encrypt") is True:
@@ -5064,13 +5064,13 @@ def node_storage_pool(principal, node_id, req):
             return {"error": "destroying a pool takes its name typed again"}
         cfg["confirm"] = name
     elif action == "import":
-        # A pool another machine made (R163 step 1), as the census lists it.
+        # A pool another machine made, as the census lists it.
         found = next((x for x in rep.get("pools_importable") or [] if x.get("name") == name), None)
         if not found:
             return {"error": f"no pool called {name} is waiting to be imported on {n['name']}"}
         cfg["id"] = found.get("id") or ""
         # One another system used last is forced only with its name typed
-        # again (B938): a machine whose stick died meets its own pools so.
+        # again: a machine whose stick died meets its own pools so.
         if req.get("force") is True:
             if str(req.get("confirm") or "") != name:
                 return {"error": "importing a pool another system used last takes its name typed again"}
@@ -5084,7 +5084,7 @@ DISK_HOT_C = 55
 
 def storage_attention():
     """The bell's rows (kind disk) for the controller's own machine's
-    storage (R164 step 3), from the census on every poll so each leaves
+    storage, from the census on every poll so each leaves
     the moment it stops being true: a disk SMART calls failing (bad), a
     disk at DISK_HOT_C or more, a pool not online (bad), an array slot not
     mounted (bad). Keyed on what is wrong, so a dismissal holds until it
@@ -5116,8 +5116,8 @@ def storage_attention():
                 if not x.get("mounted"):
                     out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "array", "bad": True, "key": f"array:{n['id']}:{kind}{x.get('slot')}",
                                 "said": f"the array's {kind}{x.get('slot')} ({x.get('id') or 'unknown disk'}) is not mounted: the disk is gone or failed; Replace on the Storage page rebuilds it"})
-        # An old system's array adopted writable and not taken over (the
-        # operator, 8 Nov): its files change with no parity behind them until
+        # An old system's array adopted writable and not taken over:
+        # its files change with no parity behind them until
         # Take the array over on the Nodes page builds SnapRAID's. A standing
         # row, not dismissed: it leaves when the array is taken or released.
         ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
@@ -5136,7 +5136,7 @@ def storage_attention():
                         "said": f"the stick's own partition has {free / 1024:.1f} GB free of {total / 1024:.1f} GB, and the controller stops when it is full"
                                 + (": name a system pool under Pool and spaces on the Nodes page, which takes docker, the VMs, the spaces and the secrets off it"
                                    if not st.get("ready") else ": the Storage page says what is on it")})
-        # The last Check parity's result (R163 step 15), until dismissed:
+        # The last Check parity's result, until dismissed:
         # clean, or what differed and what was or could not be corrected.
         v = ar.get("verify") if isinstance(ar.get("verify"), dict) else {}
         if v.get("at"):
@@ -5152,11 +5152,11 @@ def storage_attention():
 
 
 def power_attention():
-    """The bell's rows (kind power) for the controller's own machine (R164
-    step 3): on battery (bad, with the minutes left), a low battery (bad),
+    """The bell's rows (kind power) for the controller's own machine:
+    on battery (bad, with the minutes left), a low battery (bad),
     a battery to replace, a UPS that does not answer while its feature is
     installed; and, for every node whose agent counts them, its system's
-    own packages (kind host, R294 step 13): security updates waiting, and a
+    own packages (kind host): security updates waiting, and a
     restart the last update asked for. Keyed on the state, so a dismissal
     holds until it changes."""
     out = []
@@ -5206,7 +5206,7 @@ def _host_rows(n, rep):
 
 def backup_attention():
     """The bell's rows (kind backup) for the controller's own machine's
-    backups (R162 step 5): one whose last run failed (bad), one scheduled
+    backups: one whose last run failed (bad), one scheduled
     that has not had a good run in two days (or ever); keyed on the state."""
     out = []
     if not backup_summary:
@@ -5228,7 +5228,7 @@ def backup_attention():
 
 
 def node_storage_backup(principal, node_id, name):
-    """Run one of the own machine's backups now (R162 step 5): a system job
+    """Run one of the own machine's backups now: a system job
     naming the record's row, which the agent copies with rsync; refused
     anywhere else and while a system job is in flight."""
     n = node(node_id)
@@ -5249,7 +5249,7 @@ def node_storage_backup(principal, node_id, name):
 
 
 def node_host_update(principal, node_id, reboot=False):
-    """The controller's own machine's own packages updated (R164 step 3):
+    """The controller's own machine's own packages updated:
     apt on its node by the root agent, a restart after when asked for;
     refused anywhere else, on AerieOS (whole images), and while a
     system job is in flight."""
@@ -5271,8 +5271,8 @@ def node_host_update(principal, node_id, reboot=False):
 
 
 def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
-    """The controller's own machine's name and time zone (R161 step 3, R56
-    step 8): a system job on its node, whose root agent sets them through
+    """The controller's own machine's name and time zone:
+    a system job on its node, whose root agent sets them through
     hostnamectl and timedatectl; refused anywhere else, since another node's
     name is its own administrator's."""
     n = node(node_id)
@@ -5310,17 +5310,17 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
     return _queue_system(principal, n, "machine", cfg, 120, "machine", cfg)
 
 
-# A draft release (the operator, 1 Nov): the controller fetches its files
+# A draft release: the controller fetches its files
 # itself and the update is taken from that folder (server._draft_update);
 # None where the tag is no draft it can see. Configured by the server.
 draft_update = lambda principal, node_id, tag, os_image: None  # noqa: E731
 
-# How many pushed-out versions stay on the boot menu (R201): settings.os_keep.
+# How many pushed-out versions stay on the boot menu: settings.os_keep.
 keep_versions = lambda: 3  # noqa: E731
 
 
 def node_os_kept(principal, node_id, verb, version):
-    """An older version on the boot menu (R201): `next` boots it once,
+    """An older version on the boot menu: `next` boots it once,
     `remove` takes it away. A system job on the own machine's node."""
     n = node(node_id)
     if not n:
@@ -5339,7 +5339,7 @@ def node_os_kept(principal, node_id, verb, version):
 
 
 def node_os_update(principal, node_id, release="", from_dir=""):
-    """Update AerieOS on the controller's own machine (R160 step 4): a
+    """Update AerieOS on the controller's own machine: a
     system job on its node, whose root agent fetches the release's image
     files (or takes them from a folder on the machine), checks each against
     its sha256 and the slot against its build attestation, writes the slot
@@ -5380,7 +5380,7 @@ def on_stick():
 
 def workspace_held():
     """Why no project may be made, cloned or moved in here now, or "": on a
-    stick the projects are never written to the stick (the operator, 1 Nov),
+    stick the projects are never written to the stick,
     so until a system pool or a folder on the machine's disks holds them,
     they are held (system-pool's hold)."""
     for n in node_list():
@@ -5421,7 +5421,7 @@ def projects_folder_places(n):
 
 def node_projects_folder(principal, node_id, path="", release=False):
     """A folder already on a stick machine's disks named as its projects
-    folder (R163, the operator, 1 Nov): a controller moved here without its
+    folder: a controller moved here without its
     repositories finds them where the disks held them, nothing copied. The
     folder must lie inside an adopted share, a pool or the array, writable;
     the job says which of the controller's projects it holds, hands its files
@@ -5459,7 +5459,7 @@ def node_projects_folder(principal, node_id, path="", release=False):
 def adopted_pools(rep):
     """The mount points of the pools this machine adopted, mounted and
     writable, whatever their filesystem: the census's pools are zpools alone,
-    so a btrfs or XFS cache from the old system was no pool to pick (B663).
+    so a btrfs or XFS cache from the old system was no pool to pick.
     A data disk is not one: its slot is /mnt/diskN, and it carries the old
     system's parity."""
     rows = ((rep or {}).get("adopted") or {}).get("mounts") or []
@@ -5468,7 +5468,7 @@ def adopted_pools(rep):
 
 
 def node_system_pool(principal, node_id, path="", aside=False):
-    """A stick's system pool (R161 step 10): the pool, by its mount point,
+    """A stick's system pool: the pool, by its mount point,
     where docker, containerd, libvirt, the toolchains and the projects write
     instead of the stick; a system job on the own machine's node, whose root
     agent moves them there and binds them at every boot. Refused anywhere
@@ -5491,14 +5491,14 @@ def node_system_pool(principal, node_id, path="", aside=False):
     why = _reachable(n)
     if why:
         return {"error": why}
-    # The id this controller's restored configuration names as its own pool's
-    # (B939): that pool is taken back, never refused as another install's.
+    # The id this controller's restored configuration names as its own pool's:
+    # that pool is taken back, never refused as another install's.
     return _queue_system(principal, n, "system-pool", {"path": path, "aside": aside is True, "adopt_id": install_id_kept()}, 6 * 3600,
                          "system-pool", {"path": path, "aside": aside is True})
 
 
 def node_controller_update(principal, node_id, release=""):
-    """Update a controller installed bare metal (R90 step 5): a system job
+    """Update a controller installed bare metal: a system job
     on its own machine's node, whose root agent runs the installer's
     --update (the release's bundle fetched and verified, the state gate,
     the switch, and a rollback by itself when the new build does not
@@ -5527,7 +5527,7 @@ def node_controller_update(principal, node_id, release=""):
 
 
 def node_lockdown(principal, node_id):
-    """Lock down a hosting-only node (R92), the press for a box that may
+    """Lock down a hosting-only node, the press for a box that may
     have been taken over: from this moment its agent may ask for nothing
     but the lockdown job and say how it went, which stops every container
     there (and keeps it from starting again at a boot), its nginx with
@@ -5565,7 +5565,7 @@ def node_lockdown(principal, node_id):
 
 
 def reset_unenroll(principal, ids, stores=False):
-    """Un-enroll these nodes ahead of a Reset (the operator, 12 Oct), so
+    """Un-enroll these nodes ahead of a Reset, so
     each machine is clean to enroll again afterwards: a node AerieOS
     provisioned and can reach is uninstalled, its job retiring it when the
     machine reports done; any other is retired here, its tokens revoked.
@@ -5587,7 +5587,7 @@ def reset_unenroll(principal, ids, stores=False):
 
 
 def node_door(principal, node_id, on):
-    """The door in for SSH on or off (R174): a system job the agent answers
+    """The door in for SSH on or off: a system job the agent answers
     by starting or stopping the door's client (cloudflared's service, or
     the node on its tailnet). Only a node provisioned with one."""
     n = node(node_id)
@@ -5603,7 +5603,7 @@ def node_door(principal, node_id, on):
 
 
 def node_gpu_display(principal, node_id):
-    """Set the GPU display up on a node from its row (R20): a system job
+    """Set the GPU display up on a node from its row: a system job
     the agent answers with bb-sandbox gpu, which starts a headless X server
     on the card, on the driver the Library installed, and says
     whether a reboot has to follow. The machine's own answer decides: a node with no card gets that
@@ -5616,7 +5616,7 @@ def node_gpu_display(principal, node_id):
     if not (n.get("reported") or {}).get("sandbox"):
         return {"error": "only a node provisioned as an AerieOS sandbox is set up from here: "
                          "on the machine, sudo bb-sandbox gpu"}
-    # The display runs on the driver and does not install it (R102): the
+    # The display runs on the driver and does not install it: the
     # driver's card in the Library is the one place it is installed.
     gd = (n.get("reported") or {}).get("gpu_driver")
     if isinstance(gd, dict) and not gd.get("installed"):
@@ -5629,7 +5629,7 @@ def node_gpu_display(principal, node_id):
 
 
 def node_gpu_display_off(principal, node_id):
-    """Stop rendering the emulator on the card (R102): a system job the
+    """Stop rendering the emulator on the card: a system job the
     agent answers with bb-sandbox gpu-off, which stops the headless X
     server and leaves the driver alone; an emulator there renders in
     software from its next start."""
@@ -5647,7 +5647,7 @@ def node_gpu_display_off(principal, node_id):
 
 def node_gpu_compute(principal, node_id, on):
     """Whether sessions and jobs on this node may compute on its NVIDIA
-    card (R102): on unless switched off. Off, a session started there from
+    card: on unless switched off. Off, a session started there from
     now on has CUDA told there is no device and the device CUDA needs
     covered in its view; the emulator's rendering is its own switch."""
     n = node(node_id)
@@ -5690,8 +5690,8 @@ def node_power(principal, node_id, what):
     if why:
         return {"error": why}
     # ...nor under an install: a restart in the middle of apt, or of a
-    # toolchain being unpacked, leaves it half on the machine (the operator,
-    # 30 Sep), so it waits for one to end (job_waits), saying so.
+    # toolchain being unpacked, leaves it half on the machine,
+    # so it waits for one to end (job_waits), saying so.
     busy = [j["type"] for j in jobs_for(node_id=node_id, active=True, n=20)
             if j.get("type") in POWER_WAITS]
     r = _queue_system(principal, n, what, {}, 60, "node-" + what)
@@ -5704,7 +5704,7 @@ def system_job_for(node_id, skip=""):
     """The system job at work on a node, if any: one at a time, because two
     applies racing on one fstab is not a state anybody wants. One pressed
     meanwhile is queued, not refused, and job_next hands it over once this
-    has ended (B670: the first-run page sent each only when the last had
+    has ended (the first-run page sent each only when the last had
     ended, and every other page refused the second press). A light one (a
     quick root command) neither waits nor is waited for."""
     for j in jobs_for(node_id=node_id, type="system", active=True, n=20):
@@ -5765,15 +5765,15 @@ def node_apply(principal, node_id, what):
                for role, p in (desired.get("stores") or {}).items()):
             timeout = 6 * 3600 + 900
             # ...and it waits for the node to be quiet, and holds it while it
-            # runs (R120 step 7): sessions keep running and are told.
+            # runs: sessions keep running and are told.
             quiet = True
     return _queue_system(principal, n, what, cfg, timeout, "node-apply", {"what": what}, **({"quiet": True} if quiet else {}))
 
 
 def node_to_sync(principal, node_id):
-    """Back onto its synced copy from off (R164): the node holds its bound
+    """Back onto its synced copy from off: the node holds its bound
     projects again, each copied down before a session there starts. The
-    one way a node holds them; no node mounts the projects share (R163)."""
+    one way a node holds them; no node mounts the projects share."""
     n = node(node_id)
     if not n:
         return {"error": "no such node"}
@@ -5794,7 +5794,7 @@ def node_to_sync(principal, node_id):
     return {"ok": True}
 
 
-# ---- leaving a synced copy (R164) ------------------------------------------------------
+# ---- leaving a synced copy ------------------------------------------------------
 #
 # The way back from node_to_sync, in three presses with the node's word
 # between them: Stop syncing ends the sessions and holds new ones while the
@@ -5802,7 +5802,7 @@ def node_to_sync(principal, node_id):
 # Clean up /workspace, offered once the node says nothing is left, has the
 # agent remove its copies; and from there the node stays off, or moves to
 # a synced copy again. There is no way back to the projects share: no node
-# mounts the controller's disk (the operator, 10 Oct). A copy is never
+# mounts the controller's disk. A copy is never
 # removed while anything in it has not reached the controller: it may be
 # the only place a change lives.
 
@@ -5914,26 +5914,26 @@ bundle_digest = lambda: ""
 # workspace.bundle()'s `files` and `files_signed`, set by server.py.
 bundle_files = lambda: ("", False)   # noqa: E731
 idle_minutes = lambda: 0            # noqa: E731  (idle.minutes, injected by server.py)
-# {"on", "own"} for a node's agent (R79): whether its sessions are kept to
+# {"on", "own"} for a node's agent: whether its sessions are kept to
 # their own project's network, and what each project owns there
 # (devapp.session_net_own, joined by server.py).
 session_net_for = lambda nid: None  # noqa: E731
-# A project's file access (ftp.for_node, R151): the servers this node runs.
+# A project's file access (ftp.for_node): the servers this node runs.
 ftp_for = lambda nid: []  # noqa: E731
 # server.session_tokens_for: fresh credentials for the Claude sessions alive
 # on one node, so a session idle past its token's life is not locked out of
-# its own controller (R27). Injected, because minting is users.py's and the
+# its own controller. Injected, because minting is users.py's and the
 # project list is the server's, and neither is the node store's business.
 session_tokens_for = lambda nid, sessions: []   # noqa: E731
 
 
 def reported_set(nid, key, sub, value):
     """One field of a node's census, set by this side between hellos: what a
-    finished job measured (agentcode.update_done, B249). The next hello
+    finished job measured (agentcode.update_done). The next hello
     replaces the whole record, which is right: the node's word is the
     census, and this is only how the minutes before it are not wrong."""
-    # Read and written under the store's lock, the row read afresh (R228
-    # step 6): a hello, a heartbeat or a session report landing between this
+    # Read and written under the store's lock, the row read afresh:
+    # a hello, a heartbeat or a session report landing between this
     # read and its write was written over, the census with it.
     with _lock:
         n = _node(nid)
@@ -5949,17 +5949,17 @@ def reported_set(nid, key, sub, value):
 
 # Called with the node id when an agent dials in after being unheard: the
 # doctor's cached lines about nodes are wrong the moment this happens, and
-# waited out a half-hour cache after a reboot (the operator, 25 Sep).
+# waited out a half-hour cache after a reboot.
 came_back = None
 # Nodes whose toolchains are checked on the next turn of the weekly loop
 # rather than at the week (toolchains.node_checks_due): one that came back
 # from offline, or whose agent is a new file, which means it started again
-# (the operator, 6 Oct: check for updates at a node's start up).
+# (check for updates at a node's start up).
 checks_wanted = set()
 
 
 def agent_built(ag, digest, shipped, built):
-    """When the agent a node runs was built (R131), on its record: this
+    """When the agent a node runs was built, on its record: this
     controller's own image build, written the first time the node reports
     the agent this controller ships, and kept with that digest while it runs
     it, so a node left on an older one still says when that one was made.
@@ -5972,7 +5972,7 @@ def agent_built(ag, digest, shipped, built):
 
 
 def keep_clean(keep):
-    """The agent's report on the session tokens it keeps (B419), checked:
+    """The agent's report on the session tokens it keeps, checked:
     {said: [{at, key, msg}] (the last eight), ok: when one was last kept}."""
     if not isinstance(keep, dict):
         return None
@@ -5989,7 +5989,7 @@ def keep_clean(keep):
     except (TypeError, ValueError):
         ok = 0
     # Who opened an account's token there that was neither the account nor
-    # the agent (R125 step 6): the account read off the home in the path.
+    # the agent: the account read off the home in the path.
     reads = []
     for x in (keep.get("reads") if isinstance(keep.get("reads"), list) else [])[-32:]:
         if not isinstance(x, dict):
@@ -6019,7 +6019,7 @@ TOKEN_READ_DAYS = 7
 
 
 def token_attention():
-    """The bell's rows (R125 step 6): a node where something other than an
+    """The bell's rows: a node where something other than an
     account or the agent opened an account's coding-agent token in the last
     week, kind token-read, keyed on the newest read so a dismissal holds
     until another one."""
@@ -6033,12 +6033,12 @@ def token_attention():
         out.append({"kind": "token-read", "node": n["name"], "id": n["id"], "at": last["at"],
                     "count": len(reads), "comm": last["comm"], "uid": last["uid"], "pid": last["pid"],
                     "path": last["path"], "account": last["account"]})
-    # ...and a node whose retired token was presented again (R135 step 4).
+    # ...and a node whose retired token was presented again.
     for n in node_list():
         ru = (n.get("agent") or {}).get("token_reuse")
         if isinstance(ru, dict) and ru.get("at"):
             out.append({"kind": "token-reuse", "node": n["name"], "id": n["id"], "at": int(ru["at"])})
-    # ...and one whose agent is being turned away (B569), not merely quiet:
+    # ...and one whose agent is being turned away, not merely quiet:
     # it says why, and that enrolling it again is the way back.
     for n in node_list():
         rf = (n.get("agent") or {}).get("refused")
@@ -6056,11 +6056,11 @@ tls_pin = lambda: ""  # noqa: E731
 tls_reach = lambda url: (url, "")  # noqa: E731
 # A move prepared, per node (move.for_node), set by the server; {} when none.
 move_for_node = lambda nid: {}  # noqa: E731
-# ...and the node's hello on the controller a move landed on (R175 step 3).
+# ...and the node's hello on the controller a move landed on.
 move_here = lambda nid: None  # noqa: E731
-# Whether a move is armed here, which holds every node's token still (B935).
+# Whether a move is armed here, which holds every node's token still.
 move_armed = lambda: False  # noqa: E731
-# The install id the state keeps for this machine's system pool (B939): seen
+# The install id the state keeps for this machine's system pool: seen
 # from the census once the pool is set, read for the system-pool step.
 install_id_seen = lambda iid: None  # noqa: E731
 install_id_kept = lambda: ""  # noqa: E731
@@ -6077,8 +6077,8 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     restarted has none, and the rows this side still had as running there
     are then failed as lost: a subprocess does not survive its parent, so
     a row saying otherwise would say it forever."""
-    # Read and written under the store's lock, the row read afresh (R228
-    # step 6): a hello, a heartbeat or a session report landing between this
+    # Read and written under the store's lock, the row read afresh:
+    # a hello, a heartbeat or a session report landing between this
     # read and its write was written over, the census with it.
     with _lock:
         n = _node(nid)
@@ -6096,7 +6096,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
                    "addr": addr, "last_seen": int(time.time()),
                    })
         ag.pop("refused", None)
-        # An update this node would not run and went back from (R241), in the
+        # An update this node would not run and went back from, in the
         # shapes this side keeps; gone once it says none.
         went = agent_back(back)
         if went:
@@ -6104,7 +6104,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
         else:
             ag.pop("back", None)
         # Why an idle session's token was not refreshed here, said by the agent
-        # that tried (B419).
+        # that tried.
         kc = keep_clean(keep)
         if kc is not None:
             token_reads_audit(n, ag.get("keep"), kc)
@@ -6112,7 +6112,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
         rep = n.get("reported") or {}
         # The tmux sessions ride the HEARTBEAT, not the census, so the live set is
         # what the last one recorded rather than anything hello was handed. Read
-        # before _census replaces the record below (R27).
+        # before _census replaces the record below.
         live_sessions = rep.get("sessions") or []
         sample = rep.get("sample")
         # When this census was taken. The heartbeat is every 25 seconds but the
@@ -6129,7 +6129,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
         rep = _census(census)
         rep["at"] = census_at
         # A pool marked with the id this controller's restored state keeps
-        # is its own from before, never another install's (B939).
+        # is its own from before, never another install's.
         st = rep.get("os_stick")
         if isinstance(st, dict) and st.get("other_marks") and install_id_kept():
             kept = install_id_kept()
@@ -6144,10 +6144,10 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     if not was_live:
         _revived(nid)
     ours = agent_file()
-    # A node here after a move landed (R175 step 3): off the not-yet-here list.
+    # A node here after a move landed: off the not-yet-here list.
     move_here(nid)
     # The id this machine's system pool is marked with, kept in the state
-    # once the pool is set so a backup carries it (B939).
+    # once the pool is set so a backup carries it.
     st = rep.get("os_stick") or {}
     if own_machine(n) and st.get("ready") and st.get("install_id"):
         install_id_seen(st["install_id"])
@@ -6182,39 +6182,39 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
             # A hosting-only node is told so, and keeps no session half, no
             # synced copy and no bb of its own (host_only).
             "host_only": host_only(nid),
-            # Published ports bound to 127.0.0.1 by default there (R190).
+            # Published ports bound to 127.0.0.1 by default there.
             "ports_local": ports_local_on(nid),
-            # Each account a Unix user of its own there (R125).
+            # Each account a Unix user of its own there.
             "account_users": account_users_on(nid),
             # ...and, on the controller's own machine, the accounts' SMB
-            # passwords as Samba keeps them (R164 step 1): its agent imports
+            # passwords as Samba keeps them: its agent imports
             # them and removes the ones gone.
             "smb_users": (smb_users() if smb_users and own_machine(n) else []),
-            # ...and what each added pack is configured with on this node
-            # (R172): its values, the secrets opened, for the pack's verbs.
+            # ...and what each added pack is configured with on this node:
+            # its values, the secrets opened, for the pack's verbs.
             "pack_config": (pack_config(nid) if pack_config else []),
-            # ...and each account's own answers there (R172 step 5), written
+            # ...and each account's own answers there, written
             # into that account's home on the node.
             "pack_people": (pack_people(nid) if pack_people else []),
-            # ...and the other disks and shares it mounts (R162 step 4).
+            # ...and the other disks and shares it mounts.
             "ext_mounts": (ext_mounts() if ext_mounts and own_machine(n) else []),
-            # ...and the backups it copies (R162 step 5).
+            # ...and the backups it copies.
             "store_backups": (store_backups() if store_backups and own_machine(n) else []),
-            # ...and its encrypted pools' passphrases (R162 step 3): the kept ones, and an
+            # ...and its encrypted pools' passphrases: the kept ones, and an
             # offered one until the census says the pool is open; none in Safe mode.
             "pool_keys": (pool_keys({p["name"] for p in (n.get("reported") or {}).get("pools") or [] if not p.get("locked")})
                           if pool_keys and own_machine(n) else []),
-            # ...and its coding agents' sign-ins sealed there (R126), with
-            # each account's X25519 public to seal them with (R158 step 3).
+            # ...and its coding agents' sign-ins sealed there, with
+            # each account's X25519 public to seal them with.
             "token_seal": token_seal_on(nid),
             "token_pubs2": (token_pubs(nid) if token_pubs and token_seal_on(nid) else {}),
             # The idle rule for Claude sessions (idle.py): the node enforces
             # it itself, so it holds while this controller is down.
             "session_idle_minutes": idle_minutes(),
-            # How many workers a test run here may use (R81): 0 for the
+            # How many workers a test run here may use: 0 for the
             # node's cores. Into every test job's environment there.
             "test_workers": test_workers(nid),
-            # A fresh token for each Claude session alive on this node (R27).
+            # A fresh token for each Claude session alive on this node.
             # A session's token slides forward while it is TALKING, because
             # every answer it gets carries a renewal; one that sits idle past
             # twelve hours has nothing to slide it, and a dead token is never
@@ -6224,18 +6224,18 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
             # session does, and none is ever accepted past its expiry.
             "session_tokens": [] if host_only(nid) else session_tokens_for(nid, live_sessions),
             # Whether each session here is kept to its own project's network,
-            # and what each project owns here (R79). The node keeps it, so it
+            # and what each project owns here. The node keeps it, so it
             # holds while this controller is down.
             "session_net": session_net_for(nid),
-            # The FTPS servers this node runs for its projects' file access
-            # (R151): one per project, rooted at its tree.
+            # The FTPS servers this node runs for its projects' file access:
+            # one per project, rooted at its tree.
             "ftp": [] if host_only(nid) else ftp_for(nid),
-            # A move prepared (R90 step 12): the new address and this node's
+            # A move prepared: the new address and this node's
             # challenge, which it keeps and knocks with when this one goes quiet.
             "move": moving,
-            # Its next token, for an agent that rotates (R135 step 4); none
+            # Its next token, for an agent that rotates; none
             # while a move is armed, since the bundle carries the token this
-            # node holds now and the new home knows that one alone (B935).
+            # node holds now and the new home knows that one alone.
             **({"token": rotate_token(nid)} if rotates and not move_armed() else {})}
 
 
@@ -6243,7 +6243,7 @@ def store_merge(census, free, totals):
     """The heartbeat's store readings onto the census's rows, the free space
     and, when the agent sent it, the size with it. Free alone against the
     census's size read a grown disk as empty for up to ten minutes: more
-    free than the old total, so nothing used (B434)."""
+    free than the old total, so nothing used."""
     for role, mb in free.items():
         row = census.get(role)
         if row is None:
@@ -6258,7 +6258,7 @@ def beat(nid):
     """The node is there, and nothing else: last_seen stamped in place, so a
     node whose loop is busy taking a census on the spot (a hello asked for
     after a job changed the machine, a minute and more on bb-sandbox) is
-    not read as not answering (the operator, 7 Oct). One statement, so it
+    not read as not answering. One statement, so it
     cannot lose a hello's census written beside it."""
     n = node(nid)
     _exec("UPDATE nodes SET agent = json_set(agent, '$.last_seen', ?) WHERE id = ? AND kind = 'agent'",
@@ -6288,7 +6288,7 @@ def sync_rows(sent):
     the slashes stay: stripped, the session gate looked the worktree's unit
     up under its real name, never found it ready, and a session on a
     project the account has a worktree of waited for a copy that was there
-    all along (B693)."""
+    all along."""
     return {re.sub(r"[^A-Za-z0-9._/-]", "", str(k))[:100]: {
         "ready": bool((v or {}).get("ready")), "rev": int((v or {}).get("rev") or 0),
         "pending": max(0, min(10**7, int((v or {}).get("pending") or 0))),
@@ -6302,8 +6302,8 @@ def heartbeat(nid, sample, addr, running=0):
     riding the channel that exists anyway. Written to the row (current
     value) and to the ring (the last hour); last_seen is what liveness
     reads. The address is refreshed too; see _addr."""
-    # Read and written under the store's lock, the row read afresh (R228
-    # step 6): a hello, a heartbeat or a session report landing between this
+    # Read and written under the store's lock, the row read afresh:
+    # a hello, a heartbeat or a session report landing between this
     # read and its write was written over, the census with it.
     with _lock:
         n = _node(nid)
@@ -6322,7 +6322,7 @@ def heartbeat(nid, sample, addr, running=0):
                     clean[k] = round(float(s.get(k) or 0), 1)
         # What runs there by kind, its cores and who computes on its card, for
         # a session judging whether the machine is quiet enough to time
-        # anything on (R108). Only the kinds the agent counts, as numbers.
+        # anything on. Only the kinds the agent counts, as numbers.
         with contextlib.suppress(TypeError, ValueError):
             if "cores" in s:
                 clean["cores"] = max(0, min(4096, int(s.get("cores") or 0)))
@@ -6332,20 +6332,20 @@ def heartbeat(nid, sample, addr, running=0):
             clean["kinds"] = {k: max(0, min(9999, int(v))) for k, v in list(s["kinds"].items())[:16]
                               if k in PROC_KINDS and isinstance(v, (int, float))}
         # ...and the card's memory by what holds it, in MB, the same kinds and
-        # "other" (B532): what filled the card is a kind, never a name.
+        # "other": what filled the card is a kind, never a name.
         if isinstance(s.get("gpu_mem_kinds"), dict):
             clean["gpu_mem_kinds"] = {k: max(0, min(10**7, int(v))) for k, v in list(s["gpu_mem_kinds"].items())[:16]
                                       if (k in PROC_KINDS or k == "other") and isinstance(v, (int, float))}
         clean["running"] = int(running or 0)
-        # The counters and the temperature the reporting takes its points from
-        # (R164 step 4): two non-negative integers each, a whole degree.
+        # The counters and the temperature the reporting takes its points from:
+        # two non-negative integers each, a whole degree.
         for k in ("net", "io"):
             v = s.get(k)
             if isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) and x >= 0 for x in v):
                 clean[k] = [min(x, 10**15) for x in v]
         if isinstance(s.get("temp_c"), int) and not isinstance(s.get("temp_c"), bool) and 0 < s["temp_c"] < 150:
             clean["temp_c"] = s["temp_c"]
-        # How long the agent's last turn spent before its poll, by part (B841):
+        # How long the agent's last turn spent before its poll, by part:
         # a job queued meanwhile waited for it.
         if isinstance(s.get("turn_ms"), dict):
             clean["turn_ms"] = {re.sub(r"[^a-z_]", "", str(k))[:24]: max(0, min(10**7, int(v)))
@@ -6356,19 +6356,19 @@ def heartbeat(nid, sample, addr, running=0):
         totals = {str(r)[:20]: _mb((v or {}).get("total_mb"))
                   for r, v in list(stores.items())[:8]}
         # The root filesystem and Docker's, where a node fills that is no
-        # store's (R110): [free MB, total MB] each, for the bell's room check.
+        # store's: [free MB, total MB] each, for the bell's room check.
         disks = s.get("disks") if isinstance(s.get("disks"), dict) else {}
         clean["disks"] = {r: [_mb((disks.get(r) or {}).get("free_mb")), _mb((disks.get(r) or {}).get("total_mb"))]
                           for r in ("root", "docker") if isinstance(disks.get(r), dict)}
         clean["store_totals"] = totals
-        # AerieOS's memory fence (R110 step 4), [max MB, used MB], or None
+        # AerieOS's memory fence, [max MB, used MB], or None
         # from an agent that looked and found none; absent from an older one.
         if "fence" in s:
             f = s.get("fence")
             clean["fence"] = ([_mb(f.get("max_mb")), _mb(f.get("used_mb"))]
                               if isinstance(f, dict) and _mb(f.get("max_mb")) else None)
         # A running VM's memory as its balloon says, [usable MB, available MB],
-        # for the bell's ten minutes (R110 step 8).
+        # for the bell's ten minutes.
         vm = s.get("vm_mem") if isinstance(s.get("vm_mem"), dict) else {}
         clean["vm_mem"] = {str(d)[:63]: [int(v[0]), int(v[1])] for d, v in list(vm.items())[:32]
                            if re.fullmatch(r"bbvm-[a-z0-9][a-z0-9-]{0,62}", str(d)) and isinstance(v, list) and len(v) == 2
@@ -6378,12 +6378,12 @@ def heartbeat(nid, sample, addr, running=0):
         rep = n.get("reported") or {}
         # What another page draws from this row, as it stood before this sample:
         # if none of it moved, the sample's numbers are the only news, and only
-        # the Nodes page, which shows them, is told (R218 step 10).
+        # the Nodes page, which shows them, is told.
         was = _heartbeat_news(ag, rep)
         if addr:
             ag["addr"] = addr
         rep["sample"] = clean
-        # What the node publishes, by compose project (R82): the ports another
+        # What the node publishes, by compose project: the ports another
         # node's session of the same project may reach. A change re-sends every
         # firewall its allow list, so a container coming up on one node is
         # reachable from the other within a poll.
@@ -6404,7 +6404,7 @@ def heartbeat(nid, sample, addr, running=0):
         if isinstance(s.get("sessions"), list):
             rep["sessions"] = _session_rows(s["sessions"])
             _sessions_at[nid] = time.time()
-        # The sessions a controller outage held (R251), for the bell's "stopped
+        # The sessions a controller outage held, for the bell's "stopped
         # by the update" once this answers again; whitelisted, and a heartbeat
         # without it keeps what was there.
         if isinstance(s.get("held"), list):
@@ -6413,11 +6413,11 @@ def heartbeat(nid, sample, addr, running=0):
                             "session": re.sub(r"[^A-Za-z0-9_~.:-]", "", str(h.get("session") or ""))[:120],
                             "since": _mb(h.get("since")) or 0}
                            for h in s["held"][:32] if isinstance(h, dict) and h.get("session")]
-        # Each synced project's state on the node (R162): whether its first
+        # Each synced project's state on the node: whether its first
         # copy is done, what is waiting to go up, and why not when it cannot.
         if isinstance(s.get("sync"), dict):
             rep["sync"] = sync_rows(s["sync"])
-        # ...leaving it (R164): what is still to go up; absent when not leaving.
+        # ...leaving it: what is still to go up; absent when not leaving.
         if isinstance(s.get("sync_drain"), dict):
             d = s["sync_drain"]
             rep["sync_drain"] = {"files": max(0, min(10**7, int(d.get("files") or 0))),
@@ -6443,12 +6443,12 @@ def heartbeat(nid, sample, addr, running=0):
     ring = _samples.setdefault(nid, [])
     ring.append(clean)
     _trim(ring, clean["at"])
-    # ...and into the weeks-long record (history.py, R164 step 4), on the
+    # ...and into the weeks-long record (history.py), on the
     # controller's own machine, with the hottest disk's reading beside it.
     if history_add and own_machine(n):
         temps = [d["smart"]["temp_c"] for d in rep.get("disks") or [] if isinstance(d.get("smart"), dict) and isinstance(d["smart"].get("temp_c"), int)]
         history_add(nid, clean, max(temps) if temps else None)
-    # Each running container's use, once a minute (R218 step 9): name to
+    # Each running container's use, once a minute: name to
     # [cpu %, memory %], whitelisted like everything a node says.
     if isinstance(s.get("ctr_stats"), dict):
         rings = _ctr_samples.setdefault(nid, {})
@@ -6467,7 +6467,7 @@ def heartbeat(nid, sample, addr, running=0):
     # other page draws moved with it (a session, a published port, a sync
     # state, the node's address). It moved with every sample, and every page
     # with a node picker re-read the node list and the status poll for each
-    # node's every heartbeat (R218 step 10).
+    # node's every heartbeat.
     _sample_rev[0] += 1
     if _heartbeat_news(ag, rep) != was:
         _bump()
@@ -6520,7 +6520,7 @@ def _session_rows(rows):
             # not on its PATH.
             "created": _mb(row.get("created")) or 0,
             "title": str(row.get("title") or "")[:200],
-            # A pane whose program ended, kept with its last words (B1120):
+            # A pane whose program ended, kept with its last words:
             # the session is over, whatever the tmux session still holds.
             **({"dead": True, "exit": row["exit"] if isinstance(row.get("exit"), int) and -256 < row["exit"] < 256 else None}
                if row.get("dead") is True else {})})
@@ -6531,12 +6531,12 @@ def sessions_report(nid, rows):
     """A node's sessions as they are right now, sent the moment one changes
     (a session starting, ending, or turning from waiting to working) rather
     than on the poll's turn: what the dot beside each name on a project's
-    row is drawn from (the operator, 25 Sep). The same rows the heartbeat
+    row is drawn from. The same rows the heartbeat
     carries, so nothing reads them two ways."""
     if not isinstance(rows, list):
         return {"error": "sessions is a list"}
-    # Read and written under the store's lock, the row read afresh (R228
-    # step 6): a hello, a heartbeat or a session report landing between this
+    # Read and written under the store's lock, the row read afresh:
+    # a hello, a heartbeat or a session report landing between this
     # read and its write was written over, the census with it.
     with _lock:
         n = _node(nid)
@@ -6571,7 +6571,7 @@ def samples(nid):
 def spark_of(nid):
     """A node's last hour for its charts: [[at, cpu %, memory %, gpu %,
     gpu memory %], ...], the card's two None in a sample from a node without
-    one answering (the operator, 17 Oct: GPU and GPU RAM charted beside CPU
+    one answering (GPU and GPU RAM charted beside CPU
     and memory where there is a card)."""
     out = []
     for x in _samples.get(nid, []):
@@ -6606,25 +6606,25 @@ def ctr_spark(nid, names=None):
 # (phase 5), toolchain (an install against the node's toolchain store)
 # and cache-clear (drop the node's build caches) are the agent's own.
 JOB_TYPES = ("exec", "self-update", "compose", "system", "toolchain", "cache-clear", "vm",
-             # A walk of the node's disks now, for the Storage tab (R169).
+             # A walk of the node's disks now, for the Storage tab.
              "storage",
              # The node's own scanners over the projects whose node it is
-             # (R145, the Scanners page).
+             # (the Scanners page).
              "scan",
-             # One project's phone off the node, from the Storage page (R123).
+             # One project's phone off the node, from the Storage page.
              "avd-remove",
-             # The idle phones' quick-boot snapshots, the room keeper's (R129).
+             # The idle phones' quick-boot snapshots, the room keeper's.
              "phones-idle",
              # An Android system image onto a node's toolchain store, or off
              # it: there without being a toolchain (emulator.py).
              "image",
              # The sign-in flow, on the machine Claude is installed on: a job
              # of its own because it opens a PTY and drops to the SESSION
-             # account, not the job one (R47). Both matter: the flow prints a
+             # account, not the job one. Both matter: the flow prints a
              # prompt with no newline after it, and the grant has to land in
              # the home a session will read it from.
              # Each live coding agent's sign-in, sign-out and install, named
-             # by the agent table (agents.py, R95): Claude's are claude-login,
+             # by the agent table (agents.py): Claude's are claude-login,
              # claude-logout (`claude auth logout` there, in one account's
              # home, since the login is that machine's to let go) and
              # claude-update (the installer run there, then the binary pinned
@@ -6632,7 +6632,7 @@ JOB_TYPES = ("exec", "self-update", "compose", "system", "toolchain", "cache-cle
              # is queued by an administrator's press and nothing else; the
              # agent's sessions on the node are ended first.
              *(j for a in agents.TABLE for j in (a.login_job, a.logout_job) if j),
-             # ...and a pack's agent's (R233 step 6): one pair for all of
+             # ...and a pack's agent's: one pair for all of
              # them, the spec naming which.
              agents.PACK_LOGIN, agents.PACK_LOGOUT,
              *(a.update_job for a in agents.installable()),
@@ -6641,7 +6641,7 @@ JOB_TYPES = ("exec", "self-update", "compose", "system", "toolchain", "cache-cle
              # pane is): the roadmap's and the tracker's Send to Claude.
              "tell",
              # A build in dist/ signed with one of the project's keys
-             # (signing.py, R106): the key fetched over the channel for this
+             # (signing.py): the key fetched over the channel for this
              # job alone, used as the enrolled account, never a session's.
              "sign",
              # What the controller's signing keys need a jdk or build-tools
@@ -6680,7 +6680,7 @@ def on_done(job_type, fn):
 
 def _done_fn(j):
     """The hook for a job that ended: its type's, or for an exec job whose
-    spec names a `done` (a deploy's, R281 step 4), TYPE:DONE's, so a module
+    spec names a `done` (a deploy's), TYPE:DONE's, so a module
     finishes its own exec jobs without claiming every exec."""
     j = j or {}
     named = str((j.get("spec") or {}).get("done") or "")
@@ -6756,7 +6756,7 @@ def fits(job, n):
         return pl["node"] == n["id"]
     # A hosting-only node takes by selector only what job_add would place
     # on it by name: an exec's argv and its output are not a public box's
-    # to see or to write (R92).
+    # to see or to write.
     if host_only(n) and job.get("type") not in HOST_JOBS and not host_exec_ok(job.get("type"), job.get("spec")):
         return False
     sel = pl.get("select") or {}
@@ -6836,8 +6836,8 @@ def job_add(principal, placement, type, spec, project="", source=None):
             why = agent_stale(n)
             if why:
                 # Marked, so bb can wait for the update (auto_update queues it
-                # inside a window) rather than give up on the job (R253).
-                # One that refuses this build waits for nothing (B1108).
+                # inside a window) rather than give up on the job.
+                # One that refuses this build waits for nothing.
                 return {"error": why, "agent_behind": not agent_gap(n) and not build_refused(n), "node": n["id"]}
     elif pick(probe, node_list()) is None:
         want = ", ".join(f"{k}={v}" for k, v in pl["select"].items())
@@ -6874,8 +6874,8 @@ def exec_out(log):
     """A waited-on command's output: its job's log without the line the
     agent opens every job's log with, which says what the job is ("exec")
     and is the Jobs page's, not the command's. Handed back as it was, it
-    was the first line of every container log read on an agent node
-    (B65)."""
+    was the first line of every container log read on an agent node.
+    """
     return log[len("exec\n"):] if log.startswith("exec\n") else log
 
 
@@ -6923,7 +6923,7 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
     if forget:
         spec["probe"] = True
     # Docker work, which on the controller's own machine the root agent runs
-    # itself, its job account being out of the docker group (B743). Only the
+    # itself, its job account being out of the docker group. Only the
     # controller's own docker verbs say so: a queued job carries no such field.
     if docker:
         spec["docker"] = True
@@ -6952,7 +6952,7 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
 
 # What node_path_state runs there: read-only, stdlib, the python every node
 # carries for its agent. One JSON line: {path: {exists, dir, files, store,
-# mine}}: `store` when the folder carries AerieOS's store marker (R212), and
+# mine}}: `store` when the folder carries AerieOS's store marker, and
 # `mine` when it holds this node's own toolchain folder, <path>/<node id>
 # with the marker, which is what a toolchain share looks like from the share.
 _PATH_STATE = """
@@ -6976,7 +6976,7 @@ print(json.dumps(out))
 
 def node_slug(name):
     """The folder named for a node inside a store's folder that already
-    holds files (R120): its name, as a path segment."""
+    holds files: its name, as a path segment."""
     return re.sub(r"[^A-Za-z0-9._-]", "-", str(name or "")).strip(".-")[:60] or "node"
 
 
@@ -6986,7 +6986,7 @@ def node_path_state(principal, node_id, paths):
     store or a mount may go at all (store_path_ok), and what is there now.
     A path that holds files also carries the folder named for this node
     inside it, and what is there, which is where the page offers to put
-    the store instead; one that already is a store (R212: the marker,
+    the store instead; one that already is a store (the marker,
     this node's own toolchain folder inside it, or the folder the page
     nested for this node before, `own`) is adopted as it is."""
     n = node(node_id)
@@ -7026,7 +7026,7 @@ def _no_answer(job_id, node_id, timeout):
     """Why a waited-on job did not come back, in the words that are true.
 
     It used to say "the agent took the job but did not report back" whatever
-    had happened, and mostly that was false (B200): a node runs `concurrency`
+    had happened, and mostly that was false: a node runs `concurrency`
     jobs at once, usually one, so a one-second `uname` queued behind a
     fifteen-minute build never STARTED, the agent was healthy and heartbeating
     throughout, and the person reading it concluded the machine had hung.
@@ -7046,8 +7046,8 @@ def _no_answer(job_id, node_id, timeout):
         return (f"{name} is busy with {what} ({b['id']}) and runs "
                 f"{n.get('concurrency') or 1} job at a time: this waited {timeout}s for a "
                 "slot and was taken back. The machine is fine; try again when that finishes")
-    # Handed out and never started: the lane it holds is why this one waited
-    # (B245). Named with its age, and with when the agent last dialed in, so
+    # Handed out and never started: the lane it holds is why this one waited.
+    # Named with its age, and with when the agent last dialed in, so
     # the reader can tell a lost poll from a machine that is off.
     held = [x for x in jobs_for(node_id=node_id, active=True, n=10)
             if x.get("id") != job_id and x.get("state") == "assigned"]
@@ -7070,7 +7070,7 @@ def tell_wait(node_id, session, text, timeout=20, who="dashboard"):
     only if it appeared), answered in the same shape. {"sent": True} when
     it went, {"typed": True} when it was left unsent in the box, or
     {"error"}. `who` is the job's principal: the account that asked, where
-    one did (B775: two Resume lines nobody remembered sending)."""
+    one did (two Resume lines nobody remembered sending)."""
     n = node(node_id)
     if not n:
         return {"error": "no such node"}
@@ -7092,7 +7092,7 @@ def tell_wait(node_id, session, text, timeout=20, who="dashboard"):
 
 
 def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
-    """One approved command as root on a node (roadmap R38): a system job
+    """One approved command as root on a node: a system job
     with `apply: root`, waited for like run_wait. The gate is node_apply's
     (an online agent node that enrolled as a sandbox, one system job at a
     time), because root on somebody's own machine is theirs, and the agent
@@ -7178,7 +7178,7 @@ def ask_hello(node_id):
 
 
 # Sessions to end on a node, until its agent's next poll takes them: kept in
-# the store (the kills table, R227 step 13), so an End pressed just before
+# the store (the kills table), so an End pressed just before
 # the controller restarts still reaches the node. It was in memory, and the
 # row the press took off the page came back with its session running. Each
 # is kept with when it was asked, which the node holds against the session's
@@ -7199,7 +7199,7 @@ def _kills_take(node_id):
 
 
 # node id -> {project: revision}: synced projects that moved since the
-# node's agent last heard (R162), taken by its held work request.
+# node's agent last heard, taken by its held work request.
 _sync_hints = {}
 
 
@@ -7214,8 +7214,8 @@ _synced = {"at": 0.0, "ids": frozenset()}
 
 
 def sync_node_ids():
-    """The nodes that hold their projects as a synced copy (R162), which is
-    every agent node not taken off it (R163, R164: config workspace "off").
+    """The nodes that hold their projects as a synced copy, which is
+    every agent node not taken off it (config workspace "off").
     Read again at most every two seconds: it is asked per project."""
     now = time.monotonic()
     if now - _synced["at"] > 2:
@@ -7226,7 +7226,7 @@ def sync_node_ids():
     return _synced["ids"]
 
 
-# ---- a hosting-only node (the operator, 10 Oct) ---------------------------------
+# ---- a hosting-only node ---------------------------------
 # A node that holds no project's code and runs no sessions, only containers
 # sent to it (a web-facing box): nothing of it comes back to the controller
 # but what running those containers needs. Its agent may say hello, beat,
@@ -7238,20 +7238,20 @@ HOST_VERBS = frozenset(("hello", "beat", "work", "log", "result", "download",
                         "devimage", "devdata", "devdata-put", "moved"))
 # ...and of those, what a node locked down (node_lockdown) still asks: its
 # one job, and saying how it went; and either knocks where its controller
-# moved, or it could never follow (B955).
+# moved, or it could never follow.
 LOCKDOWN_VERBS = frozenset(("hello", "beat", "work", "log", "result", "moved"))
 HOST_JOBS = frozenset(("compose", "system", "self-update", "cache-clear", "storage"))
 # ...and one docker verb at a time about the containers it hosts: the Docker
 # tab's listing is a `docker ps` exec on the node (devapp._agent_read), and
 # a container's log, start, stop and restart are one exec each
 # (devapp._agent_exec). With exec refused whole, a hosting-only node's
-# containers could be sent but never listed, read or restarted (B642).
+# containers could be sent but never listed, read or restarted.
 HOST_DOCKER = frozenset(("ps", "inspect", "version", "info", "logs", "start", "stop", "restart"))
 
 
 def host_exec_ok(type, spec):
     """Whether an exec is a docker verb a hosting-only node answers, or the
-    port probe (R248), whose program is this controller's own, word for word."""
+    port probe, whose program is this controller's own, word for word."""
     argv = spec.get("argv") if isinstance(spec, dict) else None
     if type != "exec" or not isinstance(argv, list) or len(argv) < 2:
         return False
@@ -7261,7 +7261,7 @@ def host_exec_ok(type, spec):
         return False
     # ...and a container's Start on boot, in the one form the Docker tab
     # sends: refused, the choice never reached a hosting-only node and the
-    # controller asked again at every read of its list (B139).
+    # controller asked again at every read of its list.
     if [str(a) for a in argv[1:3]] == ["update", "--restart"] and len(argv) > 4 \
             and str(argv[3]) in ("unless-stopped", "no"):
         return True
@@ -7278,13 +7278,13 @@ def host_exec_ok(type, spec):
 K3S_CA_READ = ("cat", "/var/lib/rancher/k3s/server/tls/server-ca.crt")
 
 
-# Whether a container answers on its node's loopback (R248): a TCP connect
+# Whether a container answers on its node's loopback: a TCP connect
 # to 127.0.0.1 on each port, then an HTTP GET of the path on the ones that
 # took it, one JSON line a port. Run on the node by its agent, as the
 # agent's user, read-only: it opens a connection and reads a status line.
 # Fixed here, word for word, so a hosting-only node accepts this and no
 # other program (host_exec_ok), and nothing a caller sends reaches it but
-# the path and the port numbers, which probe_ports() checks first.
+# the path and the port numbers, which probe_ports checks first.
 PROBE = (
     "import json,socket,sys,time,urllib.request,urllib.error\n"
     "path=sys.argv[1]\n"
@@ -7339,15 +7339,15 @@ def host_only(n):
     return bool(((n or {}).get("config") or {}).get("host_only"))
 
 
-# What a hosting-only node runs, of the Library's kinds (R291, the operator,
-# 25 Nov: spaces build on a node of their own and deploy to a hosting one).
+# What a hosting-only node runs, of the Library's kinds
+# (spaces build on a node of their own and deploy to a hosting one).
 HOST_KINDS = ("service", "app")
 
 
 def builds_elsewhere(nid):
     """Why a toolchain, a tool pack or a coding agent is not installed on
     `nid`, or "": a hosting-only node runs services and apps, and what a
-    space builds with goes on the nodes where spaces build (R291)."""
+    space builds with goes on the nodes where spaces build."""
     if not host_only(nid):
         return ""
     return (f"{(node(nid) or {}).get('name') or 'this node'} hosts containers only: toolchains, coding agents "
@@ -7373,13 +7373,13 @@ def host_refuses(nid, verb, what=""):
 _host_refused_at = {}
 _host_refused_lock = threading.Lock()
 # How many verbs a node is audited for in an hour: a box asking made-up
-# verbs on a loop neither fills the audit log nor grows the table (R92).
+# verbs on a loop neither fills the audit log nor grows the table.
 HOST_REFUSED_VERBS = 16
 
 
 # How many hellos a hosting-only node may say a minute: each writes its row
 # and moves the token every page re-reads the nodes on, so a box saying it
-# on a loop would keep every dashboard reading (R92). The agent says one
+# on a loop would keep every dashboard reading. The agent says one
 # every ten minutes, and again after a job changed the machine.
 HOST_HELLOS_A_MINUTE = 12
 _host_hellos = {}
@@ -7448,8 +7448,8 @@ def still_ending(node_id, row, now=None):
     """Whether a node's session row is one a person just ended, to keep off
     the lists until the node drops it: ended within the minute, and not made
     since. A Restart's new session has the old one's name, and for that
-    minute the space's card said Start agent with the session running (the
-    operator, 19 Nov)."""
+    minute the space's card said Start agent with the session running.
+    """
     at = _ended.get((node_id, str((row or {}).get("name") or "")), 0)
     if (time.time() if now is None else now) - at > 60:
         return False
@@ -7499,8 +7499,8 @@ def session_kill_wait(node_id, name, timeout=25):
 # queued the same way, taken by the same poll. Each is {"session", "argv"}
 # with the node's own session name already in argv, or {"session", "page"}
 # for the paging decision the agent has to make on the pane it can see.
-# Kept beside when each was asked, and typed only while that is recent
-# (B999): keys sent as a node dropped were kept with no age and typed,
+# Kept beside when each was asked, and typed only while that is recent:
+# keys sent as a node dropped were kept with no age and typed,
 # Enter and all, into whatever session held that name when it came back a
 # day later. A kill queued the same way carries its age already.
 _tmux_ops = {}
@@ -7542,14 +7542,14 @@ def node_sessions():
         if isinstance(rows, list):
             now = time.time()
             # A session whose program has ended is not running, though its
-            # pane is kept for what it said (B1120): it read as running until
+            # pane is kept for what it said: it read as running until
             # somebody pressed Restart, and its start is a fresh one.
             out[n["id"]] = (n["name"], [r for r in rows if not still_ending(n["id"], r, now) and not r.get("dead")])
     return out
 
 
 # A read that takes a second does not queue behind a build that takes fifteen
-# minutes (B200). A node runs `concurrency` jobs at once, usually one, and the
+# minutes. A node runs `concurrency` jobs at once, usually one, and the
 # probes the dashboard draws itself from (uname for Test, `docker ps` for the
 # manager, `adb devices` for the phone census, a log tail) waited for that one
 # slot like a build would, timed out, and were reported as an agent that "did
@@ -7569,7 +7569,7 @@ def _light(j):
         return False
     # ...and a machine log read, a root `system` job marked light by
     # log_read_named: a journal tail waited up to a storage measurement's
-    # fifteen minutes behind it, then was taken back (B654).
+    # fifteen minutes behind it, then was taken back.
     light = j.get("type") == "exec" or (j.get("type") == "system" and (j.get("spec") or {}).get("light") is True)
     return light and 0 < t <= LIGHT_S
 
@@ -7583,7 +7583,7 @@ def _light_running(node_id):
 # How long a job may sit `assigned` with no word from the agent before it
 # goes back to the queue: a poll's answer can be lost (the agent restarted,
 # the socket closed under it), and until now the job held a lane on the node
-# until the agent's next hello, up to ten minutes, unnamed (B245). An agent
+# until the agent's next hello, up to ten minutes, unnamed. An agent
 # that took a job says so within seconds (its first step or the keepalive).
 ASSIGN_LOST_S = 2 * POLL_S + 40
 
@@ -7600,8 +7600,8 @@ def _requeue_unclaimed(node_id):
 
 # ...and how long past its own timeout a job may stay `running` with no
 # result before it is failed: a job whose end never came back held the
-# node's one slot for good. A lent phone's base64 screenshot did (B475's
-# job), unseen because probes are not listed, and every sign and rebuild on
+# node's one slot for good. A lent phone's base64 screenshot did,
+# unseen because probes are not listed, and every sign and rebuild on
 # bb-sandbox queued behind it for hours while short execs went on the light
 # lane (report #55). A job with no timeout gets the longest the agent gives
 # any kind, a build's.
@@ -7642,7 +7642,7 @@ def _at_work(node_id, type=None, skip=""):
 def job_waits(j, node_id):
     """Whether a queued job waits for one already at work that it would
     collide with. A press while such a job runs is queued behind it, never
-    refused (the operator, 10 Nov: every job queues unless there is a reason
+    refused (every job queues unless there is a reason
     it cannot), and handed over here once that one has ended:
 
     - a toolchain or image job, for one writing the same part of the store,
@@ -7728,7 +7728,7 @@ def _job_next_scan(node_id, runner):
         # (see _light). Everything else waits for the slot as before.
         free = job_running(node_id) < n["concurrency"]
         lane = not free and _light_running(node_id) < LIGHT_SLOTS
-        # An agent update waits for the node to go quiet (B516): the
+        # An agent update waits for the node to go quiet: the
         # agent refuses it while another job runs, and a node always
         # doing something (a session building and testing all day)
         # refused every press. So while one is queued the node is
@@ -7757,7 +7757,7 @@ def _job_next_scan(node_id, runner):
                 # passes over only those of them whose work
                 # has ended and that are only posting their end, so a
                 # stuck job no longer blocks its own way out and a
-                # job still working is never left behind (B520).
+                # job still working is never left behind.
                 held = (n.get("agent") or {}).get("held") or []
                 spec = (upd.get("spec") or {}) | {"settled": held}
                 return upd | {"state": "assigned", "node": node_id, "spec": spec}
@@ -7822,10 +7822,10 @@ def _job_next_scan(node_id, runner):
         if _hello_wanted.pop(node_id, None):
             return {"hello": True}
         # ...and setup having ended where the screen still takes
-        # admin with no password (R194).
+        # admin with no password.
         if _console_close_due(node_id):
             return {"console_close": True}
-        # ...and the synced projects that moved (R162, wssync.py):
+        # ...and the synced projects that moved (wssync.py):
         # the agent asks what changed, so a save on another node or
         # in VS Code reaches this one in a second, not at its next
         # look of its own.
@@ -7836,7 +7836,7 @@ def _job_next_scan(node_id, runner):
     return None
 
 
-# Whether this controller has finished being first set up (R194): joined by
+# Whether this controller has finished being first set up: joined by
 # server.py, which holds the accounts, the settings and the move.
 setup_over = lambda: False
 _console_asked = {}
@@ -7860,13 +7860,13 @@ def _console_close_due(node_id):
 
 
 UPDATE_QUIET_S = 600
-# A store move waits longer for quiet (R120 step 7): it also waits for every
+# A store move waits longer for quiet: it also waits for every
 # session there to finish its turn, and a turn can run a while.
 STORAGE_QUIET_S = 1800
 
 
 def _quiet_storage(j):
-    """A storage apply that moves a store (R120 step 7): it waits for the
+    """A storage apply that moves a store: it waits for the
     node to be quiet, and holds it while it runs."""
     sp = j.get("spec") or {}
     return j.get("type") == "system" and sp.get("apply") == "storage" and bool(sp.get("quiet"))
@@ -7906,7 +7906,7 @@ def _update_gate(node_id):
 
 def storage_moving(node_id):
     """{state: waiting|moving, job, since} while a store move is queued for
-    this node or running on it (R120 step 7), else None: what a session's
+    this node or running on it, else None: what a session's
     next turn waits for, and what the node's row says."""
     for j in (_job_out(r) for r in _rows("SELECT * FROM jobs WHERE node = ? AND type = 'system' AND "
                                           "state IN ('queued', 'assigned', 'running') ORDER BY queued, id",
@@ -7953,7 +7953,7 @@ def job(job_id, with_log=True):
     return j
 
 
-# ---- retention on the job logs (roadmap R17 step 1, R42) --------------------
+# ---- retention on the job logs --------------------
 #
 # A job's log is the only copy of what a node's job wrote, and it lives in the
 # controller's store: nothing else has it, and until this there was no DELETE
@@ -8007,7 +8007,7 @@ def prune_job_logs(project=None):
         # asked one job at a time, every job ending looked at each of the
         # up to two thousand rows a project keeps, on the store's one lock,
         # which the trace put at over a second of the server's time per
-        # result (the operator, 17 Oct). Past the policy is beyond the newest
+        # result. Past the policy is beyond the newest
         # N by when they ended (a job still running has no `ended` and sorts
         # first, which is right: it is the one being read), or older than
         # the days a log is kept.
@@ -8025,7 +8025,7 @@ def prune_job_logs(project=None):
 
 
 def forget_secrets(job_id=None):
-    """A finished job's `secret_env` taken off its row (R281): what a node
+    """A finished job's `secret_env` taken off its row: what a node
     was handed for one job (a deploy's cluster token, its registry password)
     is kept no longer than the job runs. One job's, or every finished job
     still carrying one (the sweep, for a row ended by a loss or a restart).
@@ -8137,7 +8137,7 @@ def job_log(node_id, job_id, chunks, step=None):
     # (a probe forgotten once its row said finished). Refusing the post kept
     # it forever: the agent posts its log before its result and retries a
     # refused log for good, so the job never left the agent's count and every
-    # self-update on bb-sandbox failed "busy" (B519). Taken and stored
+    # self-update on bb-sandbox failed "busy". Taken and stored
     # nowhere; the job is NOT told to stop (the operator: nothing is ended
     # unless it is stuck), so it runs to its own end, whose result is then
     # refused and dropped.
@@ -8208,7 +8208,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
         return {"error": "not this node's job"}
     # A row this side failed as lost while the agent kept the job (a
     # controller restart, a network gap longer than the grace window) takes
-    # the job's real end late rather than dropping it, and says so (B285).
+    # the job's real end late rather than dropping it, and says so.
     late = (got[0]["state"] == "failed"
             and str(got[0].get("error") or "").startswith(("node lost", "lost:")))
     if got[0]["state"] in JOB_END and not late:
@@ -8221,7 +8221,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
     # the question found it gone and bumped the revisions. The Docker tab
     # refetches on one of them and its read is a probe, so every read bumped
     # the next: a refresh every second or two for as long as the tab was
-    # open (the operator's recording, 24 Sep; measured on the controller,
+    # open (measured on the controller,
     # one bump per read).
     quiet = _quiet(job_id)
     code = None
@@ -8233,9 +8233,9 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
     err = str(error or "")[:500]
     # An update refused as busy on a node this side saw go quiet: what the
     # agent holds is jobs this side has finished or dropped, named from its
-    # last hello, so the row says which rather than "exit 75" (B519).
+    # last hello, so the row says which rather than "exit 75".
     # Otherwise the row says what the node was busy with, in this side's
-    # words (a toolchain job for web), and that nothing retries it (B862).
+    # words (a toolchain job for web), and that nothing retries it.
     if got[0]["type"] == "self-update" and code == 75:
         held = ((node(node_id) or {}).get("agent") or {}).get("held") or []
         doing = [f"{r['type']} job" + (f" for {r['project']}" if r["project"] and r["project"] != "-" else "")
@@ -8275,7 +8275,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
     # job that just finished is already recorded above.
     # Not after a quiet probe: its record is dropped once its answer is read,
     # it has no project, and a sweep with none swept every project's history
-    # on each Docker read, which is most of what ends (the operator, 17 Oct).
+    # on each Docker read, which is most of what ends.
     try:
         if not quiet:
             with timing.timed("result:sweep"):
@@ -8285,12 +8285,12 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
               file=sys.stderr, flush=True)
     # An uninstall that ran retires the node: the agent is gone with it, so
     # the row leaves every list now rather than after a stale timeout. The
-    # agent reports its own uninstall as done from its stop handler (B703).
+    # agent reports its own uninstall as done from its stop handler.
     if got[0]["type"] == "system" and state == "succeeded":
         spec = (job(job_id, with_log=False) or {}).get("spec") or {}
         if spec.get("apply") == "uninstall":
             node_state(f"node:{node_id}", node_id, "retired")
-    # A lockdown that ran, or failed, retires the node either way (R92).
+    # A lockdown that ran, or failed, retires the node either way.
     if got[0]["type"] == "system" and state in ("succeeded", "failed"):
         spec = (job(job_id, with_log=False) or {}).get("spec") or {}
         if spec.get("apply") == "lockdown":
@@ -8298,7 +8298,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
         # Disks adopted or a share served change what the Storage page
         # shows, which the agent otherwise walks at the next hour: measured
         # now, so the page does not say 'not mounted' of a disk just mounted
-        # (B632, the VM walk of 2 Nov).
+        # (the VM walk of 2 Nov).
         if state == "succeeded" and spec.get("apply") in ("storage-adopt", "storage-share"):
             try:
                 node_storage_measure(f"node:{node_id}", node_id)
@@ -8359,7 +8359,7 @@ def job_release(job_id, spec):
 
 def job_refuse(job_id, why):
     """A queued job its preparation refused: failed with the reason, where
-    the row and the Jobs page show the words (B260). Nothing ran, so no
+    the row and the Jobs page show the words. Nothing ran, so no
     completion hook is owed."""
     _exec("UPDATE jobs SET state = 'failed', ended = ?, error = ? WHERE id = ? "
           "AND state = 'queued'", (int(time.time()), str(why)[:500], job_id))
@@ -8371,7 +8371,7 @@ def job_refuse(job_id, why):
 def _canceler(principal):
     """The account a Cancel came from, by name, or "" when no person pressed
     it (a waiter giving up, the sign-in flow): a job's end says who stopped
-    it rather than "the operator" whoever pressed (B69)."""
+    it rather than "the operator" whoever pressed."""
     p = str(principal or "")
     return p[len("user:"):] if p.startswith("user:") else ""
 
@@ -8487,7 +8487,7 @@ def jobs_lost():
 def _lost_done(jid):
     """The module that queued a job hears that it was lost, as it hears a
     result: a compose rebuild failed as lost left the Docker row saying
-    building, since only job_result ran the hook (B287)."""
+    building, since only job_result ran the hook."""
     j = job(jid, with_log=False)
     fn = _done_fn(j)
     if not fn or not j:
@@ -8524,7 +8524,7 @@ def jobs_held(node_id, running):
     """The jobs the agent says it is running that this side has as finished
     or has no row for at all: the other half of jobs_reconcile. Each keeps
     the agent's count up, and an agent update is refused while any is held,
-    so the refusal names them from here (B519)."""
+    so the refusal names them from here."""
     live = {r["id"] for r in _rows("SELECT id FROM jobs WHERE node = ? AND state IN "
                                    "('queued', 'assigned', 'running')", (node_id,))}
     return [j for j in running if j not in live][:20]
@@ -8569,7 +8569,7 @@ def job_counts():
 # The agent's sources, beside the dashboard; a test world's own copy where
 # the harness names one (BB_AGENT_DIR), so a suite that makes its controller
 # ship a newer agent changes only its own world's, not the copy every worker
-# of a whole run serves from (B718, B751, B510). A controller's seam, read
+# of a whole run serves from. A controller's seam, read
 # only in the source tree (seams.get): the agent every node runs as root is
 # never another folder an install's environment names.
 AGENT_DIR = Path(seams.get("BB_AGENT_DIR") or HERE.parent / "agent")
@@ -8599,7 +8599,7 @@ def agent_file():
     digest hello answers with is the sources on disk right now, which is
     what makes 'is my agent current' a byte comparison on the node rather
     than a version number anyone typed. Its sources are looked at every
-    AGENT_LOOK_S at most (R228 step 26): each status read and each node's
+    AGENT_LOOK_S at most: each status read and each node's
     hello asked, and each look stats every file of the package."""
     now = time.monotonic()
     if _agent_cache.get("digest") and now - _agent_cache.get("looked", 0) < AGENT_LOOK_S:
@@ -8621,7 +8621,7 @@ def agent_file():
         was = _agent_cache.get("digest")
         if was and was != digest:
             # The sources moved under a running controller (a tree edited
-            # under aerie dashboard dev, a harness copy written mid-run, B718):
+            # under aerie dashboard dev, a harness copy written mid-run):
             # every node enrolled on the old digest is held from here on, so
             # the file that moved is named, once, where the log is read.
             newest = max(b.sources(str(AGENT_DIR)), key=lambda t: os.stat(t[1]).st_mtime)[1]
@@ -8649,7 +8649,7 @@ project_prefs = None     # a project -> its settings (its node and node set)
 may_push = None          # a project -> whether it was cloned with push rights
 no_node_advice = None    # a project with no node -> what it can still do
 turns_of = None          # a node row -> its sessions' turns: working, waiting, the limit
-working_on = None        # a node id -> how many of its sessions are mid-turn (R120 step 7)
+working_on = None        # a node id -> how many of its sessions are mid-turn
 _VERB_PARTS = ("vmtemplate", "forges", "devapp", "runner_store",
                "workspace", "project_prefs", "may_push", "no_node_advice", "turns_of", "working_on", "project_names")
 project_names = list   # the projects the controller knows, by name (prefs.all_projects)
@@ -8688,8 +8688,8 @@ def agent_test(principal, n):
                "why": out or f"{j['state']} (exit {j['exit_code']})"}
         if got["on"]:
             # ...and whether it would take what this controller ships,
-            # which the round trip says nothing of (the operator, 20 Nov:
-            # does Test test the signing key).
+            # which the round trip says nothing of
+            # (does Test test the signing key).
             ok, said = build_taken(n)
             got["trust"] = {"ok": ok, "said": said}
         return got
@@ -8744,7 +8744,7 @@ def verb(principal, req):
     def enroll():
         if req.get("script"):
             return enroll_script(principal, req)
-        # Just a token for a node already here (B656): the row's id rides
+        # Just a token for a node already here: the row's id rides
         # as `node`, as the script's does, so the mint lands on the row
         # rather than seeing its name as taken.
         m = enroll_mint(principal, field(req, "name"),
@@ -8758,7 +8758,7 @@ def verb(principal, req):
         return node_power(principal, nid, act)
 
     def gpu_display():
-        # The emulator on the card, on or off (R102): each a system job.
+        # The emulator on the card, on or off: each a system job.
         if req.get("on") is False:
             return node_gpu_display_off(principal, nid)
         return node_gpu_display(principal, nid)
@@ -8778,14 +8778,14 @@ def verb(principal, req):
         return node_turn_limit(principal, nid, req.get("limit"))
 
     def test_workers():
-        # How many workers a test run on the node may use (R81); 0 for
+        # How many workers a test run on the node may use; 0 for
         # its cores. An administrator's, like the rest.
         return node_test_workers(principal, nid, req.get("workers"))
 
 
     def ports_local():
-        # Whether published ports on the node bind to 127.0.0.1 by default
-        # (R190). An administrator's, like the rest.
+        # Whether published ports on the node bind to 127.0.0.1 by default.
+        # An administrator's, like the rest.
         return node_ports_local(principal, nid, req.get("on") is True)
 
     def root_asks():
@@ -8805,12 +8805,12 @@ def verb(principal, req):
         return node_update(principal, nid, {"host_only": False})
 
     def to_sync():
-        # Back onto its synced copy from off (R164). An administrator's,
+        # Back onto its synced copy from off. An administrator's,
         # like the rest.
         return node_to_sync(principal, nid)
 
     def sync_stop():
-        # ...and off it again (R164): stop, then clean up.
+        # ...and off it again: stop, then clean up.
         return node_sync_stop(principal, nid)
 
     def sync_resume():
@@ -8875,7 +8875,7 @@ def verb(principal, req):
 
     def path_state():
         # What is at each path on the node before a store or a mount is
-        # pointed there (R120): the page asks before it saves, so the
+        # pointed there: the page asks before it saves, so the
         # question it asks is about what is really there.
         return node_path_state(principal, nid, req.get("paths"))
 
@@ -8999,7 +8999,7 @@ def run_job(name, req, principal):
     emu = field(req, "action") == "emu"
     pf = project_prefs(name)
     # The node named, else the project's primary, else the first of its
-    # set that is up (R82 step 6): a primary that is offline is a job
+    # set that is up: a primary that is offline is a job
     # that runs elsewhere and says so, not a refusal.
     nid, fell_over = field(req, "node"), ""
     if not nid:
@@ -9056,7 +9056,7 @@ def run_job(name, req, principal):
         if r.get("error"):
             return r, 400
         return r | {"node": nid}, 200
-    # A build or a test held to the node's room (R110 step 7): it writes its
+    # A build or a test held to the node's room: it writes its
     # outputs and caches to the data store, and one started under the floor
     # fills the disk partway. aerie run is left alone: it is how room is made.
     floor = room_floor_for(nid)
@@ -9070,12 +9070,12 @@ def run_job(name, req, principal):
         return snap, 400
     spec = {"argv": argv, "timeout": timeout, "outputs": outputs, "project": name}
     # A test run sits below the node's other work: the emulator, a docker
-    # build and a session's own work keep the CPU when they want it (the
-    # operator, 27 Sep). The agent puts nice in front of the command.
+    # build and a session's own work keep the CPU when they want it.
+    # The agent puts nice in front of the command.
     if field(req, "role") == "test":
         spec["nice"] = 10
     if fell_over:
-        spec["fell_over"] = fell_over      # the primary it stood in for (R82 step 6)
+        spec["fell_over"] = fell_over      # the primary it stood in for
     r = job_add(who, {"node": nid}, "exec", spec, name,
                 source={"digest": snap["digest"], "project": name,
                         "files": snap["files"], "bytes": snap["bytes"]})
@@ -9093,7 +9093,7 @@ job_owner = None
 
 def _job_mine(j, mine):
     """Whether this account sees a job: its project's, or one of a
-    container that belongs to its project (B321)."""
+    container that belongs to its project."""
     if j.get("project") in mine:
         return True
     return bool(job_owner) and job_owner(j) in mine
@@ -9133,7 +9133,7 @@ def job_row(j):
 # reports with (signin.verb mints one for the account), and anything named
 # as one is. A reader of the Jobs page or of /api/v1/jobs is handed the job
 # without it, an administrator too: the list said a session's token to every
-# reader of it for the half hour it was good (B796).
+# reader of it for the half hour it was good.
 _SPEC_NODES_OWN = re.compile(r"token|secret|passw|passphrase|credential", re.I)
 
 
@@ -9151,7 +9151,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
     so far, or the recent ones narrowed by the query's node, project, type,
     active and n. `mine` is None for an administrator, or the projects this
     account may see: a job and its log are the project's, or its project's
-    container's (B321), and a job with no project (a node's own: an update,
+    container's, and a job with no project (a node's own: an update,
     a store move) is an administrator's, with the same answer as a typo so
     the listing says nothing about what else is queued on the box. With
     `system` (a redactor), the node's own jobs are seen as well, through it:
@@ -9159,7 +9159,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
     `hidden(job)` says is not this reader's (a schedule's run, to a session)
     is not there at all, the same answer as a typo. n counts
     what this account sees, not the node's last n before the filter, which
-    showed one job of twelve and read as history pruned (B321).
+    showed one job of twelve and read as history pruned.
     (payload, status)."""
     def seen(j):
         if hidden is not None and hidden(j):
@@ -9182,7 +9182,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
             return j
         return {k: scrub(v) if k in ("log", "error", "label", "spec") else v for k, v in j.items()}
     if jid:
-        # ...or its log's last `tail` characters alone (R228 step 13): the
+        # ...or its log's last `tail` characters alone: the
         # Jobs page draws a row's last 4,000 and asked for the whole log of
         # every row it had open on every read of the list.
         try:
@@ -9234,7 +9234,7 @@ def tab_view(rows, admin):
     for n in rows:
         if n.get("kind") == "agent":
             # The controller's bundle it refused, and what was wrong with
-            # it as one phrase (R267 step 6), for its Sessions section.
+            # it as one phrase, for its Sessions section.
             if ((n.get("reported") or {}).get("bundle_refused") or {}).get("digest"):
                 serving = serving or bundle_digest()
                 held = bundle_refused(n, serving)
@@ -9242,19 +9242,19 @@ def tab_view(rows, admin):
                     n["bundle_held"] = held
             n["turns"] = turns_of(n)
             # What keeps it from taking this build, where it is behind and
-            # would refuse it (B1108): Update agent is dead, and its row
+            # would refuse it: Update agent is dead, and its row
             # says why.
             if admin and agent_stale(n):
                 held = build_refused(n)
                 if held:
                     n["update_held"] = held
-            # Its channel in a phrase, where it is plain http (R267 step 15).
+            # Its channel in a phrase, where it is plain http.
             if channel_said(n):
                 n["channel_said"] = channel_said(n)
-            # Its last hour, for the charts on its page (R218 step 9).
+            # Its last hour, for the charts on its page.
             n["spark"] = spark_of(n["id"])
             # Its sign-ins still sealed under the install key before a
-            # rotation (R126), for an administrator: what keeps the old one.
+            # rotation, for an administrator: what keeps the old one.
             tk = (n.get("reported") or {}).get("tokseal")
             if admin and tk and token_stale:
                 n["tokseal_stale"] = token_stale(n["id"], tk)
@@ -9275,7 +9275,7 @@ def tab_view(rows, admin):
                                                         "files": listed.split(":", 1)[-1][:16],
                                                         "files_signed": bool(list_signed)}) if admin else {},
             "default": node_for() if admin else "",
-            # What Enroll node's System pulldown offers (R204).
+            # What Enroll node's System pulldown offers.
             "systems": systems.offered() if admin else []}
 
 

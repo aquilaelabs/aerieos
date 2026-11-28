@@ -1,4 +1,4 @@
-"""markup.py (R167): YAML's subset written and read back as itself, the
+"""markup.py: YAML's subset written and read back as itself, the
 keys of each data file with their lines, Markdown by its headings, and a
 file that does not parse said rather than crashed."""
 import os

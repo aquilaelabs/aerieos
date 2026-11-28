@@ -33,7 +33,7 @@ NEEDS = ("android-tools", "android:emulator")
 
 # `reads` counts the index reads that have ended, landed or not: the
 # emulator revision is it, so a read's start (which the asking tab already
-# knows of, from the answer's "loading") moves nothing and its end does (B757).
+# knows of, from the answer's "loading") moves nothing and its end does.
 _choices = {"at": 0.0, "rows": [], "flavors": [], "loading": False, "reads": 0}
 _choices_lock = threading.Lock()
 CHOICES_TTL = 3600            # the index changes when Google ships a level
@@ -255,7 +255,7 @@ def payload(nid):
             "known": "images" in rep,
             "missing": missing(n),
             # The levels this node's projects compile against with no image
-            # of that level here (R215), each with the index's plain image
+            # of that level here, each with the index's plain image
             # of it in the rootable flavor to pick, where the index has one.
             "needed": needed(n, imgs, c["rows"]),
             # A node that can never have them, and what they are packaged for:
@@ -274,7 +274,7 @@ def node_job(principal, nid, action, image_id):
     """Queue an image add or removal on a node. Refused, with the reason,
     when the node cannot take it: no sdkmanager there, an id this server did
     not hand out, no room, or the store busy with another job. An add may
-    name several (a list: the tab's Install selected, R121), one job adding
+    name several (a list: the tab's Install selected), one job adding
     each in turn."""
     ids = list(dict.fromkeys(image_id if isinstance(image_id, list) else [image_id]))
     if not ids or len(ids) > 20 or not all(isinstance(i, str) and i for i in ids) \

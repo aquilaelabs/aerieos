@@ -1,5 +1,5 @@
-"""A session whose briefing went stale is told so on its next prompt (the
-operator, 27 Oct): the card said it to the person and the session never
+"""A session whose briefing went stale is told so on its next prompt:
+the card said it to the person and the session never
 heard, so it acted on what its briefing said. Once a change, as a rule."""
 import os
 import sys

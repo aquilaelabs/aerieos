@@ -1,6 +1,6 @@
 """A controller restarting (an update) refuses connections for a minute: the
 agent's work poll knows it by what the call says and asks again every few
-seconds rather than backing off to a minute (B760)."""
+seconds rather than backing off to a minute."""
 import os
 import sys
 import unittest

@@ -45,7 +45,7 @@ function getNotebook(project){
 }
 
 function openNotebook(name, view){
-  // A project with no repository (R208) has no notebook: what there is to
+  // A project with no repository has no notebook: what there is to
   // open is its settings, as its card's Settings opens them.
   if ((state?.projects || []).find(x => x.name === name)?.work) return renameProject(name, "project");
   openTab({kind: "notebook", arg: name, label: "Notebook: " + projLabel(name)});
@@ -277,10 +277,10 @@ function makeNotebook(project){
   const root = nbCoreClone(project);
   const $ = id => root.querySelector('[id="' + CSS.escape(id) + '"]');
   // The notebook's state, one object rather than sixty closure variables,
-  // so a view can live in its own file and reach it by name (R60).
+  // so a view can live in its own file and reach it by name.
   const nb = {};
   Object.assign(nb, {root, $, project});
-  nb.groupLast = {};                 // a view group's last view, so its button returns there (R259)
+  nb.groupLast = {};                 // a view group's last view, so its button returns there
   nbCorePublish(nb);
   nbCoreBag(nb);
   nbCoreReadingRoom(nb);
@@ -457,7 +457,7 @@ function nbCoreOpenState(nb){
   // the tab opened and then held that drawing until it was closed and reopened,
   // which is a long time to be looking at a list a session has moved on from.
   nb.roadmapRev = null; nb.memRev = null;
-  nb.movedUnder = false;        // another writer moved a half this panel is holding edits to (B199)
+  nb.movedUnder = false;        // another writer moved a half this panel is holding edits to
 }
 
 async function nbCoreOpenMemory(nb, name){
@@ -516,7 +516,7 @@ function nbCoreNoteBatch(nb, b){
 // everything: the Saves, and the write-through controls on the memory and
 // bug views, because "a session is mid-change here" is a fact about the
 // notebook, not about one of its tabs.
-// A batch open past BATCH_STALE holds nothing (B198): its session is gone,
+// A batch open past BATCH_STALE holds nothing: its session is gone,
 // and a hold nobody can lift is a notebook nobody can save.
 function nbCoreHeld(nb){ return (!!nb.roadmapBatch && !nb.roadmapBatch.stale) || nb.roadmapStale; }
 
@@ -593,7 +593,7 @@ async function nbCoreRereadRoadmap(nb){
   await nbCoreReloadViews(nb);
 }
 
-// ---- a section's own Save and Revert (the operator, 5 Oct) ------------------
+// ---- a section's own Save and Revert ------------------
 // Every section that stages anything carries its own Save and Revert at its
 // foot, and they write or throw away that section's changes and nothing
 // else. There was one pair at the bottom of the tab, and on a phone a
@@ -612,7 +612,7 @@ function nbCoreStage(nb, key, st){ nb.stagers[key] = st; }
 // absent while there is nothing to save, so it does not move under a thumb.
 function nbCoreSectBar(nb, key){
   // Drawn as syncSave would leave it, its words and its dead buttons with
-  // it (B2): a view whose draw did not call syncSave after (the rules')
+  // it: a view whose draw did not call syncSave after (the rules')
   // left the bar untitled until whatever synced next, and that wrote two
   // titles into a status read that brought nothing.
   const b = nbCoreBarSays(nb, key);
@@ -637,7 +637,7 @@ function nbCoreBarSays(nb, key){
                          : "a session changed this list: reload it before saving over it")
       : "save this section; a session running here hears about it on its next prompt",
     // A panel holding unsaved work stops re-reading, since a redraw would
-    // eat the typing (B199); said where the Save is, once something here
+    // eat the typing; said where the Save is, once something here
     // has moved under it. A Save lit with nothing staged is the change no
     // session has been told about yet, which says so rather than sitting
     // there unexplained.
@@ -666,8 +666,8 @@ function nbCoreSyncSave(nb){
     const save = bar.querySelector("[data-ssave]"), rv = bar.querySelector("[data-srevert]");
     if (!st || !save || !rv || save.getAttribute("aria-busy")) return;
     const b = nbCoreBarSays(nb, key);
-    // The Roadmap's bar is its status line (R109), and its Save and Revert
-    // are the ones that sat dead most of the time (R224): they appear with
+    // The Roadmap's bar is its status line, and its Save and Revert
+    // are the ones that sat dead most of the time: they appear with
     // a reorder or an edit staged, and go with the Save. The rest stay,
     // dead, so they do not move under a thumb.
     if (key === "roadmap"){ setHidden(save, b.hide); setHidden(rv, b.hide); }
@@ -759,7 +759,7 @@ function nbCoreOnShow(nb){ const t = tabOf(panes[0]); return t?.kind === "notebo
 async function nbCoreBeat(nb, leave, keepalive){
   if (!nb.memProj) return;
   // Not for a project this account no longer has (deleted, or taken off
-  // it): the server answers that with a 400 on every poll (B65), and
+  // it): the server answers that with a 400 on every poll, and
   // there is no one there to say anything to.
   if (state && !(state.projects || []).some(p => p.name === nb.memProj)) return;
   try{
@@ -774,8 +774,8 @@ async function nbCoreBeat(nb, leave, keepalive){
   }catch(e){ /* the least important thing on the page */ }
 }
 
-// Who else has the notebook open is no longer said (the operator, 17 Oct:
-// not necessary): two windows writing one item are caught at the save,
+// Who else has the notebook open is no longer said
+// (not necessary): two windows writing one item are caught at the save,
 // which refuses the second and shows both. The heartbeat stays for what a
 // session has read, said on the Roadmap's status line.
 function nbCoreDrawHere(nb){
@@ -783,7 +783,7 @@ function nbCoreDrawHere(nb){
   // A session that has gone and read the list, which is a different claim
   // from having been told: being told rides in on its next prompt (#27), and
   // what the operator wants to know after changing something is whether it
-  // has actually looked. The Roadmap's fact, on its status line (R222): it
+  // has actually looked. The Roadmap's fact, on its status line: it
   // stood over every view.
   const rd = $("roadmapRead");
   if (rd) rd.textContent = nb.nbRead ? ` · read by a session ${ago(nb.nbRead)}` : "";
@@ -851,7 +851,7 @@ const NB_GROUPS = [["overview", "Overview"], ["plan", "Plan"], ["code", "Code"],
 //           Permissions draws itself from what the page holds, and a mark
 //           put on first would flash under it
 //   read    what it asks for once marked, so it waits as its markup
-//           declares (R109)
+//           declares
 //   watch   what it reads again while it is on screen, by the revision
 //           token that moves; a token ending in a colon is the space's own.
 //           Only ever acted on while the view is the one showing: a token
@@ -891,16 +891,16 @@ const NB_VIEWS = [
     "phone.dev": nb => nb.loadArtifacts()}},
   // The Docker view re-reads on the manager's token, as the Docker tab
   // does: a job queued, taken or finished, an instance written. Not on the
-  // status poll (B727): a read of an agent node's docker is a round trip
+  // status poll: a read of an agent node's docker is a round trip
   // through its agent, whose heartbeat moves the nodes token, whose watch
   // runs the status poll, which re-read docker again, 134 requests in 30 s.
   {key: "docker", label: "Docker", group: "ship", read: nb => nbCoreLoadDocker(nb), watch: {devapp: nb => nbCoreLoadDocker(nb)}},
   {key: "vms", label: "VMs", group: "ship", read: nb => nbCoreLoadVms(nb), watch: {vms: nb => nbCoreLoadVms(nb)}},
-  // What runs in the space's Kubernetes environments (R281 step 5): read
+  // What runs in the space's Kubernetes environments: read
   // again as an environment or a deploy moves.
   {key: "kubernetes", label: "Kubernetes", group: "ship", read: nb => nbKubeLoad(nb), watch: {deploy: nb => nbKubeLoad(nb)}},
   {key: "discord", label: "Discord", group: "ship", read: nb => nbDiscordLoad(nb), watch: {discord: nb => nbDiscordLoad(nb)}},
-  // A release's APK looked for and signed (R106), by the press or the
+  // A release's APK looked for and signed, by the press or the
   // hourly look: the Releases section follows it to its end.
   {key: "signing", label: "Signing", group: "ship", read: nb => nb.loadSigning(), watch: {releasesign: nb => nb.loadSigning()}},
   {key: "wiki", label: "Wiki", group: "docs", read: nb => nb.loadWiki(),
@@ -915,9 +915,9 @@ function nbCoreSetView(nb, v){
   // other window would otherwise name the tab this one just left.
   if (nb.nbWhere !== v){ nb.nbWhere = v; nbCoreBeat(nb); }
   nbViewMemo.keep(project, v);
-  shellSync();                    // the address names the view (R218 step 3)
+  shellSync();                    // the address names the view
   // Its group lit in the top row and the group's views in the row under it
-  // with this one lit (R259), so the row is always there and every view's
+  // with this one lit, so the row is always there and every view's
   // head at one height; Settings sits beside Overview in its group. The
   // view is the group's to come back to.
   const me = root.querySelector(`.nbtabs button[data-v="${CSS.escape(v)}"]`);
@@ -940,8 +940,8 @@ function nbCoreSetView(nb, v){
   // from another group's.
   slideMark(root.querySelector(".nbtabs .nbgroups"), "nbg:" + project);
   slideMark(sub, "nbv:" + project + ":" + g);
-  // A view switched fades through as a rail page does (the operator,
-  // 18 Oct): the one going out as a still copy fading on docOut's time,
+  // A view switched fades through as a rail page does:
+  // the one going out as a still copy fading on docOut's time,
   // the incoming on docIn's (fadeThrough's halves), rather than a tab
   // switch being the one place on the page where something simply appears.
   let away = null;
@@ -955,7 +955,7 @@ function nbCoreSetView(nb, v){
   });
   ghostOut(away);
   // Its sections open as they will once it is drawn, its placeholder's
-  // among them (the operator, 24 Nov): at a desk every one, on a phone the
+  // among them: at a desk every one, on a phone the
   // one this visit opened or the first. A view's placeholder is several
   // pieces of markup, each with its section, and only the view sees them
   // side by side.
@@ -972,7 +972,7 @@ function nbCoreSetView(nb, v){
   // is no view's does nothing here.
   const view = NB_VIEWS.find(x => x.key === v);
   view?.show?.(nb);
-  // A view still waiting on its data waits as its markup declares (R109).
+  // A view still waiting on its data waits as its markup declares.
   glanceWaiting(root.querySelector(`.nbview[data-view="${v}"] .nbglance`));
   view?.read?.(nb);
 }
@@ -1005,9 +1005,9 @@ async function nbCoreLeaveView(nb, v){
   return true;
 }
 // A view's own button opens it; a group's opens the view it was last on,
-// else its first (R259).
+// else its first.
 // The line under the strip moves first and the view is drawn a frame
-// after (the operator, 26 Oct: the slide lagged): drawn in the same task,
+// after (the slide lagged): drawn in the same task,
 // a notebook's long view held the slide's first frame until it was done.
 function nbCoreWireStrip(nb){
   const {root} = nb;
@@ -1139,7 +1139,7 @@ function nbCoreHalves(nb){
 }
 // ...while this notebook is the page on show: one left behind another
 // page marks the half and reads it when it is shown again, if it is still
-// news then (R228 step 11).
+// news then.
 function nbCoreWatchHalves(nb){
   const {project} = nb;
   nb.staleHalves = new Set();
@@ -1149,7 +1149,7 @@ function nbCoreWatchHalves(nb){
       if (nbCoreOnShow(nb)) read(); else nb.staleHalves.add(key);
     });
   // ...and the other half of each guard: the token moved and the panel did NOT
-  // re-read, because it is holding work. That is the moment to say so (B199).
+  // re-read, because it is holding work. That is the moment to say so.
   const MOVED = [
     [() => `roadmap:${project}`, k => nb.roadmapRev !== null && revs[k] > nb.roadmapRev && nb.roadmapPending.length > 0],
     [() => `mem:${project}`, k => nb.memRev !== null && revs[k] && revs[k] !== nb.memRev && nb.memDirty()],
@@ -1178,7 +1178,7 @@ function nbCoreWatchHalves(nb){
 // set. `rev` is the pair that reads and writes the view's revision. The one
 // noted is the ANSWER's, never the page's token as of now: a write landing
 // between the read and that line moved the token, and recording that marked
-// the write as seen, so the row it made never showed (B201). An answer that
+// the write as seen, so the row it made never showed. An answer that
 // failed carries none, and the token stands in so the watch keeps asking
 // rather than waiting on a number that never comes.
 //
@@ -1223,8 +1223,8 @@ function nbRevRead(nb, o, again = false){
 // that landed, with whatever the caller passed after the body.
 //
 // `opts.now`, where the page knows the result before the answer (a row
-// ticked, moved or deleted), draws it on the press as drawNow does (the
-// operator, 22 Nov): after the hold has had its say, so a held notebook
+// ticked, moved or deleted), draws it on the press as drawNow does:
+// after the hold has had its say, so a held notebook
 // draws nothing, and inside the write, so no poll reads the list back over
 // it before the answer. What it gives back puts the page as it was when
 // nothing was written: a refusal, a clash, or no answer at all.
@@ -1266,7 +1266,7 @@ function sendOutcome(j, noun){
 }
 
 // ---- this space's VMs and containers -------------------------------------
-// This project's VMs as the VMs page draws them, scoped to it (R96): the
+// This project's VMs as the VMs page draws them, scoped to it: the
 // page's own rows and their presses, the project's card alone.
 function nbCoreLoadVms(nb){
   const {$, project} = nb;
@@ -1277,8 +1277,8 @@ function nbCoreLoadVms(nb){
     nbCoreDrawVms(nb);
   });
 }
-// A band of chips narrowing a notebook's list to one node (the operator,
-// 19 Nov): drawn only where what the space has is on more than one, All and
+// A band of chips narrowing a notebook's list to one node:
+// drawn only where what the space has is on more than one, All and
 // a chip a node with its count, the pick kept for the page's life as the
 // Roadmap's is. `counts` is [[node id, name, how many]...]; answers the pick
 // that stands.
@@ -1293,7 +1293,7 @@ function nbCoreNodeChips(nb, box, counts, picked, attr, items, pick){
 }
 function nbCoreDrawVms(nb){
   const {$, project} = nb;
-  // The space's, every repository's in it (the operator, 24 Nov: never by
+  // The space's, every repository's in it (never by
   // repository), as the VMs page groups them.
   const all = (vmsData?.vms || []).filter(v => dmSpaceOf(v.project) === dmSpaceOf(project));
   const nodes = [...new Set(all.map(v => v.node || ""))];
@@ -1303,10 +1303,10 @@ function nbCoreDrawVms(nb){
                               id => { nb.nvNode = id; nbCoreDrawVms(nb); });
   const rows = nb.nvNode ? all.filter(v => (v.node || "") === nb.nvNode) : all;
   const up = rows.filter(v => v.state === "running").length;
-  // The glance (R109): what runs of how many, as the VMs page counts,
+  // The glance: what runs of how many, as the VMs page counts,
   // and on the row with VMs page and New VM what a session here may do
-  // about VMs, so those two are never on a line of their own (the sweep,
-  // 7 Nov, on a phone).
+  // about VMs, so those two are never on a line of their own
+  // (on a phone).
   const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
   viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : [],
              dial === "auto" ? "a session here makes VMs on its own" : dial === "ask" ? "a session here asks before it makes a VM"
@@ -1317,7 +1317,7 @@ function nbCoreDrawVms(nb){
   add.disabled = !(vmsData.hosts || []).length;
   add.onclick = () => openNewVm(project);
   $("nvOpen").onclick = () => openVmsTab();
-  // What the view is for, as its empty state (R119 step 4).
+  // What the view is for, as its empty state.
   drawHTML($("nvList"), rows.length ? vmGroupsHtml(rows)
     : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
         ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
@@ -1327,7 +1327,7 @@ function nbCoreDrawVms(nb){
 }
 
 // This project's containers as the Containers page draws them, scoped to
-// it (the operator, 19 Oct): its tiles, when the images were checked, and
+// it: its tiles, when the images were checked, and
 // its card in the page's cards or list, whichever this browser keeps.
 function nbCoreWireDocker(nb){
   const {$} = nb;
@@ -1372,7 +1372,7 @@ function nbCoreDrawDocker(nb){
   const called = id => (nodesList || []).find(n => n.id === id)?.name || (nb.dkGot.nodes || []).find(n => n.id === id)?.name || "its node";
   // What belongs to the space on each node read, every repository's in it
   // and what was given to the space itself, which is the Containers page's
-  // group for it there (the operator, 24 Nov: never by repository).
+  // group for it there (never by repository).
   const space = dmSpaceOf(project);
   const parts = [nb.dkGot, ...(nb.dkMore || [])].map(got => ({
     got, node: got.node || "",
@@ -1393,7 +1393,7 @@ function nbCoreDrawDocker(nb){
   const blind = !!one && one.blind;
   const where = one ? called(node) : `${shown.length} nodes`;
   const n = mine.length + others.length;
-  // The glance (R109): the Containers page's tiles for the project's own,
+  // The glance: the Containers page's tiles for the project's own,
   // then its node and when the images were checked, or why the rows
   // cannot say what runs.
   const imgs = !mine.length || !mayDocker() || featureOff("image-updates") ? ""
@@ -1404,7 +1404,7 @@ function nbCoreDrawDocker(nb){
       // ...named while they are one or two; more are counted, each one's card saying so.
       : !one && dark.length ? `on ${esc(where)}: ${dark.length > 2 ? dark.length : esc(dark.map(x => called(x.node)).join(" and "))} did not answer, so ${dark.length === 1 ? "its" : "their"} rows cannot say what is running`
       : n ? `on ${esc(where)}${one ? imgs : ""}` : "no node runs this space's containers yet", "", (blind || (!one && dark.length)) && n ? "warn" : "");
-  // Patched as the Containers page's rows are (R244): a row's settings
+  // Patched as the Containers page's rows are: a row's settings
   // dialog open, a field typed in it and a fold stay as they are, and a
   // draw that brings nothing new writes nothing, which a key of its own
   // used to decide.
@@ -1418,7 +1418,7 @@ function nbCoreDrawDocker(nb){
     for (const id of checks.slice(0, -1)) await dmCheck(ck, id, () => {});
     dmCheck(ck, checks.at(-1), () => { unbusy(ck); nbCoreLoadDocker(nb); });
   };
-  // What the view is for, as its empty state (R119 step 4).
+  // What the view is for, as its empty state.
   dmNoteOpen($("dkList"));
   patch($("dkList"), shown.map(x => dmGroupsHtml(x.mine, x.others, x.job, x.blind, space,
                                                  {id: x.node, name: one ? "" : called(x.node) + (x.blind ? ", which did not answer" : "")})).join("")
@@ -1443,8 +1443,8 @@ function nbCoreHandle(nb){
     reload(){ return nb.loadRoadmap(nb.memGen); },
     reloadMemory(){ return nb.loadMemory(nb.memGen); },
     reloadBugs(){ return nb.loadBugs(); },
-    // A roadmap item or a bug by its id (R12, B34), from a link elsewhere
-    // (the changelog, R254 step 4): its view, its list narrowed to it.
+    // A roadmap item or a bug by its id, from a link elsewhere
+    // (the changelog): its view, its list narrowed to it.
     find(id){ nbCoreFind(nb, id); },
     reloadTests(){ return nb.loadTests(); },
     leaving: () => nbCoreLeaving(nb),
@@ -1452,10 +1452,10 @@ function nbCoreHandle(nb){
     unsaved: () => nbCoreUnsaved(nb),
     view: v => nbCoreSetView(nb, v),
     where: () => nb.nbWhere,
-    // The wiki page on show, for the address, and set from one (R256 step 3).
+    // The wiki page on show, for the address, and set from one.
     wikiPage: () => nb.wkCur,
     wikiAt: name => nb.wikiAt(name),
-    // The branch whose comparison is on show, and set from an address (R269 step 2).
+    // The branch whose comparison is on show, and set from an address.
     gitPage: () => nb.gitPage?.() || "",
     gitAt: name => nb.gitAt?.(name),
     // The design page on show, and set from an address.
@@ -1498,7 +1498,7 @@ function nbCorePoll(nb, p){
   nbCoreNoteBatch(nb, p.todo_batch); nbCoreDrawBatchNote(nb); nbCoreSyncSave(nb);
   // ...and who else is in here (roadmap #26), while this is the page on
   // show: a project page left for another stays in the page model, and
-  // it went on saying this person was in its notebook (B765). Off show,
+  // it went on saying this person was in its notebook. Off show,
   // it says once that it has left; shown again, it says it is back.
   if (nbCoreOnShow(nb)){ nb.away = false; nbCoreBeat(nb); }
   else if (!nb.away){ nb.away = true; nbCoreBeat(nb, true); }

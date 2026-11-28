@@ -1,6 +1,6 @@
 """A toolchain whose directory is gone from a node's store reads as not
-installed, whatever the last check or an install since it said (B671, the
-operator, 12 Oct: the store wiped by hand to install everything again, and
+installed, whatever the last check or an install since it said
+(the store wiped by hand to install everything again, and
 every row still read current). The node's listing comes with every hello,
 so a deletion by hand is read within one, a controller restart included."""
 import os

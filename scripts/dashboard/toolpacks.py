@@ -1,4 +1,4 @@
-"""Tool packs (R77): toolchains a person adds from a git repository of their
+"""Tool packs: toolchains a person adds from a git repository of their
 own choosing, which AerieOS neither ships nor lists anywhere.
 
 A pack is a repository with a bbtool.json at its root. The manifest says how
@@ -10,7 +10,7 @@ repository at its current commit, shows the manifest, and keeps it pinned to
 that commit until somebody approves another. The record lives here, in
 /config/toolpacks.json, and never in AerieOS's repository.
 
-What a pack becomes is one catalog row (recipe()), shipped to the nodes in the
+What a pack becomes is one catalog row (recipe), shipped to the nodes in the
 bundle beside config/toolchains.json, so it installs, checks and removes the
 way every toolchain does, into the store, read-only to sessions.
 
@@ -26,7 +26,7 @@ beside config/toolpacks.json, and install it with the same pinned fetch.
     fetch(url, commit="")       the repository at a commit: {commit, manifest, guidance} or {error}
     stage(text=, archive=)      a pack made here, checked and held for Add: {staged, manifest, ...}
     add(url, commit, by) / add_staged(staged, by) / remove(name) / source(name)
-    packs() / recipes() / hosted_files()
+    packs / recipes / hosted_files
 """
 import hashlib
 import json
@@ -53,8 +53,8 @@ _lock = threading.RLock()
 MANIFEST = "bbtool.json"
 NAME = re.compile(r"^[a-z][a-z0-9-]{1,39}$")
 # aerie tool's own words (scripts/aerie cmd_tool): a pack of somebody's named one
-# would never be reached, so none may be (R169 step 5 added search and
-# install); the official packs behind graphics, diagrams and office are the
+# would never be reached, so none may be (search and
+# install among them); the official packs behind graphics, diagrams and office are the
 # toolchains those words run.
 BB_TOOL_WORDS = frozenset({"graphics", "diagrams", "docs", "office", "sound", "search", "install"})
 NAME_OFFICIAL = re.compile(r"^[a-z][a-z0-9:-]{1,39}$")
@@ -70,7 +70,7 @@ PLATFORM = re.compile(r"^(linux|darwin)/(amd64|arm64|\*)$")
 PLACEHOLDERS = ("{dir}", "{dist}", "{project}", "{args}")
 GUIDANCE_MAX = 16 * 1024
 MANIFEST_MAX = 64 * 1024
-# A pack's own icon on its Library card (R182): a file in the pack, PNG, WebP
+# A pack's own icon on its Library card: a file in the pack, PNG, WebP
 # or SVG, kept under the state and served as an image alone (server.py's
 # /api/pack-icon), never drawn into the page as markup.
 ICON_MAX = 64 * 1024
@@ -128,14 +128,14 @@ def _words(v, what, errors, placeholders=PLACEHOLDERS):
     return [str(w) for w in v]
 
 
-# One manifest for everything (R169 step 1): a pack's tier, and the two
+# One manifest for everything: a pack's tier, and the two
 # blocks the official packs carry beyond a person's pack. `shipped` is a
 # toolchain's recipe as config/toolchains.json has it (its source, probe,
 # system packages and the rest), which the installer runs; `agent` is a
 # coding agent's adapter as agents.py's table has it. Either stands in for
 # install steps and verbs, since what they install is the tool itself.
 TIERS = ("official", "vetted", "url")
-# What a pack asks for per node (R172): each field's kind, drawn by the
+# What a pack asks for per node: each field's kind, drawn by the
 # Library as Configure on the card, the answers kept sealed on the
 # controller and handed to the node. A `list` field is rows of `fields`.
 CONFIG_KINDS = ("secret", "text", "choice", "list", "switch", "projects")
@@ -144,7 +144,7 @@ CONFIG_KINDS = ("secret", "text", "choice", "list", "switch", "projects")
 FETCH_MAX, FETCH_FORMAT = packformat.FETCH_MAX, 3
 CONFIG_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
-# A deployed thing an official pack stands for (R172): the model router,
+# A deployed thing an official pack stands for: the model router,
 # nginx and the Scanners, the kinds services.py's table holds.
 SERVICES = services.KINDS
 AGENT_FIELDS = ("product", "command", "provider", "reported", "update_job", "login_job", "logout_job",
@@ -156,7 +156,7 @@ AGENT_STATES = ("hooks", "plugin", "session-log")
 
 def _agent(a, errors):
     """The agent block checked: an agent that cannot take the guards is
-    not listed (R169 step 1)."""
+    not listed."""
     if not isinstance(a, dict):
         errors.append("agent is an object: product, command, provider, reported, the jobs, briefing, guards, state, transcripts")
         return None
@@ -183,14 +183,14 @@ def _agent(a, errors):
     if out["latest_url"] and not re.fullmatch(r"https://[A-Za-z0-9._~:/@+?=&%-]{3,300}", out["latest_url"]):
         errors.append("agent.latest_url is an https address")
     _agent_allow(a, out, errors)
-    # How it is installed (R169 step 13): a shipped agent's alone, since a
+    # How it is installed: a shipped agent's alone, since a
     # pack agent is installed by its pack's own steps.
     recipe, why = agents.install_checked(a.get("install"))
     if why:
         errors.append(why)
     elif recipe:
         out["install"] = recipe
-    # How it signs in (R234 step 6), in a pack agent's own words: the
+    # How it signs in, in a pack agent's own words: the
     # command that starts it and the flow, held by the one validator.
     si = a.get("signin")
     if si is not None:
@@ -225,7 +225,7 @@ def signin_checked(si, command, errors):
 
 
 def _agent_allow(a, out, errors):
-    """An agent's `allow` (R231): how it is told the aerie verbs the
+    """An agent's `allow`: how it is told the aerie verbs the
     controller decides need no asking, checked by agents.allow_checked and
     kept only where it says a way."""
     spec, why = agents.allow_checked(a.get("allow"))
@@ -235,7 +235,7 @@ def _agent_allow(a, out, errors):
         out["allow"] = spec
 
 
-# A coding agent from a vetted pack (R169 step 8): an adapter of data, never
+# A coding agent from a vetted pack: an adapter of data, never
 # code. Its hooks file is one of the two shapes bb-tty writes for the shipped
 # agents (grouped: {hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}} as
 # Claude's, Codex's and Grok's; flat: {version: 1, hooks: {EVENT: [{type,
@@ -245,7 +245,7 @@ def _agent_allow(a, out, errors):
 # own. Before a tool, a prompt and the stop are required: an agent that
 # cannot take the guards is not listed.
 #
-# An agent whose hooks are none of those says its own as data (R234 step 3),
+# An agent whose hooks are none of those says its own as data,
 # so a protocol nobody has met is a manifest and no release of AerieOS:
 # hooks.document lays its hooks file out, hooks.payload is the paths its
 # payload keeps each thing at, hooks.answers the JSON it reads back for a
@@ -506,7 +506,7 @@ def _pack_agent(name, a, errors, newer=False):
             out["signin"]["flow"] = flow
         elif newer:
             # Written for a later second number of the framework than this
-            # build reads (R234 step 7): a flow said in a way it does not
+            # build reads: a flow said in a way it does not
             # know is left out, and the agent signs in in its terminal;
             # the manifest is not refused for it.
             del errors[before:]
@@ -534,7 +534,7 @@ def _pack_agent(name, a, errors, newer=False):
     return out if len(errors) == bad else None
 
 
-# A sign-in's flow as its pack describes it (R233 step 6), so the page signs
+# A sign-in's flow as its pack describes it, so the page signs
 # an account in to a pack's agent as it does to a shipped one: the words a
 # screen shows are plain ones, the link is named by how it starts, and what
 # is typed back is a key or a short word. No pattern comes from a manifest.
@@ -690,7 +690,7 @@ def _agent_uses(a):
 
 def _agent_format(a):
     """The pack format a cleaned adapter needs: 2 when it describes its own
-    protocol or uses what came with that (R234 step 3), else 1."""
+    protocol or uses what came with that, else 1."""
     h = a.get("hooks") or {}
     two = h.get("document") or isinstance(h.get("payload"), dict) or h.get("answers") or h.get("prompt_fires") \
         or "start" in (h.get("events") or {}) or (a.get("briefing") or {}).get("how") == "hook" or (a.get("allow") or {}).get("how") == "hook"
@@ -719,7 +719,7 @@ def _config(c, errors, depth=0):
             continue
         field = {"name": name, "kind": kind, "label": str(f.get("label") or name)[:60], "help": str(f.get("help") or "")[:200],
                  "required": f.get("required") is True}
-        # Whose the value is (R172 step 5): the node's (one for everybody
+        # Whose the value is: the node's (one for everybody
         # there), or each person's own on that node, kept under their key.
         scope = str(f.get("scope") or "node")
         if scope not in ("node", "person") or (depth and scope != "node"):
@@ -751,7 +751,7 @@ def _config(c, errors, depth=0):
 def validate(m, shipped=(), official=False):
     """A manifest checked and cut down to what AerieOS reads: (clean,
     errors). Nothing in it is run here; the errors say what to fix. An
-    official pack (tier official, R169 step 1) may carry a shipped
+    official pack (tier official) may carry a shipped
     toolchain's recipe or an agent's adapter in place of install steps and
     verbs, and may take a shipped name, being the shipped thing itself.
 
@@ -768,7 +768,7 @@ def validate(m, shipped=(), official=False):
     errors = []
     if not isinstance(m, dict):
         return None, [f"{MANIFEST} is a JSON object"]
-    # The format it needs (R234), said before anything else is read: a
+    # The format it needs, said before anything else is read: a
     # manifest of a format this build has not met is not judged by rules
     # written before it, so it is refused in one sentence, never a list.
     fmt = packformat.of(m)
@@ -829,7 +829,7 @@ def validate(m, shipped=(), official=False):
                 if (a.get("install") or {}).get("steps") and fmt < packformat.HELD_FORMAT:
                     errors.append(f"agent.install's fetch and steps are pack format {packformat.HELD_FORMAT}'s: "
                                   f'the manifest says "format": {packformat.HELD_FORMAT}')
-    # A deployed thing (R172): the model router, deployed and configured
+    # A deployed thing: the model router, deployed and configured
     # from its card; an official pack's alone, like an agent's adapter.
     if m.get("service") is not None:
         sv = m["service"] if isinstance(m["service"], dict) else {}
@@ -856,7 +856,7 @@ def validate(m, shipped=(), official=False):
     stands_in = "shipped" in out or "agent" in out or "service" in out or "pack_agent" in out
     plats = m.get("platforms") or []
     if not isinstance(plats, list) or not plats or not all(isinstance(p, str) and PLATFORM.fullmatch(p) for p in plats):
-        # The wildcard named too, in the form the rule takes (B111): a bare
+        # The wildcard named too, in the form the rule takes: a bare
         # "*" is refused, since a platform is matched as os/arch on a node.
         errors.append("platforms lists where it works as os/arch, e.g. [\"linux/amd64\", \"linux/arm64\"], "
                       "or linux/* or darwin/* for any architecture of that system")
@@ -877,7 +877,7 @@ def validate(m, shipped=(), official=False):
     # must be in the version it says. A coding agent's part is added to this
     # once its adapter is read, below.
     out["framework"] = packformat.said(packformat.framework_of(m) or (fmt, 0))
-    # What it touches (R169 step 4): the hosts its install fetches from and
+    # What it touches: the hosts its install fetches from and
     # whether it needs root on the node, said on Look before it is added; a
     # pack that needs root is an administrator's to add.
     tch = m.get("touches") if m.get("touches") is not None else {}
@@ -891,7 +891,7 @@ def validate(m, shipped=(), official=False):
     if tch.get("root") not in (None, True, False):
         errors.append("touches.root is true or false")
     out["touches"] = {"hosts": hosts, "root": tch.get("root") is True}
-    # The AerieOS versions it works with (R169 step 6), by release line
+    # The AerieOS versions it works with, by release line
     # ("0.9", "0.10"); none named, every one. Checked before it is added and
     # said on the bell when this install moves to a line it does not name.
     ww = m.get("works_with") if m.get("works_with") is not None else []
@@ -910,14 +910,14 @@ def validate(m, shipped=(), official=False):
             steps.append(w)
     out["steps"] = steps
     out["verify"] = _words(inst["verify"], "install verify", errors, ("{dir}",)) if inst.get("verify") else None
-    # Declared downloads (R234, pack format 3; the operator, 13 Nov: what an
+    # Declared downloads (pack format 3: what an
     # install takes from somewhere else had no paper trail): each file with
     # the address it comes from, the sha256 of what that address answers,
     # and where inside the pack it is kept. AerieOS fetches and checks each
     # before the steps run, and the steps then run with no network, so what
     # is not declared cannot arrive.
     #
-    # From pack format 5 (the operator, 20 Nov: everything an install takes
+    # From pack format 5 (everything an install takes
     # from somewhere else is held to something its entry carries, by one
     # mechanism): a download may name the platform it is for, and may be
     # held by its publisher's signature in the sha256's place (signed),
@@ -995,7 +995,7 @@ def validate(m, shipped=(), official=False):
         errors.append(f"layout.env sets variables of the tool's own, each {packformat.ENV_SAID}")
         env = {}
     out["layout"] = {"bin": bins, "env": env, "tool": tool or MANIFEST}
-    # System packages per package manager (R171), as the shipped recipes
+    # System packages per package manager, as the shipped recipes
     # carry them: the node's family script installs its own manager's list,
     # and a node whose manager the pack names none for is not offered it.
     sysd = m.get("system") if isinstance(m.get("system"), dict) else {}
@@ -1051,7 +1051,7 @@ def validate(m, shipped=(), official=False):
         errors.append("icon names a PNG, WebP or SVG file inside the pack")
         ic = ""
     out["icon"] = ic
-    # What it uses is in the framework version it says (R234 step 7): the
+    # What it uses is in the framework version it says: the
     # number on a manifest is what an install has to know to do all of it.
     errors.extend(packformat.needs(m, [*packformat.uses_of(m), *_agent_uses(out.get("pack_agent")), *_agent_uses(out.get("agent"))]))
     return (out if not errors else None), errors
@@ -1071,7 +1071,7 @@ mirror_bundle = None    # catalogmirror.bundle(url, commit): the imported mirror
 
 def _source(url, commit):
     """Where a fetch reads `url` at `commit` (its head when none): the
-    imported catalog mirror's bundle when it holds that commit (R169 step 6),
+    imported catalog mirror's bundle when it holds that commit,
     nothing going to the network, else the repository itself, shallow."""
     b = mirror_bundle(url, commit) if mirror_bundle and commit else None
     if b:
@@ -1098,7 +1098,7 @@ def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
     """The repository at `commit` (its default branch's head when none):
     {commit, manifest, guidance} with the manifest validated, or {error}.
     Fetched into a scratch directory that is gone when this returns. With
-    `sha256` (the catalog's, of the archive at that commit, R169 step 4)
+    `sha256` (the catalog's, of the archive at that commit)
     the archive is made and compared, and a difference refuses the pack:
     git's own hashes pin the commit, this pins what the maintainers saw.
     `official` is said by a caller that read this pin from the signed
@@ -1113,7 +1113,7 @@ def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
         return {"error": "a pack is a git repository's address: https://host/owner/repo"}
     if commit and not re.fullmatch(r"[0-9a-f]{40}", commit):
         return {"error": "a commit is its full 40-character hash"}
-    # A pack in a folder of the repository (R170 step 6): the archive and
+    # A pack in a folder of the repository: the archive and
     # the manifest are that folder's.
     path = str(path or "").strip("/")
     if path and (not PATH_IN.fullmatch(path) or ".." in path.split("/")):
@@ -1155,7 +1155,7 @@ def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
 
 
 def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
-    """A catalog entry's folder at the commit it pins (R170 step 7: an app's
+    """A catalog entry's folder at the commit it pins (an app's
     bbapp.json and compose.yml), its archive's sha256 checked as a pack's
     is: {files: {name: bytes}} or {error}. Only the files named are read."""
     url = str(url or "").strip()
@@ -1475,7 +1475,7 @@ def line_of(version):
 
 
 def fits(manifest, version=None):
-    """Whether a pack's manifest names this build's release line (R169 step 6):
+    """Whether a pack's manifest names this build's release line:
     True for one that names none, or a build with no version."""
     ww = (manifest or {}).get("works_with") or []
     line = line_of(running_version() if version is None else version)
@@ -1500,7 +1500,7 @@ def unfit():
 
 def disabled(rec):
     """Why a pack this install holds is switched off, or "": its manifest
-    does not name the running release line (the operator, 12 Nov: a pack
+    does not name the running release line (a pack
     that does not fit this AerieOS is disabled until one that does is
     kept, as it would not have been offered at all). Switched off is not
     removed: it stays where it is installed, and is in no session's PATH,
@@ -1523,15 +1523,15 @@ def add(url, commit, by, shipped=(), sha256="", tier="url", path="", may_root=Fa
     """Keep a pack pinned to `commit`, which the person approving it saw:
     the repository is fetched again at exactly that commit, so what is kept
     is what was shown. A pack of the same name is replaced (an update).
-    From the vetted catalog (R169 step 4) it carries the index's sha256,
+    From the vetted catalog it carries the index's sha256,
     checked on the way in, and its tier. A pack in a folder of the
-    repository (`path`, R170 step 6) is kept as a pack made here: that
+    repository (`path`) is kept as a pack made here: that
     folder's files at that commit, committed to its repository on this
     controller, so a node fetches the folder and nothing else."""
     got = fetch(url, commit, shipped, sha256, path)
     if got.get("error"):
         return got
-    # One that needs root is an administrator's to add (R169 step 4).
+    # One that needs root is an administrator's to add.
     if (got.get("manifest") or {}).get("touches", {}).get("root") and not may_root:
         return {"error": f"{got['manifest']['name']}: {ROOT_REFUSED}"}
     # ...and one that does not name this release line is not added (step 6).
@@ -1594,7 +1594,7 @@ def _folder_into(d, url, commit, path, sha256):
 
 def _add_folder(url, commit, path, by, shipped, sha256, tier):
     """A folder of a repository at a commit, staged as a pack made here and
-    kept, its record naming where it came from (R170 step 6). Nothing
+    kept, its record naming where it came from. Nothing
     refused is left staged."""
     _staging().mkdir(parents=True, exist_ok=True)
     tok = secrets.token_hex(8)
@@ -1624,14 +1624,14 @@ def _add_folder(url, commit, path, by, shipped, sha256, tier):
 
 def configs():
     """{pack name: its config fields} for every added pack that asks for
-    any (R172), what packconfig.for_node reads the node's answers by."""
+    any, what packconfig.for_node reads the node's answers by."""
     with _lock:
         d = _load()
     return {n: r["manifest"]["config"] for n, r in d["packs"].items() if isinstance(r, dict) and (r.get("manifest") or {}).get("config")}
 
 
 def where_said(name, where):
-    """The refusal for removing a pack still installed (B84): its files
+    """The refusal for removing a pack still installed: its files
     would stay in those stores with no row left to uninstall them from, and
     a pack added back would read as installed with no install run."""
     return {"error": f"{name} is installed on {', '.join(where)}: uninstall it there first", "installed": list(where)}
@@ -1657,7 +1657,7 @@ def remove(name, where=()):
 
 def _bundle_commit(rec):
     """The commit a node fetches a pack at. One kept from a folder of a
-    repository (R170 step 6) is in its repository here under a commit of
+    repository is in its repository here under a commit of
     its own, which is the one its bundle holds: the record's `kept_at`
     (migration 0041 wrote it into older records). Any other pack's is the
     commit it is pinned to."""
@@ -1695,7 +1695,7 @@ def recipe(rec):
         src["then"] = [{"run": s} for s in m["steps"]]
     if m.get("verify"):
         src["verify"] = m["verify"]
-    # What the install marks executable (B83): a file committed through a
+    # What the install marks executable: a file committed through a
     # forge's web editor has no executable bit, and every run of it was
     # 'Permission denied'. The programs the verbs, the steps and verify run
     # by path, the layout's tool, and whatever is in its bin directories.
@@ -1707,7 +1707,7 @@ def recipe(rec):
     src["exec"] = sorted(set(progs))
     src["exec_dirs"] = ["{dir}/" + b for b in m["layout"].get("bin") or []]
     # about is optional in a manifest, and a catalog row without one is not
-    # drawn (B106): the label stands in for it.
+    # drawn: the label stands in for it.
     row = {"name": m["name"], "label": m["label"], "probe": m["name"], "about": m["about"] or m["label"],
            "platforms": m["platforms"], "layout": m["layout"], "source": src, "terms": m["terms"],
            "maker": m.get("maker") or "", "credits": m.get("credits") or [],
@@ -1726,10 +1726,10 @@ def recipe(rec):
                     "agent": brings_agent(rec),
                     # Switched off for not fitting this AerieOS, and why.
                     "disabled": disabled(rec),
-                    # Whether it carries an icon of its own (R182).
+                    # Whether it carries an icon of its own.
                     "icon": bool(rec.get("icon"))}}
     # A coding agent it offers, for bb-tty and bb-agent-hook on the node,
-    # which read it from the bundle's config/toolpacks.json (R169 step 10).
+    # which read it from the bundle's config/toolpacks.json.
     if offers_agent(rec):
         row["agent"] = offers_agent(rec)
     if m.get("system"):
@@ -1756,7 +1756,7 @@ def brings_agent(rec):
 
 
 def offers_agent(rec):
-    """The coding agent an installed pack offers (R169 step 9), its adapter,
+    """The coding agent an installed pack offers, its adapter,
     or None: one this install lists (brings_agent), and never one switched
     off for not fitting this AerieOS (disabled)."""
     m = (rec or {}).get("manifest") or {}
@@ -1770,8 +1770,8 @@ def offered_agents():
     """[(name, label, adapter)] for every installed pack that offers a coding
     agent, in name order; read again only when the packs' file changes, since
     every session name is asked of it."""
-    # What the file is, looked at once a request (statefile.sig, R228 step
-    # 26): every session name asks, some two hundred times a status read.
+    # What the file is, looked at once a request (statefile.sig):
+    # every session name asks, some two hundred times a status read.
     st = statefile.sig(FILE) if FILE else None
     # ...and again when the install's setting for sideloaded agents turns.
     stamp = (str(FILE), st, bool(sideload_agents())) if st else None

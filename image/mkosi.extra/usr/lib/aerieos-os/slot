@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The two root slots of an AerieOS disk (R160 step 1), read and set:
+# The two root slots of an AerieOS disk, read and set:
 #
 #   slot current         the slot this boot came from (a or b), from the kernel's command line
 #   slot other           the one an update writes
@@ -12,14 +12,14 @@
 #   slot switch SLOT PREV VER   the next boot is a trial of SLOT holding VER, back to PREV: one write
 #   slot good            this boot's slot is healthy: the trial ends, and it stays
 #   slot fell-back [keep]   whether the last boot fell back to the slot before (and clears the mark, unless keep)
-#   slot kept-next [VER]    one boot of the kept older version VER next (R201), or none named: no such boot
+#   slot kept-next [VER]    one boot of the kept older version VER next, or none named: no such boot
 #   slot args [ARG...]   the kernel arguments every boot entry ends with, printed, or each ARG (NAME or
 #                        NAME=VALUE) put there in place of one of that name: from the next boot
 #   slot args-off NAME...   those arguments taken off, from the next boot
 #
 # GRUB keeps the choice in its environment block on the ESP (aerie_slot), the one
 # place this tool writes. Counting a new slot's tries and marking it good is
-# R161 step 2's, on top of this.
+# the health check's, on top of this.
 set -euo pipefail
 ESP="${BB_ESP:-/boot/efi}"
 ENVF="$ESP/grub/grubenv"
@@ -72,14 +72,14 @@ trial() {
     grub-editenv "$ENVF" unset aerie_fell_back
 }
 # Before an update writes the other slot: the next boot is this one's, no
-# trial, so a slot half written is never the one GRUB is pointed at (B470).
+# trial, so a slot half written is never the one GRUB is pointed at.
 hold() {
     needenv || return 1
     local cur; cur="$(current)" || return 1
     grub-editenv "$ENVF" set "aerie_slot=$cur" aerie_trial=0 aerie_tries=0
 }
 # After it: the written slot booted next on trial, in one write of GRUB's
-# environment, so a next without its trial never stands alone (B470).
+# environment, so a next without its trial never stands alone.
 switch() {
     local to="${1:-}" prev="${2:-}" ver="${3:-}"
     case "$to:$prev" in a:b|b:a) ;; *) echo "slot switch takes the slot written and the one to go back to (a b, or b a), and the version" >&2; return 2 ;; esac
@@ -90,7 +90,7 @@ switch() {
 # This boot is healthy. A trial ends only when this boot is the slot on
 # trial; a boot of the other slot (picked from the menu) during one that has
 # already booted ends the trial back on this slot, and one written during
-# this boot and not booted yet is left to boot (B471). Nothing is written
+# this boot and not booted yet is left to boot. Nothing is written
 # when nothing changes, so a healthy boot does not rewrite GRUB's
 # environment each time.
 good() {
@@ -114,7 +114,7 @@ good() {
     fi
     return 0
 }
-# One boot of a kept older version next, GRUB spending the word (R201).
+# One boot of a kept older version next, GRUB spending the word.
 keptnext() {
     needenv || return 1
     case "${1:-}" in

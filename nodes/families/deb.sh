@@ -12,7 +12,7 @@ FAMILY_IDS="debian ubuntu raspbian"
 # The tools the family implies, checked before anything lands.
 FAMILY_NEED="apt-get dpkg"
 
-# apt_waiting CMD...: CMD, run again while another apt holds its lock (B320).
+# apt_waiting CMD...: CMD, run again while another apt holds its lock.
 # A machine just booted from a cloud image runs its own apt-get (cloud-init,
 # unattended-upgrades) for a few minutes, and an install started as soon as
 # ssh answered failed at its first step on the lock. Up to ten minutes, said
@@ -32,7 +32,7 @@ apt_waiting() {
     return "$rc"
 }
 # pkg_refresh: the package index, once, before the first install.
-# On an AerieOS disk (image/, R160 step 1) the packages are the image's,
+# On an AerieOS disk (image/) the packages are the image's,
 # pinned when it was built, and its root forgets at the next boot: nothing is
 # fetched, and a package the provisioner needs that the image lacks is a
 # build of the image to fix, said here by name.

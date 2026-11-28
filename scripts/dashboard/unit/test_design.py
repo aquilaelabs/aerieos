@@ -33,7 +33,7 @@ def page(blocks, **kw):
 
 
 class OtherHalf(unittest.TestCase):
-    """A theme's other half (R216): the same tokens for the opposite mode,
+    """A theme's other half: the same tokens for the opposite mode,
     kept with the theme, a bad hex dropped like any color's, and written
     out wherever the theme's colors are."""
     THEME = {"name": "Night", "mode": "dark",

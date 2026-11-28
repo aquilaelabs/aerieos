@@ -1,6 +1,6 @@
 """A session a person ended is off the lists at once, for the minute its node
 may still report it; one made since under the same name, which is what
-Restart starts, is listed (the operator, 19 Nov: the space's card said Start
+Restart starts, is listed (the space's card said Start
 agent for a minute after a restart, with the session running)."""
 import os
 import sys

@@ -1,5 +1,5 @@
 """A session started before something it cannot see until it starts again
-says so on its project's row (the operator, 12 Oct): a toolchain installed
+says so on its project's row: a toolchain installed
 on its node that puts something on PATH, named, and nothing for one that
 landed before it started or changes no environment."""
 import os

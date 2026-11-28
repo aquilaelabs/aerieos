@@ -1,4 +1,4 @@
-"""Migration 0043 (B1190): a git token, a setting's secret and a forge token
+"""Migration 0043: a git token, a setting's secret and a forge token
 an account gave, each left sealed in the format from before 27 Oct
 (BBSEAL1) because only the signing keys' pass rewrote it, are sealed again
 in today's format by the round the migration asks of the start, and open to

@@ -6,13 +6,13 @@ typed; `show ID [--tz ZONE]` prints one as the Profile's download reads,
 stamped in ZONE (the controller's own when none), the newest 16 MB of a
 longer one unless --all; `fetch ID` copies the
 file itself into this machine's folder for it, which is how a synced node
-resumes a conversation it does not have (B613). A session reads its
+resumes a conversation it does not have. A session reads its
 account's conversations on its own project and on one its project reads
 (`bb -p NAME transcripts`), and nobody else's: the controller looks under
 the account's transcripts and nowhere else. `audit [DAYS]` is `aerie rules
 audit`: the same conversations counted against the rules that refuse
-commands (R200). `label ID WORDS`, `note ID WORDS`, `keep ID` and `unkeep
-ID` say something of one of the account's own (R236): the name and the note
+commands. `label ID WORDS`, `note ID WORDS`, `keep ID` and `unkeep
+ID` say something of one of the account's own: the name and the note
 its person reads it by, and whether a copy of it is kept past its agent's
 own cleanup. BB_PROJECT is the project. The auth header is bbapi's own
 (BB_AUTH_HEADER, from aerie).
@@ -46,7 +46,7 @@ if verb == "list":
     if not rows and not seen:
         print(f"no conversations of yours on {proj} yet")
         raise SystemExit(0)
-    # Each row marked with its agent (R95), in both lists.
+    # Each row marked with its agent, in both lists.
     names = {"claude": "Claude", "codex": "ChatGPT", "copilot": "Copilot", "grok": "Grok", "open": "Any model"}
 
     def line(row, who=""):
@@ -92,7 +92,7 @@ if verb in ("label", "note", "keep", "unkeep"):
     raise SystemExit(0)
 
 if verb == "audit":
-    # `aerie rules audit [DAYS]` (R200): the account's conversations here over
+    # `aerie rules audit [DAYS]`: the account's conversations here over
     # the last DAYS, counted against the rules that refuse commands.
     days = argv[1] if len(argv) > 1 and argv[1].isdigit() else "7"
     q = urllib.parse.urlencode({"project": proj, "audit": days})
@@ -137,7 +137,7 @@ if verb == "show":
 if verb == "fetch":
     # The conversation as Claude Code wrote it, into this machine's folder
     # for it, so a node holding its projects as a synced copy can resume one
-    # it does not have (B613): bb-tty runs this before claude --resume. A
+    # it does not have: bb-tty runs this before claude --resume. A
     # copy here that is as long is left alone.
     import re
     sid = argv[1] if len(argv) > 1 and not argv[1].startswith("--") else ""

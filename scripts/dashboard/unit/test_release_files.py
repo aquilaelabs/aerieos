@@ -1,6 +1,6 @@
 """A release is checked against the files its project lists in
 .release-files at the release's tag, and one short of a file is a red row
-on the bell naming the file and why (R190 step 4)."""
+on the bell naming the file and why."""
 import json
 import os
 import subprocess
@@ -72,7 +72,7 @@ class Files(unittest.TestCase):
         return releasefiles.attention(["app"])
 
     def test_a_release_deleted_on_the_git_host_ends_its_watch_and_its_row(self):
-        # B780: read once short of a file, then taken away on purpose.
+        # Read once short of a file, then taken away on purpose.
         self.assertEqual(len(self.check(["app-1.0.0-dev.5.tar.gz"])), 1)
         self.assertEqual(self.gone_at(5 * 3600), [])
 
@@ -99,7 +99,7 @@ class Files(unittest.TestCase):
 
 
 class AsCiEnds(unittest.TestCase):
-    """The check runs as the tag's runs end (R206 step 6), where it ran
+    """The check runs as the tag's runs end, where it ran
     three hours after the tag whatever CI was doing; a complete release is
     said once, and the app the controller signs is waited for."""
     TAG = "v1.0.0-dev.5"
@@ -186,7 +186,7 @@ class AsCiEnds(unittest.TestCase):
 
     def test_what_is_made_once_the_app_is_attached_is_waited_for_with_it_and_said_as_what_it_is(self):
         # A space whose list of files is signed by a workflow the controller
-        # starts once the signed app is on the release (R199): the list and
+        # starts once the signed app is on the release: the list and
         # the app both come after the tag's own runs.
         d = self.ws / "app"
         (d / ".github" / "workflows").mkdir(parents=True)

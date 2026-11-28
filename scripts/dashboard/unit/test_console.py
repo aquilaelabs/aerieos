@@ -1,4 +1,4 @@
-"""A way in at AerieOS's console (R194): the admin account made from
+"""A way in at AerieOS's console: the admin account made from
 the kept hash at every start with sudo, locked where none is kept, nothing
 done off AerieOS; and the controller's hash of a password, made by
 openssl so neither the job nor its record holds the password."""

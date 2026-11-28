@@ -5,8 +5,8 @@
 // the lines a toolchain's row says (its terms, system packages, what it
 // needs, how its download was checked), where a row stands and the presses
 // the two pages share, the machine's own rows (the NVIDIA
-// driver and the container toolkit) and the tool pack dialog (R77). Not a
-// page: the Toolchains page it was went with R170, the Library in its place.
+// driver and the container toolkit) and the tool pack dialog. Not a
+// page: the Toolchains page it was went, the Library in its place.
 //
 // Loaded BEFORE the page's own script, so everything here is a declaration
 // and nothing runs at load.
@@ -34,12 +34,12 @@ function loadToolchains(){
       clearTimeout(tcSizeTimer); tcSizeTimer = null;
       return;
     }
-    // A reply is kept while it is still about the node on show; reading()
+    // A reply is kept while it is still about the node on show; reading
     // lands every other one in the order asked, since dropping each reply
     // a later ask had overtaken was a livelock on a loaded box: the revision
     // watch, the sizing timer and the settling poll each ask again, and when
     // they asked faster than one read came back, the page sat on its
-    // template, and Forward to a node never said what it held (B154).
+    // template, and Forward to a node never said what it held.
     const node = tcNode;
     const got = await getJSON("/api/toolchains" + (node !== "local" ? `?node=${encodeURIComponent(node)}` : ""));
     if (tcNode !== node) return;
@@ -84,7 +84,7 @@ function tcTickDots(){
   const spans = document.querySelectorAll(".dots");
   if (!spans.length){ clearInterval(tcDotsTimer); tcDotsTimer = null; return; }
   tcDots = (tcDots + 1) % 4;
-  // Only the ones on show are written (R228 step 10): a page left behind
+  // Only the ones on show are written: a page left behind
   // with a job still running there was written to every 400 ms. Kept going
   // while any is on the page, so that page's dots move again when it is.
   const dots = ".".repeat(tcDots);
@@ -141,8 +141,8 @@ function tcTermsLine(p){
     acc.length && lic.length ? " " : ""}${lic.length ? `Licensed: ${lic.map(link).join(", ")}.` : ""}</span>`;
 }
 
-// How an installed toolchain's download was checked when it was installed
-// (R137): against what its publisher states, or not, and why not. Nothing
+// How an installed toolchain's download was checked when it was installed:
+// against what its publisher states, or not, and why not. Nothing
 // for one installed before AerieOS checked.
 function tcVerifiedLine(p){
   const v = p.installed ? p.verified : null;
@@ -152,7 +152,7 @@ function tcVerifiedLine(p){
     : v.algo === "gpg" ? `<span class="sub tcverified">Checked when it was installed: ${esc(v.where)}</span>`
     : `<span class="sub tcverified">Checked when it was installed: its ${esc(v.algo)} matched ${esc(v.where)}</span>`;
 }
-// An installed pack's receipt (R234; the operator, 13 Nov: what a pack's
+// An installed pack's receipt (what a pack's
 // install downloads from somewhere else had no paper trail): the manifest
 // commit the copy here came from, when, how many files landed and how big,
 // and one hash over them all. Under it, each thing the receipt shows that a
@@ -162,7 +162,7 @@ function tcVerifiedLine(p){
 // which is what an install that fetches "the latest" looks like. Nothing for
 // one installed before receipts were kept.
 // What an entry's downloads are held to, as its Details says it in one
-// line (R267; the operator, 20 Nov: one mechanism for every entry, and no
+// line (one mechanism for every entry, and no
 // paragraph where a phrase does): every download pinned, its installer
 // pinned with what it fetches by itself in the entry's own sentence, or not
 // pinned. Which part of an entry is not held is its author's to read (Look
@@ -283,7 +283,7 @@ async function agentUpdate(b, node, r, after){
   if (r.installed && !await askYes(`Update ${r.label} on ${nodeNameOf(node)}? Its sessions there end first; they start again from the space rows.`)) return;
   await sayPost(b, "Asking", "/api/agents", {action: "install", node, agent: r.agent || ""}, "", after);
 }
-// ---- tool packs (R77) -------------------------------------------------------
+// ---- tool packs -------------------------------------------------------
 // The one dialog the Library's Add tool pack and a pack's Edit open (tpDraw).
 // A pack is looked at before it is added: the dialog fetches its manifest at a
 // commit and shows what it would download and run, and Add keeps exactly that
@@ -293,9 +293,9 @@ let tpEdit = null;             // the dialog's pack: "" for Add tool pack, else 
 // an uploaded archive of its files); a pack made here edits by the last two.
 let tpForm = {url: "", seen: null, error: "", busy: "", from: "repo", text: "", file: null, catalog: null, what: "pack", app: null};
 const TP_BLANK = () => ({url: "", seen: null, error: "", busy: "", from: "repo", text: "", file: null, catalog: null,
-                         // What is being added (R170 step 3): a tool pack, or an app of the person's own (its compose file).
+                         // What is being added: a tool pack, or an app of the person's own (its compose file).
                          what: "pack", app: {id: "", name: "", what: "", port: "", compose: "", editing: ""}});
-// The vetted catalog (R169 step 4): its index as /api/catalog answers it,
+// The vetted catalog: its index as /api/catalog answers it,
 // read when the page opens and on Refresh, never polled.
 let tpCatalog = null;
 function loadCatalog(fresh){
@@ -358,7 +358,7 @@ function tpSeen(seen, was, offer = true){
   </div>`;
 }
 
-// An app of the person's own (R170 step 3, the Library's Add your own): a
+// An app of the person's own (the Library's Add your own): a
 // compose file with the blanks New container fills, its id, name, what it
 // is and its port; Look checks it the way the catalog's apps are held (every
 // image pinned, no blank but the known ones) and says what it would run;
@@ -402,7 +402,7 @@ async function tpOpenApp(id){
   tpDraw();
 }
 
-// The dialog Add tool pack and a row's Edit open (the operator, 19 Oct): the
+// The dialog Add tool pack and a row's Edit open: the
 // repository, Look, what it would install and run, then Add. A pack already
 // here is looked at again as Edit opens, so its foot is Remove, Close and,
 // when the repository has moved on, Update: three short words that sit on
@@ -444,7 +444,7 @@ function tpFromCells(f, here){
 function tpModalHtml(){
   const p = tpEdit ? (toolchains?.items || []).find(i => i.name === tpEdit && i.pack) : null;
   const f = tpForm, fresh = !p, seen = f.seen, here = !!p?.pack?.here && !f.catalog;
-  // An app of the person's own: its own form, look and foot (R170 step 3).
+  // An app of the person's own: its own form, look and foot.
   if (fresh && f.what === "app"){
     const ed = !!f.app.editing;
     const look = `<button type="button" data-tplook${f.busy && f.busy !== "look" ? " disabled" : ""}${runAttr(f.busy === "look", "Looking")}${seen ? "" : ` class="primary"`}>${seen ? "Look again" : "Look"}</button>`;
@@ -464,7 +464,7 @@ function tpModalHtml(){
     fresh || here ? "Look" : "Look again"}</button>` : "";
   const add = offer ? `<button type="button" class="primary" data-tpadd${f.busy && f.busy !== "add" ? " disabled" : ""}${runAttr(f.busy === "add", fresh ? "Adding" : "Updating")}>${
     // A pack already kept takes a newer manifest here, never a program on
-    // a node: the press says so, as the card's does (the operator, 13 Nov).
+    // a node: the press says so, as the card's does.
     fresh ? "Add" : "Manifest update"}</button>` : "";
   const rm = p ? `<button type="button" class="danger" data-tprm="${esc(p.name)}">Remove</button>` : "";
   return `<div class="box wide"><h3>${fresh ? (f.catalog ? `Install ${esc(f.catalog.name)} from the catalog` : "Add your own") : `${esc(p.label)}, a tool pack`}</h3>
@@ -487,7 +487,7 @@ function tpOpenCatalog(entry){
   tpLook();
 }
 
-// A pack kept from the vetted catalog (R169 step 4) looks at the index's
+// A pack kept from the vetted catalog looks at the index's
 // pin, never at its repository's head: the newer pin `pin` when the Library
 // offers one, else the index's own pin for it, read first if not yet read.
 // Update then keeps it at that pin with the index's sha256, its tier kept.
@@ -554,7 +554,7 @@ function tpClose(){
 
 // Drawn again on each step (looking, what came back, adding), the URL as
 // typed kept in tpForm across the redraws. The height its From panes share,
-// measured as it opens (holdPanes' way, the operator, 26 Oct), held on every
+// measured as it opens (holdPanes' way), held on every
 // redraw since each draws the box anew.
 let tpHeld = 0;
 function tpDraw(first){
@@ -586,7 +586,7 @@ function tpDraw(first){
     }
   }
   // Held while From is chosen; what a look brings back is a step of its own.
-  // ...its buttons at the held box's foot, as holdPanes puts them (R273).
+  // ...its buttons at the held box's foot, as holdPanes puts them.
   if (tpHeld && !tpForm.seen){
     const box = m.querySelector(".box");
     Object.assign(box.style, {boxSizing: "border-box", height: tpHeld + "px"});
@@ -664,7 +664,7 @@ function tpDraw(first){
   const rm = m.querySelector("[data-tprm]");
   if (rm) rm.onclick = async () => {
     const n = rm.dataset.tprm;
-    // Refused while a node's store holds it (B84), said on the form with
+    // Refused while a node's store holds it, said on the form with
     // where, before anything is asked: its files would stay there with no
     // row left to uninstall them from.
     const at = await post({action: "where", name: n});
@@ -676,14 +676,14 @@ function tpDraw(first){
   };
 }
 
-// The NVIDIA driver (R102): installed by the same job as the store's
+// The NVIDIA driver: installed by the same job as the store's
 // toolchains and asked by the same Check for updates, but this machine's own: its kernel module is built for this machine's kernel and
 // its libraries must match that module, so it is installed here as root and
 // takes the card only when the machine restarts, since nouveau holds it
 // until then. Its pulldown (on the Library's card) is the branches apt
 // offers there, live only while no driver is installed: one branch at a
-// time, so another version means removing this one first (the operator, 30
-// Sep), the rule a recipe that cannot update in place already keeps.
+// time, so another version means removing this one first,
+// the rule a recipe that cannot update in place already keeps.
 const TC_DRIVER = "nvidia-driver";
 let tcDriverPick = "";       // the package picked on the row; "" is the recommended one
 function tcDriverLine(m){
@@ -707,7 +707,7 @@ function tcDriverOption(o, m){
     rec && branch && +branch > +rec ? "newer than recommended" : ""].filter(Boolean);
   return `${o.version}${tags.length ? " · " + tags.join(", ") : ""}`;
 }
-// The NVIDIA container toolkit (R102): the second of the machine's own
+// The NVIDIA container toolkit: the second of the machine's own
 // rows, after the driver it needs. It is what lets a container on this
 // machine reserve the card, and comes from NVIDIA's package source rather
 // than the distribution's, which is said before it is added. Docker
@@ -767,7 +767,7 @@ async function tcAct(action, only, {now} = {}){
   // before anything is queued.
   const drv = names.includes(TC_DRIVER) && action === "install";
   // ...and the toolkit is the one that adds a package source of somebody
-  // else's to the machine. Both in one press are one question (R265).
+  // else's to the machine. Both in one press are one question.
   const kit = names.includes(TC_TOOLKIT) && action === "install";
   if ((drv || kit) && !await askYes("", {title: `Install on ${toolchains?.name || "this node"}?`, verb: "Install", parts: [
     {head: "NVIDIA's driver", lines: drv ? ["It takes the card only when the machine restarts, which ends every session on it."] : []},
@@ -801,9 +801,9 @@ async function tcAct(action, only, {now} = {}){
     if (j?.added?.length)
       notify(`also installing ${j.added.join(", ")}: needed by what you picked`);
     if (j.error){ back(); notify(j.error, true); return j; }
-    // The job's own toast where there is one (R218 step 6): it follows the
+    // The job's own toast where there is one: it follows the
     // job to its end, which is kept on the record. One queued behind the
-    // job running says so, and behind what (the operator, 22 Nov): the
+    // job running says so, and behind what: the
     // job's toast reads "queued" beside it, one with no job of its own
     // says the word itself.
     const on = tcNode !== "local" ? " on " + ((nodesList || []).find(n => n.id === tcNode)?.name || "the node") : "";

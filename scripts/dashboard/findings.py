@@ -237,11 +237,11 @@ def _int(v):
 # findings, each attributed to the project its path names, the reports a
 # whole cycle behind their siblings left out, and the counts the status
 # poll carries. Here rather than in server.py, beside the
-# history those reads feed (R60): the server hands in the project list it
+# history those reads feed: the server hands in the project list it
 # already holds, and nothing in here knows who is asking.
 CVE_RE = re.compile(r"CVE-\d{4}-\d{4,7}")
 REPORTS = Path(os.environ.get("FINDINGS_DIR", "/reports"))
-# The reports the nodes' own scanners sent up (R145, scanners.report_files),
+# The reports the nodes' own scanners sent up (scanners.report_files),
 # set by the server: read beside the host folder, which is deprecated.
 STATE_REPORTS = None
 
@@ -464,7 +464,7 @@ def _valid_projects(ps):
 
 
 def _sent_up():
-    """The reports the nodes' scanners sent up (R145), or []."""
+    """The reports the nodes' scanners sent up, or []."""
     try:
         return list(STATE_REPORTS()) if STATE_REPORTS else []
     except OSError:
@@ -473,10 +473,10 @@ def _sent_up():
 
 def mounted():
     """Whether there is a reports directory, False for one that cannot even
-    be looked at: pathlib's is_dir() raises for a mount gone stale under the
+    be looked at: pathlib's is_dir raises for a mount gone stale under the
     container (NFS errno 116) rather than answering, and the status poll
-    asks this every time (B326). A report a node's scanner sent up counts
-    the same way (R145)."""
+    asks this every time. A report a node's scanner sent up counts
+    the same way."""
     if _sent_up():
         return True
     try:
@@ -486,11 +486,11 @@ def mounted():
 
 
 def report_files():
-    """Every report: the ones the nodes' scanners sent up (R145), then those
+    """Every report: the ones the nodes' scanners sent up, then those
     under REPORTS, the .sarif then the .sarif.json, each sorted; None when
-    there is neither. A stale mount is one of those: counts() runs on every
+    there is neither. A stale mount is one of those: counts runs on every
     /api/status, and one unreadable directory answered the whole poll with
-    an error and held every page on loading (B326)."""
+    an error and held every page on loading."""
     sent = _sent_up()
     if not mounted():
         return None

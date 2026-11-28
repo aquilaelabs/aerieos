@@ -1,20 +1,20 @@
-// The nginx tab (R171, the operator, 10 Oct): one reverse proxy per node,
+// The nginx tab: one reverse proxy per node,
 // AerieOS's own. One node at a time, picked in the bar like Toolchains
-// (the node-switcher rule; the operator, 11 Oct: every tab about settings
+// (the node-switcher rule: every tab about settings
 // on nodes picks one the same way): a state row saying whether its nginx
 // is deployed, the routes (a hostname or path, to a port a container on
 // that node publishes, each serving 443 with a pair it picks or the one
 // its hostname resolves to, or 80 alone), the certificate pairs the node
 // holds (kept on the controller under the domain their names say, pushed
-// inside the compose file; a key never comes back; no default, R188), and
+// inside the compose file; a key never comes back; no default), and
 // what else on the node holds 80 or 443. Deploy makes the container on a
 // node without one; Save writes the routes and certificate and rebuilds a
 // deployed one so the change is up; Remove takes it out of the manager.
-// The image (R192): what each node's nginx is pinned to, the newest line
+// The image: what each node's nginx is pinned to, the newest line
 // the registry listed (checked weekly, or by Check now), and Update on a
 // node that is behind, which pins the new digest and rebuilds.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Data from
+// Chrome from docSurface; the hard rules are uniform.mjs's. Data from
 // /api/nginx, read when the tab opens and after every change; redrawn on
 // the nodes revision too, since a node coming or going moves the list.
 
@@ -26,7 +26,7 @@ let nginxNode = "";               // the node the tab shows
 let nginxWant = "";               // a node asked for that the last read did not list yet
 let nginxLatest = {};             // the image nginx's entry names, from the same answer
 let nginxCertOpen = false;        // Add a certificate pressed: its form unrolled
-let nginxAcmeOpen = false;  // the Let's Encrypt form unrolled (R150)
+let nginxAcmeOpen = false;  // the Let's Encrypt form unrolled
 let nginxHostnames = [];          // every node's hostnames: [{name, used: [{node, path, port}]}]
 let nginxHostTyped = "";          // a hostname being typed to add, kept across a redraw as the forms are
 // The routes being edited, per node, until Save or Revert; absent while a
@@ -43,7 +43,7 @@ function openNginxTab(node){
 
 // One read at a time (reading): a read started before a Save and slowed by
 // a node's daemon landed after the Save's own and put the old port and the
-// plain "deployed" back for seconds (B99, B65).
+// plain "deployed" back for seconds.
 function loadNginx(){
   return reading("nginx", async () => {
     const j = await getJSON("/api/nginx");
@@ -58,10 +58,10 @@ function loadNginx(){
   });
 }
 
-// What is being typed survives a re-read (B729): the rows are read into the
+// What is being typed survives a re-read: the rows are read into the
 // node's draft before the poll's redraw, which draws the form from it, so a
 // hostname half typed is drawn as the box it is typed in and not as the
-// pulldown it was typed in place of; the patch (R244) keeps that box, its
+// pulldown it was typed in place of; the patch keeps that box, its
 // focus and its caret.
 function nginxKeepTyping(){
   const sect = document.querySelector(".nginxtab [data-ngnode]");
@@ -78,7 +78,7 @@ async function nginxAct(body){
 }
 // Whether nginx's own build is at work on a node: a job pressed meanwhile is
 // queued behind it (one compose job at a time on a container), never
-// refused, and the press says so (the operator, 22 Nov). Read at the press.
+// refused, and the press says so. Read at the press.
 function nginxBuilding(nid){
   return !!nid && !!(nginxList || []).find(x => x.node === nid)?.state?.job?.running;
 }
@@ -94,11 +94,11 @@ async function nginxLanded(body, j, ahead = false){
   }
   // A hostname added or deleted comes back with the list as it now is, so
   // the pull-downs hold it the moment the answer lands rather than after
-  // the whole tab is read again (every node's daemon, B721).
+  // the whole tab is read again (every node's daemon).
   if (Array.isArray(j.hostnames)) nginxHostnames = j.hostnames;
   // What was saved is what the row says at once, and a rebuild it started
   // says so on the pill, before the tab is read again: the read waits on
-  // the node's daemon, and the row went on showing the old port (B99).
+  // the node's daemon, and the row went on showing the old port.
   // A pair pasted or taken off is the read's to say (its names and dates are
   // the server's), so that Save waits for it as before.
   const n = !j.error && body.node && body.action === "save" && !body.cert && !body.drop_cert
@@ -123,7 +123,7 @@ function nginxPick(){
   return have.find(n => n.node === nginxNode) || null;
 }
 
-// The pair a route serves 443 with (R188): none (80 alone), the one its
+// The pair a route serves 443 with: none (80 alone), the one its
 // hostname resolves to (its own, else its domain's: `resolved` from the
 // server, drawn with the pair's key so the automatic pick is seen), or one
 // picked by its key from what the node holds.
@@ -149,16 +149,16 @@ function nginxResolve(n, host){
   return "";
 }
 
-// A route's hostname, picked from the one list every node shares (the
-// operator, 12 Oct): made once under Hostnames, then any route on any node,
+// A route's hostname, picked from the one list every node shares:
+// made once under Hostnames, then any route on any node,
 // for any project's container, picks it. Every name (*) beside them.
 function nginxHostPick(r){
   const names = nginxHostnames.map(h => h.name);
   if (r.host && r.host !== "*" && !names.includes(r.host)) names.push(r.host);
-  // ...and one typed here (the operator, 13 Oct: a subdomain not yet under
+  // ...and one typed here (a subdomain not yet under
   // Hostnames could not be picked): the last choice turns the pick into a
   // box, and Save puts the name on the shared list. A row typed into is
-  // drawn as the box again (B729): the draft remembers, so a redraw from
+  // drawn as the box again: the draft remembers, so a redraw from
   // the poll does not hand the pulldown back mid-word.
   if (r.typed) return `<input data-ng="host" value="${esc(r.host || "")}" placeholder="app.example.com" aria-label="hostname" autocomplete="off" spellcheck="false" id="ngRtHost">`;
   return `<select data-ng="host" aria-label="hostname" id="ngRtHost">
@@ -169,7 +169,7 @@ function nginxHostPick(r){
   </select>`;
 }
 
-// The list itself, as records the way Routes is (the operator, 22 Oct):
+// The list itself, as records the way Routes is:
 // each name with where it is routed, Delete on one routed nowhere, and the
 // box to add one over the table (the record-lists rule).
 const NG_HOST_COLS = [{label: "Hostname"}, {label: "Routed on", w: "minmax(0,.7fr)"}, {act: true, w: "3rem"}];
@@ -183,8 +183,8 @@ function nginxHostLines(){
     ${rows ? `<div class="field">${tblWrap(NG_HOST_COLS, rows, "nghosts")}</div>` : ""}`;
 }
 
-// Routes as records (R218 step 44, the design's record-lists rule, the
-// operator 19 Oct: lists like Cloudflare's DNS page): a table, a row a route
+// Routes as records (the design's record-lists rule:
+// lists like Cloudflare's DNS page): a table, a row a route
 // read-only with Edit at its right; Edit opens that row in place into its
 // form (Delete, Cancel, Save), Add route opens the same form at the table's
 // top, one open at a time, and Save writes that one route.
@@ -240,11 +240,11 @@ function nginxDraftOf(n){
   return d;
 }
 
-// Each pair the node holds, one line (R188): the key it is known by, its
+// Each pair the node holds, one line: the key it is known by, its
 // subject and names, when it ends, and a way to take it off. A pair a
 // route picked is said to be in use; taking one off leaves its routes to
 // what their hostnames resolve to, or 80 alone.
-// What is being asked for from Let's Encrypt (R150), per hostname: its
+// What is being asked for from Let's Encrypt, per hostname: its
 // state as it goes, or why it stopped.
 function nginxAcmeLines(n){
   const pend = Object.entries(n.acme?.pending || {});
@@ -271,7 +271,7 @@ function nginxCertLines(n, d){
       esc(c.names || c.subject || ""), esc(when),
       used ? `${used} route${used === 1 ? "" : "s"}` : `<span class="dim">no route</span>`,
       rmIcon(`data-ngcertrm="${esc(k)}"`, `take ${k}'s pair off`, {title: "take this pair off the node"})])}${
-      // On a public box (R93) its key lives there: a pair wider than the
+      // On a public box its key lives there: a pair wider than the
       // box's own routes lends every other name to whoever takes the box.
       n.wide?.[k]?.length ? `<div class="sub warn ngwide">Its key sits on this public box and also answers for ${esc(n.wide[k].join(", "))}: a box taken over could pass as ${n.wide[k].length === 1 ? "it" : "them"}. A pair for this box's own names alone keeps the rest safe.</div>` : ""}</div>`;
   }).join(""), "ngcerts");
@@ -279,7 +279,7 @@ function nginxCertLines(n, d){
 
 // What the tab says about one node: the state row, the routes, the
 // certificates, the clash if any, and the action bar.
-// A node without nginx (R181, the operator, 11 Oct): one line saying so and
+// A node without nginx: one line saying so and
 // Deploy, not the whole form. Routes and certificates come once it is there,
 // which is also when they can be tried; a node that already holds routes
 // from before says how many Deploy will bring up.
@@ -287,10 +287,10 @@ function nginxUndeployed(n){
   const count = (n.routes || []).length, certs = Object.keys(n.certs || {}).length;
   const clash = (n.clash || []).length
     ? `<div class="field"><div class="hint bad">${esc(n.clash.join(", "))} ${n.clash.length === 1 ? "holds" : "hold"} a port nginx needs on this node: it listens on 80 and 443 there, so one of them has to give way.</div></div>` : "";
-  // The page's head (the operator, 17 and 25 Oct): not deployed and what
-  // Deploy brings, and Deploy at its right (R178: the bar holds no picker and
+  // The page's head: not deployed and what
+  // Deploy brings, and Deploy at its right (the bar holds no picker and
   // no button, so the page is one shape on every node).
-  // A reader without Configure Write here is told so, and offered nothing (R277).
+  // A reader without Configure Write here is told so, and offered nothing.
   if (n.may === "read") return `<div data-ngnode="${esc(n.node)}" class="svcro">
     ${pageHead({cls: "toolstate", pills: `<span class="pill stat">not deployed</span>`, line: [{text: SVC_RO}]})}
   </div>`;
@@ -304,9 +304,9 @@ function nginxUndeployed(n){
 }
 
 // The page's four sections, named once for the page and its placeholder
-// alike (R218, the operator 18 Oct: the nginx placeholder was a few gray
+// alike (the nginx placeholder was a few gray
 // lines while every other page's waited as itself).
-// Image first (the operator, 26 Oct): an update due is the first thing said.
+// Image first: an update due is the first thing said.
 const NG_TITLES = {image: "Image", hostnames: "Hostnames", routes: "Routes", certs: "Certificates"};
 function ngSect(key, status, body, opts){ return docSection("nginx", key, NG_TITLES[key], status, body, opts); }
 
@@ -316,18 +316,18 @@ function nginxBody(n){
   const count = (n.routes || []).length;
   // Down only when nothing is bringing it back: a Save rebuilds it, and the
   // read right after one caught it between down and up and said "down"
-  // while the build was on its way to running it (B65).
+  // while the build was on its way to running it.
   const pill = n.state?.job?.running ? `<span class="pill stat note">deployed, rebuilding</span>`
     : n.state?.running === false ? `<span class="pill stat warn">deployed, down</span>`
     : `<span class="pill stat ok">deployed</span>`;
-  // Its routes on the line (R274); which container it is, beside the link
+  // Its routes on the line; which container it is, beside the link
   // that opens it.
   const ro = n.may === "read";
   const line = [{value: count, label: count === 1 ? "route" : "routes"}, n.host_only ? {text: "on a hosting-only node"} : null,
     ro ? {text: SVC_RO} : null];
   const where = `<div class="field"><div class="hint">It runs as nginx-${esc(n.container.replace(/^nginx-/, ""))} on the ${pageLink("docker", "Containers page")}.</div></div>`;
   // The image it is pinned to, the one this AerieOS names, and Update when
-  // behind (R192): nothing asks a registry, so there is nothing to check.
+  // behind: nothing asks a registry, so there is nothing to check.
   const im = n.image || {};
   const pinned = `nginx:${im.tag || "?"}${im.digest ? "" : ", not pinned to a digest yet"}`;
   // A newer build of the tag it already runs is said as that, not as the
@@ -336,7 +336,7 @@ function nginxBody(n){
   const out = rebuild ? `a newer build of nginx:${n.behind}` : `nginx:${n.behind}`;
   const news = n.behind ? `${out} is out: Update pins it and rebuilds`
     : "the image this AerieOS names";
-  // Four sections (R218 step 29): each says its state in its head, opens
+  // Four sections: each says its state in its head, opens
   // on one short line with the rest behind its ?, and saves what it writes
   // under itself; Remove stands apart at the page's foot.
   const pairs = Object.values(n.certs || {}).filter(c => c?.set).length;
@@ -402,11 +402,11 @@ function nginxBody(n){
   </div>`;
 }
 
-// The bar, the page's and its placeholder's (R218, the operator 18 Oct):
+// The bar, the page's and its placeholder's:
 // the node switcher, and Deploy, an undeployed node's one action, at its
 // right; waiting, which node and whether it is deployed are not known yet.
 function nginxBar(pnodes, n){
-  // The node is its group's header's, the Machines group's (R178, R264), and Deploy sits in
+  // The node is its group's header's, the Machines group's, and Deploy sits in
   // an undeployed node's head, so the bar is the same on every node: none.
   return "";
 }
@@ -415,7 +415,7 @@ function renderNginxInto(i){
   const d = docSurface(i, "nginx");
   if (!d) return;
   if (nginxList === null){
-    // Its template (R218 step 16): the bar and the state row's words are
+    // Its template: the bar and the state row's words are
     // the page's own; the node and its routes are on their way.
     d.setBar(nginxBar(null));
     drawHTML(d.list, skTpl(`${pageHead({cls: "toolstate", line: [{value: GHOST, label: "routes"}]})}${
@@ -452,21 +452,21 @@ function nginxReadDraft(sect, n){
   d.certFor = sect.querySelector('[data-ng="certfor"]')?.value.trim() || "";
   // ...and the hostname being typed to add, which is every node's list's
   // and no node's draft: a re-read drew its box empty under the typing. The
-  // page is patched, so the box keeps its caret (R244); this keeps the text
+  // page is patched, so the box keeps its caret; this keeps the text
   // for a draw that writes the page whole.
   const typed = sect.querySelector("[data-nghostnew]");
   if (typed) nginxHostTyped = typed.value;
 }
 
 function wireNginxTab(root){
-  // One section open at a time on a phone, sliding, as on every page (B171).
+  // One section open at a time on a phone, sliding, as on every page.
   wireSections(root);
   const sect = root.querySelector("[data-ngnode]");
   if (!sect) return;
   const nid = sect.dataset.ngnode;
   const n = nginxList.find(x => x.node === nid);
   if (!n) return;
-  // Not deployed: Deploy is the one thing on it (R181).
+  // Not deployed: Deploy is the one thing on it.
   if (!n.deployed){
     const dep = root.querySelector("[data-ngdeploy]");
     if (dep) dep.onclick = async e => {
@@ -488,7 +488,7 @@ function wireNginxTab(root){
     }
     // The pair a route resolves to follows its hostname: the automatic
     // option said "no pair covers it yet" for a name picked after the
-    // row was drawn (the operator, 13 Oct).
+    // row was drawn.
     sect.querySelectorAll(".ngform").forEach(row => {
       const host = row.querySelector('[data-ng="host"]')?.value || "";
       const auto = row.querySelector('[data-ng="cert"] option[value=""]');
@@ -501,7 +501,7 @@ function wireNginxTab(root){
     const d = nginxDraftOf(n), add = sect.querySelector("[data-ngcertsave]");
     if (add) add.disabled = !(d.cert.trim() && d.key.trim());
   };
-  // Set, not added: the patch keeps the section across redraws (R244), and
+  // Set, not added: the patch keeps the section across redraws, and
   // this runs after each one.
   sect.oninput = sync;
   sect.onchange = sync;
@@ -533,7 +533,7 @@ function wireNginxTab(root){
   if (hostNew) hostNew.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); hostAdd.click(); } };
   // Kept as it is typed, so a redraw from anywhere draws the box as it was.
   if (hostNew) hostNew.oninput = () => { nginxHostTyped = hostNew.value; };
-  // A hostname deleted leaves the list on the press (the operator, 22 Nov);
+  // A hostname deleted leaves the list on the press;
   // the answer's list replaces it, and a refusal puts it back saying why.
   sect.querySelectorAll("[data-nghostrm]").forEach(b => b.onclick = async () => {
     nginxReadDraft(sect, n);
@@ -601,7 +601,7 @@ function wireNginxTab(root){
     const form = sect.querySelector(".ngcertform");
     slideHidden(form, true, () => form.querySelector("#ngCert")?.focus());
   };
-  // A certificate from Let's Encrypt (R150): the form unrolls, Request
+  // A certificate from Let's Encrypt: the form unrolls, Request
   // starts it in the background, and the row follows it.
   const acmeOpen = sect.querySelector("[data-ngacmeopen]");
   if (acmeOpen) acmeOpen.onclick = () => { nginxAcmeOpen = true; nginxRedraw(); setTimeout(() => $("ngAcmeHost")?.focus(), 50); };

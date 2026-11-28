@@ -1,4 +1,4 @@
-"""A publisher's signature (R137 step 4): a checksum file believed only when
+"""A publisher's signature: a checksum file believed only when
 the publisher's key signed its exact bytes, and the shell's check of a
 signed download; a tampered file or a stranger's key refused. A throwaway
 key made in a private gpg home stands in for the publisher's."""

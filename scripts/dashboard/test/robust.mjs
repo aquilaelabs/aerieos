@@ -45,12 +45,12 @@ await section("and an unchanged", async () => {
 // cannot be answered from a copy made before it.
 await section("The page names each of its scripts with that script's version, and its", async () => {
   const g0 = await get('/');
-  // ...and names its integrity after the version (R158 step 4).
+  // ...and names its integrity after the version.
   const v = g0.text.match(/<script data-cfasync="false" src="nb-history\.js\?v=([0-9a-f]+-[0-9a-f]+)" integrity="sha384-[A-Za-z0-9+/=]+">/);
   ok(!!v && !/<script[^>]* src="(tab|nb)-[a-z-]+\.js">/.test(g0.text),
      `every tab and notebook script is named with its version (${v ? v[1] : 'unversioned'})`);
   // ...and every script runs as written: Cloudflare's Rocket Loader leaves
-  // one marked data-cfasync="false" alone (B138).
+  // one marked data-cfasync="false" alone.
   ok(!/<script(?![^>]*data-cfasync="false")/.test(g0.text),
      'every script on the page is marked for Rocket Loader to leave it as it is');
   const served = new globalThis.URL('../nb-history.js', import.meta.url).pathname;
@@ -147,8 +147,8 @@ ok(badGet.length === 0,
 // 0.68s, and it used to run once per request while a sign-in was open, so a
 // phone, a desktop and a preload polling together were a gigabyte of Node and
 // a dashboard that had stopped answering.
-// Timed up to three times, a few seconds apart, and the quickest kept
-// (B517): one burst in a whole eight-worker run took 8.8s at a load past the
+// Timed up to three times, a few seconds apart, and the quickest kept:
+// one burst in a whole eight-worker run took 8.8s at a load past the
 // core count with nothing wrong, and a cost that is the code's is paid on
 // every try, where a busy moment of the box's is not. The bar stretches with
 // the harness's patience as every wait does.
@@ -174,13 +174,13 @@ ok(true, 'the console errors above are the refusals themselves');
 // want telling apart before anything else can be diagnosed.
 await page.route('**/api/status*', r => r.abort());
 // Two failures in a row, however the page's own poll interleaves: a
-// refresh() asked while another is out only queues behind it, so asking
-// twice could count once (B146). Asked until it has counted two, bounded.
+// refresh asked while another is out only queues behind it, so asking
+// twice could count once. Asked until it has counted two, bounded.
 // Bounded by time, not by a count: a status poll this page sent before the
 // route went in can still be out (a status walks every project's git, and
-// the checks above just made it slow), and while it is, refresh() only queues
+// the checks above just made it slow), and while it is, refresh only queues
 // and returns at once, so forty asks spent themselves in milliseconds and the
-// late poll then landed and cleared the light (B176, 19 Sep).
+// late poll then landed and cleared the light.
 // A page that had been reading treats reads that stop landing as a restart
 // for the time one takes (home.mjs holds that calm state); this is past it,
 // where the red line with its reason is said.
@@ -198,7 +198,7 @@ ok(dead.red && /polls failed in a row/.test(dead.line) && dead.line === dead.tit
 // ...and the case that actually bit: a page whose FIRST poll never lands, so
 // nothing ever draws and every placeholder keeps its initial text.
 await page.reload({ waitUntil: 'domcontentloaded' });
-// Waiting, the page is the shape of what is coming (R218 step 15): the first
+// Waiting, the page is the shape of what is coming: the first
 // pane's placeholder is shapes, and no placeholder on show is a line of words.
 const waiting = await page.evaluate(() => {
   const shown = [...document.querySelectorAll('main .loading')].filter(e => e.getClientRects().length);
@@ -232,7 +232,7 @@ ok(await page.evaluate(() => !document.getElementById('dot').classList.contains(
                              && pollFails === 0),
    '...and it all clears the moment a poll lands again');
 
-// ---- a page waits as itself (R218 step 16) ---------------------------------
+// ---- a page waits as itself ---------------------------------
 // What never changes on a page is drawn while its data is on the way, and
 // only the values shimmer: the Users page with its accounts on the way shows
 // its list beside the picked account's settings, their labels drawn and the
@@ -291,7 +291,7 @@ ok(await page.evaluate(() => !/not drawn/.test(document.getElementById('doctor')
 // The status answer is held until the stub is in place, so the page's own
 // first poll comes back to it: the placeholders have to be on screen for the
 // words on them to matter. A fixed half second was shorter than the reload
-// under a whole run's load, and the poll drew the page first (B837).
+// under a whole run's load, and the poll drew the page first.
 let stubIn;
 const stubbed = new Promise(r => { stubIn = r; });
 await page.route('**/api/status*', async r => {

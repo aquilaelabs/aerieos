@@ -1,4 +1,4 @@
-"""phonelease.py (R113): a phone lent to a project. Lending is its owner's and
+"""phonelease.py: a phone lent to a project. Lending is its owner's and
 only to a project on the phone's node; a lease ends by itself; a session
 drives only the lease's own apps, and touches the screen only while one of
 them is in front or is the keyboard. adb is faked: what is checked is what
@@ -21,7 +21,7 @@ OTHER = {"uid": "u2", "name": "Other"}
 
 
 class Users:
-    # As users.py answers them (R227 step 4): a session carries no account's
+    # As users.py answers them: a session carries no account's
     # id, and the person it works for is its seat.
     @staticmethod
     def uid_of(who):
@@ -111,7 +111,7 @@ class Lease(unittest.TestCase):
         # Spaces become input's %s, and the whole is one quoted word for the
         # phone's shell, so nothing typed can end the command.
         self.assertTrue(self.sent[-1][-1].endswith("input text 'a%sb'\"'\"';%sreboot'"))
-        # R126: a glide is one held stroke from the injector built on the
+        # A glide is one held stroke from the injector built on the
         # node; where the node cannot build it (exit 90), the points as
         # before. Here the node answers 90, so the points are sent.
         seen = {}
@@ -128,7 +128,7 @@ class Lease(unittest.TestCase):
                                            "hand": {"hand": "ruler"}})[0]
         finally:
             phone.nodes = saved
-        # R127: the injector is handed a hand's path, a sample every 10 ms,
+        # The injector is handed a hand's path, a sample every 10 ms,
         # from the first point to the last exactly.
         sent = seen["argv"][5].split("BbGlide ")[1].split()
         self.assertEqual(sent[0], "10")
@@ -144,7 +144,7 @@ class Lease(unittest.TestCase):
         self.assertIn("cannot build the glide injector", fell["out"])     # and it says so
         self.answer = {"code": 3, "out": "bb-not-yours: com.android.settings"}
         self.assertEqual(pl.use("app", "touch", {"kind": "tap", "x": 1, "y": 1})[1], 409)
-        # B485: a touch its owner allowed on whatever is in front carries no
+        # A touch its owner allowed on whatever is in front carries no
         # lease guard; a layout read under the same flag still has one.
         self.answer = {"code": 0, "out": ""}
         pl.use("app", "touch", {"kind": "tap", "x": "3", "y": "4", "anyapp": True})
@@ -209,7 +209,7 @@ class Lease(unittest.TestCase):
         self.assertIn("no recording", r["error"])
 
     def test_a_recording_left_running_is_collected_by_stop(self):
-        # The operator, 5 Oct: a fixed-length recording is one job and a
+        # A fixed-length recording is one job and a
         # touch another, so a glide sent during it ran after it. start
         # answers at once with screenrecord left running; stop collects it.
         pl.lend("n1", OWNER, "app", 1)
@@ -278,7 +278,7 @@ class Lease(unittest.TestCase):
 
 
 class Owner(Lease):
-    """R120: a phone is its connector's. An administrator may disconnect
+    """A phone is its connector's. An administrator may disconnect
     another's; nobody else may. A lent phone's command asks its owner, and
     only the owner's answer runs it, an administrator's included."""
 
@@ -315,7 +315,7 @@ class Owner(Lease):
 
 
 class Session(unittest.TestCase):
-    """Allow for this session (the operator, 4 Oct): the owner's second
+    """Allow for this session: the owner's second
     answer lets that account's sessions in that project drive the phone
     without asking until it is taken back, the lease ends or the phone goes."""
 
@@ -364,7 +364,7 @@ class Session(unittest.TestCase):
         self.assertFalse(self.shot(uid="u9")["allowed"])
 
     def test_a_touch_on_any_app_asks_every_time_and_never_directly(self):
-        # B485: Allow for this session covers the lease's apps, not a touch on
+        # Allow for this session covers the lease's apps, not a touch on
         # whatever is in front, which its owner answers each time.
         first = self.shot()
         phone.decide(first["asked"], True, "u1", "Owner", session=True)
@@ -409,7 +409,7 @@ class Session(unittest.TestCase):
         self.assertEqual(got["out"], big)
 
     def test_the_token_moves_with_what_the_app_posts(self):
-        # R125: what the app's live connection waits on moves when an ask
+        # What the app's live connection waits on moves when an ask
         # arrives or is answered and when a grant is made, not otherwise.
         t0 = phone.wait_token("u1")
         self.assertEqual(phone.wait_token("u1"), t0)

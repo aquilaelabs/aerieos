@@ -1,5 +1,5 @@
 "use strict";
-// ---- the tour (R94) --------------------------------------------------------
+// ---- the tour --------------------------------------------------------
 // The first time an account opens each page, a few steps about it, each a
 // card beside the part of the page it is about, with Back, Next and Done;
 // Skip tour ends it, and its box skips the tour on every page. Which pages
@@ -12,7 +12,7 @@
 // the page as a whole. A step whose part is not on screen is left out.
 const TOUR_PANE = "#pane0";
 const TOUR_BAR = `${TOUR_PANE} .docbarrow:not([hidden]), ${TOUR_PANE} .vbar`;
-// The Machines group's header (R177): the node picker where the page's bar was.
+// The Machines group's header: the node picker where the page's bar was.
 const TOUR_MHEAD = ".pane .bar.grouped .phead";
 const TOUR_SUB = `${TOUR_PANE} .bar .pseg`;
 const TOUR_FIRST = `${TOUR_PANE} .dmcard, ${TOUR_PANE} details.sect, ${TOUR_PANE} .doclist > .row, ${TOUR_PANE} .doclist .row`;
@@ -30,7 +30,7 @@ const TOUR_STEPS = {
     {at: TOUR_BAR, say: "Search narrows the cards by name, branch or node. New space is at the right, and the trash beside it keeps the spaces you deleted."},
     // A page with no project yet shows an example card, as Containers and
     // VMs do; the three steps after it turn the card over, the example or
-    // the first card on the page, and back again after (the operator, 26 Oct).
+    // the first card on the page, and back again after.
     {at: `${TOUR_PANE} .pcard:not(.flipped) .pcfront`, sample: () => tourSampleProject(false), sampleKey: "project", part: true,
      say: "A space's card: its repositories with their branches, who has a session there, and Start agent. A repository's name opens its notebook; the star makes it one of your favorites, on Home, and the box beside it archives it. Edit turns the card over."},
     {at: `${TOUR_PANE} .pcard.flipped .pcback .pcrepo`, sample: () => tourSampleProject(true), sampleKey: "project", part: true, flip: true,
@@ -57,7 +57,7 @@ const TOUR_STEPS = {
     {say: "Installed is what a node has from the Library: its coding agents, toolchains, tool packs and services, and what each is set to there."},
     {at: TOUR_MHEAD, say: "The node picked above holds here too. Open on a row, or Configure where it asks for anything, opens that thing's own page: your sign-in to an agent, a toolchain's system packages, a pack's or a service's settings."},
   ],
-  // An installed thing's own page (R181 step 2), reached from its row.
+  // An installed thing's own page, reached from its row.
   thing: [
     {say: "One installed thing on one node: what it is there, and what you set for it. Back, at the top, returns to the page you opened it from."},
     {say: "Its sections are its kind's: an agent's facts, your sign-in and what you added to it; a toolchain's path and system packages; a pack's or a service's Configure, saved with Save."},
@@ -68,7 +68,7 @@ const TOUR_STEPS = {
     {at: `${TOUR_PANE} .libsearchrow`, say: "It opens on shelves: what is on this node, then some of each kind, with All for the rest. The search, a kind or a topic makes it one list instead."},
     {at: `${TOUR_PANE} .lcard`, say: "Each card says its tier, what is installed and whether a newer one is out, with Install or Software update on it; Details opens its own page with the whole description."},
   ],
-  // A Library entry's own page (R183), reached from its card's Details.
+  // A Library entry's own page, reached from its card's Details.
   entry: [
     {say: "One entry of the Library: what it is in full, where it comes from, what it asks for and what installing it does. Back, at the top, returns to the page you opened it from."},
     {say: "Its one verb is at the right of its head, as on its card: Install, Software update, Manifest update, New container or Download. What is set for it on a node is on the Installed page."},
@@ -90,7 +90,7 @@ const TOUR_STEPS = {
     {at: TOUR_MHEAD, say: "Pick the node here; a sub-tab says when the node lacks what it needs."},
     {at: TOUR_BAR, say: "Search, and switch between cards and a list. New container and Check for updates sit at the right."},
     // Its rows by name: TOUR_FIRST matched an empty page's own notice, so
-    // the example never came (the operator, 21 Oct, on a phone).
+    // the example never came (on a phone).
     {at: `${TOUR_PANE} .dmtab .dmcard, ${TOUR_PANE} .dmtab > .tbl`, sample: () => tourSampleCard(), say: "A space's card: each container with its state, where it answers, and its buttons. The ⋯ menu holds the rest: Log opens what it prints in a tab of the dock, and Remove is last."},
   ],
   vms: [
@@ -189,7 +189,7 @@ function tourSoon(kind){
   // asks again once it is closed.
   if (document.querySelector(".modal:not([hidden])")) return;
   // ...nor over a placeholder: the page's own draw, once its data has
-  // landed, asks again (the operator, 21 Oct: the tour pointed at shimmer).
+  // landed, asks again (the tour pointed at shimmer).
   if (tourLoading()) return tourRetry(kind);
   // ...nor over the setup page, which is the whole page until Finish: a new
   // owner's first look was Home's tour over its four steps.
@@ -218,7 +218,7 @@ function tourTarget(sel){
 // tour asked for in between toured Projects instead.
 // Only a placeholder that shows counts: the Containers page keeps one in
 // each section it reads when opened, and a tour that waited for those never
-// came (B216).
+// came.
 function tourLoading(){
   return document.body.classList.contains("booting")
     || [...document.querySelectorAll(".doc.on .skel, .doc.on .loading, .doc.on .sk-b")].some(e => e.checkVisibility());
@@ -241,7 +241,7 @@ function tourStart(kind){
   }
   tourTries = 0;
   // A step about a row the page has none of yet keeps its place with an
-  // example of one (the operator, 21 Oct): an empty Containers or VMs page.
+  // example of one: an empty Containers or VMs page.
   tourSteps = TOUR_STEPS[kind].filter(s => !s.at || s.sample || tourTarget(s.at));
   if (!tourSteps.length) return;
   tourKind = kind;
@@ -283,7 +283,7 @@ function tourSample(s){
   if (!s?.sample || (s.at && tourTarget(s.at))) return null;
   // The page on show's, not the first the pane keeps: after Home, the
   // example went into Home's hidden page and the ring wrapped an empty box
-  // over the VMs page (B223).
+  // over the VMs page.
   const doc = document.querySelector(`${TOUR_PANE} .doc.on .doctab`) || document.querySelector(`${TOUR_PANE} .doctab`);
   if (!doc) return null;
   const box = document.createElement("div");
@@ -341,8 +341,8 @@ function tourSampleCard(){
 }
 
 // A page that redraws itself on its own poll, not through the panes' draw
-// (VMs), wiped a step's example and left the ring around where it had been
-// (B215): while a step with one shows, a redraw that takes it away puts it
+// (VMs), wiped a step's example and left the ring around where it had been:
+// while a step with one shows, a redraw that takes it away puts it
 // back and the ring with it.
 let tourWatch = null;
 function tourKeepSample(on){
@@ -433,7 +433,7 @@ function tourEnd(all){
   const seen = [...new Set([...tourSeen(), kind])].slice(-64);
   state.tour = {seen, off: !!state?.tour?.off || all};
   // A poll already out answers with the list from before this: dropped, as
-  // an action's own answer drops it (B217).
+  // an action's own answer drops it.
   adoptSeq++;
   postJSON("/api/users", {action: "prefs", prefs: {tour_seen: seen, tour_off: state.tour.off}}).catch(() => {});
 }
@@ -453,7 +453,7 @@ async function tourReset(){
   tourAsked.clear();
   state.tour = {seen: [], off: false};
   // ...and a reset the same way: a poll in flight put the old list back,
-  // and the tours waited for a reload (B217).
+  // and the tours waited for a reload.
   adoptSeq++;
   const j = await postJSON("/api/users", {action: "prefs", prefs: {tour_seen: [], tour_off: false}});
   // ...and a poll sent while this was on its way read the list from before it.

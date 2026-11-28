@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// USB devices to VMs (R116): a VM host's node page gains a USB section that
+// USB devices to VMs: a VM host's node page gains a USB section that
 // lists each device the node reports with what holds it, Give to a VM
 // queues the node's usb-give job with the device named by vendor, product,
 // serial and port, a device the host boots from offers no Give and says
@@ -89,7 +89,7 @@ ok(drawn.ctls.length === 2 && /0000:00:14\.0/.test(drawn.ctls[0]) && /SanDisk Ul
 // Give to a VM queues the node's usb-give job with the device named whole.
 await page.click(`${ROW} .ndusb[data-usb="0x0781:0x5583"] [data-usbgive]`);
 // Looked for among the recent jobs whatever their state: one the node took
-// and ended before the first look was not on the active queue (B1127).
+// and ended before the first look was not on the active queue.
 const job = await until(async () => ((await call('/api/v1/jobs')).jobs || [])
   .find(x => x.type === 'vm' && x.spec?.action === 'usb-give'), 15000, 250);
 ok(job && job.spec.domain === `bbvm-alpha-${VMN}` && job.spec.usb.serial === '4C53' && job.spec.usb.port === '1-3' && job.spec.usb.name === 'SanDisk Ultra Fit',
@@ -152,12 +152,12 @@ const row = (bell.asks || []).find(a => a.id === asked.id);
 ok(row && new RegExp(`vm usb ${VMN} give 0781:5583:4C53`).test((row.argv || row.cmd || []).join ? (row.argv || row.cmd).join(' ') : JSON.stringify(row)),
    `the bell shows it as aerie vm usb would say it (${JSON.stringify(row?.argv || row?.cmd || row).slice(0, 80)})`);
 await call('/api/prefs', { project: 'alpha', makevms: 'deny' });
-// The project's Test node (R151 step 1): the settings dialog offers the
+// The project's Test node: the settings dialog offers the
 // project's nodes beside the session's own, and saving one writes it.
 await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); openProjectsTab(); });
 await page.evaluate(n => renameProject(n), 'alpha');
 await page.waitForSelector('#rnmodal:not([hidden]) #rnTests', { timeout: 10000 });
-// One choice under Build and test (R223): as the space first, then the
+// One choice under Build and test: as the space first, then the
 // session's own node, then the space's nodes.
 const tn = await page.$eval('#rnTests', e => ({ hidden: e.closest('#rnTestsF').hidden, opts: [...e.options].map(o => o.value), words: [...e.options].map(o => o.textContent) }));
 ok(!tn.hidden && tn.opts.includes(`node|${minted.id}`) && tn.words.some(w => /usbbox/.test(w)) && tn.opts[0] === 'node|inherit' && tn.opts[1] === 'node|',

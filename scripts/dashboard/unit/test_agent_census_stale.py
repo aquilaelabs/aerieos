@@ -1,5 +1,5 @@
 """A hello that takes its own census while one hello_step asked for is still
-on its way lets that older one go (B851): said after the job's own hello, it
+on its way lets that older one go: said after the job's own hello, it
 put back what the job had just taken away (a removed GPU driver read as
 waiting again until the next ten-minute hello)."""
 import threading

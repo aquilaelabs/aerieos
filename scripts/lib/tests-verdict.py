@@ -16,8 +16,8 @@ except OSError as e:
     sys.exit(f"[builderbot] ERROR: no run log to read: {e}")
 
 BANNER = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+) ==")
-# The same file run again, alone, after it failed in the whole run (run.sh,
-# B124): its result decides whether the first failure was the file's or the
+# The same file run again, alone, after it failed in the whole run (run.sh):
+# its result decides whether the first failure was the file's or the
 # run's.
 AGAIN = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+) again ==")
 # ` in Xs` only when the run was timed: `aerie dashboard test FILE` prints the
@@ -84,7 +84,7 @@ passed_alone = lambda f: (again.get(f["name"]) or {}).get("totals") and not agai
 # What each file actually ran, which for a flaky one is its RETRY's total: the
 # first attempt crashed part way and its own total is short or missing, so
 # counting that reported a run's worth of checks as having gone missing
-# against the run before it (B178).
+# against the run before it.
 counted = lambda f: (again[f["name"]]["totals"] if passed_alone(f) else f["totals"])
 checks = sum(t[0] + t[1] for t in map(counted, files) if t)
 flaky = [f for f in bad if passed_alone(f)]
@@ -98,7 +98,7 @@ if flaky:
         first = f["fails"][0] if f["fails"] else (f["why"] or "crashed")
         print(f"  {f['name']}  {first[:140]}")
         # A file that died with no check failing and no cause matched: its
-        # last words, so the next time has evidence rather than a name (B267).
+        # last words, so the next time has evidence rather than a name.
         if not f["fails"]:
             for ln in [x for x in f["tail"] if x.strip()][-3:]:
                 print(f"      | {ln.strip()[:140]}")

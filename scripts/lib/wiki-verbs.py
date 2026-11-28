@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import records  # noqa: E402
 import dash  # noqa: E402
 
-# `--format json|yaml|markdown` or `--json` on list or show (R167).
+# `--format json|yaml|markdown` or `--json` on list or show.
 fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
 proj = os.environ["BB_PROJECT"]

@@ -1,4 +1,4 @@
-"""AerieOS's own services on a node, as one table (R172, R264).
+"""AerieOS's own services on a node, as one table.
 
 A service is a deployed thing of AerieOS's that the Library lists as an
 official pack: the model router (router.py), nginx (nginxproxy.py), the
@@ -14,7 +14,7 @@ as a change to that entry.
 A service's module answers by the same names as the others, which is all
 this file asks of it:
 
-  pack()                     its Library entry, a manifest, with the
+  pack                     its Library entry, a manifest, with the
                              images it runs (entry, below)
   container_name(nid)        the name its containers go by on that node
   service_deployed(nid)      whether it is on that node
@@ -49,7 +49,7 @@ TABLE = {
     "router": {"module": "router", "grant": "configure", "page": False},
     "nginx": {"module": "nginxproxy", "grant": "configure", "page": True},
     "scanners": {"module": "scanners", "grant": "configure", "page": True},
-    # A one-node Kubernetes cluster (R281): installed and removed from its
+    # A one-node Kubernetes cluster: installed and removed from its
     # card, and added to the Clusters page from there.
     "k3s": {"module": "k3s", "grant": "configure", "page": False},
 }

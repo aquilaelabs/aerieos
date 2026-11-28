@@ -1,12 +1,12 @@
 // Where the app keeps the dashboards it is paired with and the account's
 // credential for each: the phone's own device token, traded for the
-// password once at sign-in, and what its https address is held to (R290);
+// password once at sign-in, and what its https address is held to;
 // a pairing made before that keeps the password until it is traded. An
 // encrypted preferences file, keyed by the device's keystore, so neither
 // sits in plain text. Everything else the app
 // remembers is ordinary preferences.
 //
-// More than one AerieOS (R132): each pairing has a name, an address and
+// More than one AerieOS: each pairing has a name, an address and
 // an account, and one of them is current, which is the one the screens show
 // and the phone is lent from. The watch and the live connection cover every
 // pairing, each with its own memory of what it has already said, so a note
@@ -102,7 +102,7 @@ class Store(context: Context) {
     fun api(): Api? = pairing?.let { api(it) }
     fun api(p: Pairing) = Api(p.server, p.user, p.password, p.token, p.pin)
 
-    /** A pairing from before tokens, its password traded for one (R290):
+    /** A pairing from before tokens, its password traded for one:
      *  the password is forgotten as the token is kept. */
     fun traded(id: String, token: String, pin: String) {
         write(pairings.map { if (it.id == id) it.copy(password = "", token = token, pin = pin) else it })
@@ -116,13 +116,13 @@ class Store(context: Context) {
     var pollSeconds: Int
         get() = plain.getInt("poll", 20)
         set(v) { plain.edit().putInt("poll", v.coerceIn(10, 300)).apply() }
-    // Hear asks at once (R125): a foreground connection to the dashboard
+    // Hear asks at once: a foreground connection to the dashboard
     // instead of waiting on Android's alarm. Off until chosen.
     var live: Boolean
         get() = plain.getBoolean("live", false)
         set(v) { plain.edit().putBoolean("live", v).apply() }
     // The app asks for the phone's own lock (fingerprint, face, or its PIN)
-    // every time it comes to the front (R133). Off until chosen.
+    // every time it comes to the front. Off until chosen.
     var lock: Boolean
         get() = plain.getBoolean("lock", false)
         set(v) { plain.edit().putBoolean("lock", v).apply() }
@@ -131,7 +131,7 @@ class Store(context: Context) {
     var scheme: String
         get() = plain.getString("scheme", "Default") ?: "Default"
         set(v) { plain.edit().putString("scheme", v).apply() }
-    // ...and which half of it: Dark, Light or System (R50 step 16). Dark for a
+    // ...and which half of it: Dark, Light or System. Dark for a
     // phone that never chose, which is what the app was before.
     var mode: String
         get() = plain.getString("mode", "Dark") ?: "Dark"

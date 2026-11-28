@@ -1,4 +1,4 @@
-"""A QR code as an SVG, for an authenticator app to scan (R127).
+"""A QR code as an SVG, for an authenticator app to scan.
 
 The dashboard takes no libraries, so this is the encoder: byte mode, error
 correction level M, the smallest version that holds the text, the mask the

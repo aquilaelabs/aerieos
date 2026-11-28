@@ -1,5 +1,5 @@
 // The Phone tab: a handset on wireless adb, driven from a node picked in its
-// bar (R121, the operator 4 Oct: inside a node's page it was hard to find,
+// bar (inside a node's page it was hard to find,
 // and the Nodes tab is a machine's configuration). Several nodes may each
 // carry adb and hold a phone; the picker lists those, and the panel below is
 // the picked one's. Its own classic script beside index.html.
@@ -26,7 +26,7 @@ let phNode = "";                 // the picked node's id; "" until the first ans
 // a field that emptied itself mid-sentence would be unusable.
 let phIp = "", phPort = "", phCode = "", phConnPort = "";
 let phFoot = "";                 // the lease, said at the page's foot
-// The lend controls' picks, kept across a redraw (R113).
+// The lend controls' picks, kept across a redraw.
 let phLendTo = "", phLendFor = "1";
 
 // The Phone tab, on the node that holds a phone (or the first that can).
@@ -36,9 +36,9 @@ function openPhoneTab(){
   openTab({kind: "phone", arg: "__phone", label: "Phone"});   // the kind's open hook probes
 }
 
-// Check now, on the phone's own row under the header (the operator, 29
-// Oct: the bar it stood in left a gap over the page); the node is the
-// Build group's header's (R178), so the bar carries nothing.
+// Check now, on the phone's own row under the header
+// (the bar it stood in left a gap over the page); the node is the
+// Build group's header's, so the bar carries nothing.
 function phoneCheckBtn(ghost){
   return `<button type="button"${ghost ? " disabled" : ` id="phRefresh"`} title="ask the node's adb about the phone now">Check now</button>`;
 }
@@ -47,7 +47,7 @@ function renderPhoneInto(i){
   const d = docSurface(i, "phone");
   if (!d) return;
   if (!ph){
-    // Its template (R218 step 16): the state row's words and the two ways in
+    // Its template: the state row's words and the two ways in
     // (connect, pair) with their labels are the page's own; the node and
     // its phone are on their way.
     const fld = (label, em, grow = false) => skField(label, em, grow ? "grow" : "");
@@ -62,7 +62,7 @@ function renderPhoneInto(i){
     return;
   }
   const nodes = ph.nodes || [];
-  // The node the Build group's header picked (R178): one without adb is
+  // The node the Build group's header picked: one without adb is
   // said so, not swapped for the first that has it.
   const picked = (nodesList || []).find(x => x.id === phNode);
   const n = nodes.find(x => x.id === phNode) || (!phNode ? nodes[0] : null);
@@ -86,7 +86,7 @@ const mayPhone = () => true;
 // A press's ask is sent at once and its answer drawn; a read of the list
 // goes through reading(), one at a time.
 function phFetch(body, probe){
-  // An answer leaves the list the moment it is given (B641): the server
+  // An answer leaves the list the moment it is given: the server
   // drops an allowed or denied ask at once, but this request returns only
   // when what was allowed has run, which for a root command is minutes.
   // The answer that comes back is the list either way.
@@ -116,7 +116,7 @@ async function phRead(probe){
   drawBell();          // the same asks, in the header
 }
 // A remembered phone forgotten, or a session's allowance taken back, goes
-// from the page on the press (the operator, 22 Nov): its key is held out of
+// from the page on the press: its key is held out of
 // each drawing until the answer, which is the list without it, has landed;
 // a refusal brings it back and says why (drawNow).
 function phGone(key, body, row){
@@ -126,7 +126,7 @@ function phGone(key, body, row){
 }
 // A read of its own that met a controller not answering is the poll's to
 // say (its light and the line under the header), not a failure to keep;
-// a press is told either way (B301).
+// a press is told either way.
 function phLanded(j, pressed){
   if (j.error){ if (pressed || !j.unreached) notify(j.unreached ? "phone: " + j.error : j.error, true); }
   else ph = j;
@@ -140,8 +140,8 @@ function phLanded(j, pressed){
   if (ph && !ph.nodes.some(n => n.id === phNode)) phNode = ph.nodes[0]?.id || "";
 }
 
-// Why Connect or Pair cannot be pressed, said under its row in red (B114:
-// both sat dead with the reason only in a tooltip, which a phone never
+// Why Connect or Pair cannot be pressed, said under its row in red
+// (both sat dead with the reason only in a tooltip, which a phone never
 // shows): whose the phone is or that the node is away, else what is still
 // to be typed. "" when the press is ready.
 function phWhy(which, offWhy){
@@ -173,7 +173,7 @@ function phonePanel(n){
   // anybody has to go and read. The node's remembered IP is the fallback.
   if (!phIp) phIp = ph.you || n?.ip || "";
   const held = n && n.owner && !n.mine;   // somebody else's connection
-  // ...or this install switched pairing a phone off (R81).
+  // ...or this install switched pairing a phone off.
   const off = held || !n.live || !mayPhone() || !!featureOff("phone");
   const offWhy = featureOff("phone") ? esc(featureOff("phone"))
     : held ? `connected by ${esc(n.owner.name)}: only they can change it`
@@ -185,7 +185,7 @@ function phonePanel(n){
     ? `<span class="pill go">${esc(phBusy)}<span class="dots"></span></span>`
     : dev ? `<span class="pill stat ok">connected</span> <span class="pill">${esc(dev.model || "phone")}</span>`
           : `<span class="pill stat">not connected</span>`;
-  // The node-scoped tool's shape, the CI runner tab's too (R121 step 5):
+  // The node-scoped tool's shape, the CI runner tab's too:
   // the state row first, then the ways in, what it is lent to and what it
   // remembers, and at the foot how a session reaches it.
   const rows = [
@@ -203,7 +203,7 @@ function phonePanel(n){
     // An IP and its port, both read off the phone's wireless debugging
     // screen. Android hands out a new port every time wireless debugging is
     // toggled; the node used to scan the phone for it, which across a VPN is
-    // what a network flags as port scanning (the operator, 9 Oct).
+    // what a network flags as port scanning.
     `<div class="row">
        <div class="grow name phstep">Connect</div>
        <div class="grow">${formBox({fields: [
@@ -236,13 +236,13 @@ function phonePanel(n){
   // What a session is waiting on, above everything else it could be doing:
   // somebody is blocked on it, and that somebody asked YOU: a request only
   // ever reaches the account that connected the phone it is about.
-  // First after the state row, as said (R218 step 23): they were pushed last.
+  // First after the state row, as said: they were pushed last.
   rows.splice(1, 0, ...asks.map(a => `<div class="row phask">
       <div class="grow"><div class="name">${esc(a.why)}</div>
         <div class="phcmd">${askCmd(a)}</div>
         <div class="sub">${esc(askWho(a))} on ${esc(a.node_name)} · ${askLeft(a)}</div></div>
       <span class="acts">${askActs({...a, kind: "phone"}, {deny: "data-deny", allow: "data-allow"})}</span></div>`));
-  // Lent to a project (R113): its sessions drive that project's own app on
+  // Lent to a project: its sessions drive that project's own app on
   // the phone with no ask per command, and the owner watches and takes it
   // back here. The lend controls are the owner's; everybody sees the lease.
   const L = n.lease;
@@ -259,8 +259,7 @@ function phonePanel(n){
            encodeURIComponent(L.project)}&path=${encodeURIComponent(L.shot)}">
            <div class="sub">${esc(L.shot.split("/").pop())}</div>` : ""}${
          // The newest recording as its reel: the frames that changed, each
-         // with its time, in one picture, and the video itself a link away
-         // (the operator, 5 Oct).
+         // with its time, in one picture, and the video itself a link away.
          L.reel ? `<div class="phreelbox"><img class="phreel" alt="the newest recording, as the frames that changed with their times" src="/api/artifact?project=${
            encodeURIComponent(L.project)}&path=${encodeURIComponent(L.reel)}"></div>
            <div class="sub">${esc(L.reel.split("/").pop())}${L.video ? ` · <a href="/api/artifact?project=${
@@ -305,7 +304,7 @@ function phonePanel(n){
             <button type="button" class="danger" data-kforget="${esc(k.ip)}">Forget</button>
           </div>
         </div></div>`));
-  // What the owner allowed for a session (the operator, 4 Oct): its
+  // What the owner allowed for a session: its
   // commands to this phone run without asking until this is taken back,
   // the lease ends or the phone is disconnected.
   for (const g of (n.trust || []).filter(g => !going(`phone:trust:${g.project}|${g.asker_uid || ""}`)))
@@ -317,9 +316,9 @@ function phonePanel(n){
       <span class="acts"><button type="button" data-untrust="${esc(g.project)}" data-asker="${esc(g.asker_uid || "")}">Ask every time</button></span>
     </div>`);
   const L2 = n.lease;
-  // Refresh is the tab's bar's (R121); a lease is said at the foot, and
-  // nothing else is (the operator, 16 Oct: how it works is the docs' to say).
-  // At the page's foot, through setFoot (R218 step 23).
+  // Refresh is the tab's bar's; a lease is said at the foot, and
+  // nothing else is (how it works is the docs' to say).
+  // At the page's foot, through setFoot.
   phFoot = L2 ? `<span class="phbar">Lent to ${esc(projLabel(L2.project))}: each command its sessions run on its own app asks ${esc(n.owner?.name || "its owner")} first, unless allowed for the session.</span>` : "";
   if (!tcDotsTimer && rows.join("").includes('class="dots"')) tcDotsTimer = setInterval(tcTickDots, 400);
   return `<div class="phonetab">${rows.join("")}</div>`;
@@ -328,13 +327,13 @@ function phonePanel(n){
 function wirePhoneTab(root){
   const $$ = id => root.querySelector("#" + id);
   const rf = $$("phRefresh");
-  // Refresh says so on the button itself, like every other tab's (the
-  // operator, 13 Oct); the pill is for what the phone is being asked to do.
+  // Refresh says so on the button itself, like every other tab's;
+  // the pill is for what the phone is being asked to do.
   if (rf) rf.onclick = () => { phRefreshing = true; busy(rf, "Refreshing"); phFetch(null, true); };
   if (rf && phRefreshing) busy(rf, "Refreshing");
   // The fields keep what is in them across a redraw.
   const keep = (id, set) => { const el = $$(id); if (el) el.oninput = e => set(e.target.value); };
-  // Each press wakes once what it sends is typed (the operator, 18 Oct): a
+  // Each press wakes once what it sends is typed: a
   // press that only said what was missing was asleep in all but look.
   const wake = () => {
     const set = (b, ready) => { if (b) b.disabled = b.dataset.off === "1" || !ready; };
@@ -364,7 +363,7 @@ function wirePhoneTab(root){
   });
   on("phDisconnect", async () => {
     // An administrator ending somebody else's connection is told whose it
-    // is, and that its lease goes with it (R120).
+    // is, and that its lease goes with it.
     const other = document.getElementById("phDisconnect")?.dataset.other;
     if (other && !await askYes(`Disconnect ${other}'s phone? Its lease to a space ends too.`)) return;
     phBusy = "disconnecting"; readMoved("phone"); drawPanes();

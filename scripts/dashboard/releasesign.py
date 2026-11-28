@@ -1,5 +1,5 @@
 """A release's Android APK signed by AerieOS with the project's own
-sideload key, not in CI (R106, the operator 22 Oct: four keystore secrets
+sideload key, not in CI (four keystore secrets
 set by hand on GitHub failed three ways, and one put a password in a public
 log).
 
@@ -16,13 +16,13 @@ its certificate's SHA-256 fingerprint. No keystore, alias or password is
 ever a GitHub secret, and the key reaches only that job on that node.
 
 The run that hands the APK over may be the one that makes the release, as
-its last job (R206 step 1): the artifact is there long before the release
+its last job: the artifact is there long before the release
 is, and the run is not over until the release has every file. So a run
 still going is read too, its APK left alone until its release exists
 (asked at every look, never a failure), and signed within one look of it.
 A run that ended is read only when it passed.
 
-Only the release's own run is signed from (the audit of 20 Nov: any run of
+Only the release's own run is signed from (any run of
 the repository that wrote an artifact of that name had its APK signed with
 the project's key, a pull request's from a fork among them, and a later run
 for a released tag replaced the published file). A run is a tag's own when
@@ -36,7 +36,7 @@ owner's answer whatever the dial). Each run left alone is a line of what the
 look says, with the reason.
 
 A signed APK changes what the release carries, and a release whose files
-are listed and signed (AerieOS's own SHA256SUMS, R199) can have that list
+are listed and signed (AerieOS's own SHA256SUMS) can have that list
 made only once the APK is on it. So after an attach the controller starts
 the workflows in the project's tree that make it: each one that can be
 started by hand and names `bb-release-seal-` outside a comment (its
@@ -52,11 +52,11 @@ before its tag (unstartable, asked by version.verb), and a start refused for
 it says so in place of the host's bare 404.
 
 What would stop a release's signing is said on the bell before the release
-(attention(): no sideload key, an app mapped to none of several, the
+(attention: no sideload key, an app mapped to none of several, the
 project's node offline or without the jdk and build-tools), and a signing
 that failed after one is said there too, red,
 until it succeeds or is put away. The Signing view names which key signs
-the releases (status()).
+the releases (status).
 
     configure(state=, workspace=, write_json_fn=, projects=, dispatch=)
     wants(project)        whether its workflows hand over an unsigned APK
@@ -68,7 +68,7 @@ the releases (status()).
     expect(project, tag)  a release just made: look for its APK soon
     check(project, force, again)  look now; sign and attach what is waiting
     attention(projects)   the bell's rows
-    start()               the loop
+    start               the loop
 
 GitHub only: a Gitea or GitLab workflow's artifacts are asked for another
 way, and nothing here asks them.
@@ -111,7 +111,7 @@ SEAL = "bb-release-seal-"
 BY_HAND = re.compile(r"^\s*workflow_dispatch\s*:", re.M)
 TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,79}")
 # A release's tag as aerie version release names one, and the only kind
-# signed from (B1167: any tag name a branch's workflow could upload for was):
+# signed from (any tag name a branch's workflow could upload for was):
 # vX.Y.Z or a component's COMP-vX.Y.Z, a pre-release's -LABEL.N after it.
 RELEASE_TAG = re.compile(r"(?:[a-z0-9][a-z0-9-]{0,40}-)?v\d{1,4}\.\d{1,5}\.\d{1,6}(?:-[a-z][a-z0-9]{0,15}\.\d{1,9})?")
 # A job of a handing workflow gated by an environment: its run is signed from
@@ -132,7 +132,7 @@ SCAN_S = 3600
 TICK_S = int(os.environ.get("BB_RELEASESIGN_TICK", "120"))
 RUN_AGE_S = 3 * 86400
 # A release whose tag's push has started no run of its own by then never
-# will: GitHub drops a push's event in an outage (B1158).
+# will: GitHub drops a push's event in an outage.
 NO_RUN_S = 20 * 60
 MAX_ZIP = 400 << 20
 NOTE = "Signed by AerieOS:"
@@ -423,7 +423,7 @@ def _waiting(project, repo, token, seen=None):
     recent runs that handed over an unsigned APK: the ones that passed, and
     the ones still going (`going`), whose release may not be made yet;
     `seen`, when given, counts the runs asked about and the ones skipped as
-    known to hand over nothing (what a look says, R190 step 5). Any run of
+    known to hand over nothing (what a look says). Any run of
     the repository is listed here, a pull request's from a fork too: whether
     one is its tag's own is _own's to say, before anything is fetched."""
     j = cilogs._get(f"/repos/{repo}/actions/runs?per_page=50", token)
@@ -470,7 +470,7 @@ def _waiting(project, repo, token, seen=None):
         # release's twelve hours would otherwise ask about thirty runs each).
         # GitHub can list a run as finished a little before it lists the
         # artifact it uploaded, so a run that ended in the last ten minutes
-        # is asked about again (B467).
+        # is asked about again.
         try:
             ended = calendar.timegm(time.strptime(str(r.get("updated_at") or "")[:19], "%Y-%m-%dT%H:%M:%S"))
         except ValueError:
@@ -559,7 +559,7 @@ def _own(r, repo, tag, flows, commit_of, approved_of=None):
         return (f"it ran on commit {sha[:12] or 'GitHub does not name'}, and the tag {tag} names {commit[:12]}: "
                 "the tag moved after the run started, or the run is not the tag's")
     # Where the workflows gate a job on an environment, a person approved
-    # this run's deployment there (B1167): a run nobody approved, or one the
+    # this run's deployment there: a run nobody approved, or one the
     # approval could not be read for, is not signed from.
     if approved_of is not None:
         ok, why = approved_of(int(r.get("id") or 0))
@@ -624,8 +624,8 @@ def _attach(project, repo, token, tag, files, lines):
         kept.pop()
     body = "\n".join([*kept, *([""] if kept else []), *lines])
     # The release's draft said back with the notes: a draft whose notes were
-    # sent alone was published, unread, by the APK's attach (B590).
-    # The tag goes with it: GitHub drops a draft's tag patched without one (B696).
+    # sent alone was published, unread, by the APK's attach.
+    # The tag goes with it: GitHub drops a draft's tag patched without one.
     forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body, "draft": rel.get("draft") is True,
                                                                   "tag_name": tag})
     return rel.get("html_url") or ""
@@ -718,8 +718,8 @@ def check(project, force=False, again=""):
     d = _load()
     rec = _mine(d, project)
     rec["scanned"] = now
-    # What this look found, run by run, for aerie sign release to say (R190
-    # step 5): "looking" alone left a missing APK unexplained.
+    # What this look found, run by run, for aerie sign release to say:
+    # "looking" alone left a missing APK unexplained.
     last = {"at": now, "error": done["error"], "asked": seen.get("asked", 0),
             "known_bare": seen.get("known_bare", 0), "runs": []}
     flows, commits = handing(project), {}
@@ -730,7 +730,7 @@ def check(project, force=False, again=""):
             commits[tag] = _tag_commit(repo, token, tag)
         return commits[tag]
     # The run's approval, where the handing workflows gate a job on an
-    # environment (B1167): read from GitHub per run, once a look.
+    # environment: read from GitHub per run, once a look.
     approvals = {}
 
     def approved_of(rid):
@@ -843,7 +843,7 @@ def check(project, force=False, again=""):
     # ...and one whose tag's push started no run at all, the list reaching
     # back past the release: no run will hand its APK over, and a run
     # started by hand is never its own, so the way out is to withdraw it and
-    # release again (B1158). Said once; a run that starts after all still
+    # release again. Said once; a run that starts after all still
     # signs it and takes the row away.
     for tag, at in list(rec["expect"].items()):
         if (not done["error"] and now - int(at or 0) > NO_RUN_S and tag not in seen.get("started", ())

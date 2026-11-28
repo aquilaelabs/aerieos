@@ -1,4 +1,4 @@
-"""Two-factor sign-in's parts (R127): the authenticator's codes against RFC
+"""Two-factor sign-in's parts: the authenticator's codes against RFC
 6238's own vector, recovery codes good once, the P-256 check against
 signatures openssl makes, and a passkey registered and used end to end with
 an authenticator played here (its signatures openssl's)."""
@@ -129,7 +129,7 @@ class Passkey(Base):
         self.assertTrue(mfa.ecdsa_p256_verify(self.key.x, self.key.y, b"hello", sig))
         self.assertFalse(mfa.ecdsa_p256_verify(self.key.x, self.key.y, b"hellp", sig))
         self.assertFalse(mfa.ecdsa_p256_verify(self.key.x, self.key.y + 1, b"hello", sig))
-        # The check is the cryptography library's (R243), not arithmetic written here: what is
+        # The check is the cryptography library's, not arithmetic written here: what is
         # not a signature, not a point or not a number is no, never an error.
         for bad in (b"", b"\x30\x00", sig[:-3], b"not a signature at all"):
             self.assertFalse(mfa.ecdsa_p256_verify(self.key.x, self.key.y, b"hello", bad))

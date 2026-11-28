@@ -1,5 +1,5 @@
 """version._git keeps what a read about history answered while the
-repository's own files say nothing moved (the operator, 18 Oct: the
+repository's own files say nothing moved (the
 Artifacts view ran sixteen git commands on the controller's share at half a
 second each). A commit, a tag and a branch switch each move the stamp and are
 answered fresh; the working tree is always asked."""
@@ -47,7 +47,7 @@ class Kept(unittest.TestCase):
         return version._git("app", "rev-list", "--count", "HEAD")
 
     def test_a_history_read_that_fails_is_tried_again_and_never_kept(self):
-        # B586: a push landing that moment failed one read, which was said
+        # A push landing that moment failed one read, which was said
         # as no history and kept as the answer.
         fails = [2]
         real = version.subprocess.run

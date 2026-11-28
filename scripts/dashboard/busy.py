@@ -1,4 +1,4 @@
-"""Whether a node is quiet enough to time anything on (R108).
+"""Whether a node is quiet enough to time anything on.
 
 A session measuring speed (a decoder's latency, a build's length, a suite's
 seconds) reads its result against a machine it shares, and from inside its

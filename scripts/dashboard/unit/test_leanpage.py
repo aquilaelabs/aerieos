@@ -1,4 +1,4 @@
-"""The page is served without its comments (R228 step 15), by a tokenizer:
+"""The page is served without its comments, by a tokenizer:
 what is inside a string, a template literal or a regular expression is never
 a comment, and a newline a comment ended on stays where semicolon insertion
 could read it. Every page script reads the same tokens after as before."""

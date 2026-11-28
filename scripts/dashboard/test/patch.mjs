@@ -1,4 +1,4 @@
-// patch(): a redraw that keeps what a person is doing (R244). The new markup
+// patch: a redraw that keeps what a person is doing. The new markup
 // is patched into what is there: every element it can be matched to is kept
 // and brought up to date, so typing, its caret and an IME composition, a fold
 // turned and a dialog open outlive a redraw from the poll, and what the
@@ -425,7 +425,7 @@ await section("what the code takes away for a role it gives back as the markup h
      `taken away by each draw for a role that does not give them, and given back as the markup draws them by the first that does (${JSON.stringify(r)})`);
 });
 
-// ---- R9: what a press sends, what a page reads, what a draw brings -----------
+// ---- what a press sends, what a page reads, what a draw brings ---------------
 
 await section("a request that never lands answers in words, and so does one answered in other words", async () => {
   await page.route('**/api/r9-gone', r => r.abort('failed'));

@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
 
 class Resumable(unittest.TestCase):
-    """A conversation with nothing said in it is not offered as Resume (B276):
+    """A conversation with nothing said in it is not offered as Resume:
     Claude Code does not resume it, and bb-tty said No transcript."""
 
     def test_only_a_conversation_with_a_turn_counts(self):

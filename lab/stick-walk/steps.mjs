@@ -56,7 +56,7 @@ export const steps = {
     await page.goto(BASE + '#/projects'); await sleep(5000); await tall('76-projects', 1200); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 600));
     await page.goto(BASE + '#/machines/nodes'); await sleep(5000); await tall('77-nodes', 1200); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 700));
   },
-  // The first page as it is since the move token is all it asks (R175): yes,
+  // The first page as it is since the move token is all it asks: yes,
   // a controller is moving here, with the token kept in run/move-token.txt.
   async movetoken({ page, BASE, shot, tall }){
     await page.goto(BASE); await sleep(1500);

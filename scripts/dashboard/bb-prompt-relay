@@ -116,7 +116,7 @@ def catchup(project, session, prompt="", told=()):
                                     str(pending.settled_line(project) or ""))
                         if x)
         said, names = rules_firing(project, prompt=prompt, told=told)
-        # ...and the open items and bugs the prompt names (R202).
+        # ...and the open items and bugs the prompt names.
         import bugs                                          # noqa: E402
         import preamble                                      # noqa: E402
         import rules                                         # noqa: E402
@@ -132,7 +132,7 @@ def catchup(project, session, prompt="", told=()):
 def rules_firing(project, *, prompt="", path="", told=()):
     """(what to say, the names) for the conditional rules this prompt or
     path fires, read from the store here, on the controller. A node asks
-    the controller on the `seen` trip every prompt already makes (B686: it
+    the controller on the `seen` trip every prompt already makes (it
     did not, and since every session runs on a node, a named rule arrived
     on no turn at all).
 
@@ -177,8 +177,8 @@ def main():
         # where its text actually arrives: on the turn somebody asks about the
         # thing it is about. What a person typed (human_part), not the
         # machinery around it: a task notification's "output-file" sent the
-        # files rule whole on every background run's end (the operator, 12 Oct,
-        # cutting tokens). And once a conversation: the rules it was told are
+        # files rule whole on every background run's end
+        # (cutting tokens). And once a conversation: the rules it was told are
         # not said again until a summary drops them (bb-rule-hook recall).
         rulehook = hooklib()
         told = rulehook.fired(project, req.get("session_id"))
@@ -188,7 +188,7 @@ def main():
             # it (bb-rule-hook recall).
             rulehook.remember(project, req.get("session_id"), names)
         # ...and the house rules' checks, where they ran in the background at
-        # the last hand-back and failed (B824): said once, on this prompt.
+        # the last hand-back and failed: said once, on this prompt.
         failed = rulehook.check_failed(project)
         told = "\n\n".join(x for x in (say, fired, failed) if x)
         if told:

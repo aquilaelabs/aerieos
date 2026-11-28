@@ -1,4 +1,4 @@
-// Help on the rail (R258, the operator 16 Oct): AerieOS's own docs read in
+// Help on the rail: AerieOS's own docs read in
 // the dashboard. The page lists them in docs/README.md's groups beside the
 // article, opens a long one on its contents box, follows a link between docs
 // in place with an address per doc, and searches them all as the bar's field
@@ -72,7 +72,7 @@ for (const [W, H] of [[1280, 900], [393, 852]]){
   await page.waitForFunction(() => location.hash === '#/help/install' || location.hash === '#/help', null, { timeout: 10000 });
   ok(true, `${at}: Back returns to the doc before (${await page.evaluate(() => location.hash)})`);
   // An address naming a section opens its doc there (#/help/DOC/SECTION):
-  // the doctor's install key warning links to its fix (the operator, 26 Oct).
+  // the doctor's install key warning links to its fix.
   await page.evaluate(() => { location.hash = '#/help/reference/the-install-key'; });
   const sect = await page.waitForFunction(() => {
     const h = [...document.querySelectorAll('.helptab .wkarticle[data-name="reference"] .wkpage :is(h2, h3, h4)')].find(x => /The install key/.test(x.textContent));
@@ -83,7 +83,7 @@ for (const [W, H] of [[1280, 900], [393, 852]]){
   }, null, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => null);
   ok(sect !== null, `${at}: an address naming a section opens its doc at it (#/help/reference/the-install-key, ${sect}px from the top)`);
   // A table with an empty head (| | |) draws no blank first row, and its
-  // first column's words are never broken inside (B78: 'Playwrig ht').
+  // first column's words are never broken inside ('Playwrig ht').
   await page.evaluate(() => { location.hash = '#/help/how-it-works'; });
   await page.waitForFunction(() => [...document.querySelectorAll('.helptab .wkarticle[data-name="how-it-works"] .wkpage table')]
     .some(t => /Playwright/.test(t.textContent)), null, { timeout: 10000 });

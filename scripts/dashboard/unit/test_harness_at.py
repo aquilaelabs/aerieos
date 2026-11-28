@@ -1,4 +1,4 @@
-"""A suite run on a commit (R55): run.sh's --at copies the commit with git
+"""A suite run on a commit: run.sh's --at copies the commit with git
 archive, so an edit in the working tree is not in it, and without --at the
 copy is the working tree's, as it always was. The block is run.sh's own,
 run against a scratch repository with the exec that starts the copy's
@@ -17,7 +17,7 @@ EXEC = 'exec bash "$_dst/scripts/dashboard/test/run.sh" "$@"'
 
 
 def block():
-    start = SRC.index("# A run on a commit (R55)")
+    start = SRC.index("# A run on a commit: --at REF")
     end = SRC.index("\nfi\n", SRC.index(EXEC, start)) + len("\nfi\n")
     return SRC[start:end].replace(EXEC, 'echo "RAN $_dst $*"')
 
@@ -70,7 +70,7 @@ class At(unittest.TestCase):
 
 
 class LauncherGone(unittest.TestCase):
-    """B926: run.sh's launcher_watch ends the run once whoever started it
+    """run.sh's launcher_watch ends the run once whoever started it
     is gone, the way a TERM ends it, and spares a kept one."""
     def watch(self, env=None):
         start = SRC.index("launcher_watch() {")

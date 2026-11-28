@@ -1,5 +1,5 @@
 """A relayed release has longer than any other verb before the controller
-ends it (B717): ended at three minutes it printed nothing and was half made."""
+ends it: ended at three minutes it printed nothing and was half made."""
 import os
 import sys
 import unittest

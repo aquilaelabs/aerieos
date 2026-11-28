@@ -1,4 +1,4 @@
-"""Update checks on one clock (R176): each check's cadence a setting, weekly
+"""Update checks on one clock: each check's cadence a setting, weekly
 unless set, off meaning only Check now; the release's last run stamped so a
 restart does not ask again; a node's own version check its config's."""
 import json
@@ -24,7 +24,7 @@ class Checks(unittest.TestCase):
         settings.configure(write_json=lambda p, d: Path(p).write_text(json.dumps(d)), state=self.tmp)
         self.ran = []
         # ...and checks' own, which a later module in this process read with
-        # this test's directory long gone (B468).
+        # this test's directory long gone.
         kept = (checks.STATE, checks.settings)
         self.addCleanup(lambda: (setattr(checks, "STATE", kept[0]), setattr(checks, "settings", kept[1])))
         checks.configure(state=self.tmp, settings_mod=settings, last={"images": lambda: 1000},
@@ -69,7 +69,7 @@ class Checks(unittest.TestCase):
 
 class Guarded(unittest.TestCase):
     """A fetch that raises what its own except does not name leaves no check
-    in flight for good (B1026): the next ask fetches again."""
+    in flight for good: the next ask fetches again."""
 
     def test_a_raising_fetch_is_its_error_and_the_next_ask_fetches(self):
         import threading

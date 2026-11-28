@@ -65,7 +65,7 @@ import refusals
 # shielded the way the ssh keys are. Those are served by a root-owned agent and
 # cannot be read; this is a 0600 file owned by the same user a shell runs as.
 TOKEN_RE = re.compile(r"[A-Za-z0-9_.-]{8,255}")
-# Told when a project's token is stored or forgotten (R188): the server
+# Told when a project's token is stored or forgotten: the server
 # measures the new one on the git host, or drops the old one's measure.
 token_changed = None
 
@@ -95,12 +95,12 @@ def write_token(project, token, host, scheme="https", user="", uid=""):
     # Percent-encoded, the way git's own credential-store writes a line: it
     # decodes on the way back, and a token carrying a / or an @ written raw
     # would be read as part of the host, matching nothing.
-    # Kept by gitcreds, sealed under the install key where there is one
-    # (R135), and handed to git by its helper rather than git's own store.
+    # Kept by gitcreds, sealed under the install key where there is one,
+    # and handed to git by its helper rather than git's own store.
     q = lambda x: urllib.parse.quote(x, safe="")  # noqa: E731
     line = f"{scheme}://{q(user or 'oauth2')}:{q(token)}@{host}"
     # The person who gave it keeps it, in their own key store, and the
-    # project is linked to it (the operator, 27 Oct); with nobody, or no
+    # project is linked to it; with nobody, or no
     # install key to seal their store with, it is the project's own.
     if uid:
         got = gitcreds.keep_for(project, uid, line, user or "")
@@ -126,7 +126,7 @@ def token_helper(project):
 
 def token_helpers(project, uid=""):
     """The helpers for git work on the project, the acting account's own
-    first (R154), then the project's."""
+    first, then the project's."""
     return gitcreds.helpers(project, uid)
 
 
@@ -219,7 +219,7 @@ HOME = None
 write_json = None
 after_create = None
 # (name, value, env) -> version.init's answer: the first VERSION, committed,
-# for a project born with a starting version (the operator, 25 Sep).
+# for a project born with a starting version.
 first_version = None
 # What create_from_dialog() and the pins need from the server: the one lock
 # every read-edit-write of the server's state files takes, an account taking
@@ -231,13 +231,13 @@ set_prefs = None
 # brief.write: the brief a new project is made with, kept in its tree for the
 # first Claude session rather than written into CLAUDE.md.
 brief_writer = None
-# What a create that never took leaves elsewhere, put away (B93, B95): its
+# What a create that never took leaves elsewhere, put away: its
 # settings, its owner and the owner role (server: prefs.forget,
 # membership.forget_project).
 unmade = None
 # ...and what a project deleted for good leaves on the accounts: its owner
 # and the owner role (membership.forget_project); its settings stay under
-# the directory, which is never handed out again (R154).
+# the directory, which is never handed out again.
 purged = None
 
 
@@ -263,7 +263,7 @@ def configure(*, run, workspace, agent_keys, gh_authed, ensure_deploy_alias,
         STATE=Path(state), HOME=Path(home), write_json=write_json,
         after_create=after_create)
     # The tokens' keeper, here for a caller with no server (a bb verb):
-    # where they are; the server adds the install key's seal (R135).
+    # where they are; the server adds the install key's seal.
     gitcreds.configure(state=state)
     # The peer library takes the same runner: it shells out to `ssh -G` to
     # resolve a deploy-key alias, and to nothing else.
@@ -275,7 +275,7 @@ def rename(req):
     """Rename a project: the name it is shown under, and with it, in the same
     dialog, its remote's credential, authentication and address.
 
-    Since R154 a rename moves nothing on disk. The directory is the
+    A rename moves nothing on disk. The directory is the
     project's for good and every store, session, container and Claude Code
     path keys by it, so the registry's shown name is all that changes, and
     nothing that holds the project has to be asked to let go first.
@@ -291,9 +291,9 @@ def rename(req):
     # the same breath. The write is the intention worth honoring.
     clear = bool(req.get("clear_token")) and not token
     # The project's git access linked to the asking account's own token for
-    # its remote's host (R154); `_uid` is the server's, never the page's.
+    # its remote's host; `_uid` is the server's, never the page's.
     link_mine = bool(req.get("link_account")) and not token and not clear
-    # The asking account's own token no longer given to the project (R159);
+    # The asking account's own token no longer given to the project;
     # the others who gave theirs stay.
     unlink_mine = bool(req.get("unlink_mine")) and not token and not clear and not link_mine
     # The same repository's new address, after its owner was renamed on the
@@ -407,7 +407,7 @@ def rename(req):
 PUSH_FILE = None            # set in configure(), beside the rest
 
 
-# Read once while the same file (R228 step 1).
+# Read once while the same file.
 _push = statefile.Store(lambda: STATE / "push-rights.json", write=lambda: write_json, cached=True)
 
 
@@ -502,7 +502,7 @@ def ci_repo_name(project):
     """The name a space's CI logs are filed under: its origin's repository,
     without .git, read from the controller's own tree, or "". A node's view
     binds that folder by this name and never by the one in the node's copy,
-    which a session of the space writes (B886)."""
+    which a session of the space writes."""
     path = repo_path_of(origin_url(WORKSPACE / project)) if WORKSPACE else ""
     name = path.rsplit("/", 1)[-1] if path else ""
     name = name[:-4] if name.endswith(".git") else name
@@ -589,7 +589,7 @@ def auth_options(project, dest):
             "url": origin_url(dest),
             "token": bool(token_helper(project)),
             # A token kept as the project's own, from before tokens were each
-            # person's (R159): its owner may clear it.
+            # person's: its owner may clear it.
             "own": bool(gitcreds.own_line(project)),
             # Either it is on ssh already, or it was and we kept the URL. A
             # project that has only ever been https has no alias and no key
@@ -600,11 +600,11 @@ def auth_options(project, dest):
             # its public half and where the host takes it.
             "deploy": deploy_key_of(project, dest),
             # ...or a person's own token, the project linked to their key
-            # store (R154): whose, and for which host.
+            # store: whose, and for which host.
             "linked": dict(zip(("uid", "host"), gitcreds.linked_to(project), strict=True))}
 
 
-# ---- a project's own deploy key (the operator, 12 Oct) -----------------------
+# ---- a project's own deploy key -----------------------
 #
 # Made or pasted in the project's settings, beside the access token, rather
 # than only dropped into /secrets/ssh by hand (which still works, and whose
@@ -652,7 +652,7 @@ def _key_helper(argv, text=None):
 
 
 def deploy_keys_seal_all(again=False):
-    """The pass an install key's change runs over the deploy keys (R243),
+    """The pass an install key's change runs over the deploy keys,
     as it does over every store sealed under it (installkey.configure):
     the root helper seals again, under today's key, each one the key before
     sealed. How many it moved; an error raised, so the key before is kept
@@ -1035,9 +1035,9 @@ def trash_list():
                 at = 0
         # `name-2` is the second delete of `name`; the original name is what
         # somebody is looking for, and what a restore would put back.
-        # Since R154 the directory is the project's own, never reused, and
+        # The directory is the project's own, never reused, and
         # goes back where it was; the name shown is the registry's.
-        # The project it was in (R138), and whether that one is still there
+        # The project it was in, and whether that one is still there
         # to go back into, or a restore has to be told where.
         was_in = registry.last_project(restore_dir(d.name))
         out.append({"name": d.name, "was": registry.label(d.name), "at": at,
@@ -1050,7 +1050,7 @@ def trash_list():
 
 def restore_dir(name):
     """Where a directory in the bin goes back to: the directory it was.
-    One deleted before ids (R154) and numbered then (X-2) was X, and goes
+    One deleted before ids and numbered then (X-2) was X, and goes
     back to X while X is free, its notebook being X's."""
     if (registry.get(name) or {}).get("legacy"):
         base = re.sub(r"-\d+$", "", name)
@@ -1083,7 +1083,7 @@ def trash_restore(req):
 
 
 def _rmtree_share(path, tries=5):
-    """rmtree on the projects share, which is FUSE on a NAS host (B39): a file
+    """rmtree on the projects share, which is FUSE on a NAS host: a file
     deleted while something holds it open becomes a .fuse_hidden one that
     vanishes, or turns up, while the tree is being taken apart. A file
     already gone is deleted as far as this is concerned, and a directory
@@ -1127,7 +1127,7 @@ def trash_purge(req):
         _rmtree_share(src)
     except OSError as e:
         return {"error": f"could not delete it: {e}"}, 500
-    # Gone for good, its directory still never handed out again (R154).
+    # Gone for good, its directory still never handed out again.
     registry.mark(name, "purged")
     if purged:
         with contextlib.suppress(Exception):  # the files are gone already; this is tidying
@@ -1282,8 +1282,8 @@ def dropped_at_restart():
 
 
 def _start(kind, name, fn):
-    """Hand one job to a thread, or queue it behind the one running (the
-    operator, 10 Nov: a press is never refused for another job). The caller
+    """Hand one job to a thread, or queue it behind the one running
+    (a press is never refused for another job). The caller
     has already validated everything. True."""
     with _lock:
         if _job["running"]:
@@ -1335,7 +1335,7 @@ def _claim(name, shown, into=""):
     """A new repository's directory recorded, and put into the project it
     was added to in the same breath: recorded alone, a status read during
     git init or an archive's unpack gave it a project of its own (the
-    server's _place), and the one it was added to was then refused (B402).
+    server's _place), and the one it was added to was then refused.
     Which project it may go into is the server's to check first."""
     registry.claim(name, shown)
     if into:
@@ -1363,7 +1363,7 @@ def create(req, env=None):
     mode = _field(req, "mode")
     if mode not in ("init", "clone"):
         return {"error": "unknown mode"}, 400
-    # Never on a stick (the operator, 1 Nov): held until the projects have
+    # Never on a stick: held until the projects have
     # a place on the machine's disks (nodes.workspace_held).
     why = held()
     if why:
@@ -1469,7 +1469,7 @@ def create(req, env=None):
     if not PROJECT_NAME.fullmatch(name):
         return {"error": "a name needs at least one letter or digit in it"}, 400
     # The name as typed is the one shown; the directory is the sanitized one,
-    # numbered when any project ever had it (R154), so a new project never
+    # numbered when any project ever had it, so a new project never
     # takes over an old one's notebook or containers.
     shown = registry.clean_name(_field(req, "name")) or name
     name = registry.new_dir(name)
@@ -1526,7 +1526,7 @@ def _init(dest, name, about, version="", env=None):
         _unmade(name)
         return {"error": r["out"].strip()[-2000:] or "git init failed"}, 500
     note = brief_writer(dest, about) if brief_writer else ""
-    # A starting version (the operator, 25 Sep): the tree as made is the
+    # A starting version: the tree as made is the
     # first commit, and VERSION at that number the second, the way the
     # Artifacts tab gives a project its first version, so a new project has
     # a history to count from the moment it exists. Blank asks for neither.
@@ -2080,7 +2080,7 @@ def create_from_dialog(req, *, env, account, may_node):
     if code != 200 or not body.get("name"):
         return body, code
     name = body["name"]
-    # Every repository is in a project (R138): the one named (Add a
+    # Every repository is in a project: the one named (Add a
     # repository on its card), which keeps its owner, node and dials, or
     # else one made for it under its name, which it takes them from.
     into = str(req.get("project") or "")
@@ -2097,7 +2097,7 @@ def create_from_dialog(req, *, env, account, may_node):
         pass
     elif not into:
         # One a status read placed while git init ran (the server's _place)
-        # is already in a project of its own: that one, not a second (B402).
+        # is already in a project of its own: that one, not a second.
         key = repos.project_of(name)
         if not key:
             made = repos.create(registry.label(name), folder=False)
@@ -2120,7 +2120,7 @@ def create_from_dialog(req, *, env, account, may_node):
             if r.get("error"):
                 body["note"] = f"{body.get('note') or 'ready'}; gates not set: {r['error']}"
         return body, code
-    # Taken on by whoever made it (the operator, 24 Sep), before the
+    # Taken on by whoever made it, before the
     # writes below: they ask whether this account may work on the
     # project, and an administrator's new one was not on their list, so
     # it came out read-only to them and the node the dialog picked was
@@ -2144,7 +2144,7 @@ def create_from_dialog(req, *, env, account, may_node):
     # ...and the gates (roadmap #27), the design's among them, when the dialog offered them:
     # the same write the settings dialog makes, so what a session may
     # enter into the notebook is decided where the project is made. As the
-    # project's defaults (R208 step 6): a project made around its
+    # project's defaults: a project made around its
     # repository takes what the dialog set as its own.
     gate = req.get("gate")
     if isinstance(gate, dict) and gate:
@@ -2168,11 +2168,11 @@ def create_from_dialog(req, *, env, account, may_node):
             r = set_prefs(name, scope="project", **{key: str(v)})
             if r.get("error"):
                 body["note"] = f"{body.get('note') or 'ready'}; {label} not set: {r['error']}"
-    # Not pinned: what Home shows is each person's to choose (the operator,
-    # 23 Oct), and the Projects page shows every project, pinned or not. An
+    # Not pinned: what Home shows is each person's to choose,
+    # and the Projects page shows every project, pinned or not. An
     # account that has never pinned anything still sees all of them there.
     # A clone that failed while the lines above ran was put away before its
-    # owner and settings were written: they go now too (B95).
+    # owner and settings were written: they go now too.
     if not registry.get(name) and unmade:
         with contextlib.suppress(Exception):
             unmade(name)
@@ -2196,7 +2196,7 @@ def _pins_file():
 
 def _load_user_sets(path):
     """Every account's set of names kept in `path`, {uid: [names]}, sorted."""
-    v = statefile.read_json(path)            # read once while the same file (R228 step 1)
+    v = statefile.read_json(path)            # read once while the same file
     if not isinstance(v, dict):
         return {}
     return {k: sorted({x for x in names if isinstance(x, str)})
@@ -2216,10 +2216,10 @@ def _load_pins():
 
 
 def load_project_pins(uid):
-    """This account's pinned set: what it pinned, nothing until it does (the
-    operator, 7 Oct: a new user starts with nothing pinned and adds what they
+    """This account's pinned set: what it pinned, nothing until it does
+    (a new user starts with nothing pinned and adds what they
     want; migration 0040 gave each older account the set its Home showed).
-    The pins are the person's, not the controller's (the operator, 27 Sep):
+    The pins are the person's, not the controller's:
     what is worth looking at from Home is a question each account answers."""
     return sorted({_key(x) for x in (_load_pins().get(str(uid or "")) or [])})
 
@@ -2252,15 +2252,15 @@ def pin(uid, name, on):
 # ---------------------------------------------------------------------------
 # a person's own marks on projects: groups and colors
 
-# Labels a person puts on projects for their own view, and nothing else (the
-# operator, 18 Oct): a group keeps projects together on the Projects page,
+# Labels a person puts on projects for their own view, and nothing else:
+# a group keeps projects together on the Projects page,
 # a color is worn by a project's card, its tabs and its bar. Neither moves a
 # file or gates anything, and each account sees only its own: {uid:
 # {project: value}}, a file per kind.
 
 GROUP_MAX = 40
 MARK_FILES = {"group": "project-groups.json", "color": "project-colors.json"}
-# repos.key_of, handed over by the server (R138): pins, groups, colors,
+# repos.key_of, handed over by the server: pins, groups, colors,
 # locks and archives are a project's, kept by its key, and a repository
 # named is asked about through its project. Unset, every name is its own.
 key_of = None
@@ -2281,7 +2281,7 @@ def _keyed(d):
 
 
 def _projects_here():
-    """Every project a mark may be put on: each project's key (R138), and
+    """Every project a mark may be put on: each project's key, and
     each repository folder where there are none yet."""
     keys = set(registry.repos_keys())
     try:
@@ -2292,7 +2292,7 @@ def _projects_here():
 
 
 def _marks(kind):
-    d = statefile.read_json(STATE / MARK_FILES[kind])   # read once while the same file (R228 step 1)
+    d = statefile.read_json(STATE / MARK_FILES[kind])   # read once while the same file
     return d if isinstance(d, dict) else {}
 
 
@@ -2344,7 +2344,7 @@ def set_group(uid, name, group):
 
 
 def rename_group(uid, old, new):
-    """Rename one of this account's groups for every project in it (R273):
+    """Rename one of this account's groups for every project in it:
     a group is a person's own label, so nobody else's moves. A name already
     in use joins the two. (payload, status)."""
     old, new = " ".join(str(old or "").split()), " ".join(str(new or "").split())[:GROUP_MAX]
@@ -2366,7 +2366,7 @@ def rename_group(uid, old, new):
 
 def delete_group(uid, name):
     """Take one of this account's groups away, its projects with no group
-    again (the operator, 19 Oct): nobody else's moves. (payload, status)."""
+    again: nobody else's moves. (payload, status)."""
     name = " ".join(str(name or "").split())
     with lock:
         d = _marks("group")
@@ -2386,15 +2386,14 @@ def delete_group(uid, name):
 # the locks
 
 # Two lists on the /config volume, keyed by the project's directory, so a
-# rename (which moves only the name it is shown under) carries both (R119,
-# the operator, 23 Oct).
+# rename (which moves only the name it is shown under) carries both.
 #
 # ARCHIVED is out of sight and nothing else: the card folds into Archived at
 # the foot of the Projects page and leaves Home's pinned ones, and the project
 # keeps working for everybody on it. The project's owner or an administrator
 # archives one.
 #
-# LOCKED comes in two kinds (the operator, 23 Oct). Its owner's: nobody else
+# LOCKED comes in two kinds. Its owner's: nobody else
 # starts a session in it or writes to it, administrators included, and the
 # owner works on as before; the owner locks and unlocks it. An
 # administrator's: nobody at all, its owner included, until an administrator
@@ -2410,14 +2409,14 @@ def _archived_file():
 
 
 def _names(f):
-    v = statefile.read_json(f)               # read once while the same file (R228 step 1)
+    v = statefile.read_json(f)               # read once while the same file
     return sorted({x for x in v if isinstance(x, str)}) if isinstance(v, list) else []
 
 
 def rekey(old, new):
     """Each person's pin, group and color and the archive and lock kept
     under `old` (a repository, before it was put in a project) kept under
-    its project `new` instead (R138), as migration 0010 moves them."""
+    its project `new` instead, as migration 0010 moves them."""
     with lock:
         _rename_in_sets(_pins_file(), _load_pins(), old, new)
         for kind in MARK_FILES:
@@ -2439,7 +2438,7 @@ def rekey(old, new):
 
 def load_locks():
     """{name: {by, admin}}: every locked project and whose lock it is."""
-    v = statefile.read_json(_locks_file())   # read once while the same file (R228 step 1)
+    v = statefile.read_json(_locks_file())   # read once while the same file
     if not isinstance(v, dict):
         return {}
     return _keyed({k: {"by": str(r.get("by") or ""), "admin": bool(r.get("admin"))}
@@ -2487,8 +2486,8 @@ def _here(name):
 
 
 def app_flags(name, uid):
-    """What an app's project list says of a project's archive and lock
-    (R128): the Windows companion's device door and the VS Code extension's
+    """What an app's project list says of a project's archive and lock:
+    the Windows companion's device door and the VS Code extension's
     Files API, which carry neither otherwise. `locked_why` is the refusal
     when the lock holds this account out, "" when it does not."""
     held = locked_out(name, uid)
@@ -2559,7 +2558,7 @@ def _stored_token(project):
 
 
 def forge_target(name):
-    """What the git host is asked about for this project (R188): {forge,
+    """What the git host is asked about for this project: {forge,
     host, repo, scheme, token} from its remote and its stored token, or
     {error} saying what is missing. The token is the controller's to use
     and never leaves it."""
@@ -2585,7 +2584,7 @@ def forge_target(name):
     # The repository the project was linked to, where it has one on record,
     # is the one asked about: the tree's origin is a session's to rewrite,
     # and pointed at another repository on the host it took the project's
-    # token there (B544). An origin that disagrees with it is refused.
+    # token there. An origin that disagrees with it is refused.
     rec = load_push().get(name) or {}
     if rec.get("repo"):
         if (str(rec.get("host") or host).lower(), str(rec["repo"]).lower()) != (str(host).lower(), str(repo).lower()):
@@ -2617,7 +2616,7 @@ def _git_said(r):
 
 def auth_test(name, typed="", uid=None):
     """Can this project read and push with what it authenticates with now
-    (the operator, 7 Oct)? (payload, status).
+    ? (payload, status).
 
     git answers for every host and both credentials: `ls-remote` is the read
     and `push --dry-run` the write, which the host refuses at the
@@ -2628,7 +2627,7 @@ def auth_test(name, typed="", uid=None):
     what git cannot see. `typed` is a token typed in the dialog and not
     saved: it is tried in its place, over https, from a file of its own
     that is gone when this returns. `uid`: whose token a token remote is
-    tried with, the asker's own as their pushes are (the operator, 23 Nov).
+    tried with, the asker's own as their pushes are.
     """
     if not PROJECT_NAME.fullmatch(name or ""):
         return {"error": refusals.NO_SPACE}, 400

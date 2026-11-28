@@ -68,11 +68,11 @@ users = None
 projects = None
 prefs = None
 gitrelay = None
-# registry.py (R154): a shown name to the directory it is.
+# registry.py: a shown name to the directory it is.
 registry = None
-phone = None          # the asks (R219): a held push waits on the bell there
+phone = None          # the asks: a held push waits on the bell there
 pushscan = None
-forgeaccess = None    # the project's On the git host settings (B559)
+forgeaccess = None    # the project's On the git host settings
 WORKSPACE = None
 STATE = None
 
@@ -82,7 +82,7 @@ def configure(**deps):
 
 
 # The most words one relayed command carries. Beyond it the command is
-# refused whole (B3): cut short, a verb ran as a different command, a
+# refused whole: cut short, a verb ran as a different command, a
 # roadmap add losing its last steps or keeping a --step with nothing after it.
 MAX_WORDS = 1024
 
@@ -138,12 +138,12 @@ def admit(me, req):
         return None, ({"error": f"aerie {argv[0] if argv else ''} is not relayed: "
                        "it answers for the machine the session is on"}, 400)
     # A rule's check is a command, and a session may write its own rule's
-    # check, so it runs on the machine the session is on and never here
-    # (B152). A node's bb keeps it local; this refuses one sent anyway.
+    # check, so it runs on the machine the session is on and never here.
+    # A node's bb keeps it local; this refuses one sent anyway.
     if argv[:2] == ["rules", "check"]:
         return None, ({"error": "aerie rules check runs on the machine the session is on, "
                                 "not on the controller: run it there"}, 400)
-    # A new install's setup from a shell (R84): an administrator's, at the
+    # A new install's setup from a shell: an administrator's, at the
     # controller. Each verb refuses a session itself; this refuses it here as
     # well, whatever the verb does, so nothing a session sends sets a
     # project's node or mints a node's token.
@@ -163,7 +163,7 @@ def admit(me, req):
         return None, ({"error": "aerie findings --all reads every space in the report, "
                                 "and a session reads its own: run it without --all"}, 403)
     project = field(req, "project") or me.get("session") or ""
-    # A shown name (R154) is taken for its directory (B1): the person names
+    # A shown name is taken for its directory: the person names
     # projects as the dashboard shows them, and a session repeats that name.
     if project and not (WORKSPACE / project).is_dir() and registry:
         project = registry.resolve(project) or project
@@ -172,7 +172,7 @@ def admit(me, req):
         # words go through and every other refuses by name, here rather
         # than in each verb, because the relayed bb runs on the controller
         # with a token for the project it is asked about.
-        # Each by the name the dashboard shows, not its directory (B58).
+        # Each by the name the dashboard shows, not its directory.
         shown = lambda d: (registry.label(d) if registry else "") or d  # noqa: E731
         if project in (me.get("reads") or []):
             why = _not_a_read(argv)
@@ -191,7 +191,7 @@ def admit(me, req):
     # git's network half runs under the account's author like everything
     # else it does with a repository: none set, none run. Push, fetch and
     # pull write with git, and git wants an author; a policy read and an
-    # ls-remote do not (B128). Asked WITH the project, so an author set for
+    # ls-remote do not. Asked WITH the project, so an author set for
     # one repository alone is enough even when the Profile has none, and
     # asked BEFORE the project is checked for being one, so a request that
     # names no project still hears the useful half rather than "not a
@@ -240,7 +240,7 @@ def run(me, req, project):
     # Push rights first, for everybody: a project cloned without them
     # does not push, whatever its tree says. The refusing pre-push hook
     # in a read-only clone is a file a session can change, so this is
-    # the check that holds (B149), the same one the Git view makes.
+    # the check that holds, the same one the Git view makes.
     if argv[:1] == ["git"] and argv[1:2] and argv[1] in gitrelay.VERBS and gitrelay.bad_args(argv[2:]):
         return {"error": gitrelay.bad_args(argv[2:])}, 400
     if argv[:2] == ["git", "push"] and not projects.may_push(project):
@@ -249,7 +249,7 @@ def run(me, req, project):
                          "aerie git policy says so first"}, 403
     # ...and one whose Authentication is Off (an https remote with no
     # credential) pushes nowhere, said at once: such a push ran on into the
-    # host and said nothing for minutes (B1119, report #131).
+    # host and said nothing for minutes (report #131).
     if argv[:2] == ["git", "push"] and projects.remote_auth(WORKSPACE / project, project) == "none":
         return {"error": "this space's Authentication is Off, so it pushes nowhere: its owner picks Each person's token "
                          "(or Deploy key) under Repository in its notebook's Settings and saves; nothing needs linking again"}, 403
@@ -257,12 +257,12 @@ def run(me, req, project):
     # A verb that writes the tree it is asked from is never answered in
     # another: asked from a worktree the controller cannot see (one in a
     # node's /tmp), aerie changelog add wrote its line into the project
-    # directory and said it had logged it (B1131).
+    # directory and said it had logged it.
     if not kept and argv[:2] == ["changelog", "add"]:
         return {"error": f"{req.get('cwd')} is not on the share the controller reads, so its CHANGELOG.md is not "
                          f"written from here: run it in /workspace/{project} or a worktree under "
                          f"/workspace/.worktrees/{project}"}, 400
-    # ...and under the project's git policy (the Git view, roadmap R36):
+    # ...and under the project's git policy (the Git view):
     # a session may push its own branch unless told not to, and may not
     # push to main unless told it may. Judged here because here is
     # where the push runs; a local commit or merge is not this door's.
@@ -271,7 +271,7 @@ def run(me, req, project):
         if pol.get("push") == "deny":
             return {"error": "this space's git policy does not let a session "
                              "push; the operator pushes from the Git view"}, 403
-        # Read out of the tree's files, never by running git in it (B148),
+        # Read out of the tree's files, never by running git in it,
         # and out of the tree the push would RUN in, which is a worktree
         # as readily as the project directory.
         try:
@@ -279,8 +279,8 @@ def run(me, req, project):
         except gitrelay.Refused as e:
             return {"error": str(e)}, 400
         # Judged against what the push would WRITE, rather than against
-        # whether the word `main` appears somewhere in the arguments
-        # (B191). Under the old reading everything that was not spelled
+        # whether the word `main` appears somewhere in the arguments.
+        # Under the old reading everything that was not spelled
         # `main` went through, so "its own branch" also bought a session
         # every other branch on that remote and the right to delete them.
         #
@@ -342,7 +342,7 @@ def run(me, req, project):
         env.pop("BB_ACCOUNT_UID", None)
     if field(req, "from") == "session":
         env["CLAUDECODE"] = "1"
-        # Which agent's session asked (R95), for what its record names:
+        # Which agent's session asked, for what its record names:
         # one of the agent table's, or none.
         ag = agents.get(field(req, "agent"))
         if ag:
@@ -352,26 +352,26 @@ def run(me, req, project):
     else:
         env.pop("CLAUDECODE", None)
         env.pop("BB_AGENT", None)
-    # git's network half never runs in the tree a session can write
-    # (B148): the controller does it in a repository of its own and
+    # git's network half never runs in the tree a session can write:
+    # the controller does it in a repository of its own and
     # hands the tree's half back to the node's bb as `apply`.
     if argv[0] == "git" and argv[1:2] and argv[1] in gitrelay.VERBS:
         # A session's git is its person's, with their own token, while they
-        # are signed in (R159): signed out everywhere, aerie git waits for them,
+        # are signed in: signed out everywhere, aerie git waits for them,
         # and a project nobody signed in gave a token says so.
         u = gitcreds.usable(project, users.whose(me))
         # The project's git policy may turn the hold off (the Git view's
         # "Hold a push that looks sensitive"): the push then goes unread.
         hold = prefs.get(project)["gitpol"].get("scan") != "off"
-        # A session's push is held to the project's Change CI workflow files
-        # (B559): a workflow it wrote runs with the repository's secrets.
+        # A session's push is held to the project's Change CI workflow files:
+        # a workflow it wrote runs with the repository's secrets.
         wf = not me.get("session") or not forgeaccess or forgeaccess.override(project).get("workflows") != "deny"
         r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=users.whose(me),
                          token_why=u.get("why", ""), workflows=wf)
         if "error" in r:
             return r, 400
         if r.get("held"):
-            # Lines that look like a secret or something private (R219):
+            # Lines that look like a secret or something private:
             # the push waits on a person, who reads them on the bell. The
             # node's bb waits on the ask the way aerie root run does, and the
             # push runs here when they approve, its apply handed back then.
@@ -383,7 +383,7 @@ def run(me, req, project):
             if a.get("error"):
                 return {"error": a["error"]}, 400
             # Where each is, never what it says, so the session can tell the
-            # person which lines and not push again meanwhile (R289: a
+            # person which lines and not push again meanwhile (a
             # session pushed three more times over a wait it was not told of).
             at = sorted({f"{f['path']}:{f['line']}" for f in r["held"] if f.get("path")})
             return {"held": a["id"], "code": 1, "out": "",
@@ -403,7 +403,7 @@ def run(me, req, project):
                 "code": 75, "out": "", "err": ""}, 503
     limit = relay_limit(argv)
     try:
-        # A records file the session's side read and sent (B962), for the
+        # A records file the session's side read and sent, for the
         # verb's --from -; nothing for any other.
         stdin = req.get("stdin") if isinstance(req.get("stdin"), str) and "-" in argv else None
         if stdin is not None and len(stdin) > 1_000_000:
@@ -425,7 +425,7 @@ def run(me, req, project):
 # How long a relayed verb may run here. Three minutes for any verb; a
 # release or a rehearsal asks the controller to tag, push and publish, which
 # alone may take its four (version-verbs.py waits 240 s), and ending it at
-# three printed nothing and left the release half made (B717).
+# three printed nothing and left the release half made.
 RELAY_S = 180
 RELAY_LONG_S = 900
 

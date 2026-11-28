@@ -1,8 +1,8 @@
-"""artifacts.sweep_dev_builds (R105): of each product's dev builds in a
+"""artifacts.sweep_dev_builds: of each product's dev builds in a
 project's dist/, the files of the newest few builds stay, whatever they are
 named after the version, and a signed build keeps its signed copy alone. A
 product is the name before the version; a release and a file with no
-version are never swept by count (the operator, 6 Oct)."""
+version are never swept by count."""
 import os
 import sys
 import tempfile

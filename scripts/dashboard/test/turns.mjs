@@ -89,7 +89,7 @@ const CENSUS = { cpu: 4, mem_mb: 8192, arch: 'x86_64', system: 'linux',
 const en = await call('/api/v1/agent/enroll', { census: CENSUS, version: shipped.version,
   digest: shipped.digest, user: 'bb' }, bearer(minted.token));
 ok(en.ok && en.node_id === minted.id, 'a node that runs sessions enrolled');
-// ...with each project's synced copy there (R163), as an agent says.
+// ...with each project's synced copy there, as an agent says.
 const beat = sessions => call('/api/v1/agent/work', { sample: { cpu_pct: 1, mem_mb: 8192,
   mem_used_mb: 512, sessions, sync: { alpha: { ready: true, rev: 1 }, beta: { ready: true, rev: 1 }, gamma: { ready: true, rev: 1 }, delta: { ready: true, rev: 1 } } }, running: 0, wait: 0 }, bearer(en.token));
 await beat([]);
@@ -107,7 +107,7 @@ await member('tn.one', 'tn.two', 'tn.three');
 const toks = uids.map(u => usersPy(`u.mint_session("alpha", uid=${JSON.stringify(u)})`));
 const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
 
-// A session told the controller moved (R83): the build it began on is
+// A session told the controller moved: the build it began on is
 // kept per session at `started`, and the first `seen` after the build has
 // changed carries one line naming both and where to read, once.
 await section("A session told the controller moved", async () => {
@@ -130,12 +130,12 @@ await section("A session told the controller moved", async () => {
   // ...and the notebook and the settings the same way: what somebody else
   // changed on this project since the last prompt is named with the verb
   // that reads it, and the session's own writes are not, being seen as
-  // they land (the operator, 25 Sep).
+  // they land.
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found one', severity: 'low' });
   const nb = await sess({ node: 'nodeA' });
   ok(/somebody else changed this space's bugs: read `aerie bug`/.test(nb.line || ''),
      `a bug the operator filed is named on the next prompt (${(nb.line || 'no line').slice(0, 90)})`);
-  // The notebook's own route is a person's (R227 step 4): a session's bug
+  // The notebook's own route is a person's: a session's bug
   // goes by the relay, as aerie bug add sends it, and one sent to the route
   // with a session's token is refused, written by nobody.
   const direct = await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
@@ -143,7 +143,7 @@ await section("A session told the controller moved", async () => {
      `the notebook's own route refuses a session's token (${direct.status || ''} ${(direct.error || '').slice(0, 50)})`);
   // The session's own bug, filed with aerie bug add, which reaches the
   // controller through the relay and not the notebook's route, was told back to
-  // the session that filed it as somebody else's (B375). A read through
+  // the session that filed it as somebody else's. A read through
   // the relay marks nothing: what the operator did is still news after it.
   const relay = argv => call('/api/v1/bb', { argv }, bearer(toks[1]));
   const filed = await relay(['bug', 'add', 'the session found another', '--sev', 'low', '--here']);
@@ -161,8 +161,8 @@ await section("A session told the controller moved", async () => {
      `a setting the operator changed is named too (${(st.line || 'no line').slice(0, 90)})`);
   await call('/api/prefs', { project: 'alpha', build: '' });
   await sess({ node: 'nodeA' });
-  // ...and the design, which the house rules' fingerprint did not cover
-  // (B218): a person's save in the Design view is news, with where to read
+  // ...and the design, which the house rules' fingerprint did not cover:
+  // a person's save in the Design view is news, with where to read
   // it and the file to write again.
   const des = await call('/api/design?project=alpha');
   await call('/api/design', { project: 'alpha', action: 'save', language: des.language, pages: des.pages || [] });
@@ -183,7 +183,7 @@ await section("A session told the controller moved", async () => {
   await sess({ node: 'nodeA' });
   // Memories: an edit through the notebook by somebody else is news; the
   // session's own, through the API or its own memory tool on the files,
-  // is not, since the half counts notebook edits rather than mtimes (B269).
+  // is not, since the half counts notebook edits rather than mtimes.
   await call('/api/memory', { project: 'alpha', action: 'create', name: 'op-note', title: 'the operator wrote one', hook: 'h', type: 'project', body: 'x' });
   const mem = await sess({ node: 'nodeA' });
   ok(/somebody else changed this space's memories: read the notebook's Memory view/.test(mem.line || ''),
@@ -192,13 +192,13 @@ await section("A session told the controller moved", async () => {
   const ownMem = await sess({ node: 'nodeA' });
   ok(!/memories/.test(ownMem.line || ''), `...and the session's own is not (${(ownMem.line || 'no line').slice(0, 90)})`);
   // ...and a person only READING the log is no edit: the history is a POST
-  // like the writes, and it was counted as one (B296).
+  // like the writes, and it was counted as one.
   await call('/api/memory', { project: 'alpha', action: 'history', limit: 5 });
   const histRead = await sess({ node: 'nodeA' });
   ok(!/memories/.test(histRead.line || ''),
      `...nor a person reading the memory history (${(histRead.line || 'no line').slice(0, 90)})`);
   // New diagnostics reports, for a project whose house rule asks its
-  // sessions to watch them (watch-diagnostics, the operator, 6 Oct): named
+  // sessions to watch them (watch-diagnostics): named
   // once, on the next prompt, only to a project that carries the rule, and
   // only where reading them is allowed: debug mode on, the project granted
   // the diagnostics, an account with the debug grant (the owner here). It
@@ -298,7 +298,7 @@ await section("with no limit set, four prompts at once all go", async () => {
   await beat([]);
 });
 
-// ---- a session on Claude Code's own permission prompt (B52) -----------------
+// ---- a session on Claude Code's own permission prompt -----------------
 // Its pane title reads as waiting, like an idle one; the Notification hook
 // (bb-gate --asking, fed Claude Code's JSON) marks it asking, with Claude's
 // words, until its turn ends.

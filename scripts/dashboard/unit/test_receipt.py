@@ -1,4 +1,4 @@
-"""An install's receipt (R234; the operator, 13 Nov: what a pack's install
+"""An install's receipt (what a pack's install
 downloads from somewhere else had no paper trail). The installer writes
 every file that landed with its sha256 and one hash over them all
 (sdkmeta.receipt), the agent reads the summary into its census, the

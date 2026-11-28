@@ -1,4 +1,4 @@
-"""k3s on a node (R281 step 1): its compose file runs the image its entry
+"""k3s on a node: its compose file runs the image its entry
 names, privileged, its state in a volume, its API on the node's address;
 Traefik and the load balancer are off where the node has nginx; the
 controller's bootstrap token is made once, kept sealed and written as the

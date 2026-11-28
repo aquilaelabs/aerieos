@@ -1,4 +1,4 @@
-"""The controller's own machine as a node of itself (R90 step 6): minted from
+"""The controller's own machine as a node of itself: minted from
 a shell on a controller installed bare metal (aerie nodes enroll-token --own),
 an ordinary agent row that builds and runs sessions, its containers the root agent's,
 with each session in a network of its own from the first hello; there is
@@ -61,15 +61,15 @@ class OwnRow(unittest.TestCase):
     def test_its_session_network_stays_on_and_it_hosts_no_containers(self):
         mint(self.state, "nas", "--own")
         n = self.row("nas")
-        # Its sessions' own network is a fact (R146), with no switch.
+        # Its sessions' own network is a fact, with no switch.
         self.assertTrue(self.nodes.session_net_on(n["id"]))
         r = self.nodes.node_update("user:t", n["id"], {"capabilities": ["package-build", "docker-host"]})
         self.assertIn("root agent", r.get("error", ""))
         self.assertEqual(self.row("nas")["capabilities"], ["package-build"])
 
     def test_it_may_be_a_vm_host_through_the_root_agent(self):
-        # libvirt's group is root on the machine (R90 step 14), and VM host
-        # is still offered there (R165 step 1): the VMs run through the root
+        # libvirt's group is root on the machine, and VM host
+        # is still offered there: the VMs run through the root
         # agent and the jobs account stays out of the group, so the gate it
         # meets is every node's, not one of its own.
         mint(self.state, "nas", "--own")
@@ -80,7 +80,7 @@ class OwnRow(unittest.TestCase):
 
 
 class TheImageUpdate(unittest.TestCase):
-    """os-update (R160 step 4) is for a machine whose census says it runs
+    """os-update is for a machine whose census says it runs
     AerieOS; a bare-metal install on another system is told so."""
     def setUp(self):
         self.state = tempfile.mkdtemp()
@@ -99,7 +99,7 @@ class TheImageUpdate(unittest.TestCase):
 
 
 class TheNameAndTime(unittest.TestCase):
-    """node_machine (R161 step 3) is the own machine's: another node's name
+    """node_machine is the own machine's: another node's name
     is its own administrator's, and the shapes are held before any job."""
     def setUp(self):
         self.state = tempfile.mkdtemp()
@@ -109,7 +109,7 @@ class TheNameAndTime(unittest.TestCase):
         nodes.configure(state=self.state)
 
     def test_storage_and_shares_are_the_own_machines_features(self):
-        # R56 step 2: another node is told the feature is the installed
+        # Another node is told the feature is the installed
         # edition's; the own machine meets every node's gates after it.
         mint(self.state, "other", "")
         n = next(x for x in self.nodes.node_list() if x["name"] == "other")
@@ -133,7 +133,7 @@ class TheNameAndTime(unittest.TestCase):
 class TheDoctorSaysTheWall(unittest.TestCase):
     """aerie doctor (and so the Doctor card) on a controller whose own machine is
     a node: whether the wall holds there, from that node's bb-session check,
-    in red when it does not (R90 step 8)."""
+    in red when it does not."""
 
     def setUp(self):
         self.state = tempfile.mkdtemp()

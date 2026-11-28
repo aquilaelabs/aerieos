@@ -1,4 +1,4 @@
-"""An array and pools another NAS made, taken as they are (R163 step 8): a
+"""An array and pools another NAS made, taken as they are: a
 disk-per-filesystem array's data disks each mounted with the filesystem it
 already holds, its parity disk left alone, its pools mounted writable, and
 its paths kept (/mnt/diskN, /mnt/POOL, the merged /mnt/user and /mnt/user0)
@@ -7,7 +7,7 @@ were.
 
 Nothing here makes, wipes, partitions or upgrades anything: there is no
 mkfs, wipefs, partition tool or zpool upgrade in this module, and a unit test
-holds that (the way back to the old system, R163 step 5). The data disks are
+holds that (the way back to the old system). The data disks are
 read-only unless the person picked writable, since a write the old system's
 parity did not see leaves that parity stale until a parity sync on the way
 back; the pools carry no such parity, so they are writable either way. A ZFS
@@ -48,7 +48,7 @@ VM_OPS = {"start": ["start"], "shutdown": ["shutdown"], "off": ["destroy"],
 DATA_RE = re.compile(r"disk([1-9][0-9]?)")
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 # A ZFS pool's own name as a disk carries it (blkid's LABEL): a letter, then
-# what ZFS allows, and never a word zpool would read as an option (B844).
+# what ZFS allows, and never a word zpool would read as an option.
 ZPOOL_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}")
 # Names a pool may not take: the merged trees under /mnt, and AerieOS's.
 NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array", "parity", "other", "cache-mover"}
@@ -201,7 +201,7 @@ def plan(want, disks, blk=blkid):
             continue
         seen.add(d["name"])
         # Its id kept with it: a takeover finds the disk again by it, never
-        # by the kernel name, which a reboot may give another disk (B718).
+        # by the kernel name, which a reboot may give another disk.
         out["parity"].append({"slot": str(x.get("slot") or "parity"), "dev": d["name"], "id": str(x.get("id") or "")})
         say(f"{what}: {d['name']}, left alone: never mounted or written")
 
@@ -225,7 +225,7 @@ def plan(want, disks, blk=blkid):
             say(f"{name}: the ZFS pool imported as it is at {where}, writable")
             continue
         # A pool the old system kept in its cache slot, with no pool record
-        # to name its UUID (B625): the disk by its id, the UUID off it.
+        # to name its UUID: the disk by its id, the UUID off it.
         if not uuid and x.get("disk_id"):
             d0 = find_disk(disks, x.get("disk_id"))
             for n in ([p.get("name") for p in d0.get("parts") or []] + [d0.get("name")]) if d0 else []:
@@ -345,7 +345,7 @@ def adopted_now():
 
 
 def top_folders(root):
-    """The folders at the top of the merged tree (R163 step 13): each one
+    """The folders at the top of the merged tree: each one
     the old system shared or a folder made on a disk directly, which the
     page offers as a share where the plan has no settings for it."""
     try:
@@ -355,7 +355,7 @@ def top_folders(root):
     return [n for n in names if re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*", n)][:128]
 
 
-# ---- the containers and VMs another system ran (R163 steps 10 and 11) ----
+# ---- the containers and VMs another system ran ----
 # Its Docker and libvirt keep their state in image files on the disks just
 # adopted; each is opened read-only (loop, no journal replayed) to read what
 # ran: the containers set to start with the machine and the exact image each
@@ -375,7 +375,7 @@ IP_RE = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
 
 def _walk_in(root, rel):
     """(a descriptor on the folder holding `rel`'s last part, that part),
-    each folder from `root` down opened through no link (B846): the old
+    each folder from `root` down opened through no link: the old
     system's image or folder is its, and an absolute link in it names this
     machine's own files (an autostart file leading to /etc/shadow)."""
     parts = [x for x in rel.split("/") if x]
@@ -456,8 +456,8 @@ def read_docker_root(root, autostart_name=""):
         found.append((cid, name, c))
         out["containers"][name] = {"image": str((c.get("Config") or {}).get("Image") or ""),
                                    "digest": digests.get(str(c.get("Image") or ""), "")}
-    # Each one's settings, for a compose file of it (the operator, 10 Nov:
-    # a zip of compose files to import rather than containers made here).
+    # Each one's settings, for a compose file of it
+    # (a zip of compose files to import rather than containers made here).
     names = {cid: name for cid, name, _ in found}
     out["specs"] = {}
     for cid, name, c in found[:256]:
@@ -723,7 +723,7 @@ def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan, nets=None):
         nv.set("template", ovmf_pair[1])
     on_br = bool(lan) and os.path.isdir(f"/sys/class/net/{lan}/bridge")
     for iface in (dev.findall("interface") if dev is not None else []):
-        # A host with its card in a bridge (R219, AerieOS): the VM's port is
+        # A host with its card in a bridge (AerieOS): the VM's port is
         # on it, so it reaches this machine as well as the LAN.
         if on_br and iface.get("type") in ("bridge", "direct"):
             src = iface.find("source")
@@ -749,7 +749,7 @@ def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan, nets=None):
     return ET.tostring(dom, encoding="unicode"), said
 
 
-# What an adopted domain or network may carry (R247 step 5, B843): its XML
+# What an adopted domain or network may carry: its XML
 # is a backup's, which anybody could have written, and libvirt runs what it
 # says as root. What is optional (the old system's extra QEMU settings, a
 # shared folder, an ISO, a console to a file, dnsmasq's options) is left out
@@ -964,7 +964,7 @@ def carry_tpm(x, here, swtpm_dir=None):
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             # Its folders and plain files, and never a link: one kept as a
             # link led swtpm, which writes its state as root, wherever it
-            # pointed (B846).
+            # pointed.
             shutil.copytree(state, dest, symlinks=True,
                             ignore=lambda d, names: [n for n in names if not os.path.isdir(os.path.join(d, n)) and not os.path.isfile(os.path.join(d, n))
                                                      or os.path.islink(os.path.join(d, n))])
@@ -1016,7 +1016,7 @@ class AdoptMixin:
         for where, branches in (p.get("merged") or {}).items():
             # Only over every branch mounted: a disk missing at boot leaves
             # its empty folder, which mergerfs would take as the disk, its
-            # files gone from the tree and new ones written to memory (B718).
+            # files gone from the tree and new ones written to memory.
             if not os.path.ismount(where) and os.path.isdir(where) and branches_mounted(branches):
                 subprocess.run(["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
 
@@ -1025,7 +1025,7 @@ class AdoptMixin:
         asked. Imported with nothing mounted, then each of its datasets
         mounted only where its mountpoint is the plan's place for it or under
         it: the mountpoints are the disk's to say, and one saying /etc or
-        /usr/local/sbin had root mount the disk's files there (B844). The rc."""
+        /usr/local/sbin had root mount the disk's files there. The rc."""
         pool, where = str(z.get("pool") or ""), str(z.get("where") or "").rstrip("/")
         say = job.say if job is not None else (lambda t: log("adopt: " + t.rstrip("\n")))
 
@@ -1102,7 +1102,7 @@ class AdoptMixin:
         return f"Docker: the controller did not take the containers' settings ({(r or {}).get('error') or st}), so it has no compose files of them"
 
     def _apply_apps(self, job, action, cfg):
-        """read-apps, define-vms and docker-network (R163 steps 10, 11)."""
+        """read-apps, define-vms and docker-network."""
         say = job.say
         if action == "read-apps":
             got, said = {}, []
@@ -1348,7 +1348,7 @@ class AdoptMixin:
                         "journal replayed, which writes it: mount it once on the old system and shut that down cleanly, or adopt writable\n")
         for where, branches in p["merged"].items():
             # Never over a branch that did not mount: its empty folder would
-            # stand in for the disk (B718).
+            # stand in for the disk.
             if not branches_mounted(branches) or self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
                 failed.append(where)
         if failed:

@@ -98,8 +98,8 @@ def transaction():
     """What is read and what is then written, as one: the store's lock held
     from the first statement to the last and one commit when the outermost
     leaves, so no other thread's statement lands between a row read and the
-    write decided by it, and a stop half-way leaves none of it (R227 step
-    14). Whatever raises out of the outermost takes all of it back. One
+    write decided by it, and a stop half-way leaves none of it.
+    Whatever raises out of the outermost takes all of it back. One
     inside another is the same transaction."""
     global _held, _held_by
     with _lock:
@@ -127,7 +127,7 @@ def _rows(sql, args=()):
 
 def script(text):
     """A numbered migration's SQL (statemigrations/NNNN_*.sql, run by
-    stateversion in the one sequence, R295): its statements in one
+    stateversion in the one sequence): its statements in one
     transaction, all or none."""
     with _lock:
         try:
@@ -144,7 +144,7 @@ def migrate():
     schema every supported install has (0001 to 0010, which 0.9.0's first
     releases carry), for a database made new. migrations/ takes no new file
     (aerie lint): a later change to the schema is a numbered migration in
-    statemigrations/, run with /config's in one sequence (R295).
+    statemigrations/, run with /config's in one sequence.
 
     Numbered files, run inside one transaction each, recorded in a table of
     their own: the same shape at both tiers, and the discipline door 6 hangs
@@ -176,11 +176,11 @@ def migrate():
 
 def checkpoint():
     """The write-ahead log folded into the database, so a copy of the file
-    alone is whole (a move's bundle, B601)."""
+    alone is whole (a move's bundle)."""
     fold()
 
 
-# How often the log is folded on its own (B654). A minute: what a hard kill
+# How often the log is folded on its own. A minute: what a hard kill
 # can lose at most, and a fold of a minute's frames is milliseconds.
 FOLD_S = 60
 
@@ -188,11 +188,11 @@ FOLD_S = 60
 def fold():
     """The write-ahead log folded into the database file and cut back to
     nothing, so the file alone is the state: every minute and on a clean
-    stop (B654). SQLite folds on its own only at a thousand pages, and on
+    stop. SQLite folds on its own only at a thousand pages, and on
     a mount where the index it keeps beside the log is not trusted across
     a restart (a /mnt/user path, FUSE: a container re-created there came
     back with the state of the last fold, 25 minutes before, and both
-    nodes' rotated tokens unknown, 3 Nov) that is 25 minutes gone. A reader
+    nodes' rotated tokens unknown) that is 25 minutes gone. A reader
     half-way through leaves the fold to the next minute: (busy, frames,
     folded) as SQLite says it, or (0, 0, 0) with no store open."""
     if _db is None:
@@ -209,7 +209,7 @@ def fold():
 
 def through():
     """What was just committed, in the database file before anybody is told
-    of it (R227 step 7): a token handed to a node, at its enrollment and at
+    of it: a token handed to a node, at its enrollment and at
     each rotation. The store commits to its log and syncs that at a fold
     (the synchronous setting is NORMAL: FULL would sync on every heartbeat,
     which on a FUSE /config is the page waiting on the disk all day), so the
@@ -223,7 +223,7 @@ def through():
 
 
 def start_folding(every=FOLD_S):
-    """The minute loop that folds (B654), a daemon thread beside the server's others."""
+    """The minute loop that folds, a daemon thread beside the server's others."""
     def loop():
         while True:
             time.sleep(every)
@@ -291,7 +291,7 @@ _audit_key = None
 def _audit_mac_key():
     """The install's own key for the audit's digests, made once beside the
     database: a plain hash of a body holding one short secret (a backup's
-    password) could be guessed offline by anyone reading the audit (B726);
+    password) could be guessed offline by anyone reading the audit;
     keyed, the same parameters still read as the same digest here."""
     global _audit_key
     if _audit_key is None:
@@ -356,7 +356,7 @@ def prune_audit():
 
 
 def audit_page(n=100, before=0, principal="", target=""):
-    """A page of the audit for the Audit page (R158 step 8), newest first:
+    """A page of the audit for the Audit page, newest first:
     the rows before `before` (a unix time, 0 for now), by one principal
     and one target where asked, with how many match in all."""
     where, args = [], []

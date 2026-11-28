@@ -1,6 +1,6 @@
 // The notebook's approval queue (roadmap #27): what a session added under
 // ask, waiting on the operator. One classic script beside index.html
-// (docs/nodes.md §13): one file per notebook view (R60). A factory
+// (docs/nodes.md §13): one file per notebook view. A factory
 // makeNotebook calls per notebook.
 
 "use strict";
@@ -24,7 +24,7 @@ function nbPendingView({$, nb, project, root}){
     const n = rows.length;
     // The strip's own counts, per tab: a number where the tab is, so the
     // question "which of these" is answered without opening anything.
-    // A group's button carries its views' sum (R259), so a count is seen
+    // A group's button carries its views' sum, so a count is seen
     // with the group shut; Overview is its own view and counts once.
     const of = v => { const k = {roadmap: "roadmap", bugs: "bugs", briefing: "rules"}[v]; return k ? (nb.pendData?.counts?.[k] || 0) : 0; };
     for (const b of root.querySelectorAll(".nbtabs button")){
@@ -112,7 +112,7 @@ function drawPendingModal(j){
   // and a blank hint were three bands of chrome around one sentence.
   $("pendAllF").hidden = $("pendListF").hidden = !rows.length;
   $("pendHintF").hidden = !rows.length && !$("pendHint").textContent;
-  // A role that reads the project and does not write it (B101): no
+  // A role that reads the project and does not write it: no
   // Approve or Deny.
   const ro = projWriteWhy(pendFor);
   $("pendApprove").disabled = $("pendDeny").disabled = !rows.length;

@@ -1,6 +1,6 @@
 """gitrelay.ref_ok and _wanted: which ref names read out of somebody's tree
-may be written into a config file and packed-refs (R86 named these as
-untested). git check-ref-format's rules, held to ASCII and no quote."""
+may be written into a config file and packed-refs.
+git check-ref-format's rules, held to ASCII and no quote."""
 import os
 import sys
 import unittest
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
 
 class WorkflowFiles(unittest.TestCase):
-    """B559: a push that changes a CI workflow file is the project's to
+    """A push that changes a CI workflow file is the project's to
     allow; the files are read in the relay's own repository."""
 
     def test_the_workflow_files_a_push_would_change(self):

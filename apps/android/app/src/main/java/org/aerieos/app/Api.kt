@@ -1,6 +1,6 @@
 // The dashboard's API, as the app speaks it: the phone's own device token
 // on every request, traded for the person's password once at sign-in
-// (R290; a pairing made before it sends the password, Basic, until it is
+// (a pairing made before it sends the password, Basic, until it is
 // traded), the connection held to what the phone kept of the dashboard's
 // certificate (Pins), JSON in and out, one place that knows the server's
 // address. Kept to the platform's own HTTP client and
@@ -80,9 +80,9 @@ class Api(val base: String, private val user: String, private val password: Stri
     suspend fun meta() = get("/api/meta")
     suspend fun phone() = get("/api/phone")
     // Held by the dashboard until this account's asks, lease or grants move,
-    // or about 45 s (R125); `since` is the last token it answered.
+    // or about 45 s; `since` is the last token it answered.
     suspend fun phoneWait(since: String) = get("/api/phone/wait?since=${enc(since)}")
-    // This phone, connected and lent from the phone itself (R114): the
+    // This phone, connected and lent from the phone itself: the
     // Phone tab's own actions, for the node the person picks.
     suspend fun phonePair(node: String, ip: String, port: Int, code: String) =
         post("/api/phone", json("action" to "pair", "node" to node, "ip" to ip, "port" to port, "code" to code))
@@ -96,7 +96,7 @@ class Api(val base: String, private val user: String, private val password: Stri
     suspend fun invite(id: Int, accept: Boolean) =
         post("/api/members", json("action" to (if (accept) "accept" else "decline"), "id" to id))
     // `session`: Allow for this session, the rest of that session's phone
-    // commands run without asking until it is taken back (the operator, 4 Oct).
+    // commands run without asking until it is taken back.
     suspend fun decide(id: Int, allow: Boolean, session: Boolean = false) =
         post("/api/phone", json("action" to (if (allow) "allow" else "deny"), "id" to id,
                                 "session" to (allow && session)))
@@ -136,7 +136,7 @@ class Api(val base: String, private val user: String, private val password: Stri
         post("/api/bugs", json("project" to project, "action" to "send", "id" to id, "note" to note))
     suspend fun rules(project: String) = get("/api/rules?project=${enc(project)}")
     suspend fun memory(project: String) = get("/api/memory?project=${enc(project)}")
-    // The notebook's wiki (R112): its pages, and one page's Markdown.
+    // The notebook's wiki: its pages, and one page's Markdown.
     suspend fun wiki(project: String) = get("/api/wiki?project=${enc(project)}")
     suspend fun wikiPage(project: String, page: String) = get("/api/wiki?project=${enc(project)}&page=${enc(page)}")
     suspend fun artifacts(project: String) = get("/api/artifacts?project=${enc(project)}")
@@ -207,7 +207,7 @@ class Api(val base: String, private val user: String, private val password: Stri
     // (the page's endSession). `node` is the node it runs on, by id.
     suspend fun endSession(session: String, node: String) =
         post("/api/session", json("action" to "kill", "session" to session, "node" to node))
-    // Out of sight and nothing else (R119), its owner's or an administrator's.
+    // Out of sight and nothing else, its owner's or an administrator's.
     suspend fun archive(project: String, on: Boolean) =
         post("/api/archive", json("name" to project, "archived" to on))
     // Holds people out, and ends the sessions it holds out; the answer names them.
@@ -231,7 +231,7 @@ class Api(val base: String, private val user: String, private val password: Stri
      *  carries the cookie a browser would get, from the same /login the VS
      *  Code extension signs in through. The cookie's value, or an error. */
     suspend fun webCookie(ua: String): String = withContext(Dispatchers.IO) {
-        // From the phone's token where it holds one (R290): the cookie made
+        // From the phone's token where it holds one: the cookie made
         // for the WebView's own User-Agent, the browser that carries it.
         if (token.isNotBlank()) {
             val cookie = postNow("/api/v1/device/web", JSONObject().put("ua", ua)).optString("cookie")
@@ -259,7 +259,7 @@ class Api(val base: String, private val user: String, private val password: Stri
             cookie
         } finally { c.disconnect() }
     }
-    /** AerieOS's own terminal on a page of its own (R133): xterm.js on
+    /** AerieOS's own terminal on a page of its own: xterm.js on
      *  the dashboard's /termws, the same terminal its dock opens. */
     fun termUrl(arg: String) = base.trimEnd('/') + "/terminal?arg=" + enc(arg)
 

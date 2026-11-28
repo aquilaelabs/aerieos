@@ -1,5 +1,5 @@
 """bb-session's worktree verb takes a pack's coding agent as it takes a
-shipped one (B783): the agents it knows are the five AerieOS ships and the
+shipped one: the agents it knows are the five AerieOS ships and the
 ones the node's own bundle lists with an adapter, and a branch is the
 agent's own, AGENT/NAME. A name the bundle does not list is refused, so
 the verb makes no tree under a word a caller invents."""

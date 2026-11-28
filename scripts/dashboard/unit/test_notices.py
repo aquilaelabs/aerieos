@@ -1,4 +1,4 @@
-"""What the page said to each account, kept (R218 step 6, notices.py): added
+"""What the page said to each account, kept (notices.py): added
 newest first and capped, deleted one at a time, cleared whole or by kind,
 one file per account and nothing for a request with none."""
 import json

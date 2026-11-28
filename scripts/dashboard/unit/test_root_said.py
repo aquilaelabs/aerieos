@@ -1,6 +1,6 @@
 """An approved aerie root run prints what the command said, from who allowed it
 on, without the agent's own lines about the job before it ("system: root", a
-sandbox tool refreshed from the bundle), which the Jobs page keeps (B58)."""
+sandbox tool refreshed from the bundle), which the Jobs page keeps."""
 import os
 import sys
 import unittest
@@ -26,7 +26,7 @@ class RootSaid(unittest.TestCase):
 
 class RootTmpRefused(unittest.TestCase):
     """A file under the session's own /tmp is refused before anybody is
-    asked, since root runs outside that view (B159): no dashboard call is
+    asked, since root runs outside that view: no dashboard call is
     made, so none is configured here."""
     def test_nobody_is_asked(self):
         import subprocess
@@ -43,7 +43,7 @@ class RootTmpRefused(unittest.TestCase):
 
 class TooLong(unittest.TestCase):
     """A command too long to put in front of somebody says which limit it
-    passed (B1071), so a session shortens it knowing by how much."""
+    passed, so a session shortens it knowing by how much."""
 
     def test_the_refusal_names_the_limit(self):
         import phone

@@ -28,10 +28,10 @@ ok(sandbox && sandbox.reported?.toolchains?.adb,
 await api('/api/prefs', { project: 'alpha', node: sandbox.id });
 
 await page.evaluate(() => openPhoneTab());
-// The page itself (its Node picker), not its template's rows (R218 step 16).
+// The page itself (its Node picker), not its template's rows.
 await page.waitForSelector('.doc.on .phonetab .row', { timeout: 20000 });
 await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
-// A phone is a tool of its own again (R121, the operator 4 Oct): a page
+// A phone is a tool of its own again: a page
 // under Build with a Node picker of the nodes that carry adb; the Nodes
 // tab, a machine's configuration, only points at it.
 ok(await page.evaluate(() => railGroups().some(g => g.key === 'build' && g.tools.some(([k]) => k === 'phone')) && railAllows('phone')) && await page.evaluate(() => tabs.some(t => t.kind === 'phone'))
@@ -39,8 +39,8 @@ ok(await page.evaluate(() => railGroups().some(g => g.key === 'build' && g.tools
    'the rail opens a Phone page, its Node picker listing the node that carries adb');
 ok(!(await page.$('details.sect[data-sect="nodes:phone"]')),
    '...and the Nodes page carries no Phone section of its own');
-// B114: a dead Connect or Pair says why under its row, in yellow (the
-// operator, 21 Oct: not an error), and the
+// A dead Connect or Pair says why under its row, in yellow
+// (not an error), and the
 // reason follows what is typed; it was a tooltip, which a phone never shows.
 await section("B114: a dead Connect or Pair says why under its row, in yellow", async () => {
   await page.evaluate(() => { phIp = ''; phConnPort = ''; phPort = ''; phCode = ''; readMoved('phone'); drawPanes(); });
@@ -58,7 +58,7 @@ await section("B114: a dead Connect or Pair says why under its row, in yellow", 
      && await page.$eval('.doc.on [data-phwhy="connect"]', e => !e.classList.contains('warn')),
      `Connect and Pair say under their rows what they still need, muted rather than a warning, and the line goes as it is typed (${JSON.stringify({ before, after })})`);
   // ...and a box being typed in keeps the caret when the page is drawn again
-  // under it (B156): a read landing between a fill's focus and its keys took
+  // under it: a read landing between a fill's focus and its keys took
   // the focus with the old box, the keys went nowhere, and the port typed
   // was never there for the line to go.
   await page.focus('.doc.on #phConnPort');
@@ -99,10 +99,10 @@ for (const [what, body] of [
   const r = await api('/api/phone', body);
   ok(r.status === 400 && r.body.error, `refused: ${what}`);
 }
-// The port is the phone's to say, never scanned for (the operator, 9 Oct:
-// probing a phone's ports across a VPN is port scanning), and a connect
-// adb says "connected to" that never gives a usable phone is no success
-// (B598): the stub lists 192.168.9.9:5555 alone as a device.
+// The port is the phone's to say, never scanned for
+// (probing a phone's ports across a VPN is port scanning), and a connect
+// adb says "connected to" that never gives a usable phone is no success:
+// the stub lists 192.168.9.9:5555 alone as a device.
 await section("The port is the phone's to say, never scanned for", async () => {
   const noPort = await api('/api/phone', { action: 'connect', node: sandbox.id, ip: '192.168.9.9' });
   ok(noPort.status === 400 && /connect port is needed/.test(noPort.body.error || '') && /IP address & port/.test(noPort.body.error),
@@ -158,12 +158,12 @@ const seen = theirs.nodes.find(n => n.id === sandbox.id);
 ok(seen.phone && !seen.phone.model && !seen.phone.serial && !seen.mine && !seen.may_drive && seen.owner?.name === 'test',
    `another account is told a phone is connected and whose, nothing that names it, and may not drive it (${JSON.stringify(seen.phone)})`);
 // A plain account for the refusals: an administrator may disconnect
-// somebody else's phone since R120 (the unit tier holds that half).
+// somebody else's phone (the unit tier holds that half).
 execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'plainuser', '--role', 'user'],
   { input: 'plainpass1\nplainpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const plain = asUser('plainuser', 'plainpass1');
-// A user-role account (B490): no address either, and no remembered rows
+// A user-role account: no address either, and no remembered rows
 // but its own (an administrator keeps both: they may disconnect anyone's).
 // On the project, so the node is listed to them at all.
 await api('/api/users', { action: 'edit', name: 'plainuser', projects: ['alpha'] });
@@ -187,7 +187,7 @@ ok((await api('/api/phone', { action: 'ask', why: '', cmd: ['shell', 'ls'], proj
 const noNode = await api('/api/phone', { action: 'ask', why: 'look around', cmd: ['shell', 'ls'], project: 'beta' });
 ok(/has no node/.test(noNode.body.error || ''),
    'a space with no node has no phone to ask for, and is told so');
-// The companion app's live connection (R125): a wait held open answers the
+// The companion app's live connection: a wait held open answers the
 // moment an ask lands, rather than at the app's next alarm.
 const since = (await api('/api/phone/wait?since=')).body.token;
 const t0 = Date.now();
@@ -239,7 +239,7 @@ await page.waitForFunction(() => document.getElementById('bellPanel').hidden);
 const theirAllow = await api('/api/phone', { action: 'allow', id: asked.body.id }, other);
 ok(theirAllow.status === 400 && /account that connected/.test(theirAllow.body.error),
    'another account cannot answer for it');
-// Two answers that run it (the operator, 4 Oct): Allow, for this one, and
+// Two answers that run it: Allow, for this one, and
 // Approve for this session, for the rest of that session's too.
 ok(await page.$eval('.phask', r => /Approve for this session/.test(r.textContent)
      && !!r.querySelector('[data-allow]:not([data-session])')),
@@ -261,7 +261,7 @@ await page.evaluate(() => phFetch());
 await page.click('#bBell');
 await page.waitForSelector('#bellPanel .bnote.ask [data-bdeny]', { timeout: 10000 });
 await page.click('#bellPanel .bnote.ask [data-bdeny]');
-// Any press in the drawer closes it, Deny included (the operator, 7 Oct).
+// Any press in the drawer closes it, Deny included.
 ok(await page.waitForFunction(() => document.getElementById('bellPanel').hidden, null, { timeout: 5000 })
      .then(() => true, () => false),
    'pressing Deny closes the drawer');
@@ -364,10 +364,10 @@ const asPhone = !lan ? { you: 'no LAN address on this box: nothing to ask with' 
 ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPhone.you)),
    `from an Android browser it offers that browser's own address (${asPhone.you})`);
 
-// ---- lent to a project (R113, R120) ------------------------------------------
+// ---- lent to a project ------------------------------------------
 // The owner lends the phone to alpha; alpha's sessions then reach its own app
 // and nothing else, each command waiting on the owner's Allow in their bell
-// (R120: whether a session drives a phone is its owner's call each time, not
+// (whether a session drives a phone is its owner's call each time, not
 // a project's), and an administrator's Allow is not the owner's. Take back
 // ends it.
 await section("lent to a project", async () => {
@@ -397,11 +397,11 @@ await section("lent to a project", async () => {
   ok(/Lent to alpha/.test(await page.$eval('.phonetab .phlease', e => e.textContent)) && !!(await page.$('.phonetab #phTakeBack')),
      'the tab says whom it is lent to, for how long, with Take back');
   // The project's row says it to everybody on it, and its Phone button is the
-  // owner's way to take it back (R120).
+  // owner's way to take it back.
   await page.evaluate(() => { refresh(); openProjectsTab(); });
   await page.waitForFunction(() => /lent here by/.test(document.querySelector('.pgrid .pcard[data-row="alpha"]')?.textContent || ''),
                              null, { timeout: 15000 });
-  // Lending is a repository's: its page's menu offers it back (R138).
+  // Lending is a repository's: its page's menu offers it back.
   ok(await page.evaluate(() => { const d = document.createElement('div');
        d.innerHTML = projectActions(state.projects.find(p => p.name === 'alpha'));
        const b = d.querySelector('[data-ph]'); return !!b && !b.disabled && /Take your phone back/.test(b.textContent); }),
@@ -428,8 +428,8 @@ await section("lent to a project", async () => {
   ok(rec.status === 200 && /^dist\/phone\/record-.*\.mp4$/.test(rec.body.path || '')
      && readFileSync(`${DIR}/ws/alpha/${rec.body.path}`).includes(Buffer.from('moov')),
      `...and a recording lands whole in dist/phone/ (${rec.body.path || rec.body.error})`);
-  // One left running while touches work the phone, then collected (the
-  // operator, 5 Oct): a fixed-length one runs alone, so a glide sent during
+  // One left running while touches work the phone, then collected:
+  // a fixed-length one runs alone, so a glide sent during
   // it landed after it.
   const started = await allowed('record', { action: 'start', seconds: 30 });
   ok(started.status === 200 && /record stop/.test(started.body.out || ''),
@@ -484,7 +484,7 @@ await section("a phone it has met is remembered", async () => {
   const after = await known();
   ok(after.length === 1 && after[0].ip === '192.168.9.9' && after[0].model === 'Test Phone',
      'the connect above put the phone on the node\'s remembered list, by model and address');
-  // Another account's view has no such row (B490), and Forget on it is
+  // Another account's view has no such row, and Forget on it is
   // refused: a remembered phone is its maker's.
   const theirKnown = (await api('/api/phone?node=' + sandbox.id, undefined, plain)).body.nodes.find(n => n.id === sandbox.id).known || [];
   const theirForget = await api('/api/phone', { action: 'forget', node: sandbox.id, ip: '192.168.9.9' }, plain);
@@ -501,7 +501,7 @@ await section("a phone it has met is remembered", async () => {
   ok(merged.length === 1 && merged[0].model === 'Test Phone' && merged[0].ip === '192.168.9.9',
      '...and the connect fills the model in on the same row rather than adding a second');
   await page.click('.phonetab #phRefresh');
-  // Waited for whole (B437): the row can be drawn from a poll that left
+  // Waited for whole: the row can be drawn from a poll that left
   // before the connect, and the one after it marks it connected, so a row
   // read the moment it appears was read without its pill now and then.
   const drawn = await page.waitForFunction(() => {
@@ -554,8 +554,8 @@ ok(dots.none === true && dots.quiet === false,
    '...and nothing at all when there is nothing unread');
 ok(dots.asking === 'dot ask' && dots.loud === true,
    'a question waiting on an answer lights the whole button, not just the dot');
-// Something new gone wrong flashes the button red twice and lets go (the
-// operator, 11 Oct); the same failure drawn again does not flash it again,
+// Something new gone wrong flashes the button red twice and lets go;
+// the same failure drawn again does not flash it again,
 // and an ask's amber is not held off by a flash left behind.
 await section("Something new gone wrong flashes the button red twice and lets go", async () => {
   await page.evaluate(() => { notes = []; notesSeen = 0; drawBell(); notify('compose up failed', true); });

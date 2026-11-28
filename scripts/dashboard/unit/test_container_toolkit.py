@@ -1,4 +1,4 @@
-"""The NVIDIA container toolkit (R102): the agent's census of it, the row
+"""The NVIDIA container toolkit: the agent's census of it, the row
 the Library and the Installed page draw from that census, what a job is refused for first,
 and the gate a compose file that reserves the GPU meets before it starts.
 test_sandbox_gpu.py runs the helper's own install and removal."""

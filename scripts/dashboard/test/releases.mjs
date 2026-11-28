@@ -1,4 +1,4 @@
-// Bugs, commits and changelog lines tied in the notebook (R255): a fixed bug
+// Bugs, commits and changelog lines tied in the notebook: a fixed bug
 // records the commits that fixed it, its row lists the lines that answer it
 // and ties, unties, writes one or says why it needs none; the changelog
 // editor shows each line's bugs and the ones the next release owes; and a
@@ -62,7 +62,7 @@ const row = n => `#bugList .bug[data-id="${n}"]`;
 const open = async n => { if (!await page.$eval(row(n), d => d.open)) await page.click(`${row(n)} > summary`); await page.waitForSelector(`${row(n)}[open] .body`); };
 // The row's More menu, opened until its item shows: a redraw the step
 // before started (a tie's or an untie's write moving the list) shut the menu
-// under the press, and the item waited a minute for nothing (B1046).
+// under the press, and the item waited a minute for nothing.
 const more = async (n, cls) => {
   for (let i = 0; i < 4; i++){
     await page.click(`${row(n)} .macts .more > button`);

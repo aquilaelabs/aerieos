@@ -1,4 +1,4 @@
-// The Installed page (R172, the operator, 28 Oct: a thing is configured
+// The Installed page (a thing is configured
 // where it is installed, not in the catalog): under Machines beside Nodes
 // and Storage, one node picked, what is installed there by kind, each a
 // row that opens on what the Library's card does not show: an agent's
@@ -8,7 +8,7 @@
 // It reads the Library's read for the node (/api/library) and keeps only
 // what is installed; the Library keeps Install.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Loaded
+// Chrome from docSurface; the hard rules are uniform.mjs's. Loaded
 // before the page's own script, so everything here is a declaration.
 
 "use strict";
@@ -24,7 +24,7 @@ function openInstalledTab(){
 // ...on a node somebody named (a project's Sign in on NODE, the bell), the
 // agent's row open on its sign-in once the rows land.
 function openInstalledOn(id, agent = "", row = ""){
-  // ...or any thing's own page by its key (service:model-router, R181: a
+  // ...or any thing's own page by its key (service:model-router: a
   // system container's Configure), at its Configure, on that node.
   if (row){ openThing(id, row, "configure"); return; }
   if (agent) instWantAgent = agent;
@@ -56,7 +56,7 @@ function loadInstalled(){
       if (instWantAgent){
         const r = (inst.rows || []).find(x => x.kind === "agent" && x.agent === instWantAgent);
         instWantAgent = "";
-        // The agent's own page, at its sign-in (R181 step 2), once drawn.
+        // The agent's own page, at its sign-in, once drawn.
         if (r) wantPage = `agent:${r.name}`;
       }
     }
@@ -70,7 +70,7 @@ function loadInstalled(){
 function instHere(r){
   // A service that asks for settings first is here before it is deployed
   // (the router: configured, then installed); one that asks nothing (nginx,
-  // the Scanners: R264) is here once the Library put it on the node.
+  // the Scanners) is here once the Library put it on the node.
   if (r.kind === "service") return r.installed || r.running || !!(r.config || []).length;
   if (r.machine) return true;
   if (r.kind === "agent") return r.installed || r.agent === "claude";
@@ -97,8 +97,8 @@ function instState(r){
 // step with it), Remove where it is here (a pack's Remove is the dialog's
 // own, which asks where it is still installed), and a service's Install
 // once something is behind it.
-// While its own job runs they are drawn dead, never taken away (the
-// operator, 22 Nov), and its state line says what runs.
+// While its own job runs they are drawn dead, never taken away,
+// and its state line says what runs.
 function instActs(r, may){
   const off = r.running ? " disabled" : "";
   const a = (act, words, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} data-instact="${act}" data-instkind="${esc(r.kind)}" data-instname="${esc(r.name)}"${off}>${esc(words)}</button>`;
@@ -106,9 +106,9 @@ function instActs(r, may){
     : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready || r.running ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
-  // Software update, as the Library's card says it (the operator, 13 Nov).
+  // Software update, as the Library's card says it.
   // ...and Install again on a copy an earlier manifest made, which takes what
-  // the one kept now installs (B799): the same job, removing it first.
+  // the one kept now installs: the same job, removing it first.
   const upd = r.installed && r.update ? a("update", "Software update", "primary")
     : r.installed && r.receipt?.stale ? a("update", "Install again", "primary") : "";
   // Edit on a pack a person added themselves, as on the Library's card: one
@@ -121,8 +121,8 @@ function instActs(r, may){
 // The open row: what the node knows of it, and what a person sets here.
 let agYours = {plugins: [], mcp: {}};   // this account's plugins and MCP servers on the node, as the read last said
 
-// What this account added to an agent on the node (R95 step 15, moved here
-// from Profile; the Agents page's until R170): Claude Code's plugins, and
+// What this account added to an agent on the node:
+// Claude Code's plugins, and
 // each agent's MCP servers, by name, as the node last said. Read here;
 // changed in a session.
 function agExtras(a){
@@ -139,8 +139,8 @@ function agExtras(a){
       : `Set up in ${esc(a.product)}'s own configuration, for you alone.`}</div></div>`;
 }
 
-// What an installed thing is on this node, for its page's first section
-// (R181 step 2): the machine's own driver and toolkit, a toolchain's or a
+// What an installed thing is on this node, for its page's first section:
+// the machine's own driver and toolkit, a toolchain's or a
 // pack's lines, an agent's.
 function instAboutLines(r){
   const lines = [];
@@ -182,7 +182,7 @@ function instAboutLines(r){
 
 // What a toolchain or a pack asks for here: this node's answers for whoever
 // may Configure here, and each person's own for whoever works on this node's
-// projects (R172 step 5).
+// projects.
 function instConfigLines(r){
   const lines = [];
   if (r.config?.length && r.values && inst?.may?.configure) lines.push(instConfigForm(r, "node"));
@@ -194,14 +194,14 @@ function instConfigurable(r){
   return r.kind === "service" ? !!inst?.may?.configure : !!instConfigLines(r);
 }
 
-// What a pack or a service asks for on this node (R172): its config block
+// What a pack or a service asks for on this node: its config block
 // as a form, the answers as the page may see them (a secret only as set:
 // typed to replace, "clear" to take it out), Save to the card's own route.
 function instConfigField(f, v, key){
   const id = `ic-${key}-${f.name}`.replace(/[^A-Za-z0-9_-]/g, "_");
   const at = `data-icf="${esc(f.name)}"`;
   const help = f.help || "";
-  // Each a cell of the form (R301): its label over it, a list's rows and a
+  // Each a cell of the form: its label over it, a list's rows and a
   // space's ticks across it.
   switch (f.kind){
     case "secret": return formField(id, f.label, `<input id="${id}" type="password" ${at} autocomplete="off" spellcheck="false" placeholder="${v ? "set: type to replace, or 'clear'" : f.required ? "required" : ""}">`, {help});
@@ -224,7 +224,7 @@ function instConfigField(f, v, key){
   }
 }
 // The fields of one scope: the node's (one answer for everybody there) or
-// a person's own (R172 step 5).
+// a person's own.
 const instScoped = (r, scope) => (r.config || []).filter(f => (f.scope || "node") === scope);
 function instConfigForm(r, scope = "node"){
   const fields = instScoped(r, scope);
@@ -255,7 +255,7 @@ function instConfigRead(form, r, scope = "node"){
 function instServiceLines(r){
   const st = r.status || {};
   if (r.service !== "router") return "";
-  // What it is was said above the row (the catalog's line, B431): only what
+  // What it is was said above the row (the catalog's line): only what
   // Install does is said here.
   if (!r.installed) return `<span class="sub">Install deploys it as a written container once something is behind it: a provider key, an endpoint of your own, or Ollama.</span>`;
   const models = (st.models || []).filter(m => !m.wild);
@@ -269,7 +269,7 @@ function instServiceLines(r){
 }
 
 // A row: what it is in a line, where it stands and its verbs; Open, and
-// Configure where it asks for anything, open its own page (R181 step 2).
+// Configure where it asks for anything, open its own page.
 function instRow(r, may){
   const key = `${r.kind}:${r.name}`;
   const pill = packVersionPill(r), ver = pill && ` ${pill}`;
@@ -285,7 +285,7 @@ function renderInstalledInto(i){
   const d = docSurface(i, "installed");
   if (!d) return;
   if (inst === null){
-    d.setBar("");    // the node is the Machines header's (R177)
+    d.setBar("");    // the node is the Machines header's
     drawHTML(d.list, skTpl(pageHead({line: [{value: GHOST, label: "installed"}]})
       + INST_KINDS.map(([k, title]) => docSection("installed", k, title, "", skRows(2))).join("")));
     if (!readRev("installed") && !readBusy("installed")) loadInstalled();
@@ -297,7 +297,7 @@ function renderInstalledInto(i){
     return;
   }
   const may = inst.may || {};
-  d.setBar("");    // the node is picked in the Machines group's header (R177)
+  d.setBar("");    // the node is picked in the Machines group's header
   if (inst.error){
     patch(d.list, readFailed("could not read what is installed: " + inst.error));
     wireReadAgain(d.list, () => loadInstalled());
@@ -310,17 +310,17 @@ function renderInstalledInto(i){
       unmet.map(([r, ps]) => `${esc(r)}: ${esc(ps.join(" "))}`).join("; ")}. ${inst.sandbox && may.install
         ? `<button type="button" data-instsysdeps title="install these on ${esc(inst.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : "";
-  // One line (R274): what is installed, and what wants updating.
+  // One line: what is installed, and what wants updating.
   const head = pageHead({line: [
     {value: rows.filter(r => r.installed).length, label: "installed"},
     due ? {value: due, label: due === 1 ? "update due" : "updates due", tone: "warn"} : null,
   ]});
-  // Where it is all kept, at the foot of what is kept there (R274).
+  // Where it is all kept, at the foot of what is kept there.
   const where = inst.store?.root ? `<div class="field"><div class="hint">Kept in <code>${esc(inst.store.root)}</code>${
     inst.store.free_mb ? `, ${esc(humanBytes(inst.store.free_mb * 1048576))} free` : ""}.</div></div>` : "";
   const sects = INST_KINDS.map(([k, title]) => {
     // By its group, as the Library sorts it: a pack that brings a coding
-    // agent sits with the coding agents (the operator, 12 Nov).
+    // agent sits with the coding agents.
     const here = rows.filter(r => libGroup(r) === k);
     if (!here.length) return "";
     const body = `<div class="rows">${here.map(r => instRow(r, may)).join("")}</div>`;
@@ -356,7 +356,7 @@ function wireInstalled(root){
           const i = row.querySelector(`[data-icsub="${CSS.escape(sf.name)}"]`); if (i && !i.value) i.value = dr[f.name][j][sf.name]; }
       });
     }
-    // Set, not added: a patched page keeps the form across its draws (R244).
+    // Set, not added: a patched page keeps the form across its draws.
     form.oninput = read;
     form.onchange = read;
     form.querySelectorAll("[data-icadd]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icadd] = [...(v[b.dataset.icadd] || []), {}]; readMoved("installed"); drawPanes(); });
@@ -389,7 +389,7 @@ function wireInstalled(root){
 
 // Open on a row: the thing's own page on this node. A service whose
 // settings are a page of their own (nginx's routes and certificates, the
-// Scanners' schedule and runs: R264) opens that page for the node.
+// Scanners' schedule and runs) opens that page for the node.
 function instOpen(key, at = ""){
   const pages = {nginx: node => openNginxTab(node), scanners: () => openScannersTab()};
   const r = (inst?.rows || []).find(x => `${x.kind}:${x.name}` === key);
@@ -429,9 +429,9 @@ async function instAct(b, act, kind, name){
     tpOpen(r.name);
     return;
   }
-  // The machine's own two say what removing them does to the machine (R102,
-  // as the Toolchains page asked them); a store's toolchain, its files.
-  // With no card there is nothing for nouveau to take back (B168).
+  // The machine's own two say what removing them does to the machine
+  // (as the Toolchains page asked them); a store's toolchain, its files.
+  // With no card there is nothing for nouveau to take back.
   const ask = r.name === TC_DRIVER && r.machine?.state === "nocard"
     ? `Remove NVIDIA's driver from ${where}? It has no card to drive here, and its tries for one stop.`
     : r.name === TC_DRIVER

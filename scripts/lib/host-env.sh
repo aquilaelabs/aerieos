@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 #
 # The environment the image's ENV lines give every process in the container,
-# given to a controller installed bare metal (R90): sourced by host-boot.sh
+# given to a controller installed bare metal: sourced by host-boot.sh
 # before it starts anything, and by the bb on the machine's PATH that the
 # installer writes, so a shell's bb and the service see the same.
 #

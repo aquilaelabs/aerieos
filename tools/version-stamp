@@ -11,12 +11,12 @@
 # ...which a bump used to leave behind. 0.5.0 only came out consistent because
 # a person moved it by hand first; a bump that forgot would have committed a
 # controller promising one window while the agents it talks to promised
-# another (B91). A test holds the two equal, but after the commit and only
+# another. A test holds the two equal, but after the commit and only
 # when somebody runs it. This is the write that makes the test a formality.
 #
 # There used to be a second stamp here, the window line in the CLAUDE.md
-# template every project carried a copy of. It went with the block itself
-# (R63 step 3): what a session is told is assembled per session now, so
+# template every project carried a copy of. It went with the block itself:
+# what a session is told is assembled per session now, so
 # nothing is copied anywhere to fall out of window.
 #
 # The BUILD does not reset at a window boundary (0.5.28 follows 0.4.27), so a

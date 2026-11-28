@@ -1,4 +1,4 @@
-"""A bad agent build cannot strand a node (R241; the audit of 13 Nov: a
+"""A bad agent build cannot strand a node (a
 self-update wrote the new file over the running one and kept nothing, under
 a unit that restarts for ever, so one build that failed to load left every
 node it reached needing a person at its console).
@@ -9,7 +9,7 @@ trial and puts the old file back when the package cannot be loaded or never
 reaches its controller; the agent ends the trial at its controller's first
 answer and gives way after ten minutes without one; and a node that went
 back says so, after which its controller no longer sends that build by
-itself (the operator, 13 Nov)."""
+itself."""
 import hashlib
 import importlib.util
 import io

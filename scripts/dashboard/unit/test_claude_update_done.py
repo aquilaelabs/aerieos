@@ -1,6 +1,6 @@
-"""A Claude Code update's row says the new version the moment its job ends
-(B249), read off the job's last line, which names the version the way
-`claude --version` prints it, its own "(Claude Code)" included (B167)."""
+"""A Claude Code update's row says the new version the moment its job ends,
+read off the job's last line, which names the version the way
+`claude --version` prints it, its own "(Claude Code)" included."""
 import os
 import sys
 import unittest

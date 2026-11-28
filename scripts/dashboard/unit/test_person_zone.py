@@ -1,4 +1,4 @@
-"""A person's own time zone (R294 step 8): kept with the account's own
+"""A person's own time zone: kept with the account's own
 preferences when it is a zone this machine knows, refused in words when it
 is not, and the hours of their quiet windows on the bell, which read the
 controller's clock before."""

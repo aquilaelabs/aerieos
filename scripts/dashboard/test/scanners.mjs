@@ -1,4 +1,4 @@
-// The Scanners page (R145): every node with its scanners' state, Deploy on
+// The Scanners page: every node with its scanners' state, Deploy on
 // the one that holds the fixture's projects (a compose job the stub agent
 // takes), the schedule turned on and a run now (a scan job the stub takes,
 // sending a SARIF per scanner up), the report on the Analysis page and the
@@ -14,7 +14,7 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-// The page: a service's, beside Installed (R264), the schedule first, a
+// The page: a service's, beside Installed, the schedule first, a
 // section per node.
 await page.evaluate(() => openScannersTab());
 await page.waitForSelector('.scannerstab details[data-sect="scanners:schedule"]', { timeout: patience(20000) });

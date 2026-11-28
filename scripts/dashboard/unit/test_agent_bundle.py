@@ -1,4 +1,4 @@
-"""The agent's zip runs as a program (the operator, 11 Oct): the provisioner
+"""The agent's zip runs as a program: the provisioner
 runs it as "$AGENT enroll" and the unit as "$AGENT run", and a zip with no
 first line was "Exec format error" for both, so a new node could not
 enroll. The shebang goes before the zip; Python still finds the zip by its

@@ -1,4 +1,4 @@
-"""A session's push held for a person (R219): the flagged lines go to the
+"""A session's push held for a person: the flagged lines go to the
 account whose session pushes, and to the administrators; Approve runs the
 push through the relay's own repository with the lines okayed, and the
 outcome the waiting bb reads carries the push's apply; Deny runs nothing."""
@@ -55,7 +55,7 @@ class PushAsk(unittest.TestCase):
         self.assertEqual(phone.outcome(r["id"], "alpha")["state"], "denied")
 
     def test_an_ask_that_ended_is_listed_with_how_it_went(self):
-        # R280: answered or expired, an ask moves to the bell's Earlier,
+        # Answered or expired, an ask moves to the bell's Earlier,
         # saying how it ended; it is the asked account's, not another's.
         done = phone.ask_push("alpha", "/workspace/alpha", ["origin", "topic"], FOUND, asker_uid="u_00000002", asker_name="ada")
         no = phone.ask_push("alpha", "/workspace/alpha", ["origin", "x"], FOUND, asker_uid="u_00000002", asker_name="ada")

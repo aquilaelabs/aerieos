@@ -1,5 +1,5 @@
 #!/bin/sh
-# The USB edition (R161 step 1): the root slot loaded into RAM before it is
+# The USB edition: the root slot loaded into RAM before it is
 # mounted, so the stick is read once at boot and the system runs from
 # memory as Unraid's does; the stick keeps the configuration (the data
 # partition, /var) apart from both slots. Asked for by aerietoram=1 on the
@@ -17,7 +17,7 @@ read -r cmdline < /proc/cmdline
 for w in $cmdline; do
     case "$w" in aerietoram=1) toram=1 ;; bbslotdev=*) slotdev="${w#bbslotdev=}" ;; aeriekept=*) kept="${w#aeriekept=}" ;; esac
 done
-# A kept older version (R201): its root is a file on the data partition,
+# A kept older version: its root is a file on the data partition,
 # copied into memory the same way, on a disk as on a stick, so the partition
 # is free for init-bottom to mount read-write at /var as on any boot.
 if [ -n "$kept" ]; then

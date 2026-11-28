@@ -1,4 +1,4 @@
-"""A tool pack across distributions (R171): its system block names packages
+"""A tool pack across distributions: its system block names packages
 per package manager as the shipped recipes do, each list held to its
 manager's names; a node whose manager the pack names none for is told so
 on the pack's row and refused at Install, and a pack with no system

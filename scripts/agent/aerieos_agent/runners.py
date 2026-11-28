@@ -29,7 +29,7 @@ from .base import (
 )
 from .toolchains import ci_log_dir, runner_env_text
 
-# Where each runner reads the token it registers or removes with (B849):
+# Where each runner reads the token it registers or removes with:
 # its environment, which only its own account and root read, never its
 # command line, which every account on the machine does in /proc. Both
 # named by the runners' own sources (GitHub's CommandSettings, Gitea's
@@ -63,7 +63,7 @@ def slot_ok(slot):
 # A runner's folder is the jobs account's, and so is everything a CI job run
 # there leaves in it: root reads a file there only as a regular file, through
 # no link, and only so much of it; writes there as that account; and never
-# runs a script from it (R247 step 5: svc.sh and the unit template it reads
+# runs a script from it (svc.sh and the unit template it reads
 # were the CI job's to change, and root ran them).
 UNIT_RE = re.compile(r"actions\.runner\.[A-Za-z0-9._-]{1,200}\.service")
 UNIT_DIR = os.environ.get("BUILDERBOT_UNIT_DIR", "/etc/systemd/system")
@@ -86,7 +86,7 @@ TimeoutStopSec=5min
 [Install]
 WantedBy=multi-user.target
 """
-# THE RUNNER'S SHARE OF THE MACHINE (R271). On 22 Nov a CI run's suites, a
+# THE RUNNER'S SHARE OF THE MACHINE. On 22 Nov a CI run's suites, a
 # session's Gradle build and its emulator filled bb-sandbox's memory and
 # swap together; the runner sat outside AerieOS's fence (the provisioner's
 # builderbot.slice, which holds the agent, its sessions and their jobs short
@@ -100,7 +100,7 @@ WantedBy=multi-user.target
 # slows or fails red; the node, its sessions and their network stay up. And
 # the runner goes on when a job of its own is killed for memory
 # (OOMPolicy=continue): systemd's default stops the whole unit, and this one
-# has no Restart=, so it stayed down (bb-sandbox's, 22 Nov).
+# has no Restart=, so it stayed down (bb-sandbox's).
 FENCE_SLICE = "builderbot.slice"
 RUNNER_MEMORY_HIGH = "50%"
 RUNNER_MEMORY_MAX = "60%"
@@ -241,14 +241,14 @@ def _runner_runs(d, part, proc="/proc"):
 def runner_busy(d, proc="/proc"):
     """Whether the GitHub runner in `d` is running a job: a Runner.Worker of
     its own, from bin/ or from the bin.VERSION/ it updated itself into
-    (B755: the check looked under bin/ alone, so a job of an updated
+    (the check looked under bin/ alone, so a job of an updated
     runner read as idle and the .env sync restarted the runner under it)."""
     return _runner_runs(d, "Worker", proc)
 
 
 def runner_listening(d, proc="/proc"):
     """Whether the runner in `d` is up to take a job: GitHub's Runner.Listener
-    from any of its bin folders (B971: the check looked under bin/ alone, so
+    from any of its bin folders (the check looked under bin/ alone, so
     a runner that had updated itself read as not listening, its row saying
     Reinstall runner while it ran jobs), or act_runner's `daemon`, which
     runs in the foreground under this agent."""
@@ -370,7 +370,7 @@ class RunnersMixin:
     def runner_sync(self):
         """Every runner kept as this agent writes it now: its .env (the node's
         toolchain and where CI logs are archived) and its unit (its share of
-        the machine, R271). _apply_runner writes both at install; a runner
+        the machine). _apply_runner writes both at install; a runner
         installed before this agent knew a line ran with less (bb-sandbox's
         .env did, and its unit, svc.sh's, held it to nothing). Rewritten
         where either differs, and the runner restarted to take them, only
@@ -401,7 +401,7 @@ class RunnersMixin:
             with contextlib.suppress(OSError):
                 os.chmod(ci_log_dir(self.state), 0o755)
             self._runner_write(who, d, ".env", want)
-            # Which lines moved, so a restart says why (B755).
+            # Which lines moved, so a restart says why.
             moved = sorted({ln.partition("=")[0] for ln in set(have.splitlines()) ^ set(want.splitlines()) if ln})
             said.append(f"its .env now carries the node's toolchain and the CI log directory ({', '.join(moved[:8]) or 'new'})")
         if text:
@@ -671,7 +671,7 @@ class RunnersMixin:
         return os.path.join(RUNNER_DIR, slot) if slot else RUNNER_DIR
 
     def _apply_act_runner(self, job, cfg, want, who, d, installed, slot):
-        """Gitea's or Forgejo's runner (R53): act_runner, one static binary,
+        """Gitea's or Forgejo's runner: act_runner, one static binary,
         the file the controller's pin names and made executable only where
         it is the pinned bytes,
         registered with a token the controller fetches from the host's API
@@ -754,7 +754,7 @@ class RunnersMixin:
         u = urllib.parse.urlsplit(url)
         instance = f"{u.scheme}://{u.netloc}"
         job.say(f"registering {name} with {url} (instance {instance}) [{','.join(labels)}]\n")
-        job.flush()          # a register can hang; the log says where it is (B129)
+        job.flush()          # a register can hang; the log says where it is
         code = self._run_as(job, who, d, [exe, "register", "--no-interactive", "--instance", instance,
                                           "--name", name,
                                           "--labels", ",".join(f"{x}:host" for x in labels)], {GITEA_TOKEN_ENV: r["token"]})

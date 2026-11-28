@@ -85,7 +85,7 @@ fun ProjectScreen(store: Store, name: String) {
     val (st, reloadStatus) = load("status-project-$name") { api.status() }
     val row = st.value?.arr("projects")?.firstOrNull { it.str("name") == name }
     val session = ownSession(st.value, name)
-    // A session's terminal, open over the project (R128): which argument,
+    // A session's terminal, open over the project: which argument,
     // and the label it is shown under. Not saved: a rotation reattaches.
     var term by remember(name) { mutableStateOf<Pair<String, String>?>(null) }
     var menu by remember { mutableStateOf(false) }
@@ -126,7 +126,7 @@ fun ProjectScreen(store: Store, name: String) {
         Row(Modifier.padding(16.dp, 12.dp, 4.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
             val tone = projectTone(row?.obj("prefs")?.str("color") ?: "")
             if (tone != null) { Dot(tone); Spacer(Modifier.width(2.dp)) }
-            // The name it is shown under (R154); `name` is the directory, the key.
+            // The name it is shown under; `name` is the directory, the key.
             Text(row?.str("label")?.ifBlank { null } ?: name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Ink,
                  modifier = Modifier.weight(1f))
             if (session != null) {
@@ -135,7 +135,7 @@ fun ProjectScreen(store: Store, name: String) {
             }
             if (row != null && row.bool("locked")) { Spacer(Modifier.width(6.dp)); Pill(if (row.bool("locked_admin")) "locked by admin" else "locked", Warn) }
             if (row != null && row.bool("archived")) { Spacer(Modifier.width(6.dp)); Pill("archived", Dim) }
-            // Archive and Lock, the two the page keeps in its menu (R119),
+            // Archive and Lock, the two the page keeps in its menu,
             // where this account may.
             if (row != null && (row.bool("may_archive") || row.bool("may_lock"))) androidx.compose.foundation.layout.Box {
                 TextButton(onClick = { menu = true }) { Text("⋯") }
@@ -219,7 +219,7 @@ private fun Roadmap(api: org.aerieos.app.Api, project: String) {
     // Whether there is anything to send TO. The panel's rule, and the
     // server's: no session, no send.
     val live = td.value?.str("session")?.isNotBlank() == true
-    // ...and whose it is: any agent's session takes a step (R95).
+    // ...and whose it is: any agent's session takes a step.
     val to = org.aerieos.app.Agents.ofName(td.value?.str("session") ?: "")?.first?.name ?: "the session"
     Pull(td.value == null && td.error == null, reload) {
     LazyColumn(Modifier.fillMaxSize()) {
@@ -444,7 +444,7 @@ private fun Artifacts(api: org.aerieos.app.Api, project: String) {
             }
         }
         items(rows) { a ->
-            // A build signed by AerieOS (R106) says with which key.
+            // A build signed by AerieOS says with which key.
             val signed = a.obj("prov").obj("signed")
             val how = if (signed.length() == 0) "" else "signed with the " +
                 (if (signed.str("key").isNotBlank() && signed.str("key") != "default") "${signed.str("key")} key's " else "") +
@@ -468,7 +468,7 @@ private fun Artifacts(api: org.aerieos.app.Api, project: String) {
 // this account's own on the project (prefs.YOURS, answered as `yours`; the
 // project's `prefs` never carried them, so this read blanks before 0.7.0),
 // Claude's as `model` and `effort` and another agent's as `codex_model` and
-// the like (R95 step 9). Permissions are NOT here. Claude Code's own app is
+// the like. Permissions are NOT here. Claude Code's own app is
 // where a session's are changed, which is the operator's own finding and a
 // better place for it than a second control saying something similar.
 // They are read WHEN A SESSION STARTS, so changing one while a session is

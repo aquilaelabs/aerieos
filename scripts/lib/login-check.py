@@ -8,7 +8,7 @@ for itself and is the one that signs out. Never fatal, and quiet: bb-tty
 runs this on every connection.
 
 The other coding agents' sign-ins go up beside Claude's, read by the same
-readers `aerie login --list` uses (R95 step 3): the heartbeat carries them too,
+readers `aerie login --list` uses: the heartbeat carries them too,
 but a sign-in made in a job or a terminal is said at once, as Claude's is.
 
 Arguments: `--loud` for the interactive verb, or nothing; then the agent
@@ -59,8 +59,8 @@ def whoami():
     THIRD process on the one ~/.claude/.credentials.json an account has.
     Claude Code locks that file to refresh it, because a refresh rotates the
     refresh token; two sessions of one account already contend, and the loser
-    is told "another Claude Code process is refreshing it" and its turn fails
-    (B112). `aerie login --list` has read these same facts out of the files since
+    is told "another Claude Code process is refreshing it" and its turn fails.
+    `aerie login --list` has read these same facts out of the files since
     it was written, for exactly this reason, and this is that reader.
 
     The rule is --list's: .claude.json carries oauthAccount.emailAddress, and
@@ -80,7 +80,7 @@ def whoami():
     ll = readers()
     a = ll.signins().get("claude")
     got = ll.who_of(home, "claude", a) if a and home else None
-    # Unread is not signed out (B236): None, and nothing is said for it.
+    # Unread is not signed out: None, and nothing is said for it.
     if got and got.get("error"):
         return None, str(got["error"])
     email = str((got or {}).get("email") or "")
@@ -117,7 +117,7 @@ def plan_now():
 def others():
     """Every other coding agent's sign-in here, the shipped and the packs',
     each said to the controller, signed in or not: read from what its row
-    or its pack says of its sign-in (R234 step 6)."""
+    or its pack says of its sign-in."""
     ll = readers()
     home = os.environ.get("HOME") or ""
     for agent, a in sorted(ll.signins().items()):
@@ -125,7 +125,7 @@ def others():
             continue
         got = ll.who_of(home, agent, a) if home else None
         if got and got.get("error"):
-            # Unread is not signed out (B236): nothing is said for it.
+            # Unread is not signed out: nothing is said for it.
             if loud and agent == FOR:
                 warn(f"could not read this machine's {agent} login: {got['error']}")
             continue

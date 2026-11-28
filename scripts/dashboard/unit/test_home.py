@@ -1,4 +1,4 @@
-"""Home's numbers (R218 step 5, home.py): the jobs running and failed today,
+"""Home's numbers (home.py): the jobs running and failed today,
 the last ten, the nodes online of enrolled and the containers across the
 docker nodes, with a node that does not answer counted as unknown rather
 than holding the page."""
@@ -83,7 +83,7 @@ class Home(unittest.TestCase):
         got, code = home.read(rows, {}, False)
         self.assertEqual(code, 200)
         self.assertEqual((got["jobs"]["running"], got["jobs"]["failed_today"]), (1, 1))
-        # B113: where today began, so the Jobs page lists what was counted.
+        # Where today began, so the Jobs page lists what was counted.
         self.assertTrue(now - 86400 < got["jobs"]["today"] <= now)
         self.assertEqual(len(got["jobs"]["last"]), 10)
         # A job that carried a script is a row here, not the script.

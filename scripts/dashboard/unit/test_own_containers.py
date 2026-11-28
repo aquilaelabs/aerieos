@@ -1,4 +1,4 @@
-"""Containers on the controller's own machine (B743): the job and session
+"""Containers on the controller's own machine: the job and session
 accounts stay off docker, so the root agent runs docker itself, with the
 system's programs alone and its compose files where the job account cannot
 touch them; what a compose reads of the host is put in front of a person, and
@@ -225,7 +225,7 @@ class ASessionsBuild(unittest.TestCase):
         self.assertEqual(self.run_it("auto", False), (True, False))
 
     def test_auto_waits_for_a_person_when_the_compose_reaches_the_host(self):
-        # The operator, 10 Nov: auto runs at once unless the file asks for
+        # Auto runs at once unless the file asks for
         # more than its own folder that no person has acknowledged.
         self.assertEqual(self.run_it("auto", False, reach=["app runs privileged: root on the host, in effect"]), (False, True))
 

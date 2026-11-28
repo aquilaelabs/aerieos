@@ -1,5 +1,5 @@
 """The Containers page for an account that reads some projects' containers
-and not others' (B89): what is left out of the answer is left out whole,
+and not others': what is left out of the answer is left out whole,
 and the answer says that something was, so an empty page reads "nothing
 here is yours to see" rather than that the daemon is empty."""
 import os

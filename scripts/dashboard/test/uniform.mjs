@@ -29,7 +29,7 @@ await ready(page);
 
 // How each document kind is opened, and what says its content has arrived.
 // A new TABKINDS entry must add a line here or the discovery check fails.
-// One of three parts (R130): run as one file, uniform held a run's floor at
+// One of three parts: run as one file, uniform held a run's floor at
 // six and a half minutes; uniform-b and uniform-c are this file with the
 // part set, and each runs the setup above every section and its own
 // sections, so the three go side by side on the queue. Run alone with
@@ -50,27 +50,27 @@ const DRIVERS = {
     open: () => page.evaluate(() => openDocker()),
     readyWhen: '.dmtab .dmpick',
   },
-  // The Library (R170): a section per kind, or the empty band on a box
+  // The Library: a section per kind, or the empty band on a box
   // with no agent node.
   library: {
     open: () => page.evaluate(() => openLibrary()),
     readyWhen: '.librarytab .libgroup[data-libgroup="toolchain"], .librarytab .empty',
   },
-  // What is installed on a node (R172): a section per kind with anything there.
+  // What is installed on a node: a section per kind with anything there.
   installed: {
     open: () => page.evaluate(() => openInstalledTab()),
     readyWhen: '.installedtab details.sect, .installedtab .empty',
   },
-  // A machine's files (R224): its roots and the first one's top folder, or
+  // A machine's files: its roots and the first one's top folder, or
   // the band saying it has none.
   files: {
     open: () => page.evaluate(() => openFilesTab()),
     readyWhen: '.filestab .fxpage, .filestab .empty, .filestab .notice',
   },
-  // A Library entry's own page (R183): the first toolchain's on the node.
+  // A Library entry's own page: the first toolchain's on the node.
   entry: {
     open: () => page.evaluate(async () => {
-      // One the Library already holds (its shelves, R256), read for nothing
+      // One the Library already holds (its shelves), read for nothing
       // more: the entry's page asks /api/library for its own row, and the
       // opening's count holds the page to one ask of it.
       const r = libKnown().find(x => x.kind === 'toolchain' && !x.wrong_platform);
@@ -78,7 +78,7 @@ const DRIVERS = {
     }),
     readyWhen: '.entrytab details.sect, .entrytab .notice',
   },
-  // An installed thing's own page (R181 step 2): Claude Code's on the node.
+  // An installed thing's own page: Claude Code's on the node.
   thing: {
     open: () => page.evaluate(async () => {
       if (!inst || !inst.rows) await loadInstalled();
@@ -112,17 +112,17 @@ const DRIVERS = {
     open: () => page.evaluate(() => openSettingsTab()),
     readyWhen: '.settingstab .snav .rrow',
   },
-  // The Clusters page (R281 step 2): Add cluster while none is kept.
+  // The Clusters page: Add cluster while none is kept.
   clusters: {
     open: () => page.evaluate(() => openClustersTab()),
     readyWhen: '.clusterstab details.sect',
   },
-  // The Network page (R165 step 4): Connection and Reach from outside, under its own list.
+  // The Network page: Connection and Reach from outside, under its own list.
   network: {
     open: () => page.evaluate(() => openNetworkTab()),
     readyWhen: '.networktab .snav .rrow',
   },
-  // The Phone and the CI runner, tools of their own again (R121).
+  // The Phone and the CI runner, tools of their own again.
   phone: {
     open: () => page.evaluate(() => openPhoneTab()),
     readyWhen: '.phonetab .row, .doc.on .hint',
@@ -143,13 +143,13 @@ const DRIVERS = {
     open: () => page.evaluate(() => railGo('help')),
     readyWhen: '.helptab .wkarticle .wkpage',
   },
-  // The chat, the dock's Chat tab (R250 step 2): the list, then the page's
+  // The chat, the dock's Chat tab: the list, then the page's
   // rules where they apply to a body in the dock.
   chat: {
     open: () => page.evaluate(() => openChatTab()),
     readyWhen: '.chattab .chatlist .chatrow, .chattab .chatlist .hint',
   },
-  // Sessions, a page of its own (R250 step 1): the table, or the hint on a
+  // Sessions, a page of its own: the table, or the hint on a
   // box with none running.
   sessions: {
     open: () => page.evaluate(() => railGo('sessions')),
@@ -161,7 +161,7 @@ const DRIVERS = {
     open: () => page.evaluate(() => openJobsTab()),
     readyWhen: '.jobstab .jbrow, .jobstab .empty',
   },
-  // The Debug page (R147), the harness starting the controller with
+  // The Debug page, the harness starting the controller with
   // DEBUG_MODE=1: ready once its grants section says how many are granted,
   // which it says once the node list its rows offer has landed (its heading
   // shows on a phone, where every fold starts shut).
@@ -169,20 +169,20 @@ const DRIVERS = {
     open: () => page.evaluate(() => openDebugTab()),
     readyWhen: '.debugtab details[data-sect="debug:grants"] > summary .sst',
   },
-  // The Schedules page (R117): the built-in scan's row is always there.
+  // The Schedules page: the built-in scan's row is always there.
   schedules: {
     open: () => page.evaluate(() => openSchedulesTab()),
     readyWhen: '.schedulestab .schedrow, .schedulestab .empty',
   },
-  // The Keys page (R154): the install key's section and what is kept under
+  // The Keys page: the install key's section and what is kept under
   // it, drawn whether the box has a key or none.
   keys: {
     open: () => page.evaluate(() => openKeysTab()),
     readyWhen: '.keystab details[data-sect="keys:kept"]',
   },
-  // The Audit page (R158 step 8): the trail's section, with rows or the
+  // The Audit page: the trail's section, with rows or the
   // empty band, drawn for an account that reads the controller's area.
-  // This machine (R90 step 8): on the harness's container controller it
+  // This machine: on the harness's container controller it
   // says it has none, which is the page's own empty.
   machine: {
     open: () => page.evaluate(() => openMachineTab()),
@@ -193,23 +193,23 @@ const DRIVERS = {
     readyWhen: '.audittab .auditrow, .audittab .empty',
   },
   storage: {
-    // A section per node, or the empty band on a box with none (R169).
+    // A section per node, or the empty band on a box with none.
     open: () => page.evaluate(() => openStorageTab()),
     readyWhen: '.storagetab [data-stnode], .storagetab .empty',
   },
   nginx: {
-    // A section per node, or the empty band on a box with none (R171).
+    // A section per node, or the empty band on a box with none.
     open: () => page.evaluate(() => openNginxTab()),
     readyWhen: '.nginxtab [data-ngnode], .nginxtab .empty',
   },
-  // The Scanners page (R145): the schedule's section is always there.
+  // The Scanners page: the schedule's section is always there.
   scanners: {
     open: () => page.evaluate(() => openScannersTab()),
     readyWhen: '.scannerstab details[data-sect="scanners:schedule"] > summary .sst',
   },
   vms: {
     // A card per project with VMs, or the empty band where there is none
-    // or no node has VM host (R91).
+    // or no node has VM host.
     open: () => page.evaluate(() => openVmsTab()),
     readyWhen: '.vmtab [data-vm-key], .vmtab .empty',
   },
@@ -238,11 +238,11 @@ const tabKinds = await page.evaluate(() =>
 const undriven = tabKinds.filter(k => !DRIVERS[k]);
 // The notebook is one tab kind and EIGHT surfaces, and every loop below
 // measured whichever one it happened to be on, which was the Roadmap: the
-// driver opens there and bring() focuses a tab it already has. So nine of
+// driver opens there and bring focuses a tab it already has. So nine of
 // the notebook's views had never been measured for the action-bar language,
 // the loose-button rule, destructive-last or the control widths, and six
 // words for "delete this row" and 42-word paragraphs grew under a check that
-// looked like it covered them (roadmap R70). Each view is a kind of its own
+// looked like it covered them. Each view is a kind of its own
 // here, read off the strip the page draws rather than kept as a list, for
 // the same reason the tab kinds are.
 const NB_VIEWS = await page.evaluate(() =>
@@ -280,7 +280,7 @@ async function measure(kind){
       .filter(e => !INDENTED.some(c => e.classList.contains(c)))
       // Nested band-in-band measures the outer one; the inner is content.
       .filter(e => !e.parentElement.closest(BANDS));
-    // At a desk content floats as cards (R262): a band in a card (or one
+    // At a desk content floats as cards: a band in a card (or one
     // that is the card) is where its card stands, the card's edge in line
     // with the page's own content; inside, the card's inset is the card's.
     // A card here is a box edged on both sides; a phone draws none.
@@ -299,12 +299,12 @@ async function measure(kind){
     // A list beside its detail (a project's Settings view, the Roles page's
     // shape) is two columns: the detail's bands start at one x of their own,
     // beside the list, and are measured apart from the page's.
-    // At a desk a settings page's head spans the list and the column both
-    // (the operator, 26 Oct), so it stands at the page's x, not the column's.
+    // At a desk a settings page's head spans the list and the column both,
+    // so it stands at the page's x, not the column's.
     const inCol = e => !!e.closest('.ssplit') && !e.closest('.snav') && !(innerWidth > 900 && e.closest('.ssplit > .pghead'));
     const colLefts = [...new Set(bands.filter(inCol).map(leftOf))];
-    // A view's lone button beside its tiles shares the glance's line (the
-    // operator, 29 Oct): not a band of its own.
+    // A view's lone button beside its tiles shares the glance's line:
+    // not a band of its own.
     const besideGlance = e => e.matches('.nbhead') && [...e.parentElement.children].some(o => o.matches('.nbglance')
       && o.getBoundingClientRect().top < e.getBoundingClientRect().bottom - 2 && o.getBoundingClientRect().bottom > e.getBoundingClientRect().top + 2);
     const lefts = [...new Set(bands.filter(e => !inCol(e) && !besideGlance(e)).map(leftOf))];
@@ -338,13 +338,13 @@ async function measure(kind){
       stacks.get(key).push(Math.round(t.getBoundingClientRect().width));
     }
     const ragged = [...stacks.values()].filter(ws => ws.length > 1 && new Set(ws).size > 1);
-    // The jump bar's chips sit in a row (the operator, 11 Oct): the notebook's
+    // The jump bar's chips sit in a row: the notebook's
     // Settings view stacked them one per line, since the dialog's field rule
     // outranked the bar's own.
     const bar = box.querySelector('.sectjump');
     const tops = bar ? [...bar.querySelectorAll('a')].slice(0, 2).map(e => Math.round(e.getBoundingClientRect().top)) : [];
     const jump = bar && bar.offsetHeight ? { dir: getComputedStyle(bar).flexDirection, stacked: tops.length === 2 && tops[0] !== tops[1] } : null;
-    // Floating cards at a desk (R262, the operator, 17 Oct): no line runs to
+    // Floating cards at a desk: no line runs to
     // the page's edge. A visible top or bottom border spanning the document
     // box from side to side is named; the page's bar band and a notebook's
     // header and view strips are the frame, not content, and keep theirs.
@@ -367,8 +367,8 @@ async function measure(kind){
       // flush and nbhost are the same treatment in the sheet, and the notebook
       // wears the second for its own reasons; both mean "fills the pane".
       flush: host.classList.contains('flush') || host.classList.contains('nbhost'),
-      // A notebook runs the pane's width for its view strip (the operator,
-      // 17 Oct): the reading width is its view's, the band under the strip.
+      // A notebook runs the pane's width for its view strip:
+      // the reading width is its view's, the band under the strip.
       maxw: box.matches('.nb') ? getComputedStyle(box.querySelector('.nbview:not([hidden])') || box).maxWidth : cs.maxWidth,
       bands: bands.length, lefts, colLefts, who,
       controls: controls.length, offskin,
@@ -406,7 +406,7 @@ async function bring(kind){
   // its text once the view's data has landed, a beat after the band shows.
   // Waited for (lib.mjs settled: the requests landed and a quiet beat),
   // not slept: a fixed half second here was paid on every kind in every
-  // section of this file (R211).
+  // section of this file.
   await DRIVERS[kind].open();
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
   await settled(page, { quiet: 250 });
@@ -459,20 +459,20 @@ async function atWidth(p, w){
 // no text, which is what makes a roadmap row's five pictograms legal and a
 // row of Up / Down / Remove not.
 // `pagemore` joins them: it is the framework's own footer for a long list
-// (a count and up to two buttons, drawn by paginate() and nothing else), so
+// (a count and up to two buttons, drawn by paginate and nothing else), so
 // it is already one bar with one shape everywhere, which is what the rule
 // below is for. It reached this check for the first time when the Jobs tab
 // was paged, because every other paginated list is in a notebook whose
 // fixture is too short to draw one.
 // ...and a segmented switch (.pseg: Deploy key / Access token, Dark / Light,
-// Cards / List) is one choice, not a set of verbs (R216).
-// ...nor a list of rows you open (the Roles tab's accounts and roles, R255
-// step 9: the rows-you-open rule), whose rows are rows that happen to be
+// Cards / List) is one choice, not a set of verbs.
+// ...nor a list of rows you open (the Roles tab's accounts and roles:
+// the rows-you-open rule), whose rows are rows that happen to be
 // pressed, not verbs.
-// ...and a row of chips (the chips rule, R216): a view's groups, one in
+// ...and a row of chips (the chips rule): a view's groups, one in
 // force, never a set of verbs. No fixture drew two groups before the
-// Library's kinds (R170), which is when the row first met this check.
-// ...nor the Files page's places (the operator, 12 Nov: a file explorer's
+// Library's kinds, which is when the row first met this check.
+// ...nor the Files page's places (a file explorer's
 // column of the node's roots): rows you open, as a list of rows is.
 const NOT_A_BAR = ['nbtabs', 'nbgroups', 'nbsub', 'foot', 'pagemore', 'pseg', 'rlist', 'chips', 'fxplaces'];
 
@@ -515,12 +515,12 @@ async function language(){
       return { status: s.querySelector('.sst')?.textContent?.trim() || '',
                // The cursor says whether it folds: a pointer where a press
                // folds it, the plain arrow on a page's section at a desk,
-               // which stands open (sectFixed, the operator, 18 Oct).
+               // which stands open (sectFixed).
                skin: [c.minHeight, c.fontWeight, c.cursor === (sectFixed(s.parentElement) ? 'default' : 'pointer') ? 'cursor ok' : `cursor ${c.cursor}`].join('|') };
     });
-    // The voices (R210): a button speaks in the page's sans (the key caps
+    // The voices: a button speaks in the page's sans (the key caps
     // on the terminal tab are mono on purpose), never the browser's own
-    // default, which a dropped shorthand left every button in (B711); and a
+    // default, which a dropped shorthand left every button in; and a
     // notice under a row (.sub.warn, .sub.bad, .notice) is sans behind a
     // bar of its color, so it is told from the mono facts above it.
     // The first family named is what is compared: the page's stacks spell
@@ -536,8 +536,8 @@ async function language(){
       const c = getComputedStyle(n);
       return vis(n) && (/mono/i.test(c.fontFamily) || parseFloat(c.borderLeftWidth) < 2);
     }).map(n => `${named(n)} "${n.textContent.trim().slice(0, 20)}"`);
-    // Room between words and the buttons under them (R218 step 55, the
-    // operator, 18 Oct: text all but touching its buttons): a line of prose,
+    // Room between words and the buttons under them
+    // (text all but touching its buttons): a line of prose,
     // a hint or a facts list followed by an action bar keeps 8px or more.
     const tight = [...box.querySelectorAll('.sub, .hint, .note, p, dl.facts, .notice')].filter(t => {
       const n = t.nextElementSibling;
@@ -570,8 +570,8 @@ async function spanning(){
     // The rule's own number as well as the surface: a 700px field on a
     // 1080px tab is inside 90% and outside --ctl-w.
     const cap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-w')) * 16 || 480;
-    // On a phone a holder fills its surface to the gutter (R301 step 6, the
-    // operator 28 Nov), the edge a section's presses end on: judged there
+    // On a phone a holder fills its surface to the gutter,
+    // the edge a section's presses end on: judged there
     // against the two gutters, so one running past them still fails.
     const phone = W <= 600;
     const gut = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-x')) || 16;
@@ -580,13 +580,12 @@ async function spanning(){
     const ROWS = '.actbar, .ctlrow, .fcell > .ctl, .tcnode, .chips';
     // A tab strip is navigation, and the phone rule for one is the opposite
     // of a control's: its tabs share the row while they fit, and past that
-    // it scrolls under a finger with its edges faded as the dock's line does
-    // (the operator, 29 Oct).
+    // it scrolls under a finger with its edges faded as the dock's line does.
     const NAV = '.nbtabs, .switch, .subnav, .rlist';
     const vis = e => e.offsetHeight > 0 && e.getBoundingClientRect().width > 0;
     const out = [];
     const seen = new Set();
-    // A form's box (formBox, R301) is capped as a whole, two columns of
+    // A form's box (formBox) is capped as a whole, two columns of
     // controls at most, and its fields fill it so its foot ends where they
     // do: judged as one, never field by field.
     const FORM = phone ? LIM : Math.min(W * 0.95, cap * 2 + 22);
@@ -622,8 +621,8 @@ async function spanning(){
       const r = Math.max(...kids.map(k => k.getBoundingClientRect().right));
       if (r - l > LIM) out.push(`${row.className.split(' ')[0]} ${Math.round(r - l)}/${Math.round(W)}`);
     }
-    // What is left is a control in no holder. Nothing caps one alone (R301
-    // step 6: a form's box, a row of controls or a menu is capped, and its
+    // What is left is a control in no holder. Nothing caps one alone
+    // (a form's box, a row of controls or a menu is capped, and its
     // controls fill it), so one wider than the cap here is a control that
     // fills its surface and wants a holder: a formBox or a .ctlrow.
     for (const e of box.querySelectorAll(CTL)){
@@ -704,7 +703,7 @@ async function lineup(){
         // Where each one is, so a line that should not be one says why it is.
         off.push(`${line.map(c => `${name(c.e)}@${Math.round(c.r.bottom)}${
           c.e.closest('[data-sect]') ? `[${c.e.closest('[data-sect]').dataset.sect}]` : ''}`).join(' ')}`);
-      // ...and one height (the operator, 29 Sep: a field, a pulldown and a
+      // ...and one height (a field, a pulldown and a
       // button on one row were three sizes). A prose box that has wrapped
       // to a second line is taller by design and left out; a swatch is a
       // circle of its own.
@@ -751,17 +750,17 @@ async function unwrapped(){
     return { tall };
   });
 }
-// ---- tiles and facts (R216) --------------------------------------------------
+// ---- tiles and facts --------------------------------------------------
 // A row of tiles is one height with its numbers in the stat voice, and a
 // facts grid is labels in the note voice over values in mono: the two
 // shapes every tab draws the same way or not at all.
-// A section's first thing keeps room under its head, at every width (the
-// operator, 19 Oct: on a phone the first field met the head on every page,
+// A section's first thing keeps room under its head, at every width
+// (on a phone the first field met the head on every page,
 // the room having been the desk card's alone). Measured from the head's
 // foot to the first box drawn in the body, a page's own section at a page's
 // level, not one inside a row or a dialog.
 // Every row of controls wears the one class the cap and the line-up rules
-// read (R218 step 64): a row kind that forgot it would be capped by nothing,
+// read: a row kind that forgot it would be capped by nothing,
 // or each of its controls capped a second time, which is how three lists of
 // row kinds in the stylesheet drifted apart. Field rows, add rows, filter
 // rows and picker rows are the kinds the page draws.
@@ -771,7 +770,7 @@ function rowsWearTheClass(){
 }
 // An add band whose button stands alone sits at the right of what it is in,
 // where a row's Edit and a section's actions are, and one with a field keeps
-// its button on the field's line (R283: Add route stood alone at the left
+// its button on the field's line (Add route stood alone at the left
 // over a table whose Edit was at the right; a hostname's Add fell under its
 // field). Each one on show, measured: the button's right edge against its
 // container's, and a field's button against the field's top.
@@ -790,14 +789,14 @@ function addBarsPlaced(){
   }));
 }
 // A pulldown in a bar or a row is as wide as its longest answer and no wider
-// (the operator, 18 Nov: Sort and the wiki's page stretched across a phone):
+// (Sort and the wiki's page stretched across a phone):
 // each one on show measured against itself with its longest answer chosen
 // and nothing sizing it, which is how wide its longest answer makes it. Wider
 // is stretched; narrower is allowed only where its row has no room left,
 // which clips it. The pulldowns are the page's own PICKERS (page-docs.js),
 // so the check and what sizes them cannot drift apart. The one exception is
-// a phone's line of pulldowns beside a row's compact buttons (.pickshare,
-// the operator, 22 Nov): there each fills its share flush to the buttons,
+// a phone's line of pulldowns beside a row's compact buttons (.pickshare):
+// there each fills its share flush to the buttons,
 // held instead to filling it exactly.
 function pickersFit(){
   return page.evaluate(() => {
@@ -835,12 +834,12 @@ function pickersFit(){
     }).filter(Boolean);
   });
 }
-// The forms rule (the operator, 4 Nov: fields crammed together, each page its
+// The forms rule (fields crammed together, each page its
 // own way): a label over its field, never beside it, and fields that do not
 // touch. A picker in a band or an action bar sits beside what it filters and
 // is not a form's field.
-// ...on a page, or in the dialog on show (R273: a dialog's form is on the
-// same grid, the operator 23 Nov).
+// ...on a page, or in the dialog on show (a dialog's form is on the
+// same grid).
 function formsHold(root = '.doc.on'){
   return page.evaluate(root => {
     const out = new Set();
@@ -886,7 +885,7 @@ function headRoom(){
     return out;
   });
 }
-// Nothing in a section sits on its side wall (B864: the Nodes page's
+// Nothing in a section sits on its side wall (the Nodes page's
 // Network lines and Home's placeholder bars ran to the edge, each kept
 // there by a rule of its own page): every line of text and every control
 // in an open section's body starts at least 6px in from the section's box,
@@ -952,8 +951,8 @@ async function glance(){
       if (!dt || !dd) continue;
       if (!/monospace|Mono|Menlo|Consolas/i.test(getComputedStyle(dd).fontFamily)) bad.push('a fact value not in mono');
       if (px(getComputedStyle(dt).fontSize) > px(getComputedStyle(dd).fontSize)) bad.push('a fact label larger than its value');
-      // A column's values start at one line, whatever their labels' length
-      // (B76): one x per column of the grid, counted from the facts' own boxes.
+      // A column's values start at one line, whatever their labels' length:
+      // one x per column of the grid, counted from the facts' own boxes.
       if (CSS.supports('grid-template-columns', 'subgrid')){
         const cols = new Map();
         for (const f of dl.querySelectorAll(':scope > .fact')){
@@ -965,7 +964,7 @@ async function glance(){
         for (const xs of cols.values()) if (xs.size > 1) bad.push(`a facts grid whose values start at ${[...xs].join('/')}`);
       }
     }
-    // A table (R218 step 8): each row's cells start where the header's do,
+    // A table: each row's cells start where the header's do,
     // and the header is in the note voice under the cells' size.
     const tbad = [];
     for (const t of box.querySelectorAll('.tbl')){
@@ -989,7 +988,7 @@ if (runs('a')) {
 // The four readings that change nothing on the page (the box and its bands,
 // the button language, what spans, what lines up) are taken on ONE visit to
 // each kind. They were four walks over 26 kinds, each paying the bring and
-// the settle again (R211: 0.5 to 0.8 s a visit, four times over).
+// the settle again (0.5 to 0.8 s a visit, four times over).
 // The row a page's tabs sit in, by page: one height on every page, under a
 // group's header or standing alone, with an action in it or not.
 // A page a press opens wears its Back header there instead of tabs, and is
@@ -1045,7 +1044,7 @@ for (const kind of kinds){
        m.controls} checked)`);
   }
   // Nothing between a page's sections, and its pills (its chips and its
-  // jump bar) before the first of them (the operator, 25 Oct: a line between
+  // jump bar) before the first of them (a line between
   // Toolchains and Tool packs, and Storage's jump bar mid-page).
   const shape = await page.evaluate(() => {
     const host = document.querySelector('.doc.on');
@@ -1068,7 +1067,7 @@ for (const kind of kinds){
         late.push(named(b));
     });
     // Above the first section, only what a page's top is made of: its
-    // tiles, its chips and jump bar, and its head (the operator, 25 Oct: no
+    // tiles, its chips and jump bar, and its head (no
     // loose words at a page's top; a page says what it knows the way a
     // node's head does, its name, its state and its facts).
     // Words at its top: a hint or a status line before its first section,
@@ -1090,8 +1089,8 @@ for (const kind of kinds){
   ok(shape.loose.length === 0, `[${kind}] its top says what it knows in a head, not in loose words${shape.loose.length ? `; loose: ${shape.loose.join(' | ')}` : ''}`);
   ok(shape.between.length === 0, `[${kind}] nothing stands between its sections${shape.between.length ? `; between: ${shape.between.join(', ')}` : ''}`);
   ok(shape.late.length === 0, `[${kind}] its pills are at its top, before its first section${shape.late.length ? `; after it: ${shape.late.join(', ')}` : ''}`);
-  // No button on a line of its own at a page's top (the operator, 29 Oct:
-  // "a line in one, weird text above the button on the other"): a bar, a
+  // No button on a line of its own at a page's top
+  // ("a line in one, weird text above the button on the other"): a bar, a
   // control row or a band over the list holding nothing but buttons, or a
   // head's one action left under its facts rather than in its corner.
   const lone = await page.evaluate(() => {
@@ -1200,7 +1199,7 @@ await section("a page's tab row on a phone", async () => {
 });
 // A group's head (Machines, Build, Containers) is one row a little taller
 // than its tab row, at a desk and on a phone: the node's picker and its
-// state pill, no facts line under them (the operator, 17 Nov).
+// state pill, no facts line under them.
 await section("a group's head is one row", async () => {
   const got = {};
   for (const w of [1280, 393]){
@@ -1230,7 +1229,7 @@ if (runs('a')) {
 // docs/design-language.md, Document tabs: `.loading` while it waits and
 // `.empty` when there is nothing, inside the list. Read off the SOURCE, since
 // an empty state is only on screen when the data happens to be empty, and the
-// fixtures are not. Five classes were doing these two jobs (R70 step 3).
+// fixtures are not. Five classes were doing these two jobs.
 await section("one loading line and one empty state", async () => {
   const { readdirSync, readFileSync } = await import('node:fs');
   // Not `new URL`: URL in this file is the dashboard's address, from lib.mjs.
@@ -1259,7 +1258,7 @@ if (runs('a')) {
 await section("colors and corners are tokens", async () => {
   const { readFileSync } = await import('node:fs');
   const path = await import('node:path');
-  // The stylesheet's files, a cascade layer each (R9 step 4), rule by rule:
+  // The stylesheet's files, a cascade layer each, rule by rule:
   // a scheme's own rules (its tokens, and a hull of its own like Nostromo's,
   // scoped by data-theme or data-mode) define hex; nothing else does.
   const dir = path.resolve(import.meta.dirname, '..');
@@ -1308,15 +1307,15 @@ for (const kind of kinds){
   ok(!F.err && F.bare.length === 0,
      `[${kind}] every fold is remembered across a redraw${
        F.err ? ` (${F.err})` : F.bare.length ? `: ${[...new Set(F.bare)].join('; ')}` : ''}`);
-  // A poll that brings nothing new writes nothing (R218 step 10): the page,
+  // A poll that brings nothing new writes nothing: the page,
   // its bar, the rail and the dock stay the very nodes they were, so a
   // pointer resting on one keeps its hover and nothing fades in again. Read
   // over a third status read, the first two letting the page's own fetches
   // land; the header's uptime and the doctor's "ran 2 min ago" are the
-  // things that move with time (B814: it aged across a minute in the window).
+  // things that move with time (it aged across a minute in the window).
   // The first two reads and what they set off landed before the third is
   // watched: two fixed pauses of 600 ms were not that under a whole run's
-  // load, and the Settings page's own read landed in the window (17 Nov).
+  // load, and the Settings page's own read landed in the window.
   await page.evaluate(async () => { await refresh(); await refresh(); });
   await settled(page, { quiet: 600, cap: 20000 });
   const quietRead = await page.evaluate(async () => {
@@ -1334,7 +1333,7 @@ for (const kind of kinds){
     }));
     // ...unless it did bring something: a token the page follows that moved
     // in the window (a node's heartbeat on the Nodes page) is news the page
-    // is right to draw (B789), counted as page-poll.js counts it.
+    // is right to draw, counted as page-poll.js counts it.
     const r0 = { ...revs };
     mo.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
     await refresh(); await new Promise(r => setTimeout(r, 600));
@@ -1345,7 +1344,7 @@ for (const kind of kinds){
   ok(quietRead.seen.length === 0 || quietRead.moved.length > 0,
      `[${kind}] a status read that brings nothing new writes nothing${quietRead.seen.length ? ': ' + quietRead.seen.slice(0, 6).join('; ') : ''}${
        quietRead.moved.length ? '; moved: ' + quietRead.moved.join(', ') : ''}`);
-  // A draw adds no listener to what the last draw kept (R244 step 3): a
+  // A draw adds no listener to what the last draw kept: a
   // patch keeps the page's elements, so a handler wired with
   // addEventListener at every draw is wired once more each time and a press
   // runs it twice. Set as a property (onclick =) it is the same handler
@@ -1384,10 +1383,10 @@ for (const kind of kinds){
     return [...new Set(window.__lsn.got.filter(x => before.has(x.el)).map(x => `${name(x.el)} ${x.type}`))];
   }, kind.startsWith('notebook:') ? kind.slice('notebook:'.length) : '');
   ok(wired.length === 0, `[${kind}] a draw adds no listener to what the last draw kept${wired.length ? ': ' + wired.slice(0, 6).join('; ') : ''}`);
-  // What a draw brings is the draw's own (R9 step 6, drawn): on the page as
+  // What a draw brings is the draw's own (drawn): on the page as
   // drawn, every proseline is wired, no title is left to show as a
   // tooltip, and every data-style is applied. A draw that writes markup
-  // some way that does not call drawn() leaves one of these behind.
+  // some way that does not call drawn leaves one of these behind.
   const brought = await page.evaluate(() => {
     const on = e => !e.closest('template') && !(e instanceof SVGElement);
     const prose = [...document.querySelectorAll('textarea.proseline:not([data-prose])')].filter(on);
@@ -1449,7 +1448,7 @@ for (const kind of kinds){
 if (runs('a')) {
 // ---- adding goes at the top ------------------------------------------------
 // The control that adds to a notebook view is the last button on its control
-// row, the primary (R109), its form unrolling under that row; one that adds
+// row, the primary, its form unrolling under that row; one that adds
 // to a section is the first band inside it, above the list. Never at the
 // foot, where a phone scrolled past every row to find it. Measured on each
 // view that has one, against its head row and the first row of its list.
@@ -1533,13 +1532,13 @@ await section("the notebook's head row", async () => {
   // Read the ruler when it has STOPPED MOVING, rather than after a fixed
   // pause. 150ms was enough on an idle box and not on a loaded one, so the
   // Bugs view came back two pixels lower than every other about one run in
-  // three and this check went red for the suite rather than for the page
-  // (B116). Two agreeing reads is the condition; the pause was never the
+  // three and this check went red for the suite rather than for the page.
+  // Two agreeing reads is the condition; the pause was never the
   // thing being tested.
   const still = async (w) => {
     // The view's own reads landed first: a placeholder holds still for two
     // reads 50 ms apart under a whole run's load, and Analysis was measured
-    // so, two pixels low (B927).
+    // so, two pixels low.
     await settled(page, { quiet: 300, cap: 15000 });
     let last = null;
     for (let i = 0; i < 80; i++){
@@ -1575,11 +1574,11 @@ await section("the notebook's head row", async () => {
                drawn: !!head && head.offsetHeight > 0,
                top: head ? Math.round(head.getBoundingClientRect().top) : null,
                // The view's first band, wherever the CSS orders it: since the
-               // glance comes before the control row (d5dff08, the operator
-               // 29 Oct), the row's own top moves with the tiles over it.
+               // glance comes before the control row (d5dff08),
+               // the row's own top moves with the tiles over it.
                firstTop: Math.round(Math.min(...shown.map(e => e.getBoundingClientRect().top))),
                height: head ? Math.round(head.getBoundingClientRect().height) : null,
-               // The control row (R109): its search and its toggles at the
+               // The control row: its search and its toggles at the
                // left, its actions in an action bar after its spacer, the
                // primary, where there is one, last.
                right: !head || (() => {
@@ -1596,7 +1595,7 @@ await section("the notebook's head row", async () => {
                    && !n.matches('button, input, select, .actbar, .sp, .gbpicker, #dkSeg, .nbsaidslot'))).map(n => n.textContent.trim()).join(' ').slice(0, 60),
                glance: (() => {
                  const bad = [];
-                 // The glance is a status line (R274): phrases in its .pgline,
+                 // The glance is a status line: phrases in its .pgline,
                  // no tiles left.
                  const g = view.querySelector(':scope > .nbglance');
                  if (w !== 'settings' && !g) bad.push('no glance');
@@ -1623,7 +1622,7 @@ await section("the notebook's head row", async () => {
   ok(notFirst.length === 0,
      `every notebook view opens with its head row${notFirst.length ? `; not: ${notFirst.join(', ')}` : ''}`);
   // Within a pixel: a top on a half pixel rounds either way, 212 on one view
-  // and 213 on the next with nothing drawn differently (B504, B116).
+  // and 213 on the next with nothing drawn differently.
   const drawnHeads = Object.values(heads).filter(h => h.drawn);
   const topsAt = Object.values(heads).map(h => h.firstTop);
   ok(Math.max(...topsAt) - Math.min(...topsAt) <= 1,
@@ -1677,7 +1676,7 @@ await section("the notebook's lists keep one rhythm", async () => {
 ok(seenSects.size <= 1,
    `a section heading wears one skin everywhere (${JSON.stringify([...seenSects])})`);
 await section("B495: a password manager offers itself only where a password or an", async () => {
-  // B495: a password manager offers itself only where a password or an
+  // A password manager offers itself only where a password or an
   // account is asked for; every other field on the page says so, drawn
   // late or not.
   const loud = await page.$$eval('input, textarea', es => es.filter(e => {
@@ -1687,7 +1686,7 @@ await section("B495: a password manager offers itself only where a password or a
     return e.dataset.bwignore === undefined;
   }).map(e => e.id || e.name || e.className).slice(0, 8));
   ok(loud.length === 0, `every field that is not a password or an account tells password managers to stay away (${JSON.stringify(loud)})`);
-  // B533: Bitwarden honors data-bwignore only when its user opts in, and
+  // Bitwarden honors data-bwignore only when its user opts in, and
   // reads one textarea that names a public key as an add-an-SSH-key form,
   // then offers itself on every field labeled name, title or description.
   // So no textarea on the page may read as one, by Bitwarden's own words.
@@ -1705,7 +1704,7 @@ await section("B495: a password manager offers itself only where a password or a
   ok(sshy.length === 0, `...and no text box reads to Bitwarden as an SSH public key (${JSON.stringify(sshy)})`);
 });
 await section("The header's buttons are one box", async () => {
-  // The header's buttons are one box (the operator, 5 Oct): the bell stood
+  // The header's buttons are one box: the bell stood
   // taller and wider than the bug, gear and sign-out beside it on a desk.
   const hb = await page.$$eval('header > button', bs => bs.filter(b => b.offsetParent).map(b => {
     const r = b.getBoundingClientRect();
@@ -1731,8 +1730,8 @@ await section("The header's buttons are one box", async () => {
   ok(!desk.length && !phone.length, `...and each icon sits in the middle of its button, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
 });
 await section("The frame's lines of controls are one height each, as a page's are", async () => {
-  // The frame's lines of controls are one height each, as a page's are
-  // (B142): the header's search stood 32px beside 38px buttons, and the
+  // The frame's lines of controls are one height each, as a page's are:
+  // the header's search stood 32px beside 38px buttons, and the
   // dock's + and its pull 30px beside 34px tabs, at every width.
   const frameLines = () => page.$$eval('header, .pane .bar.dockbar', fs => fs.flatMap(f => {
     const cs = [...f.querySelectorAll('button, input, .dtab')].filter(e => e.offsetParent)
@@ -1760,7 +1759,7 @@ ok(seenReds.size <= 1,
 // took drawPanes down, and with it the poll, the strip and every terminal.
 await section("The fence inside the one page", async () => {
   // Opened here, not only found: part b runs without part a's walk, which
-  // is what opened it in the whole file (R130).
+  // is what opened it in the whole file.
   await bring('findings');
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'findings');
                               if (t) focusTab(t.id); });
@@ -1867,20 +1866,20 @@ await section("what reads on a filled accent surface, on every scheme", async ()
                    'ember', 'abyss', 'plum', 'rust', 'ice', 'sepia'];
   const AA = 4.5;
   const bad = [];
-  // The pick measured is the page's sub-nav (R218 step 4: the strip and its
+  // The pick measured is the page's sub-nav (the strip and its
   // active tab are gone): Machines, whose Nodes is on. Its ground is the
   // bar's, showing through a tab with no fill of its own since 17 Oct.
   await page.evaluate(() => railGo('machines', 'nodes'));
   await page.waitForSelector('.pane .bar .subnav button.on', { timeout: 10000 });
   await arrived();
-  // ...in both halves of each (R216): the light half writes white on the
+  // ...in both halves of each: the light half writes white on the
   // same darkened accent, and its icons the same.
   for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
     await page.evaluate(([th, m]) => { document.documentElement.dataset.theme = th;
       if (m) document.documentElement.dataset.mode = m; else delete document.documentElement.dataset.mode; }, [t, mode]);
     // Past the tab's own 150ms background transition: a dark half measured
     // 120ms after a light one read a blend of the two, and a fixed wait
-    // read one under load too (B811), so its transitions are waited out:
+    // read one under load too, so its transitions are waited out:
     // begun, by the frame drawn in the new scheme, and then ended, below.
     await frames();
     const r = await page.evaluate(async () => {
@@ -1945,7 +1944,7 @@ await section("good, warning and error are one trio on every scheme, and a warni
       const lum = a => 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
       const R = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
       // The wash as the page resolves it: a mix over --ground since the
-      // operator's see-through band (17 Nov), which a canvas cannot read
+      // operator's see-through band, which a canvas cannot read
       // from the token's text.
       const probe = document.createElement('div');
       probe.style.background = 'var(--warn-wash)';
@@ -1967,7 +1966,7 @@ await section("good, warning and error are one trio on every scheme, and a warni
   if (seen.dark.size !== 1) bad.push(`the dark half's trio differs by scheme: ${[...seen.dark].join(' | ')}`);
   if (seen.light.size !== 1) bad.push(`the light half's trio differs by scheme: ${[...seen.light].join(' | ')}`);
   // ...and the design language names that warning and error for every
-  // theme, never a pair the page does not draw (B1160: each theme in the
+  // theme, never a pair the page does not draw (each theme in the
   // record carried its own).
   {
     const { readFileSync } = await import('node:fs');
@@ -1985,7 +1984,7 @@ await section("good, warning and error are one trio on every scheme, and a warni
   ok(bad.length === 0, `one trio on all ${SCHEMES.length} schemes in each half, and a warning's band its own wash with its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
 });
 
-// What floats over the page stands off it (the operator, 18 Nov: a tour's
+// What floats over the page stands off it (a tour's
 // card read as part of the page): the tour, the header's pop-outs, a row's
 // menu, a help pop, the More sheet and a toast wear --float, a step brighter
 // than the panel in the dark half and white in the light, on every scheme,
@@ -2036,7 +2035,7 @@ if (runs('b')) {
 // on the document box, which painted its own ground: the ground faded in
 // with the content, over the pane's black, so every switch to a notebook
 // opened on a black pane for its first frames, and nostromo's on the bare
-// hull (the operator, 27 Sep). The ground is the stack's now. Measured on
+// hull. The ground is the stack's now. Measured on
 // the first frame itself: whatever the switch starts is held at its start,
 // the pane is photographed and its pixels read through a canvas, and that
 // frame has to be the ground the settled tab stands on (its commonest
@@ -2111,13 +2110,13 @@ await section("a document arrives on its own ground, on every scheme", async () 
     if (!id) return { ok: false, said: `no ${kind} tab to switch to` };
     const held = await switchHeld(id);
     // The page going out is still drawn in this frame, fading over it (a
-    // crossfade, the operator, 16 Oct): set aside for the reading, so the
+    // crossfade): set aside for the reading, so the
     // frame read is the ground the arriving page stands on. Put back by the
     // elements set aside, never by .leaving again: on a loaded box the
     // screenshot outlasts the page's 150ms timer, .leaving was off by then,
     // and the page set aside kept its hidden for good, so the crossfade
     // check read it hidden and the projects page later came to the front
-    // with none of its cards visible (B219).
+    // with none of its cards visible.
     await page.evaluate(() => { window.__aside = [...document.querySelectorAll('.pane .stack > .doc.leaving')];
       window.__aside.forEach(e => { e.style.visibility = 'hidden'; }); });
     const first = await frame().finally(() => page.evaluate(() => {
@@ -2137,7 +2136,7 @@ await section("a document arrives on its own ground, on every scheme", async () 
   };
   for (const kind of tabKinds){
     if (!DRIVERS[kind]) continue;
-    // A dock tab (the chat, R250 step 2) is not a page brought to the front
+    // A dock tab (the chat) is not a page brought to the front
     // over another in the same pane: it is the dock's body, which slides up
     // with the dock, and pressing it while it is in front puts the dock down.
     if (await page.evaluate(k => slotFor({kind: k}) === 1, kind)) continue;
@@ -2145,7 +2144,7 @@ await section("a document arrives on its own ground, on every scheme", async () 
     ok(r.ok, `[${kind}] brought to the front, its first frame is its own ground and only its content fades in (${r.said})`);
   }
   // ...and the page it replaces fades out over the same frames: a crossfade,
-  // not a blank between the two (the operator, 16 Oct).
+  // not a blank between the two.
   {
     await onlyDocs(['projects', 'notebook']);
     await bring('notebook:roadmap');
@@ -2153,7 +2152,7 @@ await section("a document arrives on its own ground, on every scheme", async () 
     await atRest();
     // The page going out read in the same task as the switch and the hold:
     // read after it, the page's own 150ms timer had taken .leaving off on a
-    // loaded box and the copy read hidden (B795).
+    // loaded box and the copy read hidden.
     const { held, out } = await page.evaluate(id => {
       focusTab(id);
       window.__held = document.getAnimations().filter(a => a.playState === 'running' || a.pending);
@@ -2171,7 +2170,7 @@ await section("a document arrives on its own ground, on every scheme", async () 
        `a switch between two pages is a crossfade, the one going out fading as the one coming in does (${held.join(', ') || 'nothing'}; out ${out})`);
   }
   // The line under a strip slides on transform alone, so the compositor runs
-  // it while the press draws the view (the operator, 18 Oct: it stuttered).
+  // it while the press draws the view (it stuttered).
   {
     await onlyDocs(['notebook']);
     await bring('notebook:roadmap');
@@ -2187,8 +2186,8 @@ await section("a document arrives on its own ground, on every scheme", async () 
     });
     ok(props && props.join() === 'transform', `a strip's line slides on transform alone (${props ? props.join(', ') : 'no slide'})`);
   }
-  // ...and what a press redraws inside a page fades through the same way
-  // (the operator, 18 Oct): a settings section, a role and a notebook view,
+  // ...and what a press redraws inside a page fades through the same way:
+  // a settings section, a role and a notebook view,
   // each leaving a still copy fading out on docOut's time while the new part
   // fades in on docIn's, and the copy gone soon after.
   for (const [label, kind, ready, press, ghost, fresh] of [
@@ -2236,7 +2235,7 @@ await section("a document arrives on its own ground, on every scheme", async () 
 });
 
 // Every page's bar is one control high, whatever it holds, and a picker's
-// word sits on its line, to its left (the operator, 19 Oct: a picker's word
+// word sits on its line, to its left (a picker's word
 // above it, a count alone and a count beside a button each made a bar of
 // its own height, and the content under each started somewhere else).
 await section("Every page's bar is one control high, whatever it holds, and a picker's", async () => {
@@ -2278,7 +2277,7 @@ await section("The same page, held to the same rules at phone width", async () =
      `a modal leaves with a tween rather than vanishing (${left.join(', ') || 'nothing animated'})`);
 });
 await page.setViewportSize({ width: 393, height: 851 });
-// A card turns over to its controls on a tween (R138): Edit, and the back
+// A card turns over to its controls on a tween: Edit, and the back
 // is on the screen whole, at a phone's width as at a desk's.
 await section("A card turns over to its controls on a tween", async () => {
   // The page on show's: the first card anywhere could be a page out of
@@ -2333,7 +2332,7 @@ for (const kind of kinds){
      `[${kind}] every control on a line is one height at phone width${
        L.err ? ` (${L.err})` : L.sizes.length ? `: ${L.sizes.join('; ')}` : ''}`);
   // A field too narrow for its placeholder's words shows short ones that
-  // fit (the operator, 22 Nov: a field's text has a shorter version where
+  // fit (a field's text has a shorter version where
   // the field is not long enough for it), never the first words of a long
   // one cut off mid-word.
   const phCut = await page.evaluate(() => {
@@ -2349,7 +2348,7 @@ for (const kind of kinds){
   ok(phCut.length === 0,
      `[${kind}] no field's placeholder is cut off at phone width${phCut.length ? `: ${phCut.join(', ')}` : ''}`);
   // An action bar on a phone shows at most five text buttons; what a row
-  // can do beyond its primary verbs is behind More (R210: seven wrapped to
+  // can do beyond its primary verbs is behind More (seven wrapped to
   // two lines, Remove alone on the second).
   const crowded = await page.$$eval('.doc.on .actbar', bars => bars.map(b => {
     const vis = e => e.offsetHeight > 0 && e.textContent.trim();
@@ -2359,19 +2358,19 @@ for (const kind of kinds){
   }).filter(Boolean));
   ok(crowded.length === 0,
      `[${kind}] an action bar shows at most five buttons at phone width${crowded.length ? `: ${crowded.join(', ')}` : ''}`);
-  // A tile's number is read whole at phone width (B150): three to a row,
+  // A tile's number is read whole at phone width: three to a row,
   // "11.1 TB" was cut to "11.1…" in a third of the screen.
   const cut = await page.$$eval('.doc.on .tile .tv', vs => vs.filter(v => v.offsetParent && v.scrollWidth > v.clientWidth + 1)
     .map(v => v.textContent.trim()));
   ok(cut.length === 0, `[${kind}] every tile's number is whole at phone width${cut.length ? `; cut: ${cut.join(', ')}` : ''}`);
-  // No tiles but Home's, and no facts grid open in a page's head unasked
-  // (R274, the operator 23 Nov): what a page is about now is its status line.
+  // No tiles but Home's, and no facts grid open in a page's head unasked:
+  // what a page is about now is its status line.
   const busy = await page.$$eval('.doc.on', ds => ds.flatMap(d => [
     ...[...d.querySelectorAll('.tiles:not(.hometiles)')].filter(e => e.checkVisibility()).map(() => 'tiles'),
     ...[...d.querySelectorAll('.pghead:not(.about) > dl.facts, .pghead:not(.about) > .pghfacts, .pgdet')].filter(e => e.checkVisibility()).map(() => 'a facts grid or a Details fold in the head')]));
   ok(busy.length === 0, `[${kind}] a page's top is its status line, its other facts beside what they describe${busy.length ? `: ${busy.join(', ')}` : ''}`);
   // ...and that line is in the page's head, a card at a desk, on every page
-  // alike (the operator, 24 Nov: a bare line on some pages, a card on
+  // alike (a bare line on some pages, a card on
   // others, was all over the place): pageHead's, or a node's head card,
   // which the page head was drawn after. A notebook view keeps its glance
   // on its own row (a-notebook/views), and a section's own summary line is
@@ -2481,7 +2480,7 @@ await section("The Tests view needs rows to be measured on, and one of them a co
 // the one thing allowed past the edge: it scrolls by design.
 const sideways = () => page.evaluate(() => {
   // Every section open for the measurement: on a phone one stands open at a
-  // time (R184), and what is folded away is not measured, so the folds are
+  // time, and what is folded away is not measured, so the folds are
   // opened here and the one-at-a-time rule is held by its own check below.
   document.querySelectorAll('details.sect').forEach(d => { d.open = true; });
   const host = document.querySelector('.doc.on');
@@ -2494,8 +2493,8 @@ const sideways = () => page.evaluate(() => {
   // Inside a box that scrolls sideways by design (a diff's pre), what is
   // wide is that box's to scroll, never the page's: all sections stand open
   // on a phone since 8 Oct, so a diff is measured there now. A box that
-  // clips with an ellipsis (a closed toolchain row's one line, R218 step
-  // 22) hides what is past its edge, and nothing scrolls to it either.
+  // clips with an ellipsis (a closed toolchain row's one line)
+  // hides what is past its edge, and nothing scrolls to it either.
   const scrolls = e => {
     for (let a = e.parentElement; a && a !== box; a = a.parentElement)
       if ((/(auto|scroll)/.test(getComputedStyle(a).overflowX)
@@ -2531,7 +2530,7 @@ const sideways = () => page.evaluate(() => {
     widest,
     // Every control on a phone is the field size (--f-field, 11px mono): a 16px mono
     // field beside an 11px label is the loudest thing on the tab, and the
-    // operator asked for smaller text in every box (25 Sep). The 16px that
+    // operator asked for smaller text in every box. The 16px that
     // stops iOS Safari zooming the page into a typed field is iOS's alone,
     // under @supports (-webkit-touch-callout: none), a property only it
     // has, so this browser never sees it and this measures the rule for
@@ -2541,7 +2540,7 @@ const sideways = () => page.evaluate(() => {
   };
 });
 // A page of sections on a phone opens one at a time, its head the way back
-// (the operator, 19 Oct: a Back button of its own was a row spent, and sat
+// (a Back button of its own was a row spent, and sat
 // on the head): the head wears the chevron, and a press on it shows the
 // list again.
 for (const [kind, root, pick, head, open] of [
@@ -2592,7 +2591,7 @@ for (const kind of kinds){
       m.overflow}px over${m.widest ? `; ${m.widest.what} reaches ${m.widest.right}px` : ''})`);
     ok(m.loud.length === 0, `[${tag}] no control on a phone is inflated past the field size${
       m.loud.length ? `; inflated: ${m.loud.join(', ')}` : ''}`);
-    // One section open at a time on a phone (R184, the operator, 11 Oct):
+    // One section open at a time on a phone:
     // after a draw one stands open, and opening another shuts it. Measured
     // on a surface with two or more sections in one group; the measurement
     // above opened them all, so the draw's state is put back first.
@@ -2610,7 +2609,7 @@ for (const kind of kinds){
     // Every section on show is wired (wireSections), with data or without:
     // one that is not snaps open beside the rest on a phone, and the check
     // below needs two sections, which a page with nothing to show does not
-    // draw (B171: Storage and nginx, both never wired).
+    // draw (Storage and nginx, both never wired).
     const loose = await page.evaluate(() => [...(document.querySelector('.doc.on')?.querySelectorAll('details.sect > summary') || [])]
       .filter(s => s.checkVisibility() && !s.onclick).map(s => s.parentElement.dataset.sect || '(no key)'));
     ok(loose.length === 0, `[${tag}] every section is wired to fold as the rest do${loose.length ? `; not: ${loose.join(', ')}` : ''}`);
@@ -2675,7 +2674,7 @@ await section("the document and the framework are one thing", async () => {
 }
 
 if (runs('c')) {
-// ---- a quiet page is quiet, and a tab opens once (R75 step 4) -------------
+// ---- a quiet page is quiet, and a tab opens once -------------
 // What the page asks the server for is measured, not assumed: the phone's
 // device probe filled the Jobs tab for weeks, and the Docker tab asked for
 // its listing three times per press, and nothing counted either. With
@@ -2683,7 +2682,7 @@ if (runs('c')) {
 // opening a tab asks each endpoint at most once, whichever kind it is. The
 // polls, the layout save an open makes, and the node list a picker fills
 // are the allowed noise.
-// ---- a page left open does not grow (R283 step 4) -------------------------
+// ---- a page left open does not grow -------------------------
 // A tab left open for hours meets thousands of polls and redraws: each pass
 // here is one (a status read, a page drawn, another opened), and what the
 // page hangs on the window and the document, and the document itself, are
@@ -2723,7 +2722,7 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
   await page.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !readBusy('home')), null, { timeout: 20000 });
   // Which revisions moved over a window, read off the page's own tokens: a
   // re-read a moved token asked for is the page doing its job, not noise
-  // (B757: an earlier kind's job finishing inside the window re-read Home,
+  // (an earlier kind's job finishing inside the window re-read Home,
   // the Emulator page and the Docker page, and failed a run in three).
   // Counted as the page counts them: a token only one page draws (a node's
   // heartbeat, every poll) only while that page is on show.
@@ -2735,13 +2734,13 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
     && (!REVS_PAGE_ONLY[k] || REVS_PAGE_ONLY[k]())));
   const MARK = () => page.evaluate(() => { window.__r0 = { ...revs }; });
   // Home's light read is a request of its own: opening Home asks the light
-  // one, to draw at once, and the whole one behind it (R218 step 5), and
+  // one, to draw at once, and the whole one behind it, and
   // counted as one endpoint the pair read as Home asking twice whenever its
-  // data had been let go before the open (B788).
+  // data had been let go before the open.
   await page.evaluate(() => { window.__f = {}; const f = window.fetch;
     window.fetch = (...a) => { const s = String(a[0]), u = /^\/api\/home\?light=1/.test(s) ? '/api/home?light' : s.split('?')[0];
       window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
-  // ...and its timers (R283 step 4): every timer made while it sits idle,
+  // ...and its timers: every timer made while it sits idle,
   // kept while it waits, so an idle page holds as many as its polls do and
   // makes no interval of its own.
   await page.evaluate(() => {
@@ -2767,7 +2766,7 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
   // Home re-reads on the jobs token and on nothing else.
   const noise = Object.keys(idle).filter(u => !POLLS.has(u) && !(/^\/api\/home/.test(u) && idleMoved.includes('jobs')));
   ok(noise.length === 0, `an idle page asks only its polls (${noise.length ? 'also ' + noise.join(', ') : Object.keys(idle).join(', ')}${idleMoved.length ? '; moved: ' + idleMoved.join(', ') : ''})`);
-  // ...and only so often (R218 step 10, against step 1's baseline of the
+  // ...and only so often (against step 1's baseline of the
   // revisions poll x20, the status poll x5 and the node list x4 in thirty
   // seconds on every page): a node's heartbeat moves only its numbers' own
   // token, which only the Nodes page reads, so Home reads neither the node
@@ -2847,7 +2846,7 @@ await section("a fold lasts for the page, and a reload starts it from the defaul
   const sel = `.doc.on details.sect[data-sect="${key}"]`;
   // Opened if it is not there: the request-count block above closes every
   // tab, and whether one came back before this ran depended on the layout
-  // poll, which is the whole of B219.
+  // poll.
   const focus = async () => {
     const had = await page.evaluate(k => { const t = tabs.find(x => x.kind === k);
                                            if (t) focusTab(t.id); return !!t; }, kind);
@@ -2934,10 +2933,10 @@ const DIALOGS = {
     rnEnvEdit = { i: -1, nsTyped: false, form: { name: 'prod', cluster: 'k_1', namespace: 'alpha-prod', registry: '', when: 'push',
                                                  branch: 'main', production: false } };
     rnDrawDeploy(); },
-  // Reset AerieOS (the operator, 12 Oct): the nodes to un-enroll first,
+  // Reset AerieOS: the nodes to un-enroll first,
   // what un-enrolling does, and the word. Opened, measured, never pressed.
   reset: () => askReset(),
-  // A conversation read from a notebook's Sessions view (R83): the
+  // A conversation read from a notebook's Sessions view: the
   // account's newest on alpha if it has one, else the same box with nothing
   // said in it, never a 404 the console would count.
   conversation: async () => {
@@ -3010,11 +3009,11 @@ async function dialogShape(pg = page){
     // A dialog of prose (About) may have headings; one of fields may not.
     // The verbs at the foot's right, after its .sp (the dialog's layout
     // rule): six dialogs had none and drew them at the left, under the
-    // toast stack's corner (B749).
+    // toast stack's corner.
     const fb = box.querySelector('.foot');
     const btns = fb ? [...fb.querySelectorAll('button')].filter(b => b.offsetWidth) : [];
     const gap = btns.length ? Math.round(fb.getBoundingClientRect().right - Math.max(...btns.map(b => b.getBoundingClientRect().right))) : 0;
-    // The census of the one shape (R50 step 81): its title the box's first
+    // The census of the one shape: its title the box's first
     // line, its foot the box's own, centered over the page, its width, and
     // the order of its foot (a state, the spacer, the verbs).
     const r = box.getBoundingClientRect();
@@ -3025,9 +3024,9 @@ async function dialogShape(pg = page){
       // Its title the first line, and one that shows: a notebook's rule hid
       // the sheet's while the element stood first (the dialog walk, 17 Nov).
       title: box.firstElementChild?.tagName === 'H3' && box.firstElementChild.offsetHeight > 0, ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
-      // ...and in Perch's voice (the operator, 23 Nov): the section voice,
+      // ...and in Perch's voice: the section voice,
       // sentence case, a band a pop-out's height, never small capitals.
-      // ...and its foot at the box's foot, a held box's too (R273: a box held
+      // ...and its foot at the box's foot, a held box's too (a box held
       // at its tallest pane's height showed a shorter pane with its buttons
       // under it and the rest of the height empty below them).
       low: fb ? Math.round(r.bottom - fb.getBoundingClientRect().bottom) : null,
@@ -3065,7 +3064,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   const d = seen ? await dialogShape() : { err: 'nothing opened' };
   const id = await page.evaluate(() => [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.id || '');
   if (id) opened.add(id);
-  // One shape for every dialog (R50 step 81): its title the box's first
+  // One shape for every dialog: its title the box's first
   // line, its foot the box's own, centered over the page, its foot in the
   // rule's order (only a state before the spacer; the primary first among
   // the verbs; anything destructive last), and Escape puts it away.
@@ -3087,7 +3086,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
     ok(fh.length === 0, `[dialog ${name}] a label over each field, and no field touching the one above it${fh.length ? `: ${fh.join('; ')}` : ''}`);
   }
   ok(!d.err && d.gap <= 32, `[dialog ${name}] its verbs sit at the foot's right (${d.gap}px from its edge)`);
-  // The jump bar's chips sit in a row (the operator, 11 Oct): the dialog's
+  // The jump bar's chips sit in a row: the dialog's
   // field rule stacks a band's children, and the bar is a band.
   const jump = await page.evaluate(() => {
     const bar = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden)?.querySelector('.sectjump');
@@ -3141,7 +3140,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   ok(!rhythm.err && rhythm.odd.length === 0,
      `[dialog ${name}] one rhythm down the band (${rhythm.want}px, ${rhythm.tight}px under a label)${
        rhythm.err ? ` (${rhythm.err})` : rhythm.odd.length ? `: ${rhythm.odd.join('; ')}` : ''}`);
-  // ...a press on the dimmed page around it puts it away (R50 step 81),
+  // ...a press on the dimmed page around it puts it away,
   // and so does Escape, each as a person shuts it: opened again for the
   // second. A dialog holding something said once keeps a stray press.
   const shut = () => page.waitForFunction(() => ![...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden),
@@ -3162,15 +3161,15 @@ for (const [name, open] of Object.entries(DIALOGS)) {
     null, { timeout: 3000 }).then(() => true).catch(() => false);
   ok(escaped, `[dialog ${name}] Escape puts it away`);
   // ...and the focus goes back to what opened it, so a keyboard carries on
-  // from where the person was (R50 step 81).
+  // from where the person was.
   const back = await page.evaluate(() => {
     const o = window.__dlgOpener, a = document.activeElement;
     const say = e => !e ? 'nothing' : e === document.body ? 'body' : e.id || e.dataset?.c || String(e.className || e.tagName.toLowerCase()).slice(0, 30);
     return { opener: say(o), now: say(a), same: !!o && a === o };
   });
   ok(escaped && back.same, `[dialog ${name}] the focus goes back to what opened it (${back.opener}; now on ${back.now})`);
-  // ...and Back puts it away with the page under it staying where it was
-  // (the operator, 17 Nov). Put away by Escape it gave its entry in the
+  // ...and Back puts it away with the page under it staying where it was.
+  // Put away by Escape it gave its entry in the
   // history back, so Back is the dialog's alone; one that keeps a stray
   // press holds none, and Back passes it by.
   if (!KEEPS_A_STRAY_PRESS[name]){
@@ -3228,7 +3227,7 @@ await section("and again on a small phone, where the room runs out first", async
       if (!box) return 'no dialog';
       const r = box.getBoundingClientRect(), f = box.querySelector(':scope > .foot, :scope > .dlgbody > .foot')?.getBoundingClientRect();
       const off = [r.left, r.top, innerWidth - r.right, innerHeight - r.bottom].map(Math.round);
-      // But for a question (R265): a sheet at the foot, edge to edge, as tall
+      // But for a question: a sheet at the foot, edge to edge, as tall
       // as its words and no taller, the page showing above it.
       if (modal.classList.contains('askdlg') && !modal.classList.contains('typed'))
         return off[0] || off[2] || off[3] ? `a question's sheet ${off.join(',')} in from the edges`
@@ -3281,7 +3280,7 @@ await section("a finger, not a pointer", async () => {
     .filter(b => b.offsetHeight > 0 && b.getBoundingClientRect().right > innerWidth + 1).map(b => b.textContent.trim()));
   ok(cut.length === 0, `...and the bar fits a fold's 344px cover${cut.length ? `: cut off ${cut.join(', ')}` : ''}`);
   // ...and the top bar's search keeps its 80px there, nothing in the header
-  // pushed past the edge to make room (B744, B290).
+  // pushed past the edge to make room.
   const top = await phone.evaluate(() => ({ jump: Math.round(document.getElementById('jump').getBoundingClientRect().width),
     over: [...document.querySelectorAll('header > *')].filter(e => e.offsetWidth > 0 && e.getBoundingClientRect().right > innerWidth + 0.5).map(e => e.id || e.className) }));
   ok(top.jump >= 80 && top.over.length === 0, `...and the top bar's search is at least 80px wide at 344, the header inside the screen (${JSON.stringify(top)})`);
@@ -3289,7 +3288,7 @@ await section("a finger, not a pointer", async () => {
 });
 }
 
-// What is drawn over a tint reads 4.5:1 or more (R286 step 4): a pill, a
+// What is drawn over a tint reads 4.5:1 or more: a pill, a
 // chip, the quiet voice, a placeholder and a note, each against the first
 // painted ground under it, in a theme of each family and both of its halves,
 // on two pages that hold every kind. Measured settled: the crossfade between
@@ -3337,10 +3336,10 @@ if (runs('c')) await section("what is drawn over a tint reads 4.5:1 or more in e
   await look.close();
 });
 
-// A finger's target (R286 step 3): at a phone's width every press is at least
+// A finger's target: at a phone's width every press is at least
 // the 24px WCAG asks, or nothing else to press lies within 12px of its center,
 // or it carries a press area of its own around its words (an absolutely
-// placed ::after, B1006); a link in a sentence is the sentence's.
+// placed ::after); a link in a sentence is the sentence's.
 if (runs('c')) await section("every press at a phone's width is a finger's target", async () => {
   const thumb = await newPage(browser, { viewport: { width: 393, height: 852 }, isMobile: ENGINE === 'chromium', hasTouch: ENGINE === 'chromium' });
   await thumb.goto(URL); await ready(thumb);
@@ -3369,7 +3368,7 @@ if (runs('c')) await section("every press at a phone's width is a finger's targe
   await thumb.close();
 });
 
-// Every kind that opens, shuts or arrives moves (R285): a section's fold, a
+// Every kind that opens, shuts or arrives moves: a section's fold, a
 // roadmap row's details, a bug's row, and the bell, the Doctor and a row's
 // More menu. Sampled each frame, one box at a time: a probe that read many
 // boxes a frame slowed the frames it measured and read its own stalls as
@@ -3459,7 +3458,7 @@ if (runs('c')) await section("what opens, shuts or arrives moves, and never snap
   ok(bad.length === 0, `a section, a roadmap row and a bug's row slide each way, and the bell, the Doctor and a More menu arrive, at a desk and on a phone${bad.length ? `: ${bad.slice(0, 6).join('; ')}` : ''}`);
 });
 
-// A form's foot (R301): measured by where things are, not by their classes,
+// A form's foot: measured by where things are, not by their classes,
 // so a form however it was written is held. On every page at a desk and on a
 // phone: a bar's buttons stand 12px or more under the field above them and
 // end where the fields they serve end, and every form (a section or a dialog

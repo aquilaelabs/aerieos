@@ -1,4 +1,4 @@
-"""The released apps' windows (R79 step 8): the device door (devices.py) and
+"""The released apps' windows: the device door (devices.py) and
 the Files API (files.py) each refuse an app from before their window, by the
 name it said, and let through one that said nothing, which speaks the first."""
 import os

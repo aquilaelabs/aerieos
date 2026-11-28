@@ -79,7 +79,7 @@ def wrote(e):
 
 def format_flag(words):
     """`--format json|yaml|markdown|text` or `--json` taken out of a verb's
-    words (R167): (format, the words left). Text is what the verb prints
+    words: (format, the words left). Text is what the verb prints
     today; the rest are records.py's documents."""
     fmt, out, i = "text", [], 0
     while i < len(words):

@@ -1,12 +1,12 @@
 """The root agent does file work in an account's folder as that account
-(R240; the audit of 13 Nov: root opened, chmod'ed, chowned and uploaded by
+(root opened, chmod'ed, chowned and uploaded by
 path inside folders a job or session account owns, so a link left at the
 name was followed with root's reach).
 
-base.acting_as() gives the calling thread the account's file identity
-(setfsuid, setfsgid and the thread's own groups), base.as_root() takes
+base.acting_as gives the calling thread the account's file identity
+(setfsuid, setfsgid and the thread's own groups), base.as_root takes
 root's back for a file of the agent's own in the middle of it, and
-base.fs_probe() tries it for real before anything relies on it. Most of
+base.fs_probe tries it for real before anything relies on it. Most of
 this needs root to see for real, which a suite is not: the calls are held
 here with a stand-in for libc, and the last class runs only as root."""
 import os

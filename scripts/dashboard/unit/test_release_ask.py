@@ -1,4 +1,4 @@
-"""aerie version release's ask (R138): a project on `ask` puts the tag and the
+"""aerie version release's ask: a project on `ask` puts the tag and the
 commit it would mark in front of its owner, and only its owner; Approve
 runs the release as the Artifacts view's Release does, never the session
 itself; the dial is ask unless a project says otherwise."""
@@ -46,7 +46,7 @@ class ReleaseAsk(unittest.TestCase):
         self.assertIn("releases/tag/v0.5.4", out)
 
     def test_a_dev_ask_runs_the_dev_release(self):
-        # B453: Approve on a --dev ask cut the plain release.
+        # Approve on a --dev ask cut the plain release.
         r = phone.ask_release("the dev build", "app", "", dict(PLAN, tag="v0.5.4-dev.9"), "u_00000002", "ada",
                               asker_name="sean", principal="session:app", dev=True)
         phone.decide(r["id"], True, "u_00000002", name="ada", admin=False)

@@ -1,12 +1,12 @@
-"""What this node's disks hold (the Storage page; R146 step 3, disk by
+"""What this node's disks hold (the Storage page, disk by
 project): each real filesystem with its size and use, each store with what
 it holds, Docker's own share, and each project's folders on the node, in
 the stores and in the accounts' build caches.
 
 A walk of a big store is minutes, not seconds, so it is never the census's
-to wait on: the census carries the last measurement (`last()`), a thread of
+to wait on: the census carries the last measurement (`last`), a thread of
 its own takes a new one once an hour, and the Storage page's Measure now is
-a job that takes one at once (`measure()`). Each walk runs at the lowest
+a job that takes one at once (`measure`). Each walk runs at the lowest
 CPU and IO priority, so a full disk being looked at never slows a build.
 """
 import contextlib
@@ -190,8 +190,8 @@ def _account_builds(home):
     return out, (whole or {}).get("") if whole is not None else None
 
 
-# A project's virtual phones (R123): each account's AVDs for it, in the
-# folder aerie emu keeps them in (~/.android/avd-projects/PROJECT, B511), which
+# A project's virtual phones: each account's AVDs for it, in the
+# folder aerie emu keeps them in (~/.android/avd-projects/PROJECT), which
 # no store holds, so the emulator column read the data store's emu/ and
 # missed every one of them (bb-sandbox, 23 Oct: 20 GB of phones, none shown).
 AVD_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
@@ -224,7 +224,7 @@ def avd_running(avd_dir):
     """Whether the emulator holds this AVD: its multiinstance.lock flocked,
     the test aerie emu's emu_held makes. The lock is in an account's home:
     opened only as a regular file reached by no link, and never waited on
-    (a FIFO there held the whole walk, R247 step 5)."""
+    (a FIFO there held the whole walk)."""
     import fcntl
     import stat
     lock = os.path.join(avd_dir, "multiinstance.lock")
@@ -262,7 +262,7 @@ def _phones(home):
                     mb = (sizes or {}).get(name + ".avd") if sizes is not None else None
                     avd = os.path.join(d, proj, name + ".avd")
                     # When it last started and what its quick-boot snapshot
-                    # holds (R129): what the room keeper and aerie tidy go by.
+                    # holds: what the room keeper and aerie tidy go by.
                     ran = next((int(os.path.getmtime(os.path.join(avd, f))) for f in ("hardware-qemu.ini", "emulator-user.ini")
                                 if os.path.exists(os.path.join(avd, f))), 0)
                     snap = (_du_children(os.path.join(avd, "snapshots")) or {}).get("", 0)

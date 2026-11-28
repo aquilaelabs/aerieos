@@ -57,7 +57,7 @@ def _git(cwd, *args):
     try:
         # GIT_OPTIONAL_LOCKS=0: a status here is a read, and without it git
         # refreshes the index and writes it, which on a synced project is a
-        # change the node's own next index then conflicted with (B617).
+        # change the node's own next index then conflicted with.
         r = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True,
                            text=True, timeout=20, check=False,
                            env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
@@ -131,10 +131,10 @@ def collisions(project, worktrees, names=None):
 
 def key(uid, agent="", slot=1):
     """The notes' key for one session: the account, and the coding agent
-    after a slash when it is not Claude (R95). One person's Claude and Codex
+    after a slash when it is not Claude. One person's Claude and Codex
     sessions on a project are two sessions, each told when the other has
     the file it is about to edit; Claude's key is the account alone, as it
-    always was. A slot past the first (R143) adds its number after a #:
+    always was. A slot past the first adds its number after a #:
     one person's two Claude sessions are two sessions too."""
     agent = str(agent or "")
     k = str(uid) if agent in ("", "claude") else f"{uid}/{agent}"
@@ -151,7 +151,7 @@ def said(k, names=None):
     product = agent or "Claude Code"
     try:
         # Loaded by path from aerie work too (dash.load), so the table beside
-        # this file is put on the path first (B229).
+        # this file is put on the path first.
         here = os.path.dirname(os.path.abspath(__file__))
         if here not in sys.path:
             sys.path.insert(0, here)

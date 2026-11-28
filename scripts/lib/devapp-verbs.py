@@ -42,7 +42,7 @@ def _project():
 def built_from(st):
     """What a build was made from, said as what it is: a commit, with the
     branch when one was pinned, or for a container written here, which has
-    no repository, its compose file and env hashed (B735)."""
+    no repository, its compose file and env hashed."""
     rev = st.get("built_rev") or ""
     if st.get("written"):
         return f"its definition {rev} (the compose file and env, hashed: no repository behind it)"
@@ -57,7 +57,7 @@ def status():
                    auth=_auth())
     # Asked bare where the space has several instances and none is its
     # main: each one's state, as aerie devapp ls lists them, where the bare
-    # verb refused and was asked again with --instance every time (R289).
+    # verb refused and was asked again with --instance every time.
     m = re.search(r"--instance names one of (.+)$", str(d.get("error") or ""))
     if m and not os.environ.get("BB_DEV_INSTANCE") and not os.environ.get("BB_DEV_CONTAINER"):
         for i, name in enumerate(x.strip() for x in m.group(1).split(",")):
@@ -77,7 +77,7 @@ def status():
               "no dev instance: with one there, aerie devapp new builds it from this tree")
         raise SystemExit(0)
     # Its own name, and the one the Containers page lists it under where it
-    # was renamed there: either names it to every aerie devapp verb (B338).
+    # was renamed there: either names it to every aerie devapp verb.
     # A project's default instance (main) is called by its project's name,
     # which is the one it is listed under.
     inst, named = st.get("instance") or "", st.get("name") or ""
@@ -92,7 +92,7 @@ def status():
     if st.get("built_rev"):
         print(f"  {'built from':<12} {built_from(st)}")
     elif st.get("needs_build"):
-        # Said what it waits for (B127): an ask on the bell, or a rebuild.
+        # Said what it waits for: an ask on the bell, or a rebuild.
         print(f"  {'built from':<12} nothing here yet: its first build is an Approve on the bell, "
               "or aerie devapp rebuild")
     if st.get("running"):
@@ -107,7 +107,7 @@ def status():
     if job.get("running"):
         print(f"  {'job':<12} {job.get('step') or 'working'}")
     elif job.get("error"):
-        # Whole: a cut one hid which port was taken (B338).
+        # Whole: a cut one hid which port was taken.
         print(f"  {'job':<12} last one failed: {str(job['error'])[:600]}")
 
 
@@ -131,13 +131,13 @@ def _answers_at(name):
         if row is None and isinstance(d, dict):
             # The list a session reads is its project's node's: an instance
             # shipped to a hosting node is not in it, and this line used to
-            # go missing without a word (report #129, B424).
+            # go missing without a word (report #129).
             print(f"  {'answers at':<12} not known from here: {name} is not on the project's node's list; "
                   "an instance on a hosting node is read on that node's Containers page")
         elif row is not None and not row.get("ports"):
             print(f"  {'answers at':<12} nowhere: its compose file publishes no port")
         elif route.get("why"):
-            # Why not, where the route can say (B339): a port kept on its
+            # Why not, where the route can say: a port kept on its
             # node, which only that node's nginx answers for, above all.
             on = f" on {row['node_name']}" if row.get("node_name") else ""
             print(f"  {'answers at':<12} nowhere from here{on}: {route['why']}")
@@ -164,8 +164,8 @@ def _client(instance=None):
     def look(patient=False):
         # `state` parses the compose on the instance's node, which on a slow
         # node is longer than one request's thirty seconds; this verb said
-        # "timed out" and stopped while the rebuild went on to succeed
-        # (B266). Given the time, and in the poll a slow look is a look to
+        # "timed out" and stopped while the rebuild went on to succeed.
+        # Given the time, and in the poll a slow look is a look to
         # try again rather than the verb's last word.
         d = post({"action": "state"}, timeout=180)
         if d.get("error"):
@@ -181,7 +181,7 @@ def rebuild():
     auth = _auth()
     post, look = _client()
     # A rebuild's plan carries the compose file and env from the
-    # controller's copy, so an edit made here goes up first (B623).
+    # controller's copy, so an edit made here goes up first.
     syncwait.up(_project(), "the rebuild takes the compose file from the controller's copy")
     # What it was built from before, because that is the only signal that says a
     # build HAPPENED. A job that succeeded is not news to the row (job_view
@@ -191,7 +191,7 @@ def rebuild():
     was = (look().get("built_rev") or "")
     # As patient as the look: the controller checks the instance on its node
     # before it answers, and on a slow round trip there the default thirty
-    # seconds ran out while the build went ahead (B298).
+    # seconds ran out while the build went ahead.
     r = post({"action": "rebuild", "why": os.environ.get("BB_DEV_WHY", "")}, timeout=180)
     if r.get("error") and "timed out" in str(r["error"]).lower():
         # Not a refusal: the request reached the controller, which may have
@@ -221,7 +221,7 @@ def rebuild():
 
 def _after_hang_up(look, post, was):
     """The controller closed the connection on the rebuild before answering
-    (B803: a restart landing mid-request, report #113): it may have queued
+    (a restart landing mid-request, report #113): it may have queued
     the build or not. A look for ten seconds tells which; a build that
     started is watched, and one that did not is asked for once more, which
     cannot build twice since nothing is building."""
@@ -243,7 +243,7 @@ def _watch(look, was, auth, job_id=""):
     the build's job when the answer named one, and is what is followed
     then: the row alone missed a rebuild of an unchanged commit that ended
     between two looks, since it saw neither a running job nor a new
-    revision, and said no build appeared over one that had (B312)."""
+    revision, and said no build appeared over one that had."""
     what = "rebuild" if was else "build"
     print(f"[builderbot] {what}ing; it runs on the node's daemon and takes minutes",
           file=sys.stderr)
@@ -290,7 +290,7 @@ def _watch(look, was, auth, job_id=""):
             # Running is looked at again a few seconds on before it is said:
             # a container that exits as it starts (a dashboard refusing its
             # state, a crash on boot) reads running for that moment, and was
-            # called up with exit 0 (B804).
+            # called up with exit 0.
             stopped = False
             if st.get("running"):
                 for _ in range(2):
@@ -331,14 +331,14 @@ def new():
     auth = _auth()
     post, _ = _client()
     # The compose file is read from the controller's copy: what was written
-    # here a moment ago goes up first (B623).
+    # here a moment ago goes up first.
     syncwait.up(_project(), "the controller reads the compose file from its copy")
     body = {"action": "new", "why": os.environ.get("BB_DEV_WHY", ""),
             "ref": os.environ.get("BB_DEV_REF", ""),
             "compose": os.environ.get("BB_DEV_COMPOSE", ""),
             "override": os.environ.get("BB_DEV_OVERRIDE", "")}
     # A hosting node the project names (Hosts its containers on): built on
-    # its own node and shipped there (R166).
+    # its own node and shipped there.
     if os.environ.get("BB_DEV_HOST"):
         body["node"], body["ship"] = os.environ["BB_DEV_HOST"], True
     path = os.environ.get("BB_DEV_FILE", "")
@@ -373,7 +373,7 @@ def test():
     # this gave up saying "timed out", and the controller started the run anyway.
     # So a fifteen-minute suite ran unattended inside the container, its output
     # going to a job nobody was reading, holding the node's one slot, while the
-    # caller was told nothing had been timed (B202, four sightings on 21 Sep).
+    # caller was told nothing had been timed (four sightings on 21 Sep).
     START_WAIT = 120
     r = bbapi.call("/api/devapp", {"project": proj, "instance": os.environ.get("BB_DEV_INSTANCE", ""),
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
@@ -412,7 +412,7 @@ def follow_remove(jid, forgot=False, allowed=False):
     """A remove's down is a job, and the answer only says it was queued:
     followed to its end, so a down that failed (a compose file gone from the
     tree: "empty compose file") is said as a failure with the container still
-    up, never as removed (B755, report #111), whether it ran at once or after
+    up, never as removed (report #111), whether it ran at once or after
     an Allow."""
     auth = _auth()
     for _ in range(300 if jid else 0):
@@ -464,7 +464,7 @@ def edit():
         d = post({"action": "env-get"})
         need(d)
         # Ended with a newline whatever was stored, so a line appended to
-        # this output stands on its own (B314).
+        # this output stands on its own.
         text = d.get("text") or ""
         sys.stdout.write(text if not text or text.endswith("\n") else text + "\n")
         if d.get("seeded"):
@@ -488,7 +488,7 @@ def edit():
             sys.exit(f"[builderbot] ERROR: {o.get('out') or 'it would not start'}")
         if verb == "remove":
             # Allow queued the down as a job, whose id is the outcome's
-            # words: followed like the direct remove's (B15, report #111).
+            # words: followed like the direct remove's (report #111).
             out = str(o.get("out") or "")
             follow_remove(out if out.startswith("j_") else "", allowed=True)
         else:
@@ -504,7 +504,7 @@ def ls():
     proj = _project()
     # The listing is a read on the node, which right after a build starts
     # there took longer than the client's thirty seconds and stopped with
-    # "timed out" (B310): the look's patience, and a timeout that names the
+    # "timed out": the look's patience, and a timeout that names the
     # reason rather than the clock.
     d = bbapi.call("/api/docker?project=" + urllib.parse.quote(proj), auth=_auth(),
                    timeout=180)
@@ -532,7 +532,7 @@ def ls():
         rows.append((c.get("name") or c.get("id") or "", "not ours", c.get("state") or "?",
                      " ".join(c.get("ports") or []), c.get("node_name") or ""))
     if not rows:
-        # What the session can do next, not what the operator could (B537):
+        # What the session can do next, not what the operator could:
         # with a compose file at the root, its own aerie devapp new is the way
         # in, and the Docker tab's row is for a container made elsewhere.
         st = bbapi.call("/api/devapp", {"project": proj, "action": "state"}, auth=_auth())
@@ -546,7 +546,7 @@ def ls():
                   "and a container made elsewhere is put under it on the Containers page by an administrator")
         raise SystemExit(0)
     # Which node each is on, where the project's containers are on more
-    # than one (B338).
+    # than one.
     w = max(len(r[0]) for r in rows)
     wn = max(len(r[4]) for r in rows)
     for name, kind, state, ports, node in sorted(rows):
@@ -581,7 +581,7 @@ def ctl():
 
 def probe():
     """aerie devapp probe [--port N] [--path /x]: whether the instance answers on
-    its node's loopback (R248), each published port: open or refused, and
+    its node's loopback, each published port: open or refused, and
     the HTTP status of a GET of the path."""
     args, port, path = sys.argv[2:], "", "/"
     while args:

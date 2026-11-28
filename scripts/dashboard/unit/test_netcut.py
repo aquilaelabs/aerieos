@@ -1,5 +1,5 @@
 """The network cut for a declared pack's install steps where the job account
-cannot make a network namespace itself (R234): a distribution that keeps
+cannot make a network namespace itself: a distribution that keeps
 user namespaces from unprivileged accounts refused the cut on the dev node
 and on the session node on 13 Nov, and such a pack's steps ran with the
 network. A managed node's root agent installs a helper (nodes/bb-netcut) and
@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
 class VirtiofsdWrap(unittest.TestCase):
     """The VM host feature's virtiofsd wrapper kept as the bundle's
-    provisioner writes it (R247 step 5): it checks a shared folder at every
+    provisioner writes it: it checks a shared folder at every
     start, and a node that had the feature kept the old one otherwise."""
 
     def test_a_node_with_the_wrapper_takes_the_bundles_and_one_without_gets_none(self):

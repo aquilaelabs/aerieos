@@ -1,4 +1,4 @@
-"""Behind `aerie tool sound` (R107): sound effects a session makes for an app, and
+"""Behind `aerie tool sound`: sound effects a session makes for an app, and
 the pictures that let it check one it cannot hear.
 
     aerie tool sound make PRESET [--seed N] [--name NAME] [--wav]

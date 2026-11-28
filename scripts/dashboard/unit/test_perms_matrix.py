@@ -1,5 +1,5 @@
-"""Every action against every area at every level (R277, the operator, 24 Nov:
-'there's been a lot of changes and I'm worried it's drifted').
+"""Every action against every area at every level
+('there's been a lot of changes and I'm worried it's drifted').
 
 A role holding one area at one level, on a space or Everywhere, is asked
 about every action the server checks (roles.CAP_AREA), on its own space,
@@ -69,7 +69,7 @@ class Matrix(unittest.TestCase):
 
     def test_a_role_on_a_space_holds_no_global_area(self):
         # Set with one, it keeps none of it: a global area is only ever an
-        # Everywhere role's (the areas' rule since R152).
+        # Everywhere role's (the areas' rule).
         roles.set_role("sneak", scope="projects", perms={"projects": "read", "controller": "write", "accounts": "write"})
         u = {"name": "x", "role": "user", "roles": [], "projects": ["alpha"], "project_roles": {"alpha": ["sneak"]}}
         for action in ("controller", "admin", "debug", "command-pin"):

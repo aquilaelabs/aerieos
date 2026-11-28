@@ -1,4 +1,4 @@
-"""The vetted catalog's index (R169 step 2): signed by the maintainers'
+"""The vetted catalog's index: signed by the maintainers'
 key, verified against the public half the install ships before an entry
 is read, a tampered or re-signed index refused with the one before kept,
 each entry held to its shape, and a withdrawn pack the install holds put
@@ -31,7 +31,7 @@ class Index(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
-        # A catalog asked behind a read lands before the folder goes (B1000).
+        # A catalog asked behind a read lands before the folder goes.
         self.addCleanup(catalogindex.settle)
         catalogindex.configure(state=self.d)
         catalogindex._cache.update(at=0.0, index=None, error="")
@@ -58,7 +58,7 @@ class Index(unittest.TestCase):
             return json.load(f)
 
     def test_an_index_is_current_as_long_as_its_freshness_statement_says(self):
-        # R290 step 7: a frozen index (one a mirror keeps answering after it
+        # A frozen index (one a mirror keeps answering after it
         # was replaced) is said on the Doctor once it is no longer current.
         import calendar
         import hashlib
@@ -172,7 +172,7 @@ class Index(unittest.TestCase):
         self.assertNotIn("error", catalogindex.fetch(url, opener=self.served([ENTRY], "2026-10-29T00:00:00Z")))
         # Once a dated one is kept, one with no date is refused again.
         self.assertIn("does not say when it was made", catalogindex.fetch(url, opener=self.served([ENTRY], None))["error"])
-        # The index kept is one address's (B443): another catalog's first
+        # The index kept is one address's: another catalog's first
         # answer is not measured against it.
         other = catalogindex.fetch("https://other.example/", opener=self.served([ENTRY], "2026-10-01T00:00:00Z"))
         self.assertNotIn("error", other, other)
@@ -268,7 +268,7 @@ class Index(unittest.TestCase):
         self.assertIn("did not answer", r4["error"])
         self.assertEqual(len(r4["index"]["packs"]), 1)
         # Another address under Controller settings: neither the cache nor
-        # the kept index is the old catalog's answer (B443).
+        # the kept index is the old catalog's answer.
         r5 = catalogindex.index("https://other.example/", opener=down)
         self.assertIn("did not answer", r5["error"])
         self.assertIsNone(r5["index"])
@@ -320,7 +320,7 @@ class Index(unittest.TestCase):
             self.assertIn('"catalog_index": catalogindex.said(settings.get("catalog_url") or None) if users.is_admin(who) else None,', f.read())
 
     def test_an_index_signed_by_the_spare_is_read_as_one_signed_by_the_key(self):
-        # R232: the install ships the key and its spare; an index signed by
+        # The install ships the key and its spare; an index signed by
         # either is read, and a third key's is still refused.
         data, sig = self.signed([ENTRY])
         spare = ed25519.Ed25519PrivateKey.generate()
@@ -353,7 +353,7 @@ class Index(unittest.TestCase):
         self.assertEqual(len(catalogindex.index("https://catalog.example/", opener=down_fail)["index"]["packs"]), 2)
 
     def test_an_index_kept_past_its_hour_answers_at_once_and_the_catalog_is_asked_behind_it(self):
-        # B1000: the read waited on the network, two fetches of 20 seconds
+        # The read waited on the network, two fetches of 20 seconds
         # each with the host down, and the Library stalled every few minutes.
         url = "https://catalog.example/"
         catalogindex.fetch(url, opener=self.served([ENTRY], "2026-10-29T00:00:00Z"))
@@ -471,7 +471,7 @@ class Made(unittest.TestCase):
 
 class Folders(unittest.TestCase):
     def test_an_entry_in_a_folder_keeps_its_path_and_a_bad_one_is_dropped(self):
-        # R170 step 6: the catalog's own packs live in folders of its repository.
+        # The catalog's own packs live in folders of its repository.
         good = {**ENTRY, "name": "jdk", "path": "packs/official/jdk", "kind": "app"}
         bad = {**ENTRY, "name": "evil", "path": "../etc"}
         plain = {**ENTRY, "name": "plain"}
@@ -482,7 +482,7 @@ class Folders(unittest.TestCase):
 
 class Kinds(unittest.TestCase):
     def test_an_entrys_kind_and_folder_are_kept(self):
-        # R170 steps 6 and 7, R172: a pack, a Docker app or a service, in a folder of its repository.
+        # A pack, a Docker app or a service, in a folder of its repository.
         rows = [{**ENTRY, "name": "jdk", "path": "packs/official/jdk"}, {**ENTRY, "name": "whoami", "kind": "app", "path": "packs/apps/whoami"},
                 {**ENTRY, "name": "model-router", "kind": "service"}, {**ENTRY, "name": "evil", "path": "../etc"}, {**ENTRY, "name": "odd", "kind": "thing"}]
         idx, why = catalogindex.parse(json.dumps({"version": 1, "generated": "x", "packs": rows}).encode())
@@ -494,7 +494,7 @@ class Kinds(unittest.TestCase):
 
 class Shipped(unittest.TestCase):
     def test_a_coding_agent_s_entry_says_its_recipe_s_rev(self):
-        # R169 step 13: an install fetches an agent's pack only when the
+        # An install fetches an agent's pack only when the
         # index says its install recipe is newer than the release's.
         packs = [dict(ENTRY, name="open", tier="official", path="packs/agents/open", install_rev=3),
                  dict(ENTRY, name="grok", tier="official", path="packs/agents/grok", install_rev="3"),
@@ -521,11 +521,11 @@ class Shipped(unittest.TestCase):
 
     def test_the_image_carries_the_key_the_index_is_checked_against(self):
         # Left out, every released install said it ships no catalog key and
-        # trusted no index (B451); a bare-metal install lays out by the same lines.
+        # trusted no index; a bare-metal install lays out by the same lines.
         root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         with open(os.path.join(root, "Dockerfile"), encoding="utf-8") as f:
             self.assertIn("COPY config/catalog.pub /opt/aerieos/config/catalog.pub", f.read())
-        # ...the key and its spare on the second line (R232), a key of its own.
+        # ...the key and its spare on the second line, a key of its own.
         keys = catalogindex._pubkeys(os.path.join(root, "config", "catalog.pub"))
         self.assertEqual(len(set(keys)), 2, "the repository names the catalog's key and a spare for it")
 

@@ -1,5 +1,5 @@
-"""The QR encoder (R127): its codes were read back by a decoder (jsQR 1.4.0,
-23 Oct) for a short text, an authenticator's otpauth address, a
+"""The QR encoder: its codes were read back by a decoder (jsQR 1.4.0)
+for a short text, an authenticator's otpauth address, a
 three-hundred-character text and UTF-8; these hold them to those modules."""
 import hashlib
 import os

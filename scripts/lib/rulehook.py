@@ -1,4 +1,4 @@
-"""What a session's hooks keep between calls about the house rules (R200).
+"""What a session's hooks keep between calls about the house rules.
 
 Two small records, on the machine the session runs on, in the account's
 own folder for the space (scopedir.scope_dir) beside bb-check-relay's stamp:
@@ -49,11 +49,11 @@ def post_hook(body, timeout=10):
     """One word to the controller's hook endpoint, with the session's own
     token: how a session on a node reaches the store it cannot read or write
     (roadmap #24). The answer, or {} for anything that is not one. Every
-    word names which coding agent's session speaks (R95 step 7) and its slot
-    on the space (R143), which the launcher sets, because the controller
+    word names which coding agent's session speaks and its slot
+    on the space, which the launcher sets, because the controller
     counts each one as heard from that session (hooks.verb)."""
     # A hook runs under a timeout of its own: a call here never waits out a
-    # restarting controller (bbapi.request, R251), it says so at once.
+    # restarting controller (bbapi.request), it says so at once.
     os.environ["BB_CONTROLLER_WAIT"] = "0"
     import bbapi
     body = {**body, "agent": os.environ.get("BB_AGENT") or "claude", "slot": os.environ.get("BB_SLOT") or "1"}
@@ -158,9 +158,9 @@ def refused(guards, command, background=False):
 
 def refusal(g, command):
     """What a refused Bash call is told, in place of running. `command` is
-    the line as the session wrote it: the part refused() hands back is
+    the line as the session wrote it: the part refused hands back is
     cmdmatch's words joined again, which read `2>&1` as `2 >` and dropped
-    quotes, so a session could not see what to change (R289)."""
+    quotes, so a session could not see what to change."""
     whose = {"builderbot": "AerieOS's briefing", "claude": "a note a session left"}.get(
         g.get("by"), "the operator's house rule")
     line = " ".join(str(command).split())
@@ -170,7 +170,7 @@ def refusal(g, command):
             "your reply and leave it to the person; do not run it another way.")
 
 
-# ---- the map first (the operator, 12 Oct) -----------------------------------
+# ---- the map first -----------------------------------
 # A grep for where something is defined, or where it is called, is a
 # question the code map answers in one call with the function's own
 # comment (`aerie map find`). A session that greps for it anyway is handed
@@ -179,7 +179,7 @@ def refusal(g, command):
 
 _DEF_WORDS = r"(?:async\s+function|function|def|class|fn|func|fun|interface|struct|enum|const|let|var|type)"
 # At the pattern's start, after its modifiers: "does not let run" and "the
-# type field" are text, never a lookup of run or field (R289).
+# type field" are text, never a lookup of run or field.
 _DEF = re.compile(r"^\^?\s*(?:(?:export|pub|public|private|static|async|default)\s+)*" + _DEF_WORDS
                   + r"\s+([A-Za-z_][A-Za-z0-9_]{2,})")
 _CALL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]{3,})\($")
@@ -246,7 +246,7 @@ def search_patterns(command):
     return out
 
 
-# ---- the rule checks run in the background (B824) ----------------------------
+# ---- the rule checks run in the background ----------------------------
 # bb-check-relay starts `aerie rules check` detached for a project whose new
 # asks cut a test run, so the person's next message is not held behind the
 # suite. Its run is one record beside the stamp: the tree it measured, its

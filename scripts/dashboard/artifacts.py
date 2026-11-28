@@ -23,7 +23,7 @@ that actually says so is the shebang on its first line. So a file whose
 extension this module does not know is opened and its first two bytes read.
 Nothing is executed from here, ever: the tab downloads and it reads.
 
-What a session looks with is in dist/ too (R96): a reel's sheet under
+What a session looks with is in dist/ too: a reel's sheet under
 dist/reel/NAME, a page's shot under dist/shot and an emulator's under
 dist/emu, each with a record of who asked and when. Those are not what the
 project ships, so the listing
@@ -62,9 +62,9 @@ DIST = "dist"
 UID_RE = re.compile(r"^u_[0-9a-f]{8}$")
 # The project's "captures kept" days, set by server.py from prefs.
 capture_days = None
-# ...and how many dev builds of each kind it keeps (R105), from prefs too.
+# ...and how many dev builds of each kind it keeps, from prefs too.
 dev_keep = None
-# The routes this project has a signing key for (signing.py, R106), set by
+# The routes this project has a signing key for (signing.py), set by
 # the server: what Sign on an .apk or .aab row may offer.
 sign_routes = None
 # scripts/lib/capture.py, loaded by path: captures(dist) and prune(dist, days, names).
@@ -104,7 +104,7 @@ def configure(*, workspace, worktrees=None, capture=None, state=None, write_json
 
 def _tree(project, tree=""):
     """The tree whose dist/ is meant: the project directory, or an account's
-    worktree of it by uid, None for a uid that is not one (B237). A second
+    worktree of it by uid, None for a uid that is not one. A second
     account's session builds in its worktree, and its build lands there."""
     if not tree:
         return WORKSPACE / project
@@ -178,7 +178,7 @@ def listing(project, tree=""):
 
 def branches(project):
     """[{uid, branch, artifacts}] for each account's worktree of this project
-    with something in its dist/ (B237). A second account's build lands in its
+    with something in its dist/. A second account's build lands in its
     worktree, where the tab used to never look, so its first build showed
     nothing. Listed apart from the project's own dist/, which is what ships:
     a branch's build is that branch's until it is merged."""
@@ -391,11 +391,11 @@ def pin(project, rel, on, by=""):
     return {"ok": True, "path": rel, "pinned": bool(on)}, 200
 
 
-# ---- dev builds: the newest few builds of each product (R105) ---------------------
+# ---- dev builds: the newest few builds of each product ---------------------
 # A dev build carries its version in its name the way aerie version --file
 # spells it (0.1.0-dev.17-9e09ad3, -dirty when the tree was), and a session
 # building all day leaves one file per build: seven debug APKs, 133 MB, in
-# one day on Shebang-DevBoard (30 Sep). Of each product (the name before its
+# one day on Shebang-DevBoard. Of each product (the name before its
 # version: Shebang-DevBoard-, Shebang-Voice-) the files of its newest few
 # builds stay, whatever follows the version (the project's "dev builds
 # kept", DEV_KEEP unless it says; 0 keeps them all), and the rest go.
@@ -403,7 +403,7 @@ def pin(project, rel, on, by=""):
 # It counted by the whole name with the version taken out once, which made
 # a renamed build a new kind: Shebang's first builds were -debug.apk and its
 # later -release.apk, so the three oldest debug builds were "the newest of
-# their kind" for good (85 MB, the operator, 6 Oct). A build that has been
+# their kind" for good (85 MB). A build that has been
 # signed keeps its signed copy only: the unsigned file was the signing's
 # input, and a signed one signs again (350 MB of Shebang's 811). A release
 # (no -dev.N) is never swept, nor a file whose name carries no version:
@@ -513,7 +513,7 @@ def start():
 def tab_view(name, uid):
     """The Artifacts view's whole read for one project, as account `uid`
     sees it: what it built, each account's own builds from its worktree
-    (B237) apart from dist/, which is what ships, what the project can and
+    apart from dist/, which is what ships, what the project can and
     cannot do off this box, its dev instances, and the phone."""
     keep = dev_keep(name) if dev_keep else DEV_KEEP
     sweep_dev_builds(name, keep)
@@ -530,9 +530,9 @@ def tab_view(name, uid):
 
 def download(name, rel, tree=""):
     """One file for the download: ((filename, bytes), 200), or an error and
-    its status. Resolved and prefix-checked in resolve(): a symlink inside
+    its status. Resolved and prefix-checked in resolve: a symlink inside
     dist/ must not turn this into a file server for the whole box. `tree`
-    is an account's worktree by uid, for a build made there (B237)."""
+    is an account's worktree by uid, for a build made there."""
     f = resolve(name, rel, tree)
     if f is None:
         return {"error": "no such artifact"}, 404

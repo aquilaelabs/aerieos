@@ -1,4 +1,4 @@
-"""A space's Kubernetes environments (R281 step 3): an environment saved
+"""A space's Kubernetes environments: an environment saved
 makes its namespace ready on its cluster (the namespace, a ServiceAccount
 and a Role and RoleBinding confined to it), a namespace somebody else made
 is refused and never taken over, what is typed is checked, and removing one

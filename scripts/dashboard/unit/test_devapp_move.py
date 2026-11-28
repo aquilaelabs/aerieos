@@ -1,5 +1,5 @@
-"""Moving a project's own container to another project (devapp.move_instance,
-the operator, 8 Oct): rekeyed under the new project with the compose name it
+"""Moving a project's own container to another project (devapp.move_instance):
+rekeyed under the new project with the compose name it
 already had, so its containers, env file and data directory are untouched,
 pinned to the node it is on, its owner and branch said for the new home."""
 import json
@@ -24,8 +24,8 @@ class Scripts(unittest.TestCase):
     """The pack and unpack scripts ride the plan's argv, where the agent
     rewrites the {cdir} placeholder wherever it stands: a variable of that
     name in the python pointed the helper's mount at the compose directory
-    while the tar had gone into in/ (B659). And a failed stage's row says
-    what the job last wrote, not where to look (B658)."""
+    while the tar had gone into in/. And a failed stage's row says
+    what the job last wrote, not where to look."""
 
     def test_the_scripts_never_spell_the_placeholder(self):
         for text in (relocate.PACK_PY, relocate.UNPACK_PY):
@@ -38,7 +38,7 @@ class Scripts(unittest.TestCase):
 
     def test_a_failed_step_says_its_last_telling_line(self):
         """A compose step's row carries the last line that says something
-        (B658: the whole tail, newlines flattened, read as a wall)."""
+        (the whole tail, newlines flattened, read as a wall)."""
         out = (" Network x_default Creating \n Network x_default Created \n Container x-db-1 Creating \n"
                " service:db:1 Error response from daemon: No such image: mariadb:11 \n Container x-web-1 Creating \n"
                "Error response from daemon: No such image: mariadb:11\n")
@@ -46,7 +46,7 @@ class Scripts(unittest.TestCase):
         self.assertEqual(devactions.last_line("$ docker compose up\n Container x Creating \n"), "Container x Creating",
                          "with nothing telling, the last line there is")
         self.assertEqual(devactions.last_line(""), "")
-        # B424: Docker's port refusal said whole, and a long line its end.
+        # Docker's port refusal said whole, and a long line its end.
         self.assertEqual(devactions.last_line(
             "Error response from daemon: driver failed programming external connectivity on endpoint site-web-1 "
             "(3f1c2a9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b): Bind for 0.0.0.0:8381 failed: port is already allocated"),

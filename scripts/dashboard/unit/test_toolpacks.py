@@ -1,4 +1,4 @@
-"""R77: a tool pack's manifest, checked and cut to what AerieOS reads,
+"""A tool pack's manifest, checked and cut to what AerieOS reads,
 fetched from a repository at a commit, kept pinned to it, and turned into
 one catalog row of the recipe machinery's own shape."""
 import json
@@ -61,7 +61,7 @@ class Manifest(unittest.TestCase):
         self.assertIn("install step 1 is a list of words", said)
 
     def test_a_platform_is_os_and_arch_and_the_refusal_names_the_wildcard(self):
-        # B111: the doc and the refusal agree: linux/* is any architecture,
+        # The doc and the refusal agree: linux/* is any architecture,
         # a bare * is refused, and the refusal shows the wildcard's form.
         ok = json.loads(json.dumps(GOOD))
         ok["platforms"] = ["linux/*", "darwin/*"]
@@ -116,14 +116,14 @@ class Repository(unittest.TestCase):
         self.assertEqual(row["source"], {"kind": "git", "url": self.url, "commit": seen["commit"], "fresh_only": True,
                                          "then": [{"run": ["sh", "{dir}/install.sh"]}],
                                          "verify": ["{dir}/bin/hexkit", "--version"],
-                                         # B83: what the install marks executable
+                                         # What the install marks executable
                                          "exec": ["{dir}/bin/hexkit"], "exec_dirs": ["{dir}/bin"]})
         self.assertEqual(row["pack"]["by"], "operator")
         self.assertIn("dump", row["verbs"])
         self.assertEqual(json.loads(toolpacks.catalog_json())["toolchains"][0]["name"], "hexkit")
 
     def test_the_catalogs_sha256_pins_the_archive(self):
-        # R169 step 4: the index's sha256 of the archive at the commit is
+        # The index's sha256 of the archive at the commit is
         # checked on the way in; a different one refuses the pack.
         import hashlib
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, capture_output=True, text=True, check=True).stdout.strip()
@@ -135,12 +135,12 @@ class Repository(unittest.TestCase):
         r = toolpacks.add(self.url, commit, "operator", sha256=good, tier="vetted")
         self.assertTrue(r.get("ok"), r)
         self.assertEqual((r["pack"]["tier"], toolpacks.recipes()[0]["pack"]["tier"]), ("vetted", "vetted"))
-        # ...and the node's toolchain rows carry it to the Library (B442).
+        # ...and the node's toolchain rows carry it to the Library.
         import toolchains
         row = next(t for t in toolchains.load_toolchains(toolpacks.recipes()) if t["name"] == "hexkit")
         self.assertEqual((row["pack"]["tier"], row["pack"]["path"]), ("vetted", ""))
         # The tier the index gave is kept, an official one too, and none
-        # without the index's sha256 (B440).
+        # without the index's sha256.
         self.assertEqual(toolpacks.add(self.url, commit, "operator", sha256=good, tier="official")["pack"]["tier"], "official")
         self.assertEqual(toolpacks.add(self.url, commit, "operator", tier="vetted")["pack"]["tier"], "url")
 
@@ -217,7 +217,7 @@ class Repository(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.tmp.name, "toolpacks")))
 
     def test_a_pack_in_a_folder_of_the_repository(self):
-        # R170 step 6: a pack kept in a folder (the catalog's own packs/):
+        # A pack kept in a folder (the catalog's own packs/):
         # fetched with its path, the sha256 over that folder's archive, and
         # kept as a pack made here from the folder's files alone.
         import hashlib
@@ -342,7 +342,7 @@ class Repository(unittest.TestCase):
         self.assertIn("no tool pack called", toolpacks.remove("hexkit")["error"])
 
     def test_remove_is_refused_while_a_node_holds_it(self):
-        # B84: its files would stay in that store with no row left to
+        # Its files would stay in that store with no row left to
         # uninstall them from, and the pack added back would read installed.
         toolpacks.add(self.url, toolpacks.fetch(self.url)["commit"], "operator")
         r = toolpacks.remove("hexkit", ["bb-dev-sandbox"])
@@ -464,7 +464,7 @@ class MadeHere(unittest.TestCase):
         self.assertEqual((kept["pack"]["manifest"]["tier"], toolpacks.recipe(kept["pack"])["pack"]["tier"]), ("url", "here"))
 
     def test_a_pack_without_about_is_still_a_row(self):
-        # B106: about is optional, and the catalog drops a row without one.
+        # About is optional, and the catalog drops a row without one.
         import toolchains
         m = {"name": "bare", "platforms": ["linux/amd64"], "verbs": {"go": {"run": ["{dir}/go"]}}}
         self.assertTrue(toolpacks.add_staged(self.paste(m)["staged"], "operator").get("ok"))

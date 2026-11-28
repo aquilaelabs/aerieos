@@ -1,4 +1,4 @@
-"""Start on boot (R122): a container's restart policy is read with the list,
+"""Start on boot: a container's restart policy is read with the list,
 set by boot-on and boot-off through the same verb as start and stop, kept
 for an instance of AerieOS's own, and put back by the next listing when a
 rebuild has reset it. Drives devapp and containers against a stand-in
@@ -45,7 +45,7 @@ class Boot(unittest.TestCase):
 
     def listing(self, rows):
         """A listing, the read it started off its path, and the next listing,
-        which is the one that has the answer (B476)."""
+        which is the one that has the answer."""
         devapp._boot_read(rows)
         if devapp._boot_thread is not None:
             devapp._boot_thread.join(5)
@@ -57,7 +57,7 @@ class Boot(unittest.TestCase):
         self.assertEqual([r["boot"] for r in self.rows], [False, True])
 
     def test_the_guard_lets_through_the_two_shapes_this_builds_and_no_other(self):
-        # B476: the guard refused both, so the switch never read or set a thing.
+        # The guard refused both, so the switch never read or set a thing.
         g = devapp._guard
         self.assertEqual(g([devapp.DOCKER, "inspect", "--format", devapp.BOOT_FORMAT, "aaaaaaaaaaaa"]), "")
         self.assertEqual(g([devapp.DOCKER, "update", "--restart", "unless-stopped", "web-1"]), "")
@@ -67,7 +67,7 @@ class Boot(unittest.TestCase):
         self.assertTrue(g([devapp.DOCKER, "update", "--restart", "always;rm", "web-1"]))
 
     def test_an_instance_of_several_services_is_stopped_together(self):
-        # B770: container_ctl names every container an instance means in one
+        # container_ctl names every container an instance means in one
         # docker stop, and the guard took exactly one name, so aerie devapp stop
         # builderbot-dev was refused as a bug.
         containers._targets = lambda name: [{"id": "c1", "name": "dev-ctl-1"}, {"id": "c2", "name": "dev-git-1"}]
@@ -101,7 +101,7 @@ class Boot(unittest.TestCase):
 
 
 class Seen(Boot):
-    """B470: on a node the listing is an agent job, and an inspect on every
+    """On a node the listing is an agent job, and an inspect on every
     listing was a second one; a container seen once is not asked again."""
 
     def test_a_second_listing_asks_docker_nothing_new(self):

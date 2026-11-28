@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The aerie reference in docs/reference.md, written from `aerie help`: the block
 # under "## The `aerie` helper" is replaced by what the checkout's bb prints,
-# minus its two header lines, so the two cannot drift (R91 step 5). `aerie lint`
+# minus its two header lines, so the two cannot drift. `aerie lint`
 # fails when they differ and names this. --print prints the block the
 # reference holds now.
 set -euo pipefail

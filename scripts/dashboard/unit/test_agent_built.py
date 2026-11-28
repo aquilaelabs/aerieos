@@ -1,4 +1,4 @@
-"""When the agent a node runs was built (R131): the controller's own build,
+"""When the agent a node runs was built: the controller's own build,
 written when the node first reports the agent it ships, kept with that
 digest, gone with another."""
 import os

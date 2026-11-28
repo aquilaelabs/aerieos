@@ -1,4 +1,4 @@
-"""The root startup hooks an administrator approves (B1166): scripts/root-hook
+"""The root startup hooks an administrator approves: scripts/root-hook
 keeps the approvals where only its runner writes, a hook runs (check) only as
 it was approved, a change or a folder another account could write makes it
 wait again, and roothooks.py reads and changes them through it. Run as this

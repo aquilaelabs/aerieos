@@ -1,4 +1,4 @@
-"""aerie git policy's printer (scripts/lib/git-policy.py, B734): the first line
+"""aerie git policy's printer (scripts/lib/git-policy.py): the first line
 says whether a push can happen at all, from the push state aerie settings
 --json carries, before the policy under it."""
 import json
@@ -42,7 +42,7 @@ class GitPolicy(unittest.TestCase):
 
 class PushState(unittest.TestCase):
     """Whether an https remote has a credential, read off the repository's
-    credential.helper (B1118): git-credential-bb on the space's token file
+    credential.helper: git-credential-bb on the space's token file
     is one, as git's store in the form older installs wrote is."""
     def _state(self, helper):
         # push_state alone, read out of the verbs' file: loading the file runs
@@ -83,8 +83,8 @@ class PushState(unittest.TestCase):
 
 
 class Prefs(unittest.TestCase):
-    """The hold is a third key of the git policy with its own two values
-    (the operator, 15 Oct): hold by default, off to let a push go unread."""
+    """The hold is a third key of the git policy with its own two values:
+    hold by default, off to let a push go unread."""
     def test_scan_takes_hold_or_off(self):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
         import prefs

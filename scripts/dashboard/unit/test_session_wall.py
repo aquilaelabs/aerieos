@@ -1,4 +1,4 @@
-"""The wall a session meets on the controller's own machine (R90 step 7):
+"""The wall a session meets on the controller's own machine:
 bb-session reads the folders /etc/bb-session.wall names and covers each in
 the view, and refuses to start a session (and `check` says why, which the
 node's row then says) when the machine carries a controller and no wall,
@@ -102,7 +102,7 @@ class Faults(unittest.TestCase):
 
     def test_a_group_that_is_root_by_another_door(self):
         # libvirt's, disk's, lxd's and incus-admin's are root on the machine
-        # as docker's is (R90 step 14): the session account in one is a fault.
+        # as docker's is: the session account in one is a fault.
         import collections
         import grp
         G = collections.namedtuple("G", "gr_gid")
@@ -116,7 +116,7 @@ class Faults(unittest.TestCase):
         self.assertIn(f"the session account ({ME}) is in the libvirt group", got)
 
     def test_an_account_user_is_held_to_the_same_groups(self):
-        # Each account's own user (R125, bbu-) runs that account's sessions,
+        # Each account's own user (bbu-) runs that account's sessions,
         # so a banned group of its is a fault as the session account's is.
         import collections
         import grp
@@ -244,7 +244,7 @@ class TheView(unittest.TestCase):
 class NoFallback(unittest.TestCase):
     """bb-tty runs a session without a view on a node that cannot build one
     (a Mac, a guest); on the controller's own machine it never does: a
-    failing check there is a refusal, in bb-session's words (R90)."""
+    failing check there is a refusal, in bb-session's words."""
 
     def run_in_view(self, marks):
         src = open(os.path.join(ROOT, "scripts", "dashboard", "bb-tty"), encoding="utf-8").read()

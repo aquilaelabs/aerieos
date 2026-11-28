@@ -1,7 +1,7 @@
 """The signed-in account's own settings: the Profile page.
 
 Anybody signed in, because this is about themselves, which is why it is not
-behind the admin gate the Users page wears. Out of server.py (R77): the
+behind the admin gate the Users page wears. Out of server.py: the
 server holds the door and writes the reply, with a fresh sign-in cookie when
 the account's name changes, since that is what the cookie is signed over.
 """
@@ -15,18 +15,18 @@ from timing import timed
 # and the nodes' names.
 users = None
 claude_email = None      # uid -> the Claude account signed in for it, or ""
-agent_emails = None      # uid -> {agent id: the accounts it is signed in as} (B296)
+agent_emails = None      # uid -> {agent id: the accounts it is signed in as}
 plugins_of = None        # (uid, {node id: name}) -> its plugins, as the nodes last said
 node_names = None        # () -> {node id: name}
 logs_of = None           # me -> the account's conversations with Claude (transcripts.mine)
-devices = None           # devices.py: the account's signed-in devices (R272), listed and signed out
-logins = None            # logins.py: the account's browser sign-ins (R158 step 8), listed and ended
-reach = None             # reach.py: where the bell reaches the person (R149)
+devices = None           # devices.py: the account's signed-in devices, listed and signed out
+logins = None            # logins.py: the account's browser sign-ins, listed and ended
+reach = None             # reach.py: where the bell reaches the person
 smtp_set = None          # () -> whether a mail server is set, for the email destination's hint
-mfa = None               # mfa.py: the account's second factors (R127)
+mfa = None               # mfa.py: the account's second factors
 audit = None             # db.audit
 two_factor_required = None   # account -> whether a role of it requires a second factor
-# Each coding agent's sign-in on each node (R294 step 6), the person's own
+# Each coding agent's sign-in on each node, the person's own
 # connections, so listed on their Profile:
 agent_rows = None        # () -> every coding agent (agents.rows)
 node_list = None         # () -> the registry's nodes
@@ -46,8 +46,8 @@ def agent_signins(uid, scope):
     """Every coding agent with a sign-in of its own on every node this
     account may sign in on (`scope` its node ids, None for every one), where
     it is installed or this account is signed in to it: who it is signed in
-    as, and why a press could not run there now, the server's own test
-    (R294 step 6). A hosting-only node runs no sessions and is left out."""
+    as, and why a press could not run there now, the server's own test.
+    A hosting-only node runs no sessions and is left out."""
     if not (agent_rows and node_list and signed_on):
         return []
     try:
@@ -94,16 +94,16 @@ def view(me, scope=None):
     acct = users.get(me["name"]) or {}
     return {"name": me["name"], "uid": uid,
             "role": rec.get("role", "user"),
-            # What this account may do, said once (R255 step 5).
+            # What this account may do, said once.
             "what_may": may,
             "profile": users.profile(me),
             "git": users.git_identity(me),
             "git_ready": users.git_ready(me),
             "claude": claude,
-            # ...and every agent's, by its id (B296).
+            # ...and every agent's, by its id.
             "agents": agent_emails(uid) if agent_emails else {},
-            # ...and each one on each node, with Sign in and Sign out there
-            # (R294 step 6): a person's own connection, on their Profile.
+            # ...and each one on each node, with Sign in and Sign out there:
+            # a person's own connection, on their Profile.
             "agent_signins": agent_signins(uid, scope),
             # The Claude plugins this account installed, per
             # node, as the nodes last said (plugins.py).
@@ -112,16 +112,16 @@ def view(me, scope=None):
             # (transcripts.py): the phone app's; the page reads them per
             # project.
             "logs": logs,
-            # The apps signed in as this account on its own machines
-            # (R272), newest call first: what Disconnect acts on.
+            # The apps signed in as this account on its own machines,
+            # newest call first: what Disconnect acts on.
             "devices": devices.listed(acct) if devices else [],
-            # The browsers signed in as this account (R158 step 8), each
+            # The browsers signed in as this account, each
             # bound to the browser it was made in, this one first.
             "signins": logins.rows(uid, me.get("lid") or "") if logins else [],
-            # Its second factors (R127), never a secret, and whether a role
+            # Its second factors, never a secret, and whether a role
             # of it requires one.
             # The SMB shares on the controller's own machine this person
-            # reaches (R164 step 1), and whether an SMB password is set;
+            # reaches, and whether an SMB password is set;
             # left out where no own machine serves shares.
             "smb": ({"set": bool(acct.get("smb_nt")), "at": int(acct.get("smb_at") or 0), "follows": bool(acct.get("smb_follows")), **sh}
                     if (sh := (smb_shares(uid) if smb_shares else None)) is not None else None),
@@ -132,7 +132,7 @@ def view(me, scope=None):
 def _fresh(uid, req, origin):
     """Whether this request carries a fresh second factor: a code from the
     authenticator, an unused recovery code, or a passkey's answer to the
-    challenge 2fa-fresh handed out (R127)."""
+    challenge 2fa-fresh handed out."""
     code = str(req.get("code") or "").strip()
     if code:
         return mfa.totp_check(uid, code) or mfa.recovery_use(uid, code)
@@ -141,18 +141,18 @@ def _fresh(uid, req, origin):
                                           pk.get("auth"), pk.get("sig"))
 
 
-# Who proved a factor to add another, until when (R288).
+# Who proved a factor to add another, until when.
 _adding = {}
 ADD_S = 600
 
 
 def two_factor(me, act, req, origin):
-    """Profile's Two-factor section (R127). (payload, status)."""
+    """Profile's Two-factor section. (payload, status)."""
     uid, name = users.uid_of(me), me["name"]
     who = f"user:{name}"
     first = not mfa.enabled(uid)
     # Adding to a sign-in that has a factor already takes one of those now,
-    # as a removal does (R288): a browser left signed in swapped its own
+    # as a removal does: a browser left signed in swapped its own
     # authenticator in. Asked at the begin, held for the add that follows.
     if act in ("2fa-totp-begin", "2fa-passkey-begin"):
         if not first and not _fresh(uid, req, origin):
@@ -224,10 +224,10 @@ def verb(me, act, req, origin=""):
                                   str(req.get("password") or ""))
         return r, (400 if r.get("error") else 200), None
     if act == "smb-password":
-        # Set or cleared (R164 step 1); the own machine's agent takes it up
+        # Set or cleared; the own machine's agent takes it up
         # at its next hello, a minute at most. Setting one takes the sign-in
         # password, as a password change does: a separate share password
-        # outlives the browser that set it (R288).
+        # outlives the browser that set it.
         if str(req.get("password") or "") and not users.authenticate(me["name"], str(req.get("current") or "")):
             return {"error": "your sign-in password is not right"}, 400, None
         r = users.set_smb_password(me["name"], str(req.get("password") or ""))
@@ -264,7 +264,7 @@ def verb(me, act, req, origin=""):
             audit(f"user:{me['name']}", "reach-set", r["dest"]["kind"], {})
         return r, (400 if r.get("error") else 200), None
     if act == "reach-on":
-        # R173: a destination switched off or on, its settings kept.
+        # A destination switched off or on, its settings kept.
         r = reach.set_on(me.get("uid") or "", str(req.get("id") or ""), req.get("on") is True)
         return r, (400 if r.get("error") else 200), None
     if act == "reach-remove":
@@ -274,7 +274,7 @@ def verb(me, act, req, origin=""):
         r = reach.test(me.get("uid") or "", field(req, "id"), me.get("name") or "")
         return r, (400 if r.get("error") else 200), None
     if act == "signin-out":
-        # A browser's sign-in ended from here (R158 step 8): its cookie
+        # A browser's sign-in ended from here: its cookie
         # answers nothing from its next request.
         lid = field(req, "id")
         if not logins or not any(r["id"] == lid for r in logins.rows(me.get("uid") or "")):

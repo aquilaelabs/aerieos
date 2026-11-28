@@ -1,5 +1,5 @@
-// The Roles tab (R152, the operator, 7 Oct): a page of settings, the roles
-// a list beside the one picked (R255 step 9; the operator, 17 Oct): one
+// The Roles tab: a page of settings, the roles
+// a list beside the one picked: one
 // list, the projects' owner roles folded into one row at its end, New role
 // at the right of the page's bar in a dialog, and Remove at the foot of the
 // picked one's settings. Its kind (Everywhere, or On a project) and Read
@@ -7,12 +7,12 @@
 // read only.
 //
 // What one account holds (its Everywhere roles, the projects it is on with
-// its roles there, holding one being on the project, R155, and what that
+// its roles there, holding one being on the project, and what that
 // adds up to) is picked in its settings on the Users page, beside its name
 // and password: rolesAccessFields below draws it there. The server holds every rule (roles.py, users.assign) and this
 // file draws and asks.
 //
-// Chrome comes from docSurface() and the hard rules are held by
+// Chrome comes from docSurface and the hard rules are held by
 // uniform.mjs; this file fills slots, one fold per section.
 "use strict";
 let rolesData = null;            // GET /api/roles, or null before the first load
@@ -21,7 +21,7 @@ let rolesWho = "";               // the account the People section is on
 let rolesPeopleDraft = null;     // {roles, project_roles} being edited
 let rolesPick = "";              // the role the Roles section is on
 let rolesDraft = null;           // {name, scope, perms, note, fresh, only} being edited
-const rolesExp = new Set();      // the areas opened on their instances (R260)
+const rolesExp = new Set();      // the areas opened on their instances
 
 function openRolesTab(){
   openTab({kind: "roles", arg: "__roles", label: "Roles"});
@@ -69,7 +69,7 @@ let rolesOwnersOpen = false;     // the projects' owner roles shown on the list
 function rolesSplit(which, list, detail){ return {which, list, detail}; }
 
 // The roles a project offers: every role on a project, and its own owner
-// role there and nowhere else (B726).
+// role there and nowhere else.
 const rolesOnProject = pn => Object.values(rolesData.roles || {}).filter(r => r.scope === "projects" && (!r.project || r.project === pn));
 
 // Its fields, for the account `name` (the Edit dialog's): the owner's say it
@@ -86,14 +86,14 @@ function rolesAccessFields(name){
     return `<div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div>`;
   if (!rolesPeopleDraft) rolesPeopleDraft = rolesPeopleFrom(p);
   const dr = rolesPeopleDraft;
-  // Accounts and roles Read alone: the same fields, to read (B34).
+  // Accounts and roles Read alone: the same fields, to read.
   const ro = !d.admin && !!d.readonly, dead = ro ? " disabled" : "";
   const everywhere = Object.values(d.roles || {}).filter(r => r.scope === "global" && r.name !== "owner");
   const global = d.admin || ro ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every space and on AerieOS itself, as far as each one's areas say")}
       <div class="upick" id="rolesGlobal">${everywhere.map(r => `<label class="pick"><input type="checkbox" data-rglobal="${esc(r.name)}"${
         dr.roles.includes(r.name) ? " checked" : ""}${dead}> ${esc(r.label || r.name)}</label>`).join("")}</div></div>` : "";
   // The projects it is on, and only those: holding a role on a project is
-  // being on it (R155), and a row of every project it is not on said
+  // being on it, and a row of every project it is not on said
   // nothing a picker does not.
   const all = d.projects || [];
   const on = all.filter(pn => (dr.project_roles[pn] || []).length);
@@ -107,7 +107,7 @@ function rolesAccessFields(name){
     </div>`;
   }).join("");
   // The projects it is not on that offer a role (another project's owner
-  // role is not one this project offers, B35).
+  // role is not one this project offers).
   const notOn = all.filter(pn => !on.includes(pn));
   const off = notOn.filter(pn => rolesOnProject(pn).length);
   const addPn = off.includes(rolesAddProj) ? rolesAddProj : off[0] || "";
@@ -174,7 +174,7 @@ async function rolesAccessSave(){
 let rolesAddProj = "";
 
 // What an account's roles add up to, worked out from the draft so it moves
-// as boxes are ticked (R155, the operator: "why can't they..." at a glance):
+// as boxes are ticked (the operator: "why can't they..." at a glance):
 // a grid of the project areas it holds, a column for what its Everywhere
 // roles give on every project and one per project it is on, then the areas
 // that are not about a project in a line. An administrator's answer is
@@ -255,9 +255,9 @@ function rolesFrom(r){
               builtin: !!r.builtin, only: JSON.parse(JSON.stringify(r.only || {}))} : null;
 }
 
-// ---- an area instance by instance (R260) ----
+// ---- an area instance by instance ----
 // An Everywhere role's node areas open on the nodes, the CI runner's on each
-// runner, Read and Write on each (the operator, 16 Oct). The draft keeps an
+// runner, Read and Write on each. The draft keeps an
 // area held on every instance as its level alone, and one held on some as
 // `only[area]`, {instance: level}: every instance at one level folds back to
 // the level alone, which holds on instances added later too.
@@ -301,7 +301,7 @@ function rolesRoleBody(){
     return `<button type="button" class="rrow${cls}${on ? " on" : ""}" data-rpick="${esc(n)}"${on ? ' aria-current="true"' : ""}>
       <span class="rline"><span class="name">${esc(name)}</span>${tag ? `<span class="pill">${esc(tag)}</span>` : ""}</span>
       <span class="rfacts">${esc(people(n))}</span></button>`; };
-  // One list (the operator, 17 Oct: no heading or field halfway down it):
+  // One list (no heading or field halfway down it):
   // built in first, then the ones made here, each with its kind, and the
   // projects' owner roles, one per project and each the same shape, folded
   // into one row at the end that opens on them.
@@ -320,7 +320,7 @@ function rolesRoleBody(){
   const pick = `<div class="rhead" data-rback><span class="shback" role="img" aria-label="Back to Roles">\u2039</span><b>${esc(r.fresh ? r.name : (d.roles[r.name]?.label || r.name))}</b>${
     r.fresh ? "" : ` <span class="dim">${who.length ? `held by ${esc(who.join(", "))}` : "held by nobody yet"}</span>`}</div>`;
   const ro = r.builtin || !d.admin;
-  // A table (R218 step 8): the area, with what Read and Write let one do
+  // A table: the area, with what Read and Write let one do
   // under its name, then its two boxes in their columns.
   const offOf = group => ro || (group === "global" && r.scope !== "global");
   const box = (attr, key, label, on, part, dead) => `<input type="checkbox" ${attr}="${esc(key)}" aria-label="${esc(label)}"${
@@ -351,11 +351,11 @@ function rolesRoleBody(){
         "div", "rarea rinst", `data-rinst="${esc(k)}"`); }).join("") : "");
   }).join("");
   // Why some rows are gray, said once above the table: how the form works,
-  // not a fault, so in the hint's voice (the operator, 21 Oct).
+  // not a fault, so in the hint's voice.
   const why = !ro && (d.areas || []).some(([, , group]) => offOf(group))
     ? `<div class="sub" id="rolesWhyOff">The gray areas are not about one space: only an Everywhere role holds them.</div>` : "";
   const areas = why + tblWrap(ROLE_AREA_COLS, rows, "rareas");
-  // One form (R301): its kind and what it is for on the grid, its areas
+  // One form: its kind and what it is for on the grid, its areas
   // and its two-factor tick across it, Save and Revert at the foot.
   const scopes = `<option value="projects"${r.scope !== "global" ? " selected" : ""}>On a space</option><option value="global"${r.scope === "global" ? " selected" : ""}>Everywhere</option>`;
   return rolesSplit("roles", list, `${pick}
@@ -418,19 +418,19 @@ function rolesNewOpen(){
 function renderRolesInto(i){
   const d = docSurface(i, "roles");
   if (!d) return;
-  // A count, as Users and Jobs keep (the operator, 18 Oct), not a sentence.
+  // A count, as Users and Jobs keep, not a sentence.
   const nRoles = Object.keys(rolesData?.roles || {}).length;
-  // Refused outright (a plain account by link): the refusal is the page (B38).
+  // Refused outright (a plain account by link): the refusal is the page.
   const refused = rolesErr && !nRoles;
-  // No count beside the button (the operator, 25 Oct): the list says it.
-  // New role on the head (the operator, 29 Oct: not a row of its own).
+  // No count beside the button: the list says it.
+  // New role on the head (not a row of its own).
   // Waiting, who may add a role is the status read's to say, and the
   // button is there and dead, as it will land.
   d.setBar("");
   const newRole = (rolesData ? rolesData.admin : state?.can?.admin) ? `<button type="button" class="primary"${
       rolesData ? ` id="rolesNewOpen"` : " disabled"}>New role</button>` : "";
   if (rolesData === null){
-    // Its template (R218 step 16): the two sections and their fields' labels
+    // Its template: the two sections and their fields' labels
     // are the page's own; who holds what is on its way.
     const split = detail => `<div class="rsplit"><div class="rlist">${skRows(4)}</div><div class="rdetail">${detail}</div></div>`;
     const field = skField;
@@ -443,7 +443,7 @@ function renderRolesInto(i){
     return;
   }
   const ro = rolesRoleBody();
-  // The page's head (the operator, 29 Oct): how many roles, and how many
+  // The page's head: how many roles, and how many
   // of them are a project's.
   const all = Object.values(rolesData.roles || {});
   patch(d.list, `
@@ -488,14 +488,14 @@ function wireRoles(el){
       for (const [key, , group] of rolesData.areas) if (group === "global") delete rolesDraft.perms[key];
     rolesRedraw();
   };
-  // A box ticked on one row in three, partly (R260).
+  // A box ticked on one row in three, partly.
   el.querySelectorAll("input[data-part]").forEach(cb => { cb.indeterminate = true; });
   el.querySelectorAll("[data-rexp]").forEach(b => b.onclick = () => {
     const k = b.dataset.rexp;
     if (rolesExp.has(k)) rolesExp.delete(k); else rolesExp.add(k);
     rolesRedraw();
   });
-  // The box is the role's on the press (the operator, 22 Nov), held there
+  // The box is the role's on the press, held there
   // through any draw until the answer, and put back saying why on a refusal.
   const tf = el.querySelector("#rolesTf");
   if (tf) tf.onchange = () => {
@@ -512,7 +512,7 @@ function wireRoles(el){
   const note = el.querySelector("#rolesNote");
   if (note) note.oninput = () => {
     rolesDraft.note = note.value;
-    // Save and Revert awake only while the role is unsaved (the operator, 26 Oct).
+    // Save and Revert awake only while the role is unsaved.
     const dirty = rolesRoleDirty(), st = el.querySelector("#rolesSave")?.closest(".actbar")?.querySelector(".state");
     if (st) st.textContent = dirty ? "unsaved" : "";
     for (const b of el.querySelectorAll("#rolesSave, #rolesRevert")) if (!b.dataset.busy) b.disabled = !dirty;
@@ -556,7 +556,7 @@ function wireRoles(el){
     rolesRedraw();
   };
   const rm = el.querySelector("#rolesRemove");
-  // The role leaves the list on the press (the operator, 22 Nov), and comes
+  // The role leaves the list on the press, and comes
   // back saying why on a refusal.
   if (rm) rm.onclick = async () => {
     const name = rolesDraft.name;

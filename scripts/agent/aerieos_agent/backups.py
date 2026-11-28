@@ -1,4 +1,4 @@
-"""Backups off the machine (R162 step 5): a folder on the controller's own
+"""Backups off the machine: a folder on the controller's own
 machine (a pool's mount, the array, the controller's state) copied to
 another place (the array, a disk or a share mounted under /mnt/other) by
 rsync, each run its own dated folder hard-linked to the one before so a
@@ -22,7 +22,7 @@ from .names import VAR
 STATE_FILE = VAR + "/backups-state.json"
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
 # The controller's state: its secrets among it, so never copied where they
-# would be readable by others (B861).
+# would be readable by others.
 STATE_ROOT = "/var/lib/aerieos-controller"
 ROOTS = ("/mnt/", STATE_ROOT, "/srv/")
 RUN_RE = re.compile(r"\d{8}-\d{6}")
@@ -258,7 +258,7 @@ class BackupsMixin:
             return "failed", 64
         # A destination that keeps no modes shows what root copies to whoever
         # can reach it there: refused for the controller's state, whose files
-        # are its secrets, and said for anything else (B861).
+        # are its secrets, and said for anything else.
         if not _keeps_modes(runs_fd, part):
             if real_src == STATE_ROOT or real_src.startswith(STATE_ROOT + "/"):
                 shutil.rmtree(_held(runs_fd, part), ignore_errors=True)

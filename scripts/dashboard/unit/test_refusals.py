@@ -1,4 +1,4 @@
-"""One wording for each refusal every module says (R287 step 2): a missing
+"""One wording for each refusal every module says: a missing
 space is 'not a space' and a missing account 'not an account', each written
 once in refusals.py, and no module spells either another way or writes the
 sentence out again."""

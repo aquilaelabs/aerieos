@@ -47,7 +47,7 @@ _VALUED = {"sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U"},
            "xargs": {"-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a"}}
 _ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # The shell's own words in front of a command: `until ! pgrep -f x` runs
-# pgrep (B736: a wait loop that way was the shape the refusal missed).
+# pgrep (a wait loop that way was the shape the refusal missed).
 KEYWORDS = {"!", "if", "then", "else", "elif", "while", "until", "do", "{", "}"}
 # The words that start a loop's test or its body: what a wait loop runs.
 LOOP_WORDS = {"while", "until", "do"}
@@ -123,7 +123,7 @@ def commands(text, depth=0):
     out, cur = [], []
     for t in toks + [";"]:
         # Punctuation run together (`);` after a `$(seq 1 9)`) is still
-        # separators: read as a word, it hid the next command (B170).
+        # separators: read as a word, it hid the next command.
         if t in SEPARATORS or t.strip() == "" or (set(t) <= set(";&|()") and t):
             if cur:
                 words = _unwrap(cur)
@@ -131,7 +131,7 @@ def commands(text, depth=0):
                     out.append(words)
                     # A loop's own command is also read with its loop word in
                     # front (`until grep -q exited f`), so a rule can refuse
-                    # the wait loop and leave the plain command be (B699).
+                    # the wait loop and leave the plain command be.
                     if cur[0] in LOOP_WORDS and words[0] != cur[0]:
                         out.append([cur[0]] + words)
                     # `bash -c 'apt install jq'` runs what is in the quotes.
@@ -155,7 +155,7 @@ def _fits(words, pattern):
         return False
     # The pattern's first word names the program: it has to fit the command's
     # first word on its own, so a star there cannot cross into the arguments
-    # (`*/test/run.sh` once refused `sed -n 1,5p scripts/.../test/run.sh`, B700).
+    # (`*/test/run.sh` once refused `sed -n 1,5p scripts/.../test/run.sh`).
     head = pat.split(" ", 1)[0]
     base = os.path.basename(words[0])
     if not (fnmatch.fnmatchcase(words[0], head) or fnmatch.fnmatchcase(base, head)):

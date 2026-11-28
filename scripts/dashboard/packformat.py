@@ -1,4 +1,4 @@
-"""The catalog's format number (R234).
+"""The catalog's format number.
 
 Everything a catalog entry can be (a tool pack's bbtool.json, a Docker
 app's bbapp.json, a coding agent's adapter) is written in one format, and
@@ -21,7 +21,7 @@ the format has a number. The promise the number keeps:
     primitive, written down in docs/tool-packs.md. A new primitive is a new
     number, never a change to an old one.
 
-The framework's version is two numbers (the operator, 12 Nov: a version of
+The framework's version is two numbers (a version of
 the catalog's own, moved whenever the framework changes), written X.Y:
 
   - X is the format above: it moves when an install that does not read it
@@ -97,7 +97,7 @@ FORMATS = {
 
 
 # Who stands behind a catalog entry, as the signed index says it (`tier`)
-# and as a person reads it (the operator, 12 Nov: Packaged by Aerie,
+# and as a person reads it (Packaged by Aerie,
 # Verified and Vetted, in place of official and vetted, which did not say
 # who made what; Packaged, not Built, since the tool itself is somebody
 # else's and the card names them: maker_of below):
@@ -117,7 +117,7 @@ def tier_of(word):
     return word if word in TIERS else "vetted"
 
 
-# Who a tool is by (the operator, 12 Nov): the organization or the person
+# Who a tool is by: the organization or the person
 # that makes it, as its manifest, its index entry or its shipped row says in
 # `maker`, a short line of plain words drawn on its card beside the tier. A
 # pack of several makers' tools is by AerieOS and names each under
@@ -150,8 +150,8 @@ def credits_of(doc):
     return out[:CREDITS_MAX]
 
 
-# What a catalog entry is about, beyond its kind (R256, the operator, 18 Nov:
-# a fixed list the catalog keeps, not tags anybody writes): each index entry
+# What a catalog entry is about, beyond its kind
+# (a fixed list the catalog keeps, not tags anybody writes): each index entry
 # names one to three of these keys in `topics`, the catalog's check refuses
 # any other word, and the Library's Topic pulldown offers them in this order.
 # A key is never renamed or taken back, only added to: an install reads the
@@ -577,7 +577,7 @@ def service_reach(name, sv):
         said("userns_mode", "shares the host's user namespace")
     # The other namespaces a service can ask for the host's own, and
     # another container's, which is that container's reach under this
-    # one's name (R227: the gate read pid, network and userns alone).
+    # one's name (the gate read pid, network and userns alone).
     for key, what in (("ipc", "inter-process memory"), ("uts", "hostname"), ("cgroup", "control groups")):
         if str(sv.get(key) or "") == "host":
             said(key, f"shares the host's {what} namespace")
@@ -1134,7 +1134,7 @@ def too_new(fmt, since=""):
 # own fields are its newest pin, as they always were.
 #
 # A pack that moves to a newer format keeps serving the releases that read
-# only the one before (the operator, 20 Nov): its older manifest is still
+# only the one before: its older manifest is still
 # there at its older commit, so nothing is copied, and the entry keeps that
 # pin beside the newest under `older`, newest first:
 #

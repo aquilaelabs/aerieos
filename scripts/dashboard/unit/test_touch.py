@@ -1,5 +1,5 @@
 """touch.py's mapping from a screen pixel to the touch panel's own frame and
-range, at each rotation (R101). test/capture.mjs drives it through a
+range, at each rotation. test/capture.mjs drives it through a
 stand-in adb; this pins the arithmetic."""
 import contextlib
 import io
@@ -48,7 +48,7 @@ class Panel(unittest.TestCase):
     (report 43: sorted as text, event10 came before event2)."""
 
     def test_no_device_at_all_says_the_emulator_is_not_answering(self):
-        # A dying emulator lists nothing (B321, diagnostics #128), which read
+        # A dying emulator lists nothing (diagnostics #128), which read
         # as an emulator with no touch panel.
         for said, want in (("", "not answering"),
                            ("add device 1: /dev/input/event1\n  name: \"keys\"", "no touch panel")):

@@ -1,4 +1,4 @@
-"""The coding agents a session may run, as one table (R95).
+"""The coding agents a session may run, as one table.
 
 A session used to be Claude's by construction: bb-tty's `claude:` argument,
 the `claude-` session name, the `claude` census key, the claude-login job,
@@ -49,7 +49,7 @@ class Agent:
     latest_file: str = ""   # ...or, for a row with no registry, the installer's own `latest` file on its maker's download service; no pack's field
     census_suffix: str = ""  # what its --version prints after the number, kept on the census value a finished job writes
     says: dict = field(default=None, compare=False, hash=False)  # its own wording of a sentence agentcode.py says of every agent (agentcode.SAYS, by key), None for none
-    pack: dict = field(default=None, compare=False, hash=False)  # a pack agent's adapter (R169 step 9), None for the shipped
+    pack: dict = field(default=None, compare=False, hash=False)  # a pack agent's adapter, None for the shipped
     allow: dict = field(default=None, compare=False, hash=False)  # how it is told a command needs no asking (ALLOW_HOW), None for no way
     install: dict = field(default=None, compare=False, hash=False)  # its install recipe (install_checked), None for one a pack installs
     signin: dict = field(default=None, compare=False, hash=False)  # how it signs in, as a pack's manifest says its own (agent.signin), None for none
@@ -65,7 +65,7 @@ class Agent:
         return self.id + "-"
 
 
-# What each was checked against when R95 began (22 Oct): Codex CLI 0.163.0,
+# What each was first checked against: Codex CLI 0.163.0,
 # Copilot CLI 1.0.102 and OpenCode 1.19.4, their help and docs read. Codex
 # and Copilot both carry hooks now (Codex's SessionStart, PreToolUse,
 # PermissionRequest, UserPromptSubmit and Stop; Copilot's sessionStart,
@@ -113,7 +113,7 @@ TABLE = (
           says={"no_account": "{node} runs no session account, so there is no {product} there to update",
                 "hold": "{product} is updating on {node}: press {name} on {project} again when its row comes back"},
           allow={"how": "settings", "rule": "Bash({cmd} *)"},
-          # Its sign-in as a pack's agent says its own (R234 step 6): a link
+          # Its sign-in as a pack's agent says its own: a link
           # at one of three hosts, a code pasted back, the program ending
           # itself once signed in; who is signed in is the address its own
           # record names, while the credential beside it is there.
@@ -174,7 +174,7 @@ TABLE = (
           # platform, held to the sha256 GitHub states and unpacked into
           # ~/.local/bin, which is all its vendor's installer does with it.
           install=RECIPES.get("copilot")),
-    # Grok Build (R95 step 21): xAI's coding agent, checked against its user
+    # Grok Build: xAI's coding agent, checked against its user
     # guide on 25 Oct (xai-org/grok-build, Apache-2.0). Its hooks are
     # Claude's events (PreToolUse, UserPromptSubmit, Stop), its sign-in a
     # device code into ~/.grok/auth.json, its sessions under ~/.grok/sessions.
@@ -198,7 +198,7 @@ TABLE = (
           # it was when the pin was made. Put where the installer keeps it
           # (~/.grok/downloads) with the command a link to it.
           install=RECIPES.get("grok")),
-    # Any model (R144 step 2): OpenCode, the open agent, pointed at a node's
+    # Any model: OpenCode, the open agent, pointed at a node's
     # model router (router.py) rather than signed in to anybody: its keys
     # are the router's, handed to a session at its start with the models
     # the router offers; its briefing an instructions file in its config,
@@ -223,12 +223,12 @@ TABLE = (
 
 _BY_ID = {a.id: a for a in TABLE}
 
-# ---- what an agent need not ask about (R231) ----------------------------------
+# ---- what an agent need not ask about ----------------------------------
 # Every coding agent has a permission check of its own (Claude Code's rules
 # and its classifier, Codex's execpolicy, Copilot's and Grok's allow lists),
 # and none of them knows the space's Agents may. Left alone, each judges an
 # `aerie` command by itself: the same release that ran one day was refused
-# the next, with the space's dial on auto both times (the operator, 11 Nov).
+# the next, with the space's dial on auto both times.
 # AerieOS is what decides these verbs: each is checked on the controller
 # against the space's dials, its pushing rules and its git host's permit, or
 # waits for a person's answer on the bell. So an agent is told, in its own
@@ -245,7 +245,7 @@ OWN_NAMES = ("aerie",)
 # says (agent.allow): a rule in the settings file its session starts with
 # (Claude Code), an option repeated on its command line (Grok, Copilot), a
 # rules file under its home (Codex), its own hook's answer before a tool
-# (Antigravity CLI, whose rules are in the person's own settings file: R233),
+# (Antigravity CLI, whose rules are in the person's own settings file),
 # or no way at all.
 ALLOW_HOW = ("none", "settings", "flag", "rules-file", "hook")
 _ALLOW_FLAG = re.compile(r"--[a-z][a-z0-9-]{1,30}")
@@ -309,7 +309,7 @@ def allow_plan(agent_id, spec=None):
         plan["file"] = {"path": spec["file"], "text": head + "\n".join(rules) + "\n"}
     return plan
 
-# ---- how an agent is installed (R169 step 13) ---------------------------------
+# ---- how an agent is installed ---------------------------------
 # A shipped agent's install recipe is its row's `install`, which its pack's
 # manifest in the catalog carries as agent.install. The controller hands the
 # recipe to the node with each install, update and removal, the catalog's
@@ -476,7 +476,7 @@ def install_checked(spec):
             "also": list(also), "fresh": fresh}, ""
 
 
-# The coding agents installed packs bring (R169 step 9): the server sets this
+# The coding agents installed packs bring: the server sets this
 # to toolpacks.offered_agents, [(name, label, adapter)]; a standalone reader
 # (bb-tty, the doctor) has none. Each is an ordinary row, live, installed and
 # updated as its pack is, so it has no update or sign-in job of its own.
@@ -498,7 +498,7 @@ def _pack_rows():
             rows.append(Agent(id=name, name=a.get("name") or name, product=a.get("product") or name, command=a.get("command") or name,
                               provider=a.get("provider") or "", reported=name, update_job="",
                               # One that describes its sign-in's flow is signed in
-                              # from the page as a shipped one is (R233 step 6),
+                              # from the page as a shipped one is,
                               # by one job for every pack's agent, told which.
                               login_job=PACK_LOGIN if signs_in else "", logout_job=PACK_LOGOUT if signs_in else "",
                               briefing="instructions-file" if (a.get("briefing") or {}).get("how") == "env-file" else "system-prompt-file",
@@ -553,7 +553,7 @@ def page_rows():
 
 
 # Each agent's own models and reasoning efforts, what Start's model and
-# effort step offers for it (R95 step 9) and the only words bb-tty passes on
+# effort step offers for it and the only words bb-tty passes on
 # (a table lookup, never a word from the URL): read off Codex CLI 0.163.0's
 # `codex debug models` and Copilot CLI 1.0.102's `copilot help config` on
 # 22 Oct. Claude's are the project dialog's (MODELS, EFFORTS) as before.
@@ -587,7 +587,7 @@ def default():
     return TABLE[0]
 
 
-# A second session of one agent on one project is a slot of its own (R143):
+# A second session of one agent on one project is a slot of its own:
 # `claude-alpha` is the first, as every session was named before, and
 # `claude-alpha~2` the second. tmux keeps `~` as it is (names.tmux_name
 # rewrites `.` and `:` alone), and no project's name carries one.
@@ -615,7 +615,7 @@ def of_session(base):
 
 
 def slot_of(base):
-    """Which slot an agent's session name is (R143): 1 for `claude-alpha`,
+    """Which slot an agent's session name is: 1 for `claude-alpha`,
     2 for `claude-alpha~2`; 0 for a name that is no agent's."""
     a, _stem = of_session(base)
     return _split_slot(str(base)[len(a.session):])[1] if a else 0
@@ -637,7 +637,7 @@ def of_arg(arg):
 
 
 def slot_of_arg(arg):
-    """The slot a terminal argument opens (R143): its `:s:N`, 1 when it
+    """The slot a terminal argument opens: its `:s:N`, 1 when it
     names none, as every argument from before slots does."""
     a, rest = of_arg(arg)
     m = re.search(r":s:([0-9]{1,2})(?::|$)", rest) if a else None
@@ -652,7 +652,7 @@ def project_of_arg(arg):
 
 
 # The most slots of one agent a person may have on one project, whatever a
-# project's own cap says (R143): what the names can carry.
+# project's own cap says: what the names can carry.
 MAX_SLOTS = 9
 
 
@@ -660,7 +660,7 @@ def session_name(agent_id, project, slot=1):
     """The tmux session an agent's conversation on a project runs in,
     before the account prefix a node puts in front of it. tmux rewrites
     `.` and `:` to `_` (names.tmux_name). A slot past the first carries its
-    number (R143)."""
+    number."""
     a = get(agent_id) or default()
     n = int(slot or 1) if str(slot or 1).isdigit() else 1
     return re.sub(r"[.:]", "_", a.session + str(project)) + (f"{SLOT_SEP}{n}" if 1 < n <= MAX_SLOTS else "")

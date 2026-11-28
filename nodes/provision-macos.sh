@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Enroll a Mac as an AerieOS node, a GUEST node (roadmap R23): one
+# Enroll a Mac as an AerieOS node, a GUEST node: one
 # directory and one launchd agent, and nothing outside them. The Mac stays
 # its owner's machine: no accounts made, no daemon, no root, nothing in
 # /etc, and --remove takes exactly what this put there back out again.
@@ -8,7 +8,7 @@
 # What a Mac node is for: building what only a Mac builds (iOS, macOS, the
 # Apple half of a Flutter app) with Xcode, and a toolchain store of its own
 # scope (darwin-arm64 or darwin-x86_64) under the same share the Linux
-# nodes use, so nothing lands on top of theirs (roadmap R19).
+# nodes use, so nothing lands on top of theirs.
 #
 # Run it as yourself, once:
 #

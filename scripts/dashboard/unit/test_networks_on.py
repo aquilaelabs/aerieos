@@ -1,4 +1,4 @@
-"""Migration 0007 (the operator, 26 Oct): every agent node keeps each session
+"""Migration 0007: every agent node keeps each session
 and each project's containers to their own network; one that had switched
 either off has it on again, a hosting-only node's sessions' switch is left as
 it was, and what reads a node with no switch stored reads it as on."""
@@ -40,7 +40,7 @@ class ReadsAsOn(unittest.TestCase):
         nodes.node = lambda nid: {"id": nid, "kind": "agent", "config": conf[nid]}
         self.assertEqual(nodes.session_net_on("a"), True)
         self.assertEqual(nodes.session_net_on("h"), False)
-        # The switches went in 0.9.0 (R146): a key an older build left reads as on.
+        # The switches went in 0.9.0: a key an older build left reads as on.
         self.assertEqual(nodes.session_net_on("x"), True)
 
 

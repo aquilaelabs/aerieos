@@ -1,5 +1,5 @@
 """A create that never took, and a project deleted for good, leave nothing
-behind on the accounts (B93, B95): a clone that failed kept its folder name,
+behind on the accounts: a clone that failed kept its folder name,
 so the next try landed in NAME-2, and its owner role stayed on the Profile and
 the Roles page, as did the role of a project purged, under one label with
 the live project shown by the same name."""
@@ -94,7 +94,7 @@ class Unmade(unittest.TestCase):
         live = self.make("site")
         registry.mark(purged, "purged")
         shutil.rmtree(self.ws / d)
-        with registry._lock:                 # a record gone as a failed clone left it before B93
+        with registry._lock:                 # a record gone, as a failed clone once left it
             rec = registry._load()
             rec["projects"].pop(d)
             registry._save(rec)

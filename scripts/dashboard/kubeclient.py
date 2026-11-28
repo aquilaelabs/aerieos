@@ -1,5 +1,5 @@
-"""A Kubernetes API server asked over HTTPS with the standard library alone
-(R281 step 2): the dashboard is dependency-free, and what it asks a cluster
+"""A Kubernetes API server asked over HTTPS with the standard library alone:
+the dashboard is dependency-free, and what it asks a cluster
 is a handful of reads and writes on its REST API.
 
 A client is made from what clusters.py keeps of a kubeconfig: the server's

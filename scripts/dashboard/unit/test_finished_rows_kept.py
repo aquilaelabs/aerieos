@@ -1,4 +1,4 @@
-"""Migration 0039 (R205): an item finished by its last step before B767,
+"""Migration 0039: an item finished by its last step under an older build,
 logged with its words alone or with an empty row, has its row written into
 its "done" event once, and reads as roadmap.py's rebuilding from the log
 read it on 27 Nov: FROZEN. A row kept whole is left as it is."""

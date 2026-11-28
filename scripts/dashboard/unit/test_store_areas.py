@@ -1,6 +1,6 @@
 """toolchains.store_areas: what part of a shared toolchain store a job
 writes, which is what two machines sharing it wait on. Each keeps its
-toolchains in its own directory (R196), so a toolchain is its own area in
+toolchains in its own directory, so a toolchain is its own area in
 its own directory, the Android SDK is one tree there, the system images are
 the one area every machine shares, and the machine's own installs and a
 check write none of it."""

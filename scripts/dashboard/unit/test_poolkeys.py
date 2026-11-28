@@ -1,4 +1,4 @@
-"""Encrypted pools (R162 step 3): the key record (kept sealed, or asked
+"""Encrypted pools: the key record (kept sealed, or asked
 after every boot and offered once), what the hello hands the agent and
 nothing in Safe mode, the agent making a pool with the passphrase on
 zpool's stdin and unlocking a locked pool from the hello, the census's

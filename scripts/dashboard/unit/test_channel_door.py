@@ -100,7 +100,7 @@ class Door(unittest.TestCase):
 
 class IsoAnswer(unittest.TestCase):
     """An ISO uploaded on the VMs page, fetched by its node's running job: the
-    answer is the Path, which the server asks for its size (B1035: a string
+    answer is the Path, which the server asks for its size (a string
     was handed over and the fetch was a server error)."""
 
     def setUp(self):

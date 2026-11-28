@@ -1,4 +1,4 @@
-"""bb-gate's liveness verdict (B719): a controller that accepts the
+"""bb-gate's liveness verdict: a controller that accepts the
 connection and is slow to answer is busy, not down; only a connection nobody
 accepts is a restart or an outage."""
 import importlib.machinery
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
 
 class HeldNotes(unittest.TestCase):
-    """R251: a session held by the gate may still keep its own notes, its
+    """A session held by the gate may still keep its own notes, its
     memory and its scratchpad being files on its own machine; anything else
     is refused, with the sentence saying to write where it is and stop."""
     def run_gate(self, make_call):
@@ -145,7 +145,7 @@ class HeldNotes(unittest.TestCase):
         code, _ = self.run_gate(lambda home: {"tool_name": "TodoWrite", "tool_input": {}})
         self.assertEqual(code, 0, "its to-do list")
         # ...and Codex's and Copilot's own, which reach the gate as Edit
-        # through bb-agent-hook (R95 step 18).
+        # through bb-agent-hook.
         code, _ = self.run_gate(lambda home: {"tool_name": "Edit", "tool_input": {
             "file_path": home + "/.codex/notes.md"}})
         self.assertEqual(code, 0, "Codex's own folder")
@@ -153,7 +153,7 @@ class HeldNotes(unittest.TestCase):
         self.assertEqual(code, 0, "Codex's plan")
 
     def test_a_memory_through_the_projects_link_is_a_note(self):
-        # B925: ~/.claude/projects is a link to the store's copy, so the
+        # ~/.claude/projects is a link to the store's copy, so the
         # memory's resolved path is outside the home; it is still a note.
         import tempfile
         store = tempfile.mkdtemp()
@@ -175,7 +175,7 @@ class HeldNotes(unittest.TestCase):
         self.assertEqual(code, 0, "written through the link")
 
     def test_a_hold_is_marked_and_cleared(self):
-        # R251: the mark its node's agent reports, for the bell's Resume.
+        # The mark its node's agent reports, for the bell's Resume.
         import json
         import tempfile
         home = tempfile.mkdtemp()
@@ -201,7 +201,7 @@ class HeldNotes(unittest.TestCase):
 
 
 class NodeHold(unittest.TestCase):
-    """R120 step 7: a node moving its storage holds every session on it, at
+    """A node moving its storage holds every session on it, at
     once and without the network, from the file its agent keeps beside the
     bundle; notes still go, and a hold its agent stopped saying holds nobody."""
 

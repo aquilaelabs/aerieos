@@ -1,10 +1,10 @@
-"""Another NAS's array and its pools taken as they are (R163 step 8, the
+"""Another NAS's array and its pools taken as they are (the
 agent's adopt.py): each data disk found by the serial the plan names and mounted
 with the filesystem it holds, read-only unless writable was picked, the
 parity disk left alone, the pools writable, its paths kept, and the
 merged trees with a read-only disk marked so; anything that does not match
 is refused and nothing mounted. The module never formats, wipes,
-partitions or upgrades a disk (R163 step 5's hard rules), which is read off
+partitions or upgrades a disk (its hard rules), which is read off
 its own text."""
 import os
 import re
@@ -42,7 +42,7 @@ def plan(want=WANT, disks=DISKS, blk=BLK):
 
 class Plan(unittest.TestCase):
     def test_a_pool_with_no_uuid_is_found_by_its_disk(self):
-        # B625: a cache disk the old system kept in its array's cache slot
+        # A cache disk the old system kept in its array's cache slot
         # has no pool record to name its UUID; its disk id finds it.
         p = plan({"data": [], "pools": [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_970_CCC333"}]})
         self.assertEqual([m["where"] for m in p["mounts"]], ["/mnt/cache"], p)
@@ -95,14 +95,14 @@ class Plan(unittest.TestCase):
         self.assertEqual(p["zfs"], [{"pool": "disk1", "where": "/mnt/disk1", "readonly": True, "slot": "disk1"}])
 
     def test_a_pool_named_like_an_option_is_left_alone(self):
-        # B844: the name is the disk's to say, and "-a" imported every pool.
+        # The name is the disk's to say, and "-a" imported every pool.
         blk = {**BLK, "sda1": {"TYPE": "zfs_member", "LABEL": "-a"}}
         p = plan({"data": [{"slot": "disk1", "id": "WDC_WD80EFAX_AAA111", "fs": "zfs"}]}, blk=blk)
         self.assertEqual(p["zfs"], [])
         self.assertTrue(p["refused"])
 
     def test_only_datasets_under_the_pools_place_are_mounted(self):
-        # B844: imported with nothing mounted; a dataset whose mountpoint is
+        # Imported with nothing mounted; a dataset whose mountpoint is
         # elsewhere (/etc here) is said and left unmounted.
         from unittest import mock
         ran = []
@@ -166,7 +166,7 @@ class HardRules(unittest.TestCase):
         self.assertFalse(re.search(r'\["zpool", "import"[^\]]*"-f"', body))
 
     def test_the_way_back_stays_open(self):
-        # R163 step 5: no btrfs feature the old kernel may not read, no ZFS
+        # No btrfs feature the old kernel may not read, no ZFS
         # upgrade, in the adoption or the takeover; the takeover formats the
         # parity partition alone (test_array.Takeover holds that by running it).
         here = os.path.dirname(adopt.__file__)
@@ -220,8 +220,8 @@ class Request(unittest.TestCase):
 
 
 class FromTheStick(unittest.TestCase):
-    """What the stick's plan names to adopt (firstboot.adopt_want, R163
-    step 9): data disks by slot and serial, parity left alone, pools by
+    """What the stick's plan names to adopt (firstboot.adopt_want):
+    data disks by slot and serial, parity left alone, pools by
     UUID, an encrypted disk set apart with why."""
 
     def setUp(self):
@@ -246,20 +246,20 @@ class FromTheStick(unittest.TestCase):
         self.assertEqual(why, "")
 
     def test_a_cache_in_the_arrays_slot_is_offered_as_a_pool_by_its_disk(self):
-        # B625: an old system with no pool records kept its cache in the
+        # An old system with no pool records kept its cache in the
         # array's cache slot; the plan offers it as the pool cache.
         cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}],
                          "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "btrfs"}, {"slot": "cache2", "id": "Crucial_Y", "fs": "LUKS:btrfs"}]}}
         got = self.want(cfg)
         self.assertEqual(got["want"]["pools"], [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_X"}])
-        # cache2 is that pool's second member, never a pool of its own (B941).
+        # cache2 is that pool's second member, never a pool of its own.
         self.assertEqual(got["skipped"], [])
         # ...and not twice when a pool record names it already.
         cfg["pools"] = [{"name": "cache", "fs": "btrfs", "uuid": "u-1"}]
         self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache"])
 
     def test_with_pool_records_the_cache_slots_are_their_members(self):
-        # B941: a ZFS pool's second member offered as the pool cache2 never
+        # A ZFS pool's second member offered as the pool cache2 never
         # imported, and the merged tree waited on it for good.
         cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}],
                          "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "zfs"}, {"slot": "cache2", "id": "Samsung_Y", "fs": "zfs"},
@@ -268,7 +268,7 @@ class FromTheStick(unittest.TestCase):
         self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache", "vms"])
 
     def test_a_degraded_array_is_said_and_its_disabled_disk_set_apart(self):
-        # B940: a disk the old system disabled, or one missing and emulated
+        # A disk the old system disabled, or one missing and emulated
         # from the parity, holds files the parity alone has.
         cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs", "status": "DISK_OK"},
                                    {"slot": "disk2", "id": "WDC_B2", "fs": "xfs", "status": "DISK_DSBL"},
@@ -291,7 +291,7 @@ class FromTheStick(unittest.TestCase):
         self.assertIn("degraded: disk2 (DISK_DSBL), disk3 (DISK_NP_DSBL)", why)
         with mock.patch.object(firstboot, "kept_config", return_value={}):
             self.assertEqual(nodes._degraded_why("x"), "")
-        # B948: the takeover waits while a planned data disk is not adopted.
+        # The takeover waits while a planned data disk is not adopted.
         plan = {"array": {"disks": [{"slot": "disk1", "id": "A", "fs": "xfs"}, {"slot": "disk2", "id": "B", "fs": "xfs"},
                                     {"slot": "disk3", "id": "C", "fs": "luks:xfs"}]}}
         with mock.patch.object(firstboot, "kept_config", return_value=plan):
@@ -301,7 +301,7 @@ class FromTheStick(unittest.TestCase):
             self.assertEqual(nodes._takeover_gaps_why({"mounts": [{"where": "/mnt/disk1"}, {"where": "/mnt/disk2"}]}), "")
 
     def test_a_pool_the_adopt_cannot_take_is_set_apart_not_the_whole_request(self):
-        # B612: an encrypted pool, one with no filesystem the adopt takes, or
+        # An encrypted pool, one with no filesystem the adopt takes, or
         # one named as no pool can be here, left in the request failed its
         # shape check whole, and nothing of the stick's adopted.
         cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}]},
@@ -326,7 +326,7 @@ class FromTheStick(unittest.TestCase):
 
 class SharesFromTheStick(unittest.TestCase):
     """The plan's shares as storage-share's set-many takes them
-    (firstboot.share_requests, R163 step 9)."""
+    (firstboot.share_requests)."""
 
     def setUp(self):
         import sys
@@ -361,7 +361,7 @@ class SharesFromTheStick(unittest.TestCase):
 
 class Vetted(unittest.TestCase):
     """An adopted domain or network, from a backup anybody could have
-    written, as it may be defined here (R247 step 5, B843)."""
+    written, as it may be defined here."""
     ad = agent.module("adopt")
     PLAIN = ("<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'><name>w</name>"
              "<metadata><vmtemplate xmlns='unraid' name='Windows 11' icon='w.png'/></metadata>"

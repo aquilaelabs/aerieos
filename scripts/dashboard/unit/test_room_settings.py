@@ -1,4 +1,4 @@
-"""The room a node keeps, as Controller settings (R110 steps 1 and 5): whole
+"""The room a node keeps, as Controller settings: whole
 numbers held to their range, and a container whose compose file sets no
 memory limit given the default one right after up."""
 import json

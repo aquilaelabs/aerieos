@@ -1,4 +1,4 @@
-"""A controller installed bare metal (R90 steps 4 and 5): nodes/install-controller.sh
+"""A controller installed bare metal: nodes/install-controller.sh
 is built on the provisioner's core (sourced, not copied), lays a release out
 by the Dockerfile's own COPY lines so the image and the install cannot
 drift, gives every process the environment the image's ENV gives the
@@ -104,8 +104,8 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.assertIn("BB_VERSION=1.2.3\n", env)
         self.assertIn("BB_IMAGE_REV=abc123\n", env)
         self.assertFalse(os.path.exists(rel + ".partial"))
-        # ...with the scripts' bytecode made here, as the image makes it (R228
-        # step 8), and not copied from the tree's (cp -a keeps its old time).
+        # ...with the scripts' bytecode made here, as the image makes it,
+        # and not copied from the tree's (cp -a keeps its old time).
         cache = os.path.join(rel, "scripts", "dashboard", "__pycache__")
         made = [n for n in os.listdir(cache) if n.startswith("server.") and n.endswith(".pyc")]
         self.assertTrue(made)
@@ -241,7 +241,7 @@ class TheEnvironment(unittest.TestCase):
 
 
 class TheWall(unittest.TestCase):
-    """What the installer writes for bb-session (R90 step 7): every folder of
+    """What the installer writes for bb-session: every folder of
     the controller's the env file names, each once and none inside another,
     and no loopback port: the controller keeps none that answers without a
     sign-in, so the table an earlier install wrote is not written again."""
@@ -310,7 +310,7 @@ class Updates(unittest.TestCase):
         return sh(f'ENV_FILE="{envf}"; gate "{ROOT}" {ver}')
 
     def test_the_state_is_the_services_own_when_the_env_file_names_none(self):
-        # B499: an empty answer had the gate read the current directory.
+        # An empty answer had the gate read the current directory.
         with tempfile.TemporaryDirectory() as d:
             envf = os.path.join(d, "controller.env")
             open(envf, "w").write("PORT=7680\n")
@@ -408,7 +408,7 @@ class Rollback(unittest.TestCase):
         self.assertLess(body.index("restore"), body.index('flip "$prev"'))
 
     def test_there_is_no_roll_back_by_hand(self):
-        # The operator, 28 Oct: a release moves forward only.
+        # A release moves forward only.
         text = open(INSTALLER, encoding="utf-8").read()
         self.assertNotIn("--rollback", text)
         r = subprocess.run(["bash", INSTALLER, "--rollback"], capture_output=True, text=True, timeout=30, check=False)

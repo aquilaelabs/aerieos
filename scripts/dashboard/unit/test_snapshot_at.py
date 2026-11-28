@@ -1,4 +1,4 @@
-"""A deploy's tree (R281 step 4): workspace.snapshot_at is the tree as
+"""A deploy's tree: workspace.snapshot_at is the tree as
 committed at a branch, a tag or a commit, never the working tree's edits,
 by git archive, so the same commit is the same digest; dist/ stays behind;
 and what is not a commit is said so."""

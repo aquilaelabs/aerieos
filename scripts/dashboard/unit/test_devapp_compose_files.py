@@ -1,5 +1,5 @@
-"""Every compose file in a project, each sent to Docker on its own (the
-operator, 10 Oct): which files are found, the folder each one's compose
+"""Every compose file in a project, each sent to Docker on its own:
+which files are found, the folder each one's compose
 calls run in, and the name Send offers, named for what the project is called
 now rather than its folder."""
 import json

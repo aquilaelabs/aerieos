@@ -1,4 +1,4 @@
-"""AerieOS's own terminal on a node (R133, term.py on screen.py's port):
+"""AerieOS's own terminal on a node (term.py on screen.py's port):
 only what the controller signed opens, and the program it runs is the one
 the session agent recorded for that kind, in a real pty. Keys typed reach
 it, a resize reaches it, a read-only terminal drops keys, and when the
@@ -35,7 +35,7 @@ class Client:
         a, b = socket.socketpair()
         self.sock, self.frames = a, screen._Frames()
         when = int(time.time()) if when is None else when
-        # A value of its own on every open, as the controller sends one (R288).
+        # A value of its own on every open, as the controller sends one.
         nonce = os.urandom(6).hex()
         sig = term.sign(KEY, f"{blob}.{nonce}", when) if sig is None else sig
         self.t = threading.Thread(target=self._serve, args=(b, kinds), daemon=True)
@@ -110,7 +110,7 @@ class Term(unittest.TestCase):
 
     def test_a_rotation_s_previous_key_is_taken_beside_the_current(self):
         # The controller signs with the token it has seen used, for a few
-        # minutes the one before a rotation (R135 step 4).
+        # minutes the one before a rotation.
         blob, now = term.pack({"kind": "rw", "argv": ["x"]}), int(time.time())
         old, new = screen.screen_key("bbn_old"), screen.screen_key("bbn_new")
         self.assertTrue(term.signed([new, old], blob, now, term.sign(old, blob, now)))

@@ -1,6 +1,6 @@
-"""The Library however big the catalog grows (R256): the index's topics and
+"""The Library however big the catalog grows: the index's topics and
 the day each entry was added are read, an index past what this build reads
-says so rather than dropping the rest unsaid (B975), and one look at the
+says so rather than dropping the rest unsaid, and one look at the
 Library is narrowed, counted and paged on the server: the front page's
 shelves of eight, a list a page at a time, every chip's count under the
 other narrowings, and what runs only on other systems counted and left out

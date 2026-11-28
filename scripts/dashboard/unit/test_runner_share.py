@@ -1,4 +1,4 @@
-"""A node's CI runner is held to its share of the machine (R271): its unit
+"""A node's CI runner is held to its share of the machine: its unit
 puts it in AerieOS's fence where the node has one, slows it past half the
 memory, kills it inside its own share past three fifths, lets it swap a
 quarter of the swap at most, and makes it the kernel's to take before the

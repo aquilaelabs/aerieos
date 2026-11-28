@@ -1,4 +1,4 @@
-"""A repository's deploy (R281 step 4): where its job runs and where its
+"""A repository's deploy: where its job runs and where its
 image goes (imported into a k3s of this install on the node it builds on,
 else pushed to the environment's registry or the git host's with the
 person's own token); the nodes a deploy is refused on, and why; what ships

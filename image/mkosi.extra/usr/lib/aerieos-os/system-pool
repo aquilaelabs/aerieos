@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The system pool of an AerieOS stick (R161 step 10, the operator,
-# 29 Oct: the stick read once and written rarely, as Unraid's is): what
+# The system pool of an AerieOS stick
+# (the stick read once and written rarely, as Unraid's is): what
 # writes all day, docker's and containerd's data, libvirt's, the toolchain
 # store and the projects, lives on a pool, bound over its usual place at
 # every boot, and the stick keeps the configuration alone. Until a pool is
@@ -9,7 +9,7 @@
 # wait for the array.
 #
 # The secrets folder (its *.env files, ssh/ and the install key) goes to the
-# pool too (the operator, 7 Nov): the stick alone, lost or taken, then opens
+# pool too: the stick alone, lost or taken, then opens
 # nothing the controller sealed. While a named pool is not mounted it is held
 # empty and read only, so no key is made on the stick in the key's place.
 #
@@ -43,7 +43,7 @@ ENVF="${BB_CONTROLLER_ENV:-/etc/aerieos-controller/controller.env}"
 SUB="aerieos-system"
 SERVICES=(containerd docker libvirtd)
 PFILE="$WORK/projects-folder"
-# Which install a pool's folder is (the operator, 6 Nov): another install's
+# Which install a pool's folder is: another install's
 # data (its containers, VMs, toolchains, spaces and the session accounts'
 # homes with their sign-ins) is never taken by a new one; that comes over only
 # through a move token from the controller it was.
@@ -87,7 +87,7 @@ others() {
     return 0
 }
 # ...and the id each of them is marked with, "PATH": "ID", so a controller
-# restored here knows its own pool from before among them (B939).
+# restored here knows its own pool from before among them.
 other_marks() {
     local t m
     while IFS= read -r t; do
@@ -106,7 +106,7 @@ projects_place() { local ws; ws="$(envget WORKSPACE)"; printf '%s' "${ws:-/srv/a
 # The folder named as the projects folder, if one is (projects PATH).
 named_projects() { [ -s "$PFILE" ] && head -1 "$PFILE"; }
 bound() { findmnt -rn -o TARGET "$1" 2>/dev/null | grep -qx "$1"; }
-# The projects never on the stick (the operator, 1 Nov): until a system pool
+# The projects never on the stick: until a system pool
 # or a folder on the disks is named, the projects folder is an empty
 # read-only mount of its own, held, so nothing can be written there.
 HELD="bb-projects-held"
@@ -144,7 +144,7 @@ hold_projects() {
     echo "system-pool: the spaces are held: none is made on the stick, and they wait for a system pool or a folder on the disks"
 }
 # A folder made on a pool is as the place it is bound over is, whoever that is
-# (the projects and the toolchains are the controller's, not root's, B597).
+# (the projects and the toolchains are the controller's, not root's).
 as_place() {
     [ -n "${BB_SP_NO_MOUNT:-}" ] && return 0
     chown --reference="$2" "$1" 2>/dev/null || true
@@ -156,7 +156,7 @@ as_place() {
 # boot.sh secrets_enterable, which only a controller's start sets). Shut
 # outright here, a running controller was locked out of its key until its
 # next start, and a move landed in that time, right after Moving here placed
-# the pool, was refused at the install key it carried (B777).
+# the pool, was refused at the install key it carried.
 secrets_shut() {
     local through=""
     [ -d "$2" ] && [ "$(( 0$(stat -c %a "$2" 2>/dev/null || echo 0) & 010 ))" -ne 0 ] && through=1
@@ -236,7 +236,7 @@ apply() {
         unhold "$place"
         if lasting "$name"; then
             # The image binds these from the data partition: the pool's goes
-            # over that one, so here "mounted" is not "there" (B669).
+            # over that one, so here "mounted" is not "there".
             # Only ever over the image's own: a plain folder there was never
             # moved (set_pool), so the pool's empty one must not cover it.
             if findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
@@ -276,7 +276,7 @@ apply() {
 
 # projects PATH [NAME...]: an existing folder taken as the projects folder.
 # Who had a projects folder before it was handed over, written as a script in
-# the folder itself (B665): it stays with the disks, so it runs on the other
+# the folder itself: it stays with the disks, so it runs on the other
 # system too, which has no AerieOS and has only what is on them. Let it go
 # runs it here. Nothing is written over one that is there, and a folder already
 # the account's own has nothing to give back. Relative paths, so it works from
@@ -301,7 +301,7 @@ note_owners() {
     } > "$s.new" || { rm -f "$s.new"; echo "system-pool: could not write in $f, so it stays as it is" >&2; return 2; }
     # The copy Let it go runs as root is root's own, outside the folder: the
     # one in it is handed to the controller's account with the rest, and
-    # anything running as that account could add to it (B719). It goes into
+    # anything running as that account could add to it. It goes into
     # the folder by its path, not its own place.
     local own; own="$(give_back_of "$f")"
     mkdir -p "$(dirname "$own")"; chmod 0700 "$(dirname "$own")"
@@ -349,7 +349,7 @@ set_projects() {
         echo "system-pool: handing $f to $acct (its files' owner alone)"
         chown -R "$acct${grp:+:$grp}" "$f"
         # The top closed to others: the wall refuses every session on this
-        # machine while anybody can walk into the projects (B596).
+        # machine while anybody can walk into the projects.
         chmod 0750 "$f"
     fi
     [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl stop "$CONTROLLER" 2>/dev/null || true
@@ -407,7 +407,7 @@ set_pool() {
     mounted "$p" || { echo "system-pool: $p is not a mounted pool" >&2; return 2; }
     # A pool is a disk's: the stick's own root (/, in memory on a stick) or
     # any folder of memory would take the system's data and lose it at the
-    # next boot (B719).
+    # next boot.
     local fst="${BB_SP_FSTYPE:-}"
     [ -n "$fst" ] || [ -n "${BB_SP_MOUNTED:-}" ] || fst="$(findmnt -rn -o FSTYPE --target "$p" 2>/dev/null || echo unknown)"
     case "$fst" in
@@ -420,7 +420,7 @@ set_pool() {
     if [ -n "$var_src" ] && [ "$var_src" = "$p_src" ]; then
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
-    # The pool this controller had before its stick died (B939): a
+    # The pool this controller had before its stick died: a
     # configuration restored here carries the install id its system pool is
     # marked with, and names it; the pool is this install's again, and the
     # stick takes that id for its own.
@@ -436,7 +436,7 @@ set_pool() {
             echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, set it aside, or pick a pool without it; nothing on $p was touched" >&2
             return 3
         fi
-        # Set aside, never taken (the operator, 8 Nov): renamed beside it
+        # Set aside, never taken: renamed beside it
         # as it is, to be deleted by a person once sure, and this install
         # starts on an empty folder.
         local aside
@@ -461,7 +461,7 @@ set_pool() {
             fi
             # Moved through what shows there, which is the data partition or
             # the old pool, then only an old pool's bind comes down: the image's
-            # stays underneath for the day the pool is gone (B669).
+            # stays underneath for the day the pool is gone.
             if ! on_it "$place" "$src"; then
                 if [ -d "$place" ] && [ -n "$(ls -A "$place" 2>/dev/null)" ]; then
                     cp -a "$place/." "$src/"
@@ -477,7 +477,7 @@ set_pool() {
         # Unmounted until nothing is mounted there, and the move stopped
         # whole while something still is: a copy and a delete through a
         # bind still standing (a second one stacked under the first by two
-        # applies at once) would empty the old pool (B476, B613). Nothing
+        # applies at once) would empty the old pool. Nothing
         # more moves; what moved stays.
         # The secrets are the one folder carried from an old pool to the new:
         # the install key in them opens what the controller sealed, and the
@@ -533,7 +533,7 @@ status() {
     # held (nowhere yet: never the stick).
     if [ -n "$pf" ]; then home="folder"; elif [ -n "$p" ] && [ "$ready" = true ]; then home="pool"; else home="held"; fi
     local oth; oth="$(others | paste -sd, -)"
-    # The id its system pool is marked with (B939), for a backup to carry.
+    # The id its system pool is marked with, for a backup to carry.
     local iid=""; [ -s "$IDFILE" ] && iid="$(head -c 64 "$IDFILE" | tr -cd '0-9a-f')"
     local marks; marks="$(other_marks | paste -sd, -)"
     printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s], "install_id": "%s", "other_marks": {%s}}\n' \

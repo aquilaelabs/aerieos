@@ -1,4 +1,4 @@
-"""Projects and their repositories (R136, R138): a project made with a name
+"""Projects and their repositories: a project made with a name
 alone (spaces and punctuation kept), a repository in one at a time and moved
 between them, a project deleted only when empty, a repository out of its
 project as it goes to the trash with where it was kept, names unique within
@@ -68,7 +68,7 @@ class Repos(unittest.TestCase):
         self.assertEqual(repos.made_since("app", 200), ["docs"],
                          "docs was made after a session on app started; server before; app is its own")
         # One moved in from another project after the session started counts,
-        # made long before or not (the operator, 27 Oct).
+        # made long before or not.
         other = self.project("Elsewhere", "reader")
         d["projects"]["reader"]["at"] = 10
         (Path(self.tmp) / "projects.json").write_text(json.dumps(d))
@@ -106,7 +106,7 @@ class Repos(unittest.TestCase):
         self.assertEqual(repos.place(), [], "a second time, nothing to place")
 
     def test_a_repository_added_to_a_project_is_in_it_before_a_status_read_can_place_it(self):
-        # B402: claimed alone, a status read during git init gave it a
+        # Claimed alone, a status read during git init gave it a
         # project of its own, and the one it was added to refused it.
         import projects
         shop = self.project("Shop", "app")
@@ -146,7 +146,7 @@ class Repos(unittest.TestCase):
         self.assertTrue(repos.create("Shop")["ok"], "its name is free again")
 
     def test_a_test_node_is_one_of_the_project_s_nodes(self):
-        # R151 step 1: the node the suites run on is one of the project's
+        # The node the suites run on is one of the project's
         # own, "" for the session's own; stored only when picked.
         prefs.set_prefs("app", node="n1", nodes=["n1", "n2"])
         self.assertIn("one of the space's nodes", prefs.set_prefs("app", test_node="n9")["error"])
@@ -163,8 +163,8 @@ class Repos(unittest.TestCase):
         prefs.set_prefs("server", build="make server")
         s = prefs.get("server")
         # The node is the project's, set from any of its repositories; a dial
-        # set from a repository's notebook is that repository's own override
-        # (R208 step 6), and the project's default is set on its own door.
+        # set from a repository's notebook is that repository's own override,
+        # and the project's default is set on its own door.
         self.assertEqual((s["node"], s["devbuild"], s["repos_of"]), ("n1", "deny", key),
                          "the space's node from any repository; a dial set there is that repository's alone")
         self.assertEqual((prefs.get("app")["devbuild"], prefs.get("app")["overrides"]), ("auto", ["devbuild"]))
@@ -217,7 +217,7 @@ class Briefing(unittest.TestCase):
         self.assertEqual(preamble.repos_part("other"), "")
 
     def test_a_session_is_briefed_as_its_project_with_every_repository_its_own(self):
-        """The operator, 27 Oct: a session in the second repository's project
+        """A session in the second repository's project
         was told it was the first repository's project by that one's name
         and id, and that the other repository was read-only."""
         import preamble  # noqa: PLC0415
@@ -270,7 +270,7 @@ class Briefing(unittest.TestCase):
         self.assertNotIn("reads server", r.stdout)
 
     def test_each_repositorys_memories_ride_every_agents_briefing(self):
-        """R152: the account's memory index of each repository, for any
+        """The account's memory index of each repository, for any
         agent; a Claude session's own repository's left to Claude Code."""
         import preamble  # noqa: PLC0415
         ws = tempfile.mkdtemp()
@@ -307,7 +307,7 @@ if __name__ == "__main__":
 
 class StandAlone(unittest.TestCase):
     """prefs.py loaded by a bb verb, with no server to hand it repos.py's
-    answers (R138): a repository still reads its project's settings, from
+    answers: a repository still reads its project's settings, from
     the state files themselves."""
 
     def test_a_repository_reads_its_projects_settings_with_no_server(self):

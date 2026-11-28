@@ -1,4 +1,4 @@
-"""A session whose program has ended (B1120): its pane stays with what it
+"""A session whose program has ended: its pane stays with what it
 said (remain-on-exit), so the tmux session lives on; the agent says so with
 its exit status, and the controller counts it as over, where it read as
 running until somebody pressed Restart."""

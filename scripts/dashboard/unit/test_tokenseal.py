@@ -1,4 +1,4 @@
-"""The coding agents' sign-ins sealed on a node (R126, tokenseal.py): the
+"""The coding agents' sign-ins sealed on a node (tokenseal.py): the
 node seals with an account's public key and cannot open what it sealed;
 the controller makes the key from the install key; a key wrapped to the
 agent's boot secret opens only there; a value outside the group, a wrong

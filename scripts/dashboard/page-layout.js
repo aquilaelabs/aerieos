@@ -1,8 +1,8 @@
 // The layout: the tabs, shared between browsers, saved on the server so a
 // phone and a desk have the same strip open and adopted when another
 // browser changes it; the panes and the tab in front, each browser's own
-// (R131: switching tabs on the phone switched the desk too, the operator,
-// 5 Oct); and render(), the one draw of the page every change ends in.
+// (switching tabs on the phone switched the desk too);
+// and render, the one draw of the page every change ends in.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
 // pure declarations, nothing runs at load. What runs at load is
@@ -32,7 +32,7 @@ function render(){ shellBoot(); if (state) dockSettle(); drawPanes(); drawKeys()
 // poll carrying a different one means another browser changed something.
 // Which tab is in front, and which tab each pane holds, are this browser's
 // own, kept in localStorage: the server's copy is taken only by a browser that has
-// none yet, and a switch writes nothing to the server (R131).
+// none yet, and a switch writes nothing to the server.
 let myRev = -1, savePending = false, saveTimer = null, adopting = false;
 const PANES_KEY = "bb.panes";
 let lastLocal = null;
@@ -127,7 +127,7 @@ function adoptLayout(v){
   adopting = true;
   // Taken whole: a browser that closed a tab must not have it resurrected
   // by this one.
-  // `popped` (R8) survives only where this window holds the popped window's
+  // `popped` survives only where this window holds the popped window's
   // handle: another browser's pop-out is not one this page can see or close,
   // and a placeholder nobody can reattach would be a dead pane.
   // A tab of a kind this page does not have is left out rather than drawn

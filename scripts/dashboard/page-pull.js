@@ -1,4 +1,4 @@
-// Pull to refresh, on a touch screen (the operator, 2 Oct). The page scrolls
+// Pull to refresh, on a touch screen. The page scrolls
 // inside its panes, never the document, so a phone browser's own pull to
 // refresh never fires here; this is the same gesture, done by the page: a
 // finger that lands on a pane scrolled to its top and drags down past the
@@ -60,7 +60,7 @@ function wirePull(){
   };
   // A row a poll redraws under the finger leaves the page, and a touch's
   // moves and lift go on to it alone, never reaching the document, so the
-  // pull was lost (B854): while it is out of the page they are heard on it.
+  // pull was lost: while it is out of the page they are heard on it.
   let held = null;
   const unhold = () => {
     if (!held) return;
@@ -74,14 +74,14 @@ function wirePull(){
     if (busy || e.touches.length !== 1) return reset();
     const t = e.target;
     // Not where a finger types, drags a block or works a terminal.
-    // ...nor one scrolling a terminal's output (B411: the dock's xterm, its
+    // ...nor one scrolling a terminal's output (the dock's xterm, its
     // host and the pane slot that holds a terminal), which has its own scroll.
     if (t.closest("input, textarea, select, iframe, .dsboard, .modal:not([hidden]):not(.inline), .xterm, .xhost, .slot.ownterm, .slot.term")) return reset();
     const sc = pullScroller(t);
     if (sc && sc.scrollTop > 0) return reset();
     y0 = e.touches[0].clientY; live = false; last = 0;
     // It comes down from the header's lower edge, wherever that is, or the
-    // install's banner's under it (R88).
+    // install's banner's under it.
     hint.style.top = `${Math.round((document.getElementById("banner") || document.querySelector("header"))?.getBoundingClientRect().bottom || 0)}px`;
     unhold();
     const away = f => ev => { if (!t.isConnected) f(ev); };

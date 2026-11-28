@@ -1,5 +1,5 @@
-"""An apply uses a target that already is this node's store as it is
-(B661): the marker, the node's own toolchain folder, or a folder this agent
+"""An apply uses a target that already is this node's store as it is:
+the marker, the node's own toolchain folder, or a folder this agent
 made for the store before says so, and a folder of someone else's files
 does not."""
 import os

@@ -1,6 +1,6 @@
 """The node's one port for the controller's sockets: AerieOS's own
-terminals (R133, term.py) at /term, the file explorer's requests (R224,
-files.py) at /files, and a VM's screen for the dock (R99),
+terminals (term.py) at /term, the file explorer's requests
+(files.py) at /files, and a VM's screen for the dock,
 relaying one connection to one of this machine's VMs' VNC, which libvirt
 listens for on the loopback alone.
 
@@ -33,7 +33,7 @@ WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
 def screen_key(token):
-    """The signing key (R288): an HMAC of this node's token, which the
+    """The signing key: an HMAC of this node's token, which the
     controller works out from the token as the node presents it and keeps in
     memory alone. The token's sha256, which the controller's database holds,
     signed it before, so a copy of that file could open this node's
@@ -141,12 +141,12 @@ def _accept(conn, hdr):
 
 
 def serve_term(conn, key, hdr, q, kinds):
-    """A terminal (R133): checked as the controller signed it, then its
+    """A terminal: checked as the controller signed it, then its
     kind's program in a pty, joined to the socket (term.relay)."""
     blob, nonce, sig = (q.get("a") or [""])[0], (q.get("n") or [""])[0], (q.get("s") or [""])[0]
     if not term.signed(key, relaytls.subject(blob, nonce), (q.get("t") or [""])[0], sig):
         return _refuse(conn, 403, "not signed by this node's controller")
-    # A value of the controller's own on every request (R288): without one a
+    # A value of the controller's own on every request: without one a
     # signed request could be sent again for its two minutes, and every
     # controller this agent takes work from sends one.
     if not nonce:
@@ -161,7 +161,7 @@ def serve_term(conn, key, hdr, q, kinds):
     if not how:
         return _refuse(conn, 409, "this node's terminals are not up")
     # The account's sealed sign-ins, opened for its session before the
-    # program starts (R126). One that cannot be opened leaves the terminal
+    # program starts. One that cannot be opened leaves the terminal
     # to start as it is: its agent then says it is not signed in here.
     if spec.get("tk") and spec["kind"] in ("rw", "ro") and callable(ks.get("_open")):
         try:
@@ -187,7 +187,7 @@ def serve_one(conn, key, kinds=None):
     hdr = {k.strip().lower(): v.strip() for k, _, v in (ln.partition(":") for ln in lines[1:])}
     q = urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
     if files.route(path):
-        # The file explorer's one request (R224), the body's start with it.
+        # The file explorer's one request, the body's start with it.
         return files.serve(conn, key, hdr, q, head.split(b"\r\n\r\n", 1)[1])
     if urllib.parse.urlsplit(path).path == "/term":
         return serve_term(conn, key, hdr, q, kinds or (lambda: {}))
@@ -197,7 +197,7 @@ def serve_one(conn, key, kinds=None):
     nonce, sig = (q.get("n") or [""])[0], (q.get("s") or [""])[0]
     if not signed(key, relaytls.subject(domain, nonce), (q.get("t") or [""])[0], sig):
         return _refuse(conn, 403, "not signed by this node's controller")
-    # A value of the controller's own on every request (R288): without one a
+    # A value of the controller's own on every request: without one a
     # signed request could be sent again for its two minutes, and every
     # controller this agent takes work from sends one.
     if not nonce:
@@ -238,7 +238,7 @@ def serve_one(conn, key, kinds=None):
 
 class ScreenRelay:
     """The listener, on the session address; a connection each in its own
-    thread: a terminal (R133), or a VM's screen. Up whether or not the agent
+    thread: a terminal, or a VM's screen. Up whether or not the agent
     is root: a terminal as the agent's own account needs nothing more."""
     def __init__(self, agent):
         self.agent = agent
@@ -247,8 +247,8 @@ class ScreenRelay:
         self.securing = threading.Lock()
 
     def secure(self):
-        """The relay's own certificate, made once beside the agent's data
-        (R243), and its sha256 said in the hello so the controller pins it.
+        """The relay's own certificate, made once beside the agent's data,
+        and its sha256 said in the hello so the controller pins it.
         A node with neither the cryptography library nor openssl has none:
         the controller opens nothing on its relay, and the node's page says
         why. Asked again at each hello until there is one, so a library put
@@ -318,7 +318,7 @@ class ScreenRelay:
 
     def _keys(self):
         """The keys a request may be signed with: this node's token's, and
-        for a few minutes after a rotation the one before's (R135 step 4),
+        for a few minutes after a rotation the one before's,
         which the controller signs with until it has seen the new one used."""
         keys = [screen_key(self.agent.state.get("token"))]
         prev, at = getattr(self.agent, "prev_token", None) or ("", 0)
@@ -328,7 +328,7 @@ class ScreenRelay:
 
     def _kinds(self):
         """The terminals' programs as the session half last recorded them,
-        and what opens an account's sealed sign-ins for one (R126)."""
+        and what opens an account's sealed sign-ins for one."""
         ks = dict(getattr(self.agent, "term_kinds", None) or {})
         if callable(getattr(self.agent, "token_open", None)):
             ks["_open"] = self.agent.token_open

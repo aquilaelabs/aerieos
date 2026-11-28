@@ -21,25 +21,25 @@
 // what it was showing.
 // A new layout opens on the projects, with the controller's shell beside
 // them: the shell first was a raw prompt for a newcomer, and on a setup
-// whose work runs on nodes, one that could not even start (R119, 4 Oct).
+// whose work runs on nodes, one that could not even start.
 let tabs = [{id:"pj", kind:"projects", arg:"__projects", label:"Spaces"},
             {id:"ws", kind:"term", arg:"shell", label:"sh: workspace"}];
-// The windows terminals were popped out into (R8), by tab id: this browser's
+// The windows terminals were popped out into, by tab id: this browser's
 // own handles, which is the only way a page can know a popped window still
 // lives. A reload loses them, and a tab popped from a page since reloaded
-// comes back into the strip: the edge R8 named, decided this way.
+// comes back into the strip: an edge decided this way.
 const popWins = new Map();
 let panes = ["pj", null];
 // What a session's container ask is asking for, from its own command line:
 // "new" makes a container, "remove" removes one, "env set" writes its env,
 // start, stop and restart are themselves, and only the rest is a rebuild.
-// The card said rebuild for all of them (B301).
+// The card said rebuild for all of them.
 function askVerb(a){
   return a.ctl || ({new: "create", remove: "remove", env: "env set"}[a.cmd?.[1]] || "rebuild");
 }
 let active = 0;
 let state = null;   // the status poll's answer, and the one source: a `let` that
-                    // mirrors part of it drifts (B213, B215), so read it here
+                    // mirrors part of it drifts, so read it here
 let findings = null;
 // Shut, on every device. A touch device is where the on-screen keys are most
 // useful and also where they cost the most room: opening one over the
@@ -71,7 +71,7 @@ function postJSON(path, body, opts = {}){
                                                  opts.read ? READ_WAIT_MS : WRITE_WAIT_MS), opts), opts));
 }
 // How long a read may take before it is given up on and said as not
-// answered (B1002): one /api/status that never answered (git on a stalled
+// answered: one /api/status that never answered (git on a stalled
 // share) held the poll for good, and every press that awaited a refresh
 // spun with it. A write may take as long as the longest the server allows
 // one (a release, 17 minutes), and is held to that: one that never
@@ -83,7 +83,7 @@ const timeLimit = ms => typeof AbortSignal?.timeout === "function" ? {signal: Ab
 // A request held to its limit, which throws the limit's own reason when the
 // limit is what ended it: a TimeoutError in every engine, where WebKit threw
 // an AbortError for it ("Fetch is aborted") and Firefox throws one for a read
-// the page cut short on its way out (B1125). So a read that was not answered
+// the page cut short on its way out. So a read that was not answered
 // is said as one, and a page leaving is told apart from it.
 function limitedFetch(url, init, ms){
   const o = timeLimit(ms);
@@ -97,7 +97,7 @@ function postFile(path, file, type = ""){
                                                  ...(type ? {headers: {"Content-Type": type}} : {})}), {}), {}));
 }
 // Every write is counted while it is unanswered, and leaving the page then
-// asks first (the operator, 22 Nov: a press's change is drawn at once and
+// asks first (a press's change is drawn at once and
 // the server follows, so a page left early could lose one unsaid). The
 // page's own writes on a timer (presence, the layout) say {background: true}
 // and hold nothing, and one sent as the page goes (keepalive) is meant to
@@ -126,8 +126,8 @@ function writeOut(p, opts){
 // draws without it once they have gone; a refusal puts it back whole and
 // says why. `send` makes the request, `redraw` draws the page from its own
 // data, and `after` (the read again, a word said) runs once the server has
-// it, the key let go after. One mechanism for every page (the operator,
-// 22 Nov: each change an opportunity to make it consistent and fold what
+// it, the key let go after. One mechanism for every page
+// (each change an opportunity to make it consistent and fold what
 // was written out several times).
 const goingNow = new Set();
 const going = key => goingNow.has(key);
@@ -211,7 +211,7 @@ function poster(path, {reload, base, said} = {}){
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const tabOf = id => tabs.find(t => t.id === id) || null;
-// A dev feature says so wherever it is offered (R102, the badges rule): a
+// A dev feature says so wherever it is offered (the badges rule): a
 // gold `dev` pill beside a row's name, a setting's label or a section's
 // title, and " (dev)" after an option's words, since an option holds no pill.
 const devMark = () => ` <span class="pill devmark" title="a dev feature: offered because Offer dev features is on, and not yet walked on a real machine">dev</span>`;
@@ -255,24 +255,24 @@ const myTmux = s => (state?.tmux_prefix || "") + s;
 const notMine = p => p.mine === false;
 const NOT_MINE_WHY = "read-only: you hold no role on this space; its owner or an "
   + "administrator gives you one to work on it";
-// Why this account may not change a project, or "" (B86): not taken on, or
+// Why this account may not change a project, or "": not taken on, or
 // a role that gives Projects Read and not Write, as the server words it on
 // the row (write_why). Every writing control on the project's page is dead
 // on it, with this under it in red; the server refuses the same.
 const writeWhy = p => !p ? "" : notMine(p) ? NOT_MINE_WHY : (p.write_why || "");
 const projWriteWhy = name => writeWhy((state?.projects || []).find(p => p.name === name));
-// ...and why its version is not this account's to move or release, or ""
-// (B101): Releases and versions Write, which Projects Write does not carry.
+// ...and why its version is not this account's to move or release, or "":
+// Releases and versions Write, which Projects Write does not carry.
 const projReleaseWhy = name => {
   const p = (state?.projects || []).find(x => x.name === name);
   return !p ? "" : notMine(p) ? NOT_MINE_WHY : (p.release_why || "");
 };
 // The reason under a dead control, a feature this install switched off: one
-// line in the warning's yellow, since a control that is off is not an error
-// (the operator, 21 Oct). A role an account lacks is never one: what it does
+// line in the warning's yellow, since a control that is off is not an error.
+// A role an account lacks is never one: what it does
 // not give is not drawn at all.
 const deadWhy = why => why ? `<div class="notice warn deadwhy">${esc(why)}</div>` : "";
-// A feature this install switched off (R81): its sentence, or "" when it is
+// A feature this install switched off: its sentence, or "" when it is
 // on. Every control the feature draws is dead with this under it.
 const featureOff = feature => state?.off?.[feature] || "";
 // May this account have a shell at all (roadmap #27)? An account without one
@@ -282,13 +282,13 @@ const featureOff = feature => state?.off?.[feature] || "";
 // DRAWN; every one of these is refused again on the server.
 const mayShell = () => state?.can?.terminal !== false;
 // ...and one on no space, at /workspace, which reaches every space's trees:
-// Terminal Write Everywhere (R277).
+// Terminal Write Everywhere.
 const mayShellAny = () => state?.can?.["terminal-any"] !== false;
-// A node's service read without Configure Write on that node (R277): its
+// A node's service read without Configure Write on that node: its
 // page says so in its head, and its controls are not drawn (.svcro).
 const SVC_RO = "read only: changing it is Configure Write's on this node";
 const mayDocker = () => state?.can?.["docker-write"] !== false;
-// ...on that node where one is named (R260: Toolchains held node by node),
+// ...on that node where one is named (Toolchains held node by node),
 // read off the node's row; a node not drawn yet is the server's to refuse.
 const mayToolchains = nid => state?.can?.["toolchains-write"] !== false
   && (!nid || ((typeof nodesList === "undefined" ? null : nodesList)?.find(x => x.id === nid)?.areas_may?.install ?? "write") === "write");
@@ -297,12 +297,12 @@ const mayToolchains = nid => state?.can?.["toolchains-write"] !== false
 // worktree of their own, so the name has to say whose conversation it is,
 // and the name is then the only record of that, with no file to go stale.
 // Every "is it running" question below is about the asker's own.
-// Which agent's session it is, the agent table says (R95): Claude's here.
-// ...in its slot (R143): the first is the name it always had, a second one
+// Which agent's session it is, the agent table says: Claude's here.
+// ...in its slot: the first is the name it always had, a second one
 // `claude-alpha~2`.
 const myAgentSession = (id, proj, slot = 1) => myTmux(tmuxName((agentById(id) || AGENTS[0]).id + "-" + proj) + (slot > 1 ? `~${slot}` : ""));
 const myClaude = (proj, slot = 1) => myAgentSession("claude", proj, slot);
-// Every agent session of THIS account on a project (R143): [{agent, slot,
+// Every agent session of THIS account on a project: [{agent, slot,
 // name, row}], each agent's slots in order, on whichever node.
 function mySlots(proj){
   const stem = tmuxName(proj);
@@ -320,10 +320,10 @@ function freeSlot(proj, id){
   for (let n = 1; n <= cap; n++) if (!used.has(n)) return n;
   return 0;
 }
-// THIS account's running session on a project, whichever agent's (R95: the
+// THIS account's running session on a project, whichever agent's (the
 // header's dot, Manage agent, a Send to session and a restart notice ask it
 // of every agent alike), the project's default agent's first; or null.
-// ...any of its slots (R143), the first slot of each before the rest.
+// ...any of its slots, the first slot of each before the rest.
 function myLiveSession(proj){
   const live = liveSessions(), first = (state?.projects || []).find(x => x.name === proj)?.prefs?.agent_default;
   const ids = AGENTS.map(a => a.id).sort((x, y) => (y === first) - (x === first));
@@ -343,7 +343,7 @@ function sessionOf(arg){
   if (arg.startsWith("shell:"))  return myTmux(tmuxName("shell-"  + arg.slice(6)));
   // ctr:NAME:INSTANCE:CONTAINER, named by its container (bb-tty's ctr-).
   if (arg.startsWith("ctr:"))    return myTmux(tmuxName("ctr-" + arg.split(":")[3]));
-  // vm:PROJECT:NAME, a VM's console (R91), named by its domain (bb-tty's vm-).
+  // vm:PROJECT:NAME, a VM's console, named by its domain (bb-tty's vm-).
   if (arg.startsWith("vm:"))     return myTmux(tmuxName("vm-bbvm-" + arg.split(":")[1].toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) + "-" + arg.split(":")[2]));
   return arg;
 }
@@ -387,7 +387,7 @@ function principalWords(by){
 // ---- times and sizes ----------------------------------------------------
 
 // The time zone times are shown in. A person's own, set on their Profile,
-// is every browser's (R294 step 8), the same zone their quiet windows on the
+// is every browser's, the same zone their quiet windows on the
 // bell keep; a browser may pick its own in the gear's menu, kept in a cookie
 // because it is where this device is, not who the account is (a phone
 // abroad): a zone, or "device", this device's own. With neither, the
@@ -418,7 +418,7 @@ function fmtTime(t, opts = {}){
   return new Date(t).toLocaleString([], z ? {...opts, timeZone: z} : opts);
 }
 
-// ...and GB past a gigabyte (B825): a 19 GB limit read 19476.5MB; TB past
+// ...and GB past a gigabyte: a 19 GB limit read 19476.5MB; TB past
 // a terabyte, where a big store read 11274.0 GB. A space before the unit,
 // as every other size on the page has it (the Emulator's 11.0 TB beside the
 // Library's 11.0TB).
@@ -429,7 +429,7 @@ const humanBytes = n =>
   : n >= 1024 ? Math.round(n / 1024) + " kB" : (n || 0) + " B";
 
 // ---- fields a password manager leaves alone ------------------------------
-// Bitwarden offered itself on every text box on the page (B495): a search,
+// Bitwarden offered itself on every text box on the page: a search,
 // a note, a role's purpose. It ignores autocomplete="off" and honors only
 // its own attribute, as 1Password and LastPass honor theirs, so every field
 // that is not a password or a sign-in carries all three. A password field,

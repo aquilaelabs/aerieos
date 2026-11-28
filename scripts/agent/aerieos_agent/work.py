@@ -36,7 +36,7 @@ def cache_age_days(path):
     return 0.0
 
 def _sign_work(kind, jid):
-    """A signing job's folder under SIGN_WORK (B315): on this machine's own
+    """A signing job's folder under SIGN_WORK: on this machine's own
     memory, its parents root's and open to pass through alone."""
     root = os.path.join(SIGN_WORK, kind)
     os.makedirs(root, mode=0o711, exist_ok=True)
@@ -116,7 +116,7 @@ class WorkMixin:
                 # config directory of a container running as another user,
                 # or a tree an administrator just chowned on request, and
                 # handing it to the agent's account on every rebuild broke
-                # the containers that owned it (B315).
+                # the containers that owned it.
                 had = os.path.isdir(d)
                 os.makedirs(d, exist_ok=True)
                 if who and not had:
@@ -150,7 +150,7 @@ class WorkMixin:
                 job.say("stopped\n")
                 job.outputs.append({"kind": "compose", "steps_done": done})
                 return "canceled", 130
-            # An image shipped between two nodes (R166): the build node
+            # An image shipped between two nodes: the build node
             # uploads what it saved to the controller, and the node the
             # instance lives on fetches it, so the project's source never
             # reaches a node that does not hold the project. The file is the
@@ -201,7 +201,7 @@ class WorkMixin:
         return "succeeded", 0
 
     def ship_step(self, job, stp, cdir):
-        """One half of shipping an image (R166): `upload` sends a file under
+        """One half of shipping an image: `upload` sends a file under
         this job's compose directory to the controller and removes it here;
         `fetch` brings one down into it. The path never leaves the compose
         directory, and the controller's verb is the only one either names."""
@@ -211,7 +211,7 @@ class WorkMixin:
             job.say(f"refused: {path} is not in this job's directory\n")
             return "failed", 78
         verb = str(stp.get("to") or stp.get("fetch") or "")
-        # The image a shipped instance runs (R166), or the data a copied or
+        # The image a shipped instance runs, or the data a copied or
         # moved one carries (relocate.py on the controller).
         if not verb.startswith(("devimage", "devdata")):
             job.say(f"refused: not the controller's image or data verb: {verb[:40]}\n")
@@ -225,7 +225,7 @@ class WorkMixin:
             job.say(f"sending {what} to the controller ({size >> 20} MB)\n")
             if self.state.get("reach") == "public" and verb.startswith("devdata"):
                 # A tunnel's edge may cap a request's body (Cloudflare: 100
-                # MB, R170): in pieces.
+                # MB): in pieces.
                 code, r = self.ctl.upload_pieces(verb, real, 64 << 20, timeout=int(stp.get("timeout") or 3600),
                                                  say=lambda off: job.say(f"  {off >> 20} MB sent\n"))
             else:
@@ -251,8 +251,8 @@ class WorkMixin:
         """Drop this node's build caches: one project's, or all of them.
         The one thing that goes wrong with caches is a full disk, and this
         is the button for it (docs/nodes.md §6). With older_days, only the
-        ones no job has used for that long (the controller's room keeper,
-        R110 step 7), read off the stamp a job leaves (.used), else the
+        ones no job has used for that long (the controller's room keeper),
+        read off the stamp a job leaves (.used), else the
         directory's own time."""
         root = (self.state.get("stores") or {}).get("cache") or ""
         if not root or not os.path.isdir(root):
@@ -271,7 +271,7 @@ class WorkMixin:
         except (TypeError, ValueError):
             days = 0
         # ...and with `builds`, that project's build caches in every
-        # account's home as well (R123 step 2: the Storage page's builds
+        # account's home as well (the Storage page's builds
         # column, its Gradle home and out-of-tree build per account).
         if project and spec.get("builds"):
             home = storage.SESSION.get("home") or ""
@@ -300,7 +300,7 @@ class WorkMixin:
         return "succeeded", 0
 
     def phones_idle(self, job, spec):
-        """The room keeper's (R129): every project's phones here that are not
+        """The room keeper's: every project's phones here that are not
         running and have not started for `older_days` give back their
         quick-boot snapshot. A phone and its data are never removed here;
         its next start boots cold. Then a walk, so the page shows it."""
@@ -311,7 +311,7 @@ class WorkMixin:
         now, freed, n = time.time(), 0, 0
         for _uid, d in storage.avd_homes(storage.SESSION.get("home") or ""):
             # As the home's owner: the folder is theirs, and a link they left
-            # at snapshots had root remove whatever it led to (R247 step 5).
+            # at snapshots had root remove whatever it led to.
             with fs_holds(storage.home_owner(os.path.dirname(os.path.dirname(d)))):
                 for proj in sorted(os.listdir(d))[:300]:
                     pd = os.path.join(d, proj)
@@ -340,7 +340,7 @@ class WorkMixin:
         return "succeeded", 0
 
     def avd_remove(self, job, spec):
-        """A project's phone off this node (R123): one account's AVD, its
+        """A project's phone off this node: one account's AVD, its
         .avd folder and its .ini, which aerie emu start makes again. Refused
         while the emulator holds it; every name checked against the shape
         aerie emu gives it, and the folder found only under the homes'
@@ -397,7 +397,7 @@ class WorkMixin:
         # Every name it was sent, or a refusal that says so: this kept the
         # first eight and dropped the rest without a word, so a batch of
         # nine reported success with the ninth never tried, and the move of
-        # twenty-eight installed eight (the operator, 12 Oct).
+        # twenty-eight installed eight.
         if len(names) > TC_NAMES_MAX:
             job.say(f"refused: {len(names)} toolchains in one job; at most {TC_NAMES_MAX}\n")
             return "failed", 64
@@ -417,10 +417,10 @@ class WorkMixin:
         if action == "sysdeps":
             return self.sysdeps(job, names, into)
         # What cuts the network for a declared pack's steps where the job
-        # account cannot (R234), from the bundle just fetched.
+        # account cannot, from the bundle just fetched.
         if action == "install":
             self.refresh_netcut_tool()
-        # The NVIDIA driver (R102), a member of the batch like any row, but
+        # The NVIDIA driver, a member of the batch like any row, but
         # the machine's and not the store's: installed or removed as root by
         # bb-sandbox, after the store's names, since it ends at a restart.
         drv = [n for n in names if n == DRIVER or n.startswith(DRIVER + ":")]
@@ -428,7 +428,7 @@ class WorkMixin:
         ctk = [n for n in names if n == TOOLKIT]
         names = [n for n in names if n not in drv and n not in ctk]
         if action == "clean":
-            # A retired node's directory on the store (R196). The controller
+            # A retired node's directory on the store. The controller
             # offered these names; each is checked again here: a node id at
             # the top of the store, never this node's own, and nothing
             # running from it.
@@ -468,7 +468,7 @@ class WorkMixin:
             # installed to compare it against is the node's. One command for
             # every name, because `aerie toolchains check` with no argument
             # already means all of them, and the controller reads the TSV out
-            # of this job's log (R67).
+            # of this job's log.
             job.step("checking")
             job.say(f"== aerie toolchains check {' '.join(names)}\n")
             return job.exec({"argv": ["bash", os.path.join(into, "scripts", "aerie"),
@@ -478,7 +478,7 @@ class WorkMixin:
         bad = 0
         # The catalog the bundle carries, for where each toolchain lives:
         # what an update or a removal would pull out from under whatever is
-        # running it (the operator, 6 Oct).
+        # running it.
         try:
             cat = read_catalog(into)
             cat = cat.get("toolchains", cat) if isinstance(cat, dict) else cat
@@ -503,7 +503,7 @@ class WorkMixin:
                 bad += 1
                 continue
             # One verb, or a remove and then the install for a recipe that
-            # cannot update in place (tc_verbs, R193): the remove that fails
+            # cannot update in place (tc_verbs): the remove that fails
             # ends this name there, with the old one still installed.
             for verb in tc_verbs(store, name, cat.get(name), action):
                 job.say(f"== aerie toolchains {verb} {name}\n")
@@ -519,7 +519,7 @@ class WorkMixin:
             else:
                 # Landed: the terminal server is started again now, not when
                 # the whole batch ends, so a session opened meanwhile has it
-                # on its PATH (the operator, 12 Oct: one opened an hour into
+                # on its PATH (one opened an hour into
                 # a batch still had the old environment). Open sessions run on.
                 if action == "install":
                     self.session_renew()
@@ -553,8 +553,8 @@ class WorkMixin:
         return "succeeded", 0
 
     def sign(self, job, spec):
-        """Sign one build from the project's dist/ with one of its keys
-        (R106): the build fetched as a job input, the key fetched over this
+        """Sign one build from the project's dist/ with one of its keys:
+        the build fetched as a job input, the key fetched over this
         agent's channel for this job alone, both into a 0700 directory of the
         enrolled account that is removed whatever happens. zipalign then
         apksigner for an .apk, jarsigner for an .aab, verified, and the result
@@ -610,7 +610,7 @@ class WorkMixin:
                 os.chown(src, who["user"], who["group"])
                 os.chown(work, who["user"], who["group"])
             # Which app it is, so the controller can hand the key its package
-            # is mapped to (R106 step 6): aapt2 for an .apk; a bundle's
+            # is mapped to: aapt2 for an .apk; a bundle's
             # manifest is a protobuf no tool here reads, and the package name
             # is the one string in it shaped like one after "package".
             package = ""
@@ -638,7 +638,7 @@ class WorkMixin:
             ks = keyops.private(work, "key", base64.b64decode(k["keystore"]), who)
             env.update({"BB_KS_PASS": str(k.get("store_pass") or ""),
                         "BB_KEY_PASS": str(k.get("key_pass") or k.get("store_pass") or "")})
-            # A rotated key (R106 step 7): the key it replaced signs first and
+            # A rotated key: the key it replaced signs first and
             # the proof says the new one takes over, from Android 9 on.
             prev = k.get("previous") if kind == ".apk" and k.get("lineage") else None
             if prev:
@@ -689,7 +689,7 @@ class WorkMixin:
             got = re.search(r"SHA-256 digest:\s*([0-9a-fA-F]{64})", said)
             cert = got.group(1).upper() if got else ""
             # Which signature schemes verified, as apksigner says it; a
-            # bundle is a jar signature (R106 step 4: the row says so).
+            # bundle is a jar signature (the row says so).
             schemes = ",".join(re.findall(r"Verified using (v\d(?:\.\d)?) scheme[^:]*:\s*true", said)) \
                 if kind == ".apk" else "jar"
             want = str(k.get("sha256") or "").replace(":", "").upper()
@@ -718,8 +718,8 @@ class WorkMixin:
             shutil.rmtree(work, ignore_errors=True)
 
     def sign_key(self, job, spec):
-        """The controller's signing key work, on this node (R106, the
-        operator 22 Oct: the controller runs nothing): a keystore checked, a
+        """The controller's signing key work, on this node
+        (the controller runs nothing): a keystore checked, a
         key made, a key wrapped under a backup's password, a rotation's
         proof, or a release's APK signed (keyops.py). What the job needs
         comes over this agent's channel for it alone (signing-key) and what
@@ -832,8 +832,8 @@ class WorkMixin:
         node's toolchain store, or off it. Not a toolchain (it exists at
         every API level at once), but it lives on the same store and goes
         through the same bundle, account and one-at-a-time rule, so this is
-        toolchain() for one id, or for several in turn: the Emulator page's
-        Install selected sends the ticked ones as `images` (R121), and the
+        toolchain for one id, or for several in turn: the Emulator page's
+        Install selected sends the ticked ones as `images`, and the
         first that fails ends the job, as a toolchain install does. Nothing
         on PATH moves, so no session renew."""
         store = tc_root(self.state)
@@ -906,13 +906,13 @@ class WorkMixin:
 
     def administers(self):
         """Whether this agent may install system packages here: root, on a
-        node provisioned as a sandbox (the stamp; roadmap R23 refines it to
-        a class). Anywhere else the machine is its owner's."""
+        node provisioned as a sandbox (the stamp). Anywhere else the machine is
+        its owner's."""
         return os.geteuid() == 0 and os.access(SANDBOX_BIN, os.X_OK)
 
     def sysdeps(self, job, names, into):
         """Install the system packages the recipes already on the store need
-        here, without touching the recipes (roadmap R51). The store is a
+        here, without touching the recipes. The store is a
         share, so a toolchain installed from one node is on every node that
         mounts it, while the libraries it needs are each machine's own: a
         node enrolled afterwards has dotnet and not libicu, and the only

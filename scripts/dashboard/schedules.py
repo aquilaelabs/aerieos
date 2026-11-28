@@ -1,4 +1,4 @@
-"""Scheduled scripts (R117): an administrator's own cron in AerieOS. Each
+"""Scheduled scripts: an administrator's own cron in AerieOS. Each
 schedule is a script, a timetable in cron's
 five fields (said in words: "Sundays at 4:00"), the node it runs on, and
 whether it runs there as the node's jobs account or as root (a sandbox node
@@ -29,7 +29,7 @@ _lock = threading.Lock()
 MAX = 64                     # schedules kept
 SCRIPT_MAX = 64 * 1024
 # A run is stopped after a day unless its schedule says less: the form asks
-# nothing about it (the operator, 26 Oct), and a hung script holds its
+# nothing about it, and a hung script holds its
 # node's job slot no longer than that.
 TIMEOUT_MAX = 24 * 3600
 TIMEOUT_DEFAULT = TIMEOUT_MAX
@@ -37,7 +37,7 @@ TIMEOUT_DEFAULT = TIMEOUT_MAX
 # for it: run once, and say how late.
 LATE_S = 180
 AS = ("job", "root")
-# A schedule the controller's own pages make (R162 step 5): a system job
+# A schedule the controller's own pages make: a system job
 # from the root agent's table rather than a script, on the node named;
 # the table's entries a page may schedule, each with the shape its config
 # must have, checked here before the record and again on the node.
@@ -50,7 +50,7 @@ SYSTEM_TIMEOUT = {"storage-snapshot": 900, "storage-array": 86400, "storage-back
 
 def system_timeout(sysj):
     """A scheduled system job's time limit: a parity check reads every disk
-    whole, two days for a large array (R163 step 15)."""
+    whole, two days for a large array."""
     if sysj.get("apply") == "storage-array" and (sysj.get("config") or {}).get("array") == "verify":
         return 172800
     return SYSTEM_TIMEOUT.get(sysj.get("apply"), 900)
@@ -172,8 +172,8 @@ def scheduled_backups(node_id):
 
 
 def snapshot_schedules(node_id):
-    """The storage-snapshot and storage-array schedules on one node (R162
-    steps 5 and 2), for the Storage page: [{id, pool, kind, keep, array,
+    """The storage-snapshot and storage-array schedules on one node,
+    for the Storage page: [{id, pool, kind, keep, array,
     on, words, next_at}], a pool's hourly, daily and weekly and the
     array's sync and scrub each one row."""
     out = []
@@ -183,9 +183,9 @@ def snapshot_schedules(node_id):
             continue
         cfg = sysj.get("config") or {}
         out.append({"id": r["id"], "pool": cfg.get("pool", ""), "kind": cfg.get("kind", ""), "keep": cfg.get("keep", 0),
-                    # ...and the array's sync and scrub rows (R162 step 2), told apart by `array`.
+                    # ...and the array's sync and scrub rows, told apart by `array`.
                     "array": cfg.get("array", "") if sysj.get("apply") == "storage-array" else "",
-                    # ...and the backups' rows (R162 step 5), told apart by `backup`.
+                    # ...and the backups' rows, told apart by `backup`.
                     "backup": cfg.get("name", "") if sysj.get("apply") == "storage-backup" else "",
                     "on": bool(r.get("on")), "words": r.get("words", ""), "next_at": r.get("next_at")})
     return out

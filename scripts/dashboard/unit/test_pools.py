@@ -1,4 +1,4 @@
-"""ZFS pools on the controller's own machine (R162 step 1): the agent reads
+"""ZFS pools on the controller's own machine: the agent reads
 zpool's list and status into the census, its storage-pool job holds every
 argument to its shape and every disk to the census before zpool runs, and
 names disks by their by-id links; the controller keeps the census's pools
@@ -58,7 +58,7 @@ class Job:
 
 
 class BackupFolder(unittest.TestCase):
-    """B937: each pool's folder for the controller's configuration copies is
+    """Each pool's folder for the controller's configuration copies is
     the controller's account's, so a copy reaches the pools at all."""
 
     def setUp(self):
@@ -138,7 +138,7 @@ class TheAgent(unittest.TestCase):
         return state, code, job.text()
 
     def test_a_pool_another_machine_made_is_imported_as_it_is_and_again_after_a_boot(self):
-        # R163 step 1: zpool import's list read; imported with no -f and no
+        # Zpool import's list read; imported with no -f and no
         # upgrade, its datasets under /mnt, kept out of zpool.cache and
         # imported again by the minute pass; export forgets it.
         found = ("   pool: nas\n     id: 1234567890\n  state: ONLINE\n action: The pool can be imported using its name or numeric identifier.\n"
@@ -157,7 +157,7 @@ class TheAgent(unittest.TestCase):
                  mock.patch.object(self.pm.os, "geteuid", return_value=0), mock.patch.object(self.pm.subprocess, "run") as run:
                 self.A().pools_pass()
             self.assertEqual(run.call_args[0][0][-2:], ["1234567890", "nas"])
-            # Never forced (B857): this machine's host id is pinned, and a
+            # Never forced: this machine's host id is pinned, and a
             # pool another machine has now is never taken from it.
             self.assertNotIn("-f", run.call_args[0][0])
             # ...and only by its number: a row with none is a name another
@@ -183,7 +183,7 @@ class TheAgent(unittest.TestCase):
                 self.assertEqual([x["name"] for x in json.load(f)], ["nas"])
 
     def test_this_machines_own_pool_from_before_comes_back_as_it_was(self):
-        # B938: a stick that died leaves its pools never exported, under
+        # A stick that died leaves its pools never exported, under
         # another host id; imported anyway with the name typed, one AerieOS
         # made comes back where it was and at every boot.
         found = ("   pool: tank\n     id: 42\n  state: ONLINE\n status: The pool was last accessed by another system.\n"
@@ -207,7 +207,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(self.ran[0], ["/usr/sbin/zpool", "import", "-f", "-N", "-o", "cachefile=none", "42", "old"])
         self.assertIn(["/usr/sbin/zpool", "set", "cachefile=", "old"], self.ran)
         self.assertFalse([a for a in self.ran if "upgrade" in a or "altroot=/mnt" in a], "never upgraded, and back where it was")
-        # Its datasets mounted only under /mnt, never all at once (B857).
+        # Its datasets mounted only under /mnt, never all at once.
         mounts = [a[-1] for a in self.ran if a[1:2] == ["mount"]]
         self.assertEqual(mounts, ["old"])
         self.assertIn("old/x is not mounted: its mountpoint /etc is outside /mnt", text)
@@ -239,7 +239,7 @@ class TheAgent(unittest.TestCase):
 
     def test_a_held_disk_goes_in_when_the_job_says_wipe_and_the_rest_run_as_named(self):
         # A single disk into a mirror pool is refused, wipe or not: it could
-        # never be taken out again (B526).
+        # never be taken out again.
         state, code, text = self.run_job({"pool": "add", "name": "tank", "layout": "single", "disks": ["sda"], "wipe": True})
         self.assertEqual((state, code), ("failed", 64), text)
         self.assertIn("could not be taken out again", text)
@@ -259,7 +259,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(self.ran[-1][1:], ["export", "tank"])
 
     def test_a_disk_whose_name_moved_since_the_pick_is_refused(self):
-        # B527: the job carries the serial the person saw under sdb; another
+        # The job carries the serial the person saw under sdb; another
         # disk under that name now is never written.
         state, code, text = self.run_job({"pool": "create", "name": "data", "layout": "mirror", "disks": ["sdb", "sdc"],
                                            "ids": {"sdb": {"serial": "Z"}, "sdc": {"serial": "C"}}})
@@ -345,7 +345,7 @@ class TheController(unittest.TestCase):
             r = nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})
             self.assertTrue(r.get("ok"), r)
             self.assertEqual(add.call_args[0][3]["config"], {"pool": "import", "name": "nas", "id": "123"})
-            # B938: one another system used last is forced with its name typed.
+            # One another system used last is forced with its name typed.
             self.assertIn("name typed again", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas", "force": True, "confirm": "na"})["error"])
             r = nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas", "force": True, "confirm": "nas"})
             self.assertEqual(add.call_args[0][3]["config"], {"pool": "import", "name": "nas", "id": "123", "force": True, "confirm": "nas"})

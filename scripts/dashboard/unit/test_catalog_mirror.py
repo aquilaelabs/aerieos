@@ -1,4 +1,4 @@
-"""A mirror of the vetted catalog (R169 step 6): tools/catalog-mirror.py
+"""A mirror of the vetted catalog: tools/catalog-mirror.py
 makes one from a signed index, the controller imports it only when the
 signature is the maintainers' and every pinned repository is in it, refuses
 an older one, answers its index when the catalog does not, and fetches a
@@ -48,7 +48,7 @@ class Mirror(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
-        # A catalog asked behind a read lands before the folder goes (B1000).
+        # A catalog asked behind a read lands before the folder goes.
         self.addCleanup(catalogindex.settle)
         self.priv = ed25519.Ed25519PrivateKey.generate()
         pub = self.priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
@@ -135,8 +135,8 @@ class Mirror(unittest.TestCase):
         # The catalog not answering: the mirror's index answers.
         def down(u):
             raise OSError("no route")
-        # The mirror answers at once while the catalog is asked behind it
-        # (B1000), and the read after says it did not answer.
+        # The mirror answers at once while the catalog is asked behind it,
+        # and the read after says it did not answer.
         first = catalogindex.index("https://catalog.example/", opener=down)
         self.assertTrue(first["index"]["mirror"])
         self.assertEqual(first["error"], "")

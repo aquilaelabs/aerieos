@@ -3,7 +3,7 @@ leaves the doors' rules where their units read them when the doors stay.
 
 account_goes is run as the bash it is, its /etc/aerieos pointed at a
 scratch directory; the uninstall's order and the folder's removal are read
-as text, since they run as root on a real node (B894, B895)."""
+as text, since they run as root on a real node."""
 import getpass
 import os
 import shutil
@@ -68,7 +68,7 @@ class AccountGoes(unittest.TestCase):
 
 class Uninstall(unittest.TestCase):
     def test_no_process_is_ended_before_the_account_is_known_to_go(self):
-        # B895: pkill -u ran before the kept-accounts check, so the person's
+        # Pkill -u ran before the kept-accounts check, so the person's
         # own account, and the shell running the uninstall, could be killed.
         text = uninstall()
         for sig in ("pkill -TERM -u", "pkill -KILL -u"):
@@ -78,7 +78,7 @@ class Uninstall(unittest.TestCase):
         self.assertEqual(text.count("account_goes"), 3)
 
     def test_the_doors_rules_stay_when_the_doors_do(self):
-        # B894: without --doors the door-22 and hosting-fw units stay and
+        # Without --doors the door-22 and hosting-fw units stay and
         # read their rules from /etc/aerieos at boot, which went whole.
         text = uninstall()
         a = text.index("keep_door=()")

@@ -2,8 +2,8 @@
 
 Everything AerieOS keeps lives in its state directory (/config) by
 default. The directories here are the ones that grow with use, and each can
-be put somewhere else on the controller's disks, where there is room: the
-operator's ask of 10 Oct. What stays in /config whatever is set: the JSON
+be put somewhere else on the controller's disks, where there is room.
+What stays in /config whatever is set: the JSON
 records and the database (small, and what a backup of /config is for), and
 the signing keys and git credentials, which belong with the rest of the
 container's secrets rather than wherever there happened to be space.
@@ -48,7 +48,7 @@ def configure(*, state, workspace):
 
 
 def _load():
-    d = statefile.read_json(STATE / FILE)   # read once while the same file (R228 step 1)
+    d = statefile.read_json(STATE / FILE)   # read once while the same file
     if not isinstance(d, dict):
         return {}
     return {k: str(v) for k, v in d.items() if k in KINDS and isinstance(v, str)}
@@ -127,7 +127,7 @@ def problem(name, path):
     ws = os.path.realpath(WORKSPACE)
     if real == ws or real.startswith(ws + "/"):
         # Nodes reach the projects through their synced copies; nothing kept
-        # here belongs where a node's writes land (B618, R165).
+        # here belongs where a node's writes land.
         return f"{p} is inside the spaces at {WORKSPACE}, where nodes' writes land"
     if real in ("/", "/etc", "/usr", "/bin", "/sbin", "/lib", "/proc", "/sys", "/dev", "/boot"):
         return f"{p} is the system's"
@@ -152,7 +152,7 @@ def set_path(name, path):
     try:
         made = not want.exists()
         want.mkdir(parents=True, exist_ok=True)
-        # The controller's alone (R90 step 15): a session or job account on
+        # The controller's alone: a session or job account on
         # the same machine, beside a controller installed bare metal, enters
         # nothing it keeps, wherever on the machine it is kept.
         if made or (want.stat().st_uid == os.getuid() and not any(want.iterdir())):

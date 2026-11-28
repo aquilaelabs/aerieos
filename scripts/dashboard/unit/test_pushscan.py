@@ -1,4 +1,4 @@
-"""What a push is read for before it goes (pushscan, R219): the lines that
+"""What a push is read for before it goes (pushscan): the lines that
 look like a secret or something private, keyed so that approving one okays
 that exact line in that file and nothing else."""
 import os

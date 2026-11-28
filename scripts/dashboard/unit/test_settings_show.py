@@ -1,5 +1,5 @@
 """aerie settings show (scripts/lib/settings-verbs.py): every Agents may dial
-is on the list a session reads, the signing ones included (R106), each as
+is on the list a session reads, the signing ones included, each as
 the project has it or at its default."""
 import json
 import os

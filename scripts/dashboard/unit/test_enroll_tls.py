@@ -1,5 +1,5 @@
 """An enrollment names its controller as https, with the pin of the
-controller's own key (R267 step 15).
+controller's own key.
 
 On the LAN and behind WireGuard a node dials the controller's own port,
 which answers a handshake under the install's own key in every Connection

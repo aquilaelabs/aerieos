@@ -1,5 +1,5 @@
-"""A newer AerieOS release, for a controller installed bare metal (R90
-step 5): the newest published release asked of GitHub a while after the
+"""A newer AerieOS release, for a controller installed bare metal:
+the newest published release asked of GitHub a while after the
 start and then daily, kept in memory, said on the bell and under Controller
 settings when it is newer than the build running, and applied when pressed
 as a system job on the controller's own node (its root agent runs the
@@ -9,7 +9,7 @@ The container edition has its own path (the image, pulled by the host), so
 nothing here is drawn for it: `attention` and `status` answer nothing when
 the install is not bare metal.
 
-What a release says its container image is (R199) is read here too, for
+What a release says its container image is is read here too, for
 whoever compares an image with a registry's tag (imagecheck.py): each
 release carries one line naming the image its tag pushed by digest
 (aerieos-image-VER.digest), in the release's signed list of its files, so a
@@ -34,14 +34,14 @@ BOOT_DELAY = float(os.environ.get("BB_RELEASE_BOOT_DELAY") or 120)
 EVERY = 24 * 3600
 TIMEOUT = 30
 VER = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
-# A dev build's tag (R179): the release it heads for and its ordinal.
-# A pre-release of any name (R218): vX.Y.Z-dev.N, -rc.N, -beta.N, N the
+# A dev build's tag: the release it heads for and its ordinal.
+# A pre-release of any name: vX.Y.Z-dev.N, -rc.N, -beta.N, N the
 # commit's ordinal whatever the name, so one number orders them all.
 DEV = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)-[a-z][a-z0-9]*\.(\d+)(?:\+[0-9a-f]+)?$")
 # A release's tag by its shape, which is what says which release it is: a
 # stable one is vX.Y.Z, a pre-release has a name and the commit's ordinal
 # after it. The channel a release is offered on and who may have signed its
-# list of files (R199) both follow the tag, never the flag the git host
+# list of files both follow the tag, never the flag the git host
 # keeps beside it, which whoever can edit a release can flip.
 STABLE_TAG = re.compile(r"v\d+\.\d+\.\d+")
 PRE_TAG = re.compile(r"v\d+\.\d+\.\d+-[a-z][a-z0-9]*\.\d+")
@@ -69,7 +69,7 @@ _debug = lambda: False      # noqa: E731 (configured: a controller in debug mode
 _window = lambda: ("", 4)   # noqa: E731 (the update window: day, hour)
 _apply = lambda v: None     # noqa: E731 (queue the update to version v)
 _applied = {"version": ""}  # the version the window last queued, so one window queues once
-# Drafts (the operator, 1 and 2 Nov): a controller in debug mode on the dev channel
+# Drafts: a controller in debug mode on the dev channel
 # holding a token for AerieOS's repository sees its draft releases too,
 # and updates from one by fetching its files with that token.
 _draft_token = lambda: ""   # noqa: E731 (configured)
@@ -102,7 +102,7 @@ def channel():
 
 
 def in_window(now=None):
-    """Whether this hour is the update window the person set (R160 step 4):
+    """Whether this hour is the update window the person set:
     daily or one weekday, at the hour named; "" is no window, the default,
     and nothing is applied by itself then."""
     day, hour = _window()
@@ -204,7 +204,7 @@ def _read():
             url = str(live[0].get("html_url") or "")
         else:
             error = f"no published release on the {follow} line" if follow else "no published release"
-        # The dev channel's newest (R179): a pre-release whose tag is a dev
+        # The dev channel's newest: a pre-release whose tag is a dev
         # build's, never taken on the normal channel; a draft only where
         # it was asked with the token (debug mode, the dev channel).
         dev = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and parse_dev(x.get("tag_name"))
@@ -245,7 +245,7 @@ def newer():
     alone; on the dev channel the newest of the releases and the dev
     pre-releases. Both by rank, so a dev build moves to a later dev build
     (dev channel) or to the release it was heading for (either channel: a
-    build that picked Releases again is offered the release, B618)."""
+    build that picked Releases again is offered the release)."""
     lt = latest()
     now = rank(_version()) or rank(str(_version() or "").split("+")[0]) or parse(str(_version() or "").split("-")[0])
     if now and len(now) == 3:
@@ -375,7 +375,7 @@ def start():
         import checks
         while True:
             try:
-                # On its cadence (R176, weekly unless set), from when it last
+                # On its cadence (weekly unless set), from when it last
                 # ran, which outlives a restart.
                 if checks.due("release", checks.stamped("release")):
                     check()

@@ -1,5 +1,5 @@
 """sessionsasked: which account's terminals the controller opened on each
-node, for which space (R288 step 7), so a node's heartbeat is handed a
+node, for which space, so a node's heartbeat is handed a
 fresh session token only for a pair it was given already."""
 import os
 import pathlib

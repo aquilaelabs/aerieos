@@ -1,4 +1,4 @@
-"""The code map's index is two files since format 5 (R228 step 16): what each
+"""The code map's index is two files since format 5: what each
 file calls and passes by name in a file of its own, read only when a
 question asks for it, and the rule hook asks for several names at once."""
 import builtins

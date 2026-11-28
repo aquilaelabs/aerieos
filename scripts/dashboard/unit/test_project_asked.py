@@ -41,7 +41,7 @@ def handler():
     cls = next(n for n in ast.parse(SERVER).body if isinstance(n, ast.ClassDef) and n.name == "Handler")
     body = "\n".join("\n".join(lines[f.lineno - 1:f.end_lineno]) for f in cls.body
                      if isinstance(f, ast.FunctionDef) and f.name in LIFTED)
-    import refusals                     # the one wording of a missing space (R287)
+    import refusals                     # the one wording of a missing space
     ns = {"field": field, "urllib": urllib, "users": _Users, "projects": _Projects, "refusals": refusals,
           "project_names": lambda who: who["sees"]}
     exec("class Lifted:\n" + body, ns)      # noqa: S102 (the repository's own source, read from beside this test)
@@ -71,7 +71,7 @@ def handler():
 Stand = handler()
 USER = {"uid": "u_user", "sees": ["alpha", "beta", "locked"], "works": ["alpha", "locked"]}
 OWNER = {"uid": "u_owner", "sees": ["alpha", "locked"], "works": ["alpha", "locked"]}
-# On beta by a role that gives it Containers alone (R277, the audit of 24 Nov).
+# On beta by a role that gives it Containers alone.
 BOXER = {"uid": "u_box", "sees": ["beta"], "works": [], "reads": []}
 
 

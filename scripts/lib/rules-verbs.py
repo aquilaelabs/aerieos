@@ -25,13 +25,13 @@ reg.configure(write_json=statefile.write_json, state=_rules_state,
               actor=lambda: dash.account_name(_rules_state))
 
 proj, argv = sys.argv[2], sys.argv[3:]
-# `--global` is the rules that apply to EVERY project (R63). Reading one is
+# `--global` is the rules that apply to EVERY project. Reading one is
 # anybody's; writing one is refused by rules.py itself, because the key is the
 # global one and everything bb writes is a session's.
 if "--global" in argv:
     argv = [a for a in argv if a != "--global"]
     proj = reg.GLOBAL
-# `--format json|yaml|markdown` on a list or a show (R167); `--json` stays
+# `--format json|yaml|markdown` on a list or a show; `--json` stays
 # the plain list the page, the briefing and aerie rules check read.
 if "--json" in argv:
     fmt, argv = "text", ["--json"] + [a for a in argv if a != "--json"]
@@ -192,7 +192,7 @@ elif op == "list":
     p = reg.payload(proj)
     print(f"{p['standing']} standing, {p['conditional']} conditional; "
           f"{p['chars']} characters in front of every session here")
-    # The name column is as wide as the longest name (B233): a fixed 22 ran
+    # The name column is as wide as the longest name: a fixed 22 ran
     # no-credentials-in-the-repo straight into its text.
     w = max([22] + [len(r['name']) + 1 for r in rs])
     for r in rs:

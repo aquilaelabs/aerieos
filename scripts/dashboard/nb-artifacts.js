@@ -1,12 +1,11 @@
 // The notebook's Artifacts view and the version block in its head: what the
 // project built, the dev instance, the version, the changelog. One classic
-// script beside index.html (docs/nodes.md §13): one file per notebook view
-// (R60). A factory makeNotebook calls per notebook.
+// script beside index.html (docs/nodes.md §13): one file per notebook view.
+// A factory makeNotebook calls per notebook.
 
 "use strict";
 // The view's sections by the titles they are drawn under, read by the view
-// and by its placeholders (page-docs.js SKTPLS: artifacts, version) alike
-// (R218, the operator 18 Oct).
+// and by its placeholders (page-docs.js SKTPLS: artifacts, version) alike.
 const ART_TITLES = {build: "Build", files: "Files", version: "Version"};
 const artTitle = k => ART_TITLES[k] || k;
 // Each drawn form's own ids (a version box per component), unique while it is out.
@@ -18,7 +17,7 @@ const windowMove = (part, cost) =>
   (part === "minor" || part === "major") && (cost?.projects || []).length > 0;
 
 // The changelog's released text with each roadmap item and bug it names a
-// link to that row (R254 step 4): escaped first, then R12 and B34 wrapped.
+// link to that row: escaped first, then R12 and B34 wrapped.
 function clLinks(text){
   return esc(text).replace(/(^|[^\w-])([RB])(\d{1,5})(?![\w-])/g,
     (m, pre, k, n) => `${pre}<a href="#" data-clref="${k}${n}" title="open ${k === "R" ? "roadmap item" : "bug"} ${k}${n}">${k}${n}</a>`);
@@ -65,7 +64,7 @@ function nbArtHuman(n){
 }
 
 // `kept`: drawn again from the read in hand, which is what Show more
-// asks (R228 step 13), rather than read again.
+// asks, rather than read again.
 function nbArtLoad(av, kept){
   const {$, project} = av;
   return reading(`${project}:artifacts`, async () => {
@@ -96,18 +95,18 @@ function nbArtLoad(av, kept){
     const jobHtml = nbArtPushRow(project, job);
     const instHtml = nbArtInstallRow(inst);
     const devNote = nbArtDevNote(art, rows);
-    // Sections like the rest of the view (the operator, 6 Oct): the files
+    // Sections like the rest of the view: the files
     // were a band of their own under Version, the one part of the tab that
     // did not fold, and a long list pushed Captures off the screen. The dev
     // instance is its own; the files are the one a person opens this view
     // for, so the one left open when nobody has chosen.
-    // A role that reads the project and does not write it (B101): no
+    // A role that reads the project and does not write it: no
     // Install, Push, Remove or pin on a file, no Sign without Releases and versions
-    // Write; nothing says why (the operator, 21 Oct: what a role does not
+    // Write; nothing says why (what a role does not
     // give is not advertised).
     const ro = projWriteWhy(project), relWhy = projReleaseWhy(project);
-    // Only the files on show are built, a page at a time (pageLimit, R228
-    // step 13); each row is named by its place in `rows`, which a page from
+    // Only the files on show are built, a page at a time (pageLimit);
+    // each row is named by its place in `rows`, which a page from
     // the top keeps.
     const artLim = pageLimit(list, "artList", rows.length);
     const apks = !ro && rows.some(a => a.kind === "apk"), xpis = !ro && rows.some(a => a.kind === "xpi");
@@ -116,7 +115,7 @@ function nbArtLoad(av, kept){
       xpis && !phoneWhy && !art.webext ? `Push cannot go: web-ext is not on ${art.node_name || "the node"}; install it there first.` : "",
       // One at a time on the phone, and the server refuses a second
       // (phone.py): the rows' Install or Push are dead while one runs, and
-      // say why here, live again when it ends (the operator, 22 Nov).
+      // say why here, live again when it ends.
       apks && !phoneWhy && inst.running ? `Install waits: one install at a time, and ${inst.what || "one"} is installing now.` : "",
       xpis && !phoneWhy && art.webext && job.running ? `Push waits: one push at a time, and ${job.what || "one"} is on the phone now; Stop ends it.` : "",
     ].filter(Boolean).map(t => `<div class="hint artwhy">${esc(t)}</div>`).join("");
@@ -124,7 +123,7 @@ function nbArtLoad(av, kept){
       ? `<div class="hint">Nothing in <b>dist/</b> yet: a build copies what it keeps there.</div>`
       : devNote + deadSaid + jobHtml + instHtml + rows.slice(0, artLim).map((a, i) => nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy,
           open: av.artOpen.has(a.path)})).join("");
-    // Patched (R244): a field or a fold in the list stays as the person left
+    // Patched: a field or a fold in the list stays as the person left
     // it when a build lands or the dev instance moves.
     patch(list, (devHtml ? docSection("artifacts", "dev", "Docker",
                                             cf.available === false ? "unreachable"
@@ -142,7 +141,7 @@ function nbArtLoad(av, kept){
   });
 }
 
-// The glance (R109): what this project ships, in dist/, and its size;
+// The glance: what this project ships, in dist/, and its size;
 // what was built on a branch, in each account's worktree; and the
 // captures sessions looked with, kept apart from both.
 function nbArtGlance(hint, art, rows, caps, onBranches){
@@ -150,14 +149,14 @@ function nbArtGlance(hint, art, rows, caps, onBranches){
     {label: "in dist/", value: rows.length, sub: rows.length ? humanBytes(rows.reduce((n, a) => n + (a.size || 0), 0)) : ""},
     {label: "built on branches", value: onBranches, omit: !onBranches},
     {label: caps.length === 1 ? "capture" : "captures", value: caps.length, omit: !caps.length},
-    // The room the last build used on its node, workspace and cache (R110
-    // step 7), which the next one is checked against. Said as room: "last
+    // The room the last build used on its node, workspace and cache,
+    // which the next one is checked against. Said as room: "last
     // build took 2kB" read as a time; a label short enough for a phone's
     // tile, the build it was under it.
     {label: "build room", value: humanBytes(art.build?.took?.workspace || 0),
      sub: art.build?.took?.cache ? `the last build's, cache ${humanBytes(art.build.took.cache)}` : "the last build's", omit: !art.build?.took?.workspace}],
-    // Its status line, on the control row beside Download source (the
-    // operator, 29 Oct: never a button alone on its line).
+    // Its status line, on the control row beside Download source
+    // (never a button alone on its line).
     "the code base as a zip, without build output");
 }
 
@@ -183,7 +182,7 @@ function nbArtBuildSection(av, art){
                   ? `; it carries ${b.tools.map(esc).join(", ")}`
                   : "; it reports no toolchains yet, so a compile will not find one"}.
                  ${railAllows("library") ? `Add to it from the ${pageLink("library", "Library")}.`
-                   // Not offered a page their grants keep them from (B114).
+                   // Not offered a page their grants keep them from.
                    : "An account that may open the Library adds to it there."}</div>`
         : `<div class="hint">No node: nothing can be compiled for this space here.
                  ${esc(b.why || "")}</div>`,
@@ -194,7 +193,7 @@ function nbArtBuildSection(av, art){
 
 // Sending to Docker: a row a compose file in the repository, each with
 // its own Send, which makes a new container from that file on the Docker
-// tab, as many as are wanted under as many names (the operator, 10 Oct).
+// tab, as many as are wanted under as many names.
 // Nothing here follows a container once it is made: whether it is up,
 // built, or answering is the Docker tab's, and a row here that said
 // "down" read as a second place to run it. What a row says is about the
@@ -263,7 +262,7 @@ function nbArtInstallRow(inst){
         </div>` : "";
 }
 
-// Dev builds go on their own past the newest few of each (R105): said
+// Dev builds go on their own past the newest few of each: said
 // once, over the list, where there are any.
 function nbArtDevNote(art, rows){
   const keep = art.dev_keep ?? 3;
@@ -336,7 +335,7 @@ function nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy, open
                 <b>${esc(a.name)}</b>${a.pinned ? ` <span class="pill on">pinned</span>` : ""}${
                 a.prov?.signed ? ` <span class="pill ok">signed</span>` : ""}
                 <span class="dim">${esc(nbArtHuman(a.size))} · ${esc(ago(a.at))}</span></span>${
-              // A build named with no version (the operator, 6 Oct): the
+              // A build named with no version: the
               // sweep cannot tell when it is out of date, so it says so, in
               // the warning color, and offers Remove.
               a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with aerie version --file</span>` : ""}${
@@ -354,7 +353,7 @@ function nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy, open
           </div>`;
 }
 
-// What a session looked with (R96): a reel's sheet, an emulator shot.
+// What a session looked with: a reel's sheet, an emulator shot.
 // One fold apart from the files, since they are not what ships, each
 // row saying whose it is and when. They go by age (the project's
 // "captures kept" days, swept by the server on this read) or by Remove
@@ -398,7 +397,7 @@ function nbArtCaptures(av, art, caps){
   }
 }
 
-// Builds made on a branch, in each account's worktree (B237): Download
+// Builds made on a branch, in each account's worktree: Download
 // and View, carrying the tree. Install and Push stay with dist/, whose
 // files the phone's node is sent by their path in the project.
 function nbArtBranches(av, groups){
@@ -408,7 +407,7 @@ function nbArtBranches(av, groups){
   if (brList){
     brList.hidden = !brRows.length;
     let at = 0;
-    // A page at a time too, numbered across the groups (R228 step 13): a
+    // A page at a time too, numbered across the groups: a
     // group with nothing on the page leaves its heading out.
     const brLim = pageLimit(brList, "artBranches", brRows.length);
     patch(brList, !brRows.length ? "" : docSection("artifacts", "branches", "Branch builds", String(brRows.length),
@@ -486,7 +485,7 @@ function nbArtWireList(av, list, rows, cf, cfFiles){
   // A shipped script is a thing people read before they run it, and on a
   // phone a download is the end of that. Over the panel like a History, the
   // text as it is; nothing here runs it, and the tab has no way to.
-  // Sign (R106): a job on the project's node with the project's key,
+  // Sign: a job on the project's node with the project's key,
   // which never comes near the page either; the signed build arrives in
   // dist/ beside this one, and the list picks it up when it lands.
   list.querySelectorAll("[data-artsign]").forEach(b => b.onclick = async () => {
@@ -547,15 +546,15 @@ function nbArtPoll(av, job, inst){
   // Polled while either thing is in flight. An install is the slower of the
   // two (a 24MB APK over wifi) and is the reason this exists at all. Only
   // while the view is in front and the page is seen: behind another page or
-  // in a hidden browser tab it read every two seconds for nobody (R283 step
-  // 4); the view's own open reads it again when it comes back.
+  // in a hidden browser tab it read every two seconds for nobody;
+  // the view's own open reads it again when it comes back.
   const view = root.querySelector('[data-view="artifacts"]');
   if ((job.running || inst.running) && view && !view.hidden && !document.hidden && view.checkVisibility())
     av.artTimer = setTimeout(() => nbArtLoad(av), 2000);
 }
 
-// A change to a file or a capture that the page knows before the answer
-// (the operator, 22 Nov): made to the view's own read, `key` its list and
+// A change to a file or a capture that the page knows before the answer:
+// made to the view's own read, `key` its list and
 // `match` the row, and drawn from it at once; `change` answers the row as it
 // will be, and without one the row goes. For drawNow, whose refusal puts the
 // row back; a read landed since is the server's, and stands.
@@ -632,7 +631,7 @@ function nbArtDrawVersion(av){
   // tab is opened with. They used to be bands separated by a rule, with a
   // wall of bump buttons under each and nothing naming either.
   nbArtVerStages(av, all);
-  // Patched (R244): a starting version or a bump being typed stays when a
+  // Patched: a starting version or a bump being typed stays when a
   // build lands or the version is read again.
   patch(box, all.map(v => docSection("artifacts",
     `version${v.component ? ":" + v.component : ""}`,
@@ -655,7 +654,7 @@ function nbArtDrawVersion(av){
 }
 
 // Each VERSION file's section saves and reverts its own staged bump, the
-// project's also its Claude access (the operator, 5 Oct); and every staged
+// project's also its Claude access; and every staged
 // bump together is the view's own stager, for the notebook's leave and close
 // questions.
 function nbArtVerStages(av, all){
@@ -687,7 +686,7 @@ function nbArtVerSection(av, v){
   // where a staged bump would land: the server's sentences (version.lands),
   // so the row and aerie version say the same thing. A bump on a branch
   // already merged, unpushed, read as the project's version here while
-  // main still had the old one, and nothing on the row said so (B338).
+  // main still had the old one, and nothing on the row said so.
   const lands = v.lands || {};
   const mark = (text, bad) => text ? `<div class="verln"><span></span><span class="vermark${
       bad ? " bad" : ""}">${esc(text)}</span></div>` : "";
@@ -727,7 +726,7 @@ function nbArtVerSection(av, v){
             ? line(v.released ? "released as" : "building towards", v.target)
             : line("version", "none yet: no VERSION file; Set one below"))
     + (v.released ? line("tag", v.tag) : "")
-    // The forge's release Release made for this tag (R123, R124).
+    // The forge's release Release made for this tag.
     + (v.released && nbArtRelUrl(ver, v.tag) ? `<div class="verln"><span>on ${esc(nbArtRelOf(ver, v.tag).forge || "GitHub")}</span><a href="${
            esc(nbArtRelUrl(ver, v.tag))}" target="_blank" rel="noopener noreferrer">the ${esc(v.tag)} release</a></div>`
        // ...or why there is none, the tag left pushed.
@@ -740,7 +739,7 @@ function nbArtVerSection(av, v){
              : `, with no changelog entries to date`}</span></div>` : "")
     + (staged ? mark(lands.staged, lands.staged_bad) : "")
     // What a MINOR bump costs everything else, said BEFORE Save rather than
-    // discovered after it (B92): the minor is the compatibility window, so
+    // discovered after it: the minor is the compatibility window, so
     // moving it ends the Claude sessions on every project whose block is
     // from the old one and holds them until each is updated. The count is
     // the server's, from the blocks that actually exist.
@@ -815,7 +814,7 @@ function nbArtRelOf(ver, tag){
 }
 function nbArtRelUrl(ver, tag){
   // A web address and nothing else (never javascript:); plain http too,
-  // which a Gitea on a LAN serves its releases on (B505).
+  // which a Gitea on a LAN serves its releases on.
   const u = nbArtRelOf(ver, tag).url || "";
   return /^https?:\/\//.test(u) ? u : "";
 }
@@ -847,15 +846,15 @@ function nbArtVerAddFold(project, v){
 // way to say who may give it one, which is the setting that matters most
 // at exactly that moment.
 function nbArtVerPolicyPicker(v){
-  // Said here, set on the Permissions view beside every other dial (R223,
-  // the operator, 7 Nov: one place for what an agent may do).
+  // Said here, set on the Permissions view beside every other dial
+  // (one place for what an agent may do).
   return `<span class="verpol">
       <span>Agent access</span> <b>${esc(POLICY_LABEL[v.policy] || v.policy || "")}</b>
       <button type="button" data-verpolgo>Change on Permissions</button>
     </span>`;
 }
 
-// Drafts (the operator, 1 Nov): every release CI makes waits as a draft,
+// Drafts: every release CI makes waits as a draft,
 // seen by the repository's own people alone, its notes read and corrected
 // here, then published. A role that may not release reads them.
 function nbArtLoadDrafts(av, force){
@@ -871,8 +870,8 @@ function nbArtLoadDrafts(av, force){
     const may = !projReleaseWhy(project);
     patch(box, docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
       const miss = d.missing || [];
-      // What keeps it from being published, each said on its row (R206 step
-      // 3): a tag that is not on the git host stops the press; placeholder
+      // What keeps it from being published, each said on its row:
+      // a tag that is not on the git host stops the press; placeholder
       // notes are put right in the box, so the press stays and is checked.
       const holds = d.holds || [], stop = miss.length || holds.some(h => h.what !== "notes");
       return `<div class="field verdraft" data-draft="${esc(d.tag)}" data-key="${esc(d.tag)}">
@@ -909,10 +908,10 @@ function nbArtLoadDrafts(av, force){
   });
 }
 
-// A role without Releases and versions Write on the project (B101):
+// A role without Releases and versions Write on the project:
 // every button that moves or releases the version left out, and the
 // fields that say it read-only; without Projects Write, Send to Claude
-// too. Nothing says why (the operator, 21 Oct).
+// too. Nothing says why.
 function nbArtVerByRole(av, box){
   const {project} = av;
   const relWhy = projReleaseWhy(project), ro = projWriteWhy(project);
@@ -933,7 +932,7 @@ function nbArtWireRelease(av, box, all){
     const blk = all.find(x => (x.component || "") === comp);
     const tag = comp ? `${comp}-v${blk?.target}` : `v${blk?.target}`;
     // What would keep its Android APK from being signed, said before the
-    // tag rather than found after it (R134 step 4).
+    // tag rather than found after it.
     if (!await askYes(`Release ${blk?.target}?\n\n`
                  + `Tags this branch's pushed commit as ${tag} and pushes the tag; a pushed tag is not moved or deleted from here. `
                  + "A change not committed here is not in it, and a commit not pushed is asked for first."
@@ -942,8 +941,7 @@ function nbArtWireRelease(av, box, all){
     busy(b, "Releasing");
     box.querySelectorAll("button,select").forEach(x => x.disabled = true);
     const j = await nbArtPostVersion(av, {action: "release", component: comp});
-    // The forge's release beside the tag (R123; Gitea and GitLab since
-    // R124), or why there is none: the tag is pushed either way, so a
+    // The forge's release beside the tag (Gitea and GitLab), or why there is none: the tag is pushed either way, so a
     // forge's no is a note, not a failure.
     const fg = j?.released?.forge, on = fg?.forge || "the forge";
     if (j?.released?.tag)
@@ -986,8 +984,8 @@ async function nbArtVerCommit(av, only){
   if (!parts.length && policy == null) return "";
   // A window move is the one thing on this tab that reaches other
   // projects: it ends their sessions. Asked here as well as said on the
-  // staged line, because the line can be scrolled past and this cannot
-  // (B92). Anything else saves without a question, as it always has.
+  // staged line, because the line can be scrolled past and this cannot.
+  // Anything else saves without a question, as it always has.
   const cost = av.ver?.window_cost;
   const moves = parts.find(([comp, part]) => !comp && windowMove(part, cost));
   if (moves && !await askYes(
@@ -1129,7 +1127,7 @@ async function nbArtPostVersion(av, body, quiet){
 function nbArtDrawChangelog(av, pane, comp, j){
   const {nb, project} = av;
   let gs = JSON.parse(JSON.stringify(j.groups || []));
-  // The tracker's half (R255): the bugs each saved line answers, by its
+  // The tracker's half: the bugs each saved line answers, by its
   // words as saved (`orig`); a line written here for a bug carries it as
   // `pend` until Save has put the line in the file, then it is tied.
   const norm = t => String(t || "").split(/\s+/).filter(Boolean).join(" ");
@@ -1286,7 +1284,7 @@ function nbArtDrawChangelog(av, pane, comp, j){
         draw();
       };
     });
-    // The tracker's half (R255): a tie to a saved line is written at once,
+    // The tracker's half: a tie to a saved line is written at once,
     // one to a line written here waits for Save. The one written at once is
     // drawn on the press, and put back saying why if the tracker refuses.
     const tie = (e, n, on) => {
@@ -1361,7 +1359,7 @@ function nbArtDrawChangelog(av, pane, comp, j){
         const a = await postJSON("/api/changelog", {project, component: comp, groups: gs});
         if (a.error){ notify(a.error, true); return; }
         // Drawn again from what the server kept, not what was sent: a
-        // tidy-up on the way in shows (B820: it set the list and never
+        // tidy-up on the way in shows (it set the list and never
         // drew it).
         gs = a.groups || [];
         // ...the bugs a new line was written for are tied to its words as

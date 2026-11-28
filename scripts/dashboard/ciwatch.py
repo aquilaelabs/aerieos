@@ -1,10 +1,10 @@
-"""A project's CI watched from the day it is linked (R117), on every
+"""A project's CI watched from the day it is linked, on every
 AerieOS and for every project, with nothing set up in the repository.
 
 Shebang-DevBoard's CI had failed for weeks on an action GitHub had moved
 past (setup-android v3 asking for an SDK package Google stopped serving),
 and the move of ubuntu-latest to Ubuntu 26 was seen only because a session
-happened to read a run's annotations (2 Oct). Both were on GitHub to be
+happened to read a run's annotations. Both were on GitHub to be
 read; nothing read them. This does, once when a project is linked and
 then once a day:
 
@@ -17,9 +17,9 @@ then once a day:
 
 What it finds is kept per project (STATE/ciwatch/PROJECT.json) and read
 by the Git view, aerie catchup and, for a red main branch, the bell. It only
-reads, with one exception a person presses for (R117 step 4): a moving
+reads, with one exception a person presses for: a moving
 label and an action a major behind each carry their fix, the one line
-that changes, and fix() writes that line into the project's working tree,
+that changes, and fix writes that line into the project's working tree,
 uncommitted, for the Git view's Changes to show. It never commits and
 never pushes: that stays somebody's, on their branch.
 """
@@ -78,7 +78,7 @@ USES = re.compile(r"^\s*-?\s*uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[^@\s]
 
 # Where a tree keeps its workflows: GitHub's, then Gitea's and Forgejo's,
 # which read the same YAML (a repository on the lab Gitea read as having
-# none, B92). A file under .github is named by itself, as the page has
+# none). A file under .github is named by itself, as the page has
 # always shown it; one under the others carries its directory, so two
 # hosts' ci.yml are two findings.
 WORKFLOW_DIRS = (".github/workflows", ".gitea/workflows", ".forgejo/workflows")
@@ -198,7 +198,7 @@ def look(project):
     found, run, err = [], {}, ""
     token = cilogs._token(project)
     flows = workflows(project)
-    # Watching is nobody's work in the moment (R159): it takes the token
+    # Watching is nobody's work in the moment: it takes the token
     # of anyone on the project signed in now, and pauses, said on the
     # project, while nobody who gave one is.
     import gitcreds                                         # noqa: PLC0415
@@ -404,6 +404,6 @@ def red(projects):
             if f.get("sev") == "bad":
                 out.append({"kind": "ci", "project": p, "text": f["text"], "id": f.get("where", ""),
                             # One word: the page sends a row's keys joined by
-                            # spaces, and "run N" was two (B331).
+                            # spaces, and "run N" was two.
                             "url": f.get("url", ""), "key": f"ci:{p}@{''.join(str(f.get('where', '')).split())}"})
     return out

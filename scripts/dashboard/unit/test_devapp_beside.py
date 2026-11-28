@@ -1,4 +1,4 @@
-"""What a dev container's build ships beside the app (the operator, 17 Oct):
+"""What a dev container's build ships beside the app:
 an image-only service its last build did not ship stops the build until a
 person says yes to exactly that set; the first build takes what is there as
 the baseline; a session carries no yes. And an env never steers compose

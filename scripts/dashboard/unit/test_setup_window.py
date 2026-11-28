@@ -1,4 +1,4 @@
-"""The first-run doors (B1165): open for SETUP_WINDOW_S after a start and
+"""The first-run doors: open for SETUP_WINDOW_S after a start and
 only to this dashboard's own page, and a landing's startup hooks set aside
 rather than put where a start runs them as root."""
 import ast

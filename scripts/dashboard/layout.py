@@ -44,15 +44,15 @@ def configure(*, state, write_json, lock):
 # dropped on read without a word, which is how the notebook came back from a
 # refresh as no tab at all: it was written to the file and filtered out of it.
 # The same read is how a retired page leaves a layout that still names it
-# (the Toolchains, Agents and Apps tabs, the Library since R170): no migration.
+# (the Toolchains, Agents and Apps tabs, the Library): no migration.
 # "findings" is the Analysis tab the Static analysis button opens, the
 # report as a document tab beside the notebook's own view of it.
 TAB_KINDS = {"term", "library", "installed", "files", "emulator", "notebook", "projects", "docker", "findings", "roles", "nginx", "vms", "storage",
              "nodes", "clusters", "settings", "jobs", "users", "profile", "phone", "runner", "home", "notices", "help",
              "sessions", "chat", "schedules", "debug", "keys", "audit", "scanners", "machine", "network",
-             # An installed thing's own page (R181 step 2), a press's.
+             # An installed thing's own page, a press's.
              "thing",
-             # A Library entry's own page (R183), a press's.
+             # A Library entry's own page, a press's.
              "entry"}
 
 
@@ -64,7 +64,7 @@ def _layouts():
     last saved and handed to everybody else is fine for one operator and
     wrong the moment there are two.
     """
-    # Read once while it stays the same file (statefile.read_json, R228): the
+    # Read once while it stays the same file (statefile.read_json): the
     # status poll asks every few seconds and the file moves on a layout save.
     v = statefile.read_json(TABS_FILE, {}) if TABS_FILE is not None else {}
     if not isinstance(v, dict):
@@ -104,7 +104,7 @@ def load_layout(uid):
             continue
         ids.add(tid)
         tabs.append({"id": tid, "kind": t["kind"], "arg": arg, "label": label,
-                     # Popped out into its own window (R8): kept so the page
+                     # Popped out into its own window: kept so the page
                      # that popped it reconciles; another page drops it.
                      "popped": bool(t.get("popped"))})
     stored = v.get("panes") if isinstance(v.get("panes"), list) else []

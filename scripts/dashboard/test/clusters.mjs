@@ -1,4 +1,4 @@
-// The Clusters page (R281 step 2): a Kubernetes cluster added from a
+// The Clusters page: a Kubernetes cluster added from a
 // kubeconfig against the stub API server lib.mjs runs (kubeApi, as agent-stub stands
 // in for a node), its facts and namespaces drawn, Test, Rename and Forget,
 // a cloud CLI's sign-in refused with the way out, the credential never in
@@ -81,7 +81,7 @@ await section("Test, Rename and Forget", async () => {
   ok(page.errors.length === 0, `no console error through any of it (${page.errors.slice(0, 2).join(' | ')})`);
 });
 
-// k3s from the Library (R281 step 1): a node running it is one press on the
+// k3s from the Library: a node running it is one press on the
 // page, and one whose cluster is still starting says so in one sentence with
 // the press live again. Its record is written as the Library's Install
 // leaves it: this world has no k3s to install.

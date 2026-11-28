@@ -1,4 +1,4 @@
-"""A job's secret_env (R281): the node is handed it and merges it into the
+"""A job's secret_env: the node is handed it and merges it into the
 job's environment as it does `env` (a job run by the root agent taking no
 PATH or loader variable from it); every reader of the job is handed the
 job without it; and its row keeps it no longer than the job runs."""

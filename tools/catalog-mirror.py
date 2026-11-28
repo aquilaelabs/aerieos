@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make a mirror of the vetted catalog (R169 step 6), for a controller that
+"""Make a mirror of the vetted catalog, for a controller that
 cannot reach it: run on a machine with the network, carry the file over,
 and import it under Controller settings' Vetted catalog.
 

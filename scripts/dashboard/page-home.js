@@ -1,4 +1,4 @@
-// Home (R218 step 5, the design's the-dashboard/home rule): the landing page
+// Home (the design's the-dashboard/home rule): the landing page
 // and the one single-screen view. A row of tiles, each a number across the
 // whole install and a link into the page that holds it; under them
 // Attention (the bell's rows, put away there as on the bell) and the last
@@ -66,7 +66,7 @@ function homeUpdates(){
 function homeTiles(){
   const h = homeData || {};
   // What the Sessions page lists and counts, so the tile and the page it
-  // opens say one number (B59): every session of this account's, Claude's
+  // opens say one number: every session of this account's, Claude's
   // and the terminals.
   const ss = state?.sessions || [];
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name)));
@@ -92,10 +92,10 @@ function homeTiles(){
     {key: "sessions", label: sessions === 1 ? "session open" : "sessions open", value: sessions, wait: !state, sub: claudes ? `${claudes} of them ${agentsWord(agentSs.map(s => s.name))}` : ""},
     {key: "updates", label: updates === 1 ? "update due" : "updates due", value: updates, wait: !state, tone: updates ? "warn" : ""},
     {key: "ci", label: "CI red", value: red, wait: !state, tone: red ? "bad" : "", sub: red === 1 ? projLabel(state.ci_red[0].project) : ""},
-    // The Kubernetes clusters kept (R281 step 7), once one is.
+    // The Kubernetes clusters kept, once one is.
     h.clusters ? {key: "clusters", label: h.clusters.ready === 1 ? "cluster ready" : "clusters ready", value: h.clusters.ready,
                   sub: `of ${h.clusters.all} kept`, tone: h.clusters.ready < h.clusters.all ? "warn" : ""} : null,
-    // The own machine's backups (R162 step 5): the last good run, or what
+    // The own machine's backups: the last good run, or what
     // failed or went stale; only where a backup is recorded.
     h.backups ? {key: "backups", label: h.backups.count === 1 ? "backup" : "backups", value: h.backups.count,
                  sub: h.backups.failed?.length ? `${h.backups.failed.length} failed` : h.backups.stale?.length ? `${h.backups.stale.length} not run in two days`
@@ -110,13 +110,13 @@ function homeTiles(){
 function homeHref(key){
   const c = (state?.ci_red || [])[0];
   // The jobs tile says what failed today when anything did, and opens the
-  // Jobs page narrowed to those, the number pressed the number listed (B74,
-  // B113: it opened on every failed job, yesterday's too).
+  // Jobs page narrowed to those, the number pressed the number listed
+  // (it opened on every failed job, yesterday's too).
   const failed = homeData?.jobs?.failed_today;
   return {nodes: "#/machines/nodes", containers: "#/containers", jobs: failed ? "#/jobs/failed-today" : "#/jobs",
           // The updates due are toolchains, images, nginx and agents on every
           // node, which no one node's page holds: they are listed
-          // on Home's own Attention card, so the tile brings that into view (B73).
+          // on Home's own Attention card, so the tile brings that into view.
           updates: "#/home", backups: "#/machines/storage", clusters: "#/machines/clusters",
           ci: c ? `#/spaces/${encodeURIComponent(c.project)}/git` : "#/spaces", sessions: "#"}[key] || "#";
 }
@@ -145,8 +145,8 @@ function homeGlanceHtml(){
   const pinned = projectList().filter(c => c.pinned);
   if (!pinned.length) return `<div class="empty">no favorite space yet: the star by a space's name on the Spaces page puts it here</div>`;
   // In groups, in the Projects page's order, each group's name over its
-  // cards (R273): the page this glances at is sorted so. Each opens its
-  // first repository's page (R138).
+  // cards: the page this glances at is sorted so. Each opens its
+  // first repository's page.
   const card = c => {
     const pc = colorAttrs(c.color), first = c.first;
     return `<div class="hproj${pc.cls}"${pc.style}>
@@ -162,7 +162,7 @@ function homeGlanceHtml(){
     `${group ? `<div class="hgroup">${esc(group)} <span class="dim">${list.length}</span></div>` : ""}<div class="hglance">${list.map(card).join("")}</div>`).join("");
 }
 
-// Getting started (R267): what is left of first run's four once Finish is
+// Getting started: what is left of first run's four once Finish is
 // pressed, each with its own way there, until all are done or it is put
 // away; read from setupSteps, the setup page's own reading, so the two
 // never disagree. Put away is this browser's, which is all it needs.
@@ -180,7 +180,7 @@ function homeStartReadsNodes(){
 // node that has dialed in before is still the first node while its agent
 // is not heard from lately (the machine off for the night, the LAN out),
 // and Claude Code on it is still installed. Read live, the card came back
-// at 2 of 4 whenever the nodes went quiet (B651, the operator, 3 Nov).
+// at 2 of 4 whenever the nodes went quiet.
 function homeStartSteps(){
   const s = setupSteps();
   if (s.node) return s;
@@ -230,7 +230,7 @@ function homeCards(jobs){
 }
 
 // The Attention card brought into view and marked a moment: where the
-// updates due tile's number is listed (B73).
+// updates due tile's number is listed.
 function homeAttention(root){
   const card = root.querySelector(".hattn");
   if (!card) return;
@@ -243,7 +243,7 @@ function renderHomeInto(i){
   const d = docSurface(i, "home");
   if (!d) return;
   if (homeData === null){
-    // Its template while /api/home is on its way (R218 step 16): the poll
+    // Its template while /api/home is on its way: the poll
     // already holds Attention, the favorite spaces and three of the tiles,
     // so only the node, container and job numbers and Last jobs wait.
     const tiles = homeTiles().map(t => t.key === "jobs" ? {...t, wait: true, sub: ""} : t);
@@ -280,7 +280,7 @@ function renderHomeInto(i){
     else if (k === "machine") openMachineTab();
     else if (k === "ownnode") openDockerOn(ownMachine()?.id || "");
     // Put away, it leaves as a row does: faded as its height folds, what is
-    // under it riding up (the operator, 24 Nov: nothing goes with a cut).
+    // under it riding up (nothing goes with a cut).
     else if (k === "hide"){ homeStartHidden = true; try{ localStorage.setItem("bb.gsHidden", "1"); }catch(e){ /* private */ }
       leaveBox(b.closest(".hstart")?.closest(".field"), () => drawPanes()); }
   });

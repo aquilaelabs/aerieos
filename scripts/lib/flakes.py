@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The harness remembers its flakes (R7 step 3).
+"""The harness remembers its flakes.
 
 A browser suite that fails in a whole run and passes when run again
 without the run's load is flaky: named above the verdict, and until now
@@ -8,7 +8,7 @@ forgotten with the terminal's scroll. Each one is a line here, in
 check that failed in the run, how many workers the run had and the load it
 ended under. `aerie tests flakes` counts them, and the pre-push gate fails on
 one in a suite it ran, since every suite a gate runs is one the change
-touches (the operator, 14 Nov); a release's tag still counts a flaky suite
+touches; a release's tag still counts a flaky suite
 as passed.
 
     flakes.py record --file F --workers N --load L [--logs LOG...] --suites A.mjs B.mjs
@@ -17,7 +17,7 @@ as passed.
     flakes.py said --file F [--commit C] SUITE      the last sighting, as a bug's note says it
     flakes.py bug-for --bugs BUGLIST SUITE          the open bug that names the suite, if one does
 
-Each line also keeps what the check waited for (R250 step 2): the harness's
+Each line also keeps what the check waited for: the harness's
 [wait] line under the first FAIL, or the error that stopped the suite, so
 the gate can note a sighting's cause on the suite's bug as it happens.
 """

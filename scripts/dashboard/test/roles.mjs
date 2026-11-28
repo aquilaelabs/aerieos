@@ -33,7 +33,7 @@ const CAST = [
   { name: 'w.user3', role: 'user', projects: [] },
 ];
 for (const p of CAST.filter(c => c.role !== 'owner')) { p.pw = `pw-${p.name}-1`; make(p.name, p.role, p.projects); }
-// What a plain account did before R152 is a role now, given as an
+// What a plain account does is a role, given as an
 // administrator would (lib.mjs member).
 await member('w.user1', 'w.user2', 'w.user3');
 
@@ -126,8 +126,8 @@ for (const who of CAST) {
   const was = !!(await api(page, '/api/settings')).settings?.offer_unvetted?.value;
   const ctl = await api(page, '/api/settings', { set: { offer_unvetted: !was } });
   if (who.role === 'owner' || isAdmin) {
-    // Admin is built in with everything the owner may do since R152 (the
-    // operator, 7 Oct), the debug settings included.
+    // Admin is built in with everything the owner may do,
+    // the debug settings included.
     ok(ctl.status === 200, `${tag} changes a controller setting (${ctl.status})`);
     await api(page, '/api/settings', { set: { offer_unvetted: was } });
   } else {
@@ -170,14 +170,14 @@ await section("meeting each other", async () => {
   const road = JSON.stringify(await api(user2.page, '/api/roadmap?project=alpha'));
   ok(['test', 'w.admin1', 'w.admin2', 'w.user1', 'w.user2'].every(n => road.includes(`walked by ${n}`)),
      'everybody on alpha reads the items the others added to its roadmap');
-  // A project's color is each person's own (the operator, 18 Oct): the
+  // A project's color is each person's own: the
   // owner's pick is the owner's, and nobody else's view wears it.
   const color = await api(owner.page, '/api/project-color', { name: 'alpha', color: 'teal' });
   ok(color.status === 200, `the owner gives alpha a color of their own (${color.status})`);
-  // Waited for, not read after one refresh(): a poll already on its way when
+  // Waited for, not read after one refresh: a poll already on its way when
   // it is called makes it queue another and return at once, so one call can
   // read the state from before the write. On a loaded box, the whole run, a
-  // poll is on its way often enough that this read undefined (B238).
+  // poll is on its way often enough that this read undefined.
   const colorOf = () => (state.projects || []).find(p => p.name === 'alpha')?.color || '';
   await refreshUntil(owner.page, () => ((state.projects || []).find(p => p.name === 'alpha')?.color || '') === 'teal',
                      { timeout: 20000 }).catch(() => {});
@@ -185,7 +185,7 @@ await section("meeting each other", async () => {
   const mine = await owner.page.evaluate(colorOf), theirs = await user1.page.evaluate(colorOf);
   ok(mine === 'teal' && theirs === '', `...which the owner sees and w.user1 does not (${mine} | ${theirs || 'none'})`);
   // The tabs it colors: a shell opened on a project is that project's as
-  // much as its Claude session is (the operator, 18 Oct: the dock's boxes
+  // much as its Claude session is (the dock's boxes
   // too); the workspace's shell is nobody's.
   const tabsOf = await owner.page.evaluate(() => ['claude:alpha:1', 'sh:2:alpha', 'sh:1:', 'shell']
     .map(arg => tabProject({ kind: 'term', arg }) || '-').join(' '));
@@ -195,20 +195,20 @@ await section("meeting each other", async () => {
   const moved = await owner.page.evaluate(() => {
     const was = state.sessions;
     // In place of the workspace's real shell, which a full run has open by
-    // here: found first, at /workspace, it answered for this one (B405).
+    // here: found first, at /workspace, it answered for this one.
     state.sessions = [{ name: sessionOf('shell'), cwd: '/workspace/alpha' },
                       ...(was || []).filter(s => s.name !== sessionOf('shell'))];
     const r = tabProject({ kind: 'term', arg: 'shell' }) || '-';
     state.sessions = was; return r; });
   ok(moved === 'alpha', `...and the workspace's shell, gone into alpha, wears alpha's (${moved})`);
   // ...and is labeled with the name alpha is shown under, not its directory,
-  // which a name reused after a delete has numbered (B64): the tab, its row
+  // which a name reused after a delete has numbered: the tab, its row
   // and the confirm that ends it all read the label. Planted and read in
   // one evaluate, so a poll cannot land between.
   const shown = await owner.page.evaluate(() => {
     const was = state.sessions, row = (state.projects || []).find(p => p.name === 'alpha'), lbl = row?.label;
     // In place of the workspace's real shell, which a full run has open by
-    // here: found first, at /workspace, it answered for this one (B405).
+    // here: found first, at /workspace, it answered for this one.
     state.sessions = [{ name: sessionOf('shell'), cwd: '/workspace/alpha' },
                       ...(was || []).filter(s => s.name !== sessionOf('shell'))];
     if (row) row.label = 'alpha-shown';
@@ -225,12 +225,12 @@ await section("meeting each other", async () => {
   ok(models.every(m => m === 'sonnet'), `each person's own model on alpha is their own setting (${models.join(', ')})`);
 });
 
-// ---- found walking the dev pair (19 Oct) ----------------------------------------------
-// B19: a member whose role reads Project settings and does not write them
+// ---- found walking the dev pair ----------------------------------------------
+// A member whose role reads Project settings and does not write them
 // (lib.mjs MEMBER) is refused the project's own settings, and keeps what is
 // their own there; the page is told, to lock them with the reason.
-// B21: such a member is not handed every account name by the People view.
-// B20: a role removed is taken off every account that held it, so a role
+// Such a member is not handed every account name by the People view.
+// A role removed is taken off every account that held it, so a role
 // made later under its name gives them nothing.
 await section("found walking the dev pair", async () => {
   const u2 = await pageFor(CAST.find(c => c.name === 'w.user2'));
@@ -256,7 +256,7 @@ await section("found walking the dev pair", async () => {
   await owner.close();
 });
 
-// ---- Accounts and roles Read alone (B34), and a plain account by link (B38)
+// ---- Accounts and roles Read alone, and a plain account by link
 // Read sees Users and Roles to read: every field dead, no Add, Save or
 // Remove, and the reason said on the page; the Roles page is not refused.
 // A plain account sent to either by link is told it may not, with no count
@@ -295,7 +295,7 @@ await section("Accounts and roles Read alone", async () => {
   ok(!r.bad && !r.save && !r.add, `...and the Roles page to read, not refused (${JSON.stringify(r)})`);
   ok(page.errors.length === 0, `[${who.name}] no console errors${page.errors.length ? ': ' + page.errors.slice(0, 2).join(' | ') : ''}`);
 
-  // B35: the only roles on a project being other projects' owner roles, the
+  // The only roles on a project being other projects' owner roles, the
   // picker is not drawn empty: the line naming the Roles page is.
   const b35 = await owner.page.evaluate(() => {
     const was = [rolesData, rolesWho, rolesPeopleDraft];
@@ -310,7 +310,7 @@ await section("Accounts and roles Read alone", async () => {
   ok(/No role on a space yet/.test(b35) && !/rolesAddOn/.test(b35),
      'with only another space\'s owner role, Add to space is not drawn dead: the way to a role is named (B35)');
 
-  // B38: a plain account by link.
+  // A plain account by link.
   await user3.page.evaluate(() => { usersList = null; usersErr = ''; openUsersTab(); });
   await user3.page.waitForSelector('.userstab .row.bad', { timeout: 15000 });
   const p = await user3.page.evaluate(() => ({ add: !!document.querySelector('.userstab #uAddOpen'),

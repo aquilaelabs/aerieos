@@ -1,5 +1,5 @@
 """toolchains.driver_row: the census turned into the NVIDIA driver row's
-state in the Library and on the Installed page (R102). The page draws each state's sentence;
+state in the Library and on the Installed page. The page draws each state's sentence;
 this holds which state each census is."""
 import os
 import sys
@@ -30,7 +30,7 @@ class DriverRow(unittest.TestCase):
         self.assertIsNone(row(card=""))
 
     def test_a_driver_left_for_a_card_that_has_gone_keeps_its_row_to_be_removed(self):
-        # B168: hidden, it tried for the card at every boot with no way off.
+        # Hidden, it tried for the card at every boot with no way off.
         r = row({"installed": "610.57.04", "loaded": "", "bound": "", "nocard": True}, card="")
         self.assertEqual((r["state"], r["here"], r["card"]), ("nocard", True, ""))
         n = {"id": "n_x", "name": "x", "config": {}, "reported": {"gpu_card": "", "sandbox": True,

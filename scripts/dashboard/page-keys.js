@@ -36,7 +36,7 @@ function mobLinksShut(){
   if (ml && ml.getAttribute("aria-expanded") !== "false") ml.setAttribute("aria-expanded", "false");
 }
 // A phone's line carries a shell's other keys past the hot ones, where the
-// Keys panel was (the operator, 12 Nov: most of them were on the bar
+// Keys panel was (most of them were on the bar
 // already): the rest of the table, in its order.
 function mobMoreKeys(t){
   if (!isShellTab(t) || !mayShell()) return [];
@@ -46,7 +46,7 @@ function mobMoreKeys(t){
 
 function drawKeys(){
   const t = tabOf(panes[active]);
-  // On a phone the band is the hot bar (the operator, 12 Nov): the keys of
+  // On a phone the band is the hot bar: the keys of
   // the terminal in front, whichever kind it is, in a line that scrolls (a
   // shell's carrying the rest of the key table past its hot ones), then
   // Links. A desk's keys float over the
@@ -74,7 +74,7 @@ function drawKeys(){
   // Its ends, as the dock's line has them: faded, with the arrow, where
   // more keys lie past one (chipsEdge), measured once it is laid out.
   if (own) requestAnimationFrame(() => chipsEdge(hot));
-  // Sessions is a page and Chat the dock's tab (R250): the foot bar keeps
+  // Sessions is a page and Chat the dock's tab: the foot bar keeps
   // what is about the terminal in front, its keys and Links, on a phone,
   // and is not drawn with nothing in it. (Commands, a panel of things to
   // type into a shell, went on 12 Nov: the operator.)

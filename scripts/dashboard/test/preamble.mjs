@@ -36,7 +36,7 @@ const read = (name) => {
 // ---- nothing at all --------------------------------------------------------
 // A project with no rules, no open items and no open bugs still gets the
 // briefing: how this machine works is true of every project, and it is the
-// thing a new project's first session most needs (R63). What it does NOT get
+// thing a new project's first session most needs. What it does NOT get
 // is an empty rules, roadmap or bugs piece.
 put('rules.json', { projects: {} });
 put('roadmap.json', { projects: {}, unsaved: {} });
@@ -46,7 +46,7 @@ ok((p.parts || []).map(x => x.name).join(',') === 'core,rules,briefing,live'
    && /## What holds every time/.test(p.text) && /\(global\)/.test(p.text) && (p.notes || []).length === 0,
    `a space with nothing set still gets the briefing's core and the shipped global rules (${
      (p.parts || []).map(x => x.name).join(',') || 'none'}, ${p.bytes} bytes)`);
-// The rest of the briefing is topics (R202): the block carries the index
+// The rest of the briefing is topics: the block carries the index
 // and aerie help TOPIC the text, so a session pays for the manual only where
 // the work reaches it. A topic the tree gates out (Android, here) is not
 // in the index and still answers when asked for.
@@ -100,13 +100,13 @@ ok(/Questions to the person: more/.test(more.text) && /before a judgment call/.t
 await setPref({ asks: '' });
 await setChange('wait');
 // Answering while a run goes is the briefing's (While tests run): what nobody
-// would switch off is not a global rule (the operator, 2 Oct), so it is said
+// would switch off is not a global rule, so it is said
 // there once and nowhere else.
 ok(p.text.split('answer while it runs').length === 2 && !/never holds a reply/.test(p.text)
    && p.text.split('unshelve N WHY').length <= 2,
    'an obligation reaches a session once, from the briefing and not again as a rule; the shelf is said by the roadmap\'s own note');
 
-// ---- the order, and the lists as counts (R202) ------------------------------
+// ---- the order, and the lists as counts ------------------------------
 // How they want this worked on comes before what there is to work on, and
 // what there is to work on is a count and the verbs: the items a prompt
 // names arrive on that prompt, below.
@@ -209,7 +209,7 @@ await section("the briefing has to be where the IMAGE puts it", async () => {
      '...and the file it ships is in the tree');
 });
 
-// ---- aerie status tells a refusal from a silence (R62) --------------------------
+// ---- aerie status tells a refusal from a silence --------------------------
 // The first version reported an expired token as "the controller did not
 // answer", which is the mistake bbapi.request exists to prevent and that
 // bb-gate had already made once. A session sent chasing a network problem

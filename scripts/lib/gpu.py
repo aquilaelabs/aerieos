@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`aerie gpu`: this node's NVIDIA card, from where a session stands (R102).
+"""`aerie gpu`: this node's NVIDIA card, from where a session stands.
 
     gpu.py                  what the card is, how much of its memory is free,
                             who is computing on it, whether this session may

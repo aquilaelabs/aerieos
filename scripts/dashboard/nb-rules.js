@@ -1,7 +1,7 @@
 // The notebook's house rules (roadmap #7): the operator's and a session's,
 // read, edited, staged and saved with the rest of the notebook. One classic
-// script beside index.html (docs/nodes.md §13): one file per notebook view
-// (R60). A factory makeNotebook calls per notebook.
+// script beside index.html (docs/nodes.md §13): one file per notebook view.
+// A factory makeNotebook calls per notebook.
 
 "use strict";
 
@@ -17,14 +17,14 @@ function ruleWhen(r){
 // The Overview's sections in the box drawRules fills, in their order, by
 // the titles they are drawn under, and whether each opens: read by their
 // builders here and in nb-analysis.js and by the view's placeholder
-// (page-docs.js SKTPLS.briefing), so neither falls behind (R218, the
-// operator 18 Oct). The Brief is only a project started from one's.
+// (page-docs.js SKTPLS.briefing), so neither falls behind.
+// The Brief is only a project started from one's.
 const BRIEF_SECTS = [["codebase", "Code base", true], ["brief", "Brief", false], ["rules", "Your rules", false],
                      ["preamble", "What a session is sent", true]];
 const briefTitle = k => (BRIEF_SECTS.find(s => s[0] === k) || [k, k])[1];
 
 function nbRulesView({$, nb, project}){
-  // One answer for the several askers of a first show (B218): the view
+  // One answer for the several askers of a first show: the view
   // switch, the view shown again before the first answer landed, and the
   // poll's watch all asked while nothing was loaded yet, and a notebook's
   // first open fetched the rules and the code base three times over.
@@ -44,7 +44,7 @@ function nbRulesView({$, nb, project}){
       // A reload that lands on staged work keeps the work: the poll never
       // asks while the panel is dirty (HALVES), but a load already on its
       // way when Add or Edit was pressed used to land afterwards and drop the
-      // row under the finger that made it (B255). What is on disk is read
+      // row under the finger that made it. What is on disk is read
       // fresh either way; Save's own conflict check is what judges the base.
       draw: () => { if (!ruleDirty()) nb.ruleClash = null; drawRules(); },
       // No second read while somebody is typing, which is the case the
@@ -55,7 +55,7 @@ function nbRulesView({$, nb, project}){
 
   // The global rules, under the project's own: every project's sessions
   // are handed them, and each can be switched off for THIS project by
-  // anybody who works on it (the operator, 2 Oct), staged with the rest of
+  // anybody who works on it, staged with the rest of
   // the Briefing behind the notebook's Save. An administrator also changes
   // the rules themselves here, for every project at once, written as each
   // row's own Save; there is no dialog for them anywhere else. A class of
@@ -65,7 +65,7 @@ function nbRulesView({$, nb, project}){
   function globalRules(gs){
     const may = !!nb.ruleData?.may_global;
     if (!gs.length && !may) return "";
-    // Switching one off here is a change to the project (B86): dead, with
+    // Switching one off here is a change to the project: dead, with
     // the reason said once under Add a rule above.
     const ro = projWriteWhy(project);
     const off = offHere();
@@ -168,7 +168,7 @@ function nbRulesView({$, nb, project}){
     // anybody can answer without knowing what it is charged for, and the
     // charge is on every session started in this project, forever.
     const chars = ruleDirty() ? null : d.chars;
-    // A role that reads the project and does not write it (B86): no Add a
+    // A role that reads the project and does not write it: no Add a
     // rule, and no Edit or Remove on a row.
     const ro = projWriteWhy(project);
     const body = `
@@ -237,8 +237,8 @@ function nbRulesView({$, nb, project}){
         <div class="actbar"><span class="state">nothing has been written</span>
           <button type="button" id="rlKeepTheirs">Keep theirs</button>
           <button type="button" class="primary" id="rlUseMine">Use mine</button></div></div>`;
-    // The rules' own Save and Revert, at the section's foot (the operator,
-    // 5 Oct): registered before the bar is drawn, which asks it.
+    // The rules' own Save and Revert, at the section's foot:
+    // registered before the bar is drawn, which asks it.
     nb.stage("briefing:rules", {
       count: () => (ruleDirty() ? 1 : 0),
       what: () => "the edited rules",
@@ -409,7 +409,7 @@ function nbRulesView({$, nb, project}){
       const j = await postJSON("/api/rules", {project, action: "save", rules: body,
                                               ...(nb.globalOffPending ? {globals_off: [...nb.globalOffPending]} : {}),
                                               rev: nb.ruleData?.rev, ...(force === true ? {force: true} : {})});
-      // Somebody else wrote these rules while they were open here (B195).
+      // Somebody else wrote these rules while they were open here.
       // Nothing is written and nothing typed is dropped: the staged copy
       // stays, and the band puts the choice where the rules are.
       if (j.conflict){ nb.ruleClash = j.current; drawRules(); return; }

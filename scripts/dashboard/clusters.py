@@ -1,4 +1,4 @@
-"""The Kubernetes clusters this install may deploy to (R281 step 2): a
+"""The Kubernetes clusters this install may deploy to: a
 cluster an administrator adds once on the Clusters page, under Machines, from
 a kubeconfig pasted or uploaded, kept here with its credential sealed under
 the install key, never shown again and never handed to a session.
@@ -7,7 +7,7 @@ What is kept of a kubeconfig is its current context alone: the API server's
 address, its certificate authority, and one way in, a bearer token or a
 client certificate and its key. A kubeconfig that signs in through a cloud
 CLI (an exec plugin or an auth-provider: EKS, GKE, AKS, kubelogin) is refused
-with the way out, a token-based one (the operator, 25 Nov), since a command
+with the way out, a token-based one, since a command
 run on the controller to sign in is a credential nobody here can hold to
 anything. A path where data belongs (certificate-authority: /a/file) is
 refused too: the file is on the machine the kubeconfig came from.
@@ -264,7 +264,7 @@ def cert_ends(pem):
 
 
 def doctor(now=None, soon_days=14):
-    """The Doctor's lines about the clusters kept (R281 step 2): each asked
+    """The Doctor's lines about the clusters kept: each asked
     again now, a warn for one that does not answer or whose client
     certificate ends within `soon_days`, an ok otherwise; nothing when none
     is kept. [{level, text, detail}]."""

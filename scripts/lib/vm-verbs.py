@@ -1,4 +1,4 @@
-"""Behind `aerie vm` (cmd_vm in bb): a project's VMs (R91), made, listed, started,
+"""Behind `aerie vm` (cmd_vm in bb): a project's VMs, made, listed, started,
 stopped, snapshotted and removed through /api/vms. A session works on its own
 project's under its Make VMs dial: deny refuses, ask waits for the
 administrators on their bell, auto does it now. A new VM is made from an OS
@@ -61,7 +61,7 @@ def cmd_list(_args):
 
 
 def hw_said(v):
-    """What a VM was given beyond its size (R100), in the words its row uses."""
+    """What a VM was given beyond its size, in the words its row uses."""
     hw, bits = v.get("hw") or {}, []
     if hw.get("cpuset"):
         bits.append(f"pinned to threads {', '.join(map(str, hw['cpuset']))}")
@@ -258,7 +258,7 @@ def cmd_disk(verb, args):
 
 
 def cmd_hardware(args):
-    """A stopped VM's hardware beyond its size (R100), what is named and no
+    """A stopped VM's hardware beyond its size, what is named and no
     more: --pin, --mem-max, --share, each none to take it off."""
     if not args or args[0].startswith("-"):
         die(USAGE)
@@ -271,7 +271,7 @@ def cmd_hardware(args):
 
 
 def cmd_devices(args):
-    """The USB devices on this project's VM hosts (R116), each with what
+    """The USB devices on this project's VM hosts, each with what
     holds it, for a session to name one in aerie vm usb."""
     d = read()
     hosts = [h for h in d.get("hosts") or [] if not args or h.get("name") == args[0] or h.get("id") == args[0]]
@@ -290,7 +290,7 @@ def cmd_devices(args):
 
 
 def cmd_usb(args):
-    """A USB device to a VM, or back (R116 step 6): always held for a person
+    """A USB device to a VM, or back: always held for a person
     on the bell, since a device can be a disk or a key."""
     if len(args) < 3 or args[1] not in ("give", "take"):
         die(USAGE)
@@ -334,7 +334,7 @@ def cmd_ssh(args):
     # The key own_key made and the hosts it met, named from $HOME as it made
     # them: ssh reads the Unix account's home from the password file, which
     # for an account's session is the shared session account's, where there
-    # is no key and .ssh cannot be written (B307).
+    # is no key and .ssh cannot be written.
     home = os.path.expanduser("~/.ssh")
     key = os.path.join(home, "id_ed25519")
     pick = (["-i", key, "-o", "IdentitiesOnly=yes"] if os.path.isfile(key) else []) \

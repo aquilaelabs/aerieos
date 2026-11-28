@@ -68,7 +68,7 @@ USAGE = ("aerie version [--for DIR] "
 
 def fail(msg):
     # The page says this one in a person's words; a session is told the verbs
-    # that settle it (R289: it ran aerie changelog --help twice to find them).
+    # that settle it (it ran aerie changelog --help twice to find them).
     if "no Fixed line" in str(msg):
         msg = (f"{msg}\n[builderbot] aerie changelog missing lists them; aerie changelog add \"...\" --cat Fixed "
                "--bug N gives one its line, aerie changelog skip N \"why\" says it needs none")
@@ -80,7 +80,7 @@ def lands_line(prefix=""):
     """Where the number here lives against the branch builds come from,
     when they differ: version.lands, the same words the Artifacts view's
     version row shows. A bump on a branch already merged, unpushed, looked
-    like the project's version while main still had the old one (B338)."""
+    like the project's version while main still had the old one."""
     now = version.lands(proj, comp).get("now")
     if now:
         print(prefix + now)
@@ -149,7 +149,7 @@ if argv and argv[0] == "init":
     raise SystemExit(0)
 
 if argv and argv[0] == "release":
-    # aerie version release (R138): the tag on this commit and the forge's
+    # aerie version release: the tag on this commit and the forge's
     # release, made on the controller with the project's own credentials,
     # which this session never holds. Under Agents may: Tag and publish a
     # release: auto releases at once, ask waits for the project's owner.
@@ -192,15 +192,15 @@ if argv and argv[0] == "release":
         why = rest[i + 1]
         rest = rest[:i] + rest[i + 2:]
     # A release whose Android APK could not be signed is refused before the
-    # tag unless this says to go on (R134 step 4).
+    # tag unless this says to go on.
     unsigned = "--without-apk" in rest
-    # A dev pre-release (R179): the dev build's tag, vX.Y.Z-dev.N, on the
+    # A dev pre-release: the dev build's tag, vX.Y.Z-dev.N, on the
     # dev channel, its release page CI's.
     dev = "--dev" in rest
     # ...and a stable one from a branch other than main is said in so many
-    # words (R190 step 1): without it, it is a dev one.
+    # words: without it, it is a dev one.
     stable = "--stable" in rest
-    # A pre-release of any name (R217): rc, beta, nightly, as the tag says it.
+    # A pre-release of any name: rc, beta, nightly, as the tag says it.
     pre = ""
     if "--pre" in rest:
         i = rest.index("--pre")
@@ -244,7 +244,7 @@ if argv and argv[0] == "release":
                 print(f"not attached: {s}")
     elif forge.get("error"):
         print(f"no release on the forge: {forge['error']}")
-    # What it owes once it is out (R190 step 7): the last line names the verb
+    # What it owes once it is out: the last line names the verb
     # that does it, where this repository says it owes something.
     if not comp and (version.root(proj) / ".aerie" / "after-release").is_file():
         print("once it is published: aerie version follow does what the space's repositories owe it, "
@@ -252,7 +252,7 @@ if argv and argv[0] == "release":
     raise SystemExit(0)
 
 if argv and argv[0] == "rehearse-check":
-    # Before a rehearsal is spent (B1156): the controller asks every question
+    # Before a rehearsal is spent: the controller asks every question
     # the release would ask of the tree and the git host (a Fixed line owed,
     # the catalog floor, the upgrade snapshot's state, what the host owes the
     # tag's workflows, the APK's signing) and says the first it would refuse.
@@ -267,7 +267,7 @@ if argv and argv[0] == "rehearse-check":
     raise SystemExit(0)
 
 if argv and argv[0] == "rehearse-roll":
-    # The changelog rolled before a rehearsal (R190 step 2), run by aerie
+    # The changelog rolled before a rehearsal, run by aerie
     # version rehearse before it pushes and starts the run: stdout is the
     # version rolled and its commit, or nothing where nothing was rolled.
     r = version.rehearsal_section(proj, comp)
@@ -281,7 +281,7 @@ if argv and argv[0] == "rehearse-roll":
     raise SystemExit(0)
 
 if argv and argv[0] == "rehearse":
-    # A release rehearsed (R190 step 2): the project's release-rehearsal
+    # A release rehearsed: the project's release-rehearsal
     # workflow started on this branch through the controller, which holds
     # the forge's token. It builds what a tag would and publishes nothing.
     import bbapi
@@ -322,7 +322,7 @@ if argv and argv[0] == "rehearse":
     raise SystemExit(0)
 
 if argv and argv[0] == "line":
-    # The release this branch works toward (R112): read, set, or `none` back
+    # The release this branch works toward: read, set, or `none` back
     # to what the branch's name says.
     if len(argv) > 1:
         r = version.set_line(proj, "" if argv[1].lower() == "none" else argv[1])
@@ -336,8 +336,8 @@ if argv and argv[0] == "line":
     raise SystemExit(0)
 
 if argv and argv[0] == "forward":
-    # A released patch line merged into this branch's later line (R112 step
-    # 3): its fixes carried, this line's number kept, the changelog stitched.
+    # A released patch line merged into this branch's later line:
+    # its fixes carried, this line's number kept, the changelog stitched.
     r = version.forward(proj, argv[1] if len(argv) > 1 else "")
     if r.get("error"):
         fail(r["error"])
@@ -349,8 +349,8 @@ if argv and argv[0] == "forward":
     raise SystemExit(0)
 
 if argv and argv[0] == "backport":
-    # A fix made on a later line carried back onto this patch line (R112
-    # step 4), its changelog entries with it.
+    # A fix made on a later line carried back onto this patch line,
+    # its changelog entries with it.
     r = version.backport(proj, argv[1] if len(argv) > 1 else "")
     if r.get("error"):
         fail(r["error"])

@@ -1,5 +1,5 @@
-"""A short read goes beside whatever holds a node's slot (B200), and a
-machine log read is one (B654): a root system job marked light, with the
+"""A short read goes beside whatever holds a node's slot, and a
+machine log read is one: a root system job marked light, with the
 light lane's short timeout. Anything else root waits for the slot."""
 import os
 import sys

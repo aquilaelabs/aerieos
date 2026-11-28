@@ -1,5 +1,5 @@
 """What on a shared toolchain store no node runs from any more is offered
-for removal (R196): a retired or unknown node's directory, never a live
+for removal: a retired or unknown node's directory, never a live
 node's, never `shared` or the controller's own <os>-<arch>."""
 import os
 import sys

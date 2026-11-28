@@ -1,5 +1,5 @@
 """The apps a person installs, shipped with every controller and kept current
-by it (R272 steps 3 and 4): the Android app, the VS Code extension and the
+by it: the Android app, the VS Code extension and the
 Windows companion, each built for every release and attached to it with its
 sha256 (the android app and companion app workflows).
 
@@ -8,10 +8,10 @@ apps_* switches, settings.py), or by the seed file a generator writes beside
 a compose file, read once on the first boot and then put aside. At boot and
 once a day the controller fetches each offered app from the release that
 matches its own version (the newest release when none does, and says so),
-holds it to the release's signed list of its files (R199) and to its sha256
+holds it to the release's signed list of its files and to its sha256
 file, keeps it under /config/apps, and serves it at /apps/NAME/FILE to
 anybody signed in and to a device's app, which is how the companion keeps
-itself current (R270 step 9). Nothing here runs a file it fetched.
+itself current. Nothing here runs a file it fetched.
 
 The signed list is what makes a file AerieOS's: the sha256 beside a file is
 the release's word for itself, and whoever can replace a file on a release
@@ -28,11 +28,11 @@ all: no app is taken from it. The rule the OS updater (osimage.py), the installe
 maker follow; test_release_signing.py holds the four to one table of cases.
 
     configure(state=, version=, setting=, write_json=, audit=)
-    view()                     the Settings section's and the Library's reading
-    check_now()                look again, in the background
+    view                     the Settings section's and the Library's reading
+    check_now                look again, in the background
     path(name, file)           a held file's path, or None
-    start()                    the boot look and the daily one
-    seed()                     apply /config/seed.json once
+    start                    the boot look and the daily one
+    seed                     apply /config/seed.json once
 """
 import base64
 import hashlib
@@ -68,7 +68,7 @@ APPS = {
                 "does": "The notebook, the bell and your sessions on a phone, and the phone lent to a space.",
                 "files": [("aerieos-app-", ".apk")]},
     # dev: offered only with Offer dev features on, until walked on a real
-    # Windows PC and a real VS Code (the operator, 20 Oct).
+    # Windows PC and a real VS Code.
     "vscode": {"title": "VS Code extension", "setting": "apps_vscode", "dev": True,
                "does": "A space's files and its terminal in VS Code, opened from the controller.",
                "files": [("aerieos-vscode-", ".vsix")]},
@@ -122,8 +122,8 @@ IMAGE_REF = re.compile(r"[a-z0-9][a-z0-9.-]*(?::[0-9]+)?/[a-z0-9._/-]+@sha256:[0
 
 
 def own_image(releases):
-    """The container edition's image held to its signed release (R290 step
-    3; the operator, 26 Nov): the release for this very build, its signed
+    """The container edition's image held to its signed release:
+    the release for this very build, its signed
     list verified, the image reference its aerieos-image-VERSION.digest
     names, and what the registry serves under this version's tag now.
     {version, signed, registry, ok} where it could be told, {said} where
@@ -235,8 +235,8 @@ def path(name, file):
 
 
 def _get(url, limit=MAX_BYTES, accept="application/octet-stream, application/json"):
-    # No credential: the apps come from AerieOS's public releases alone
-    # (the operator, 20 Oct), so a controller holds no GitHub token for them.
+    # No credential: the apps come from AerieOS's public releases alone,
+    # so a controller holds no GitHub token for them.
     req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": "builderbot-apps"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:                   # noqa: S310 (our releases, or a test's file)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         body = r.read(limit + 1)
@@ -282,7 +282,7 @@ def signers():
 
 # The signed list itself and its signature, by tag, as the last look read
 # them: handed to the companion with the files, so it checks the signature
-# with keys of its own and not on this controller's word (B1168).
+# with keys of its own and not on this controller's word.
 _proof = {}
 
 
@@ -411,10 +411,10 @@ def check():
     idx = {"apps": held, "checked": int(time.time()), "problem": err, "absent": absent, "signature": signature,
            "release": tag or idx.get("release") or "", "matched": matched,
            # The signed list the held files were taken on, kept for the
-           # companion's own check (B1168); the one before stays while
+           # companion's own check; the one before stays while
            # nothing new was taken.
            "proof": _proof.get(tag) if tag and not refused else idx.get("proof"),
-           # The container edition's image against its signed release (R290 step 3).
+           # The container edition's image against its signed release.
            "image": image}
     write_json(INDEX, idx)
     return view()
@@ -507,7 +507,7 @@ def start():
     threading.Thread(target=loop, daemon=True, name="apps-loop").start()
 
 
-# ---- the seed file (R272 step 4) -------------------------------------------
+# ---- the seed file -------------------------------------------
 #
 # /config/seed.json, written by a compose generator beside the compose file:
 #

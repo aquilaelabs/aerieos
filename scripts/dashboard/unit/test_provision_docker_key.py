@@ -1,5 +1,5 @@
-"""Docker's own package source is held to a key the provisioner carries
-(R267 step 17), on each family that adds it: Debian's and Ubuntu's apt
+"""Docker's own package source is held to a key the provisioner carries,
+on each family that adds it: Debian's and Ubuntu's apt
 repository and the RHEL family's rpm one. The key was fetched from Docker at
 the moment of every enrollment (its gpg piped into `gpg --dearmor`, and a
 docker-ce.repo whose gpgkey line names an address), so it arrived with the

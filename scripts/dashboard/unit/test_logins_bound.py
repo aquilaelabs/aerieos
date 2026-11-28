@@ -1,4 +1,4 @@
-"""A browser's sign-in held to that browser (R158 step 8, R288): another
+"""A browser's sign-in held to that browser: another
 browser's cookie is refused, and so is one sent with no User-Agent at all
 once the sign-in is bound, where a stolen cookie sent bare used to pass."""
 import os

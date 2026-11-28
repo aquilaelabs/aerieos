@@ -1,4 +1,4 @@
-"""The two seal formats side by side (R158 step 3): a node seals with
+"""The two seal formats side by side: a node seals with
 X25519 and ChaCha20-Poly1305 and with nothing else, and the controller
 opens a seal of either kind, one made the way before among them, and moves
 the old one to the new at the next terminal its person opens; the install
@@ -39,7 +39,7 @@ class NodeSeals(unittest.TestCase):
             ts.open_with(ts.key_for(a, head["R"]), bytes(bad))
 
     def test_a_point_that_gives_no_shared_key_is_refused(self):
-        # B551: an all-zero R raised ValueError, which no caller catches.
+        # An all-zero R raised ValueError, which no caller catches.
         a = ts.secret(KEY, "n_1", "u_1")
         with self.assertRaises(ts.Refused):
             ts.key_for(a, "0" * 64)
@@ -110,7 +110,7 @@ class ControllerSeals(unittest.TestCase):
             signing.unseal(bytes(bad))
 
     def test_with_no_vetted_cipher_nothing_is_sealed(self):
-        # It fell back to a cipher built here from HMAC, silently (R243).
+        # It fell back to a cipher built here from HMAC, silently.
         from unittest import mock
         with mock.patch.object(signing, "_have_aead", lambda: False):
             with self.assertRaises(signing.NoCipher) as e:

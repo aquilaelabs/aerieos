@@ -112,7 +112,7 @@ ok(!aside.pending && aside.kept?.sent === false && aside.kept.text === 'set this
    && !existsSync(`${DIR}/ws/briefless/BUILDERBOT-BRIEF.md`),
    'Start without it opens a session and puts the brief away unsent, kept outside the tree');
 
-// ---- another agent's first session takes it the same way (R95) ------------------
+// ---- another agent's first session takes it the same way ------------------
 // A new Codex conversation on a project with a brief waiting opens the same
 // dialog, with Codex's own models, and Build it opens Codex's session.
 const made3 = await api('/api/create', { name: 'briefcodex', mode: 'init', about: 'Build a minesweeper.', version: '' });

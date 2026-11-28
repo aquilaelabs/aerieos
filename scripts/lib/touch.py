@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Timed touches on the running emulator (R101): `aerie emu touch`, and $BB_TOUCH
+"""Timed touches on the running emulator: `aerie emu touch`, and $BB_TOUCH
 inside a capture's --drive script.
 
     touch.py tap X Y
@@ -10,12 +10,12 @@ Screen pixels, as a screenshot shows them, whichever way the screen is
 turned. `adb shell input tap` costs about 300 ms a call and `input swipe`
 moves at its own pace, so neither can time a glide across letters or tell a
 long-press from a slide: a keyboard session found that out and wrote its
-own sendevent script (Shebang-DevBoard, 30 Sep). This one writes the whole
+own sendevent script (Shebang-DevBoard). This one writes the whole
 gesture as one `adb shell` of sendevent lines with sleeps between them, so
 the device sees the timing the script asked for. --pre holds the finger
 still before it starts moving (a long-press that then slides), --hold keeps
 it down at the end before lifting. The path between the points is a
-hand's (hand.py, R127): curved, eased, overshooting and wobbling the way a
+hand's (hand.py): curved, eased, overshooting and wobbling the way a
 finger moves, `--hand ruler` for the straight even stroke, and hand.py's
 dials (--speed, --curve, --shake, --overshoot, --dwell, --ms) to set one.
 
@@ -28,8 +28,8 @@ the guess is wrong.
 A glide keeps its pace. Each move is a sleep and three sendevent processes
 on the device, which on an emulator can cost more than the 10 ms between a
 hand's samples: a 3.6 s stroke ran far longer than it said, and a session
-catching it mid-stroke with a sleep guessed wrong twice (Shebang-DevBoard,
-5 Oct). So the cost of one move is measured first, with moves that change
+catching it mid-stroke with a sleep guessed wrong twice (Shebang-DevBoard).
+So the cost of one move is measured first, with moves that change
 nothing, and the samples are spaced to it; the line printed says how long
 the stroke took on the device, beside how long it was asked to.
 
@@ -121,7 +121,7 @@ def panel(a):
         if d in xs and d in ys:
             return d, xs[d], ys[d]
     # No device at all is an emulator not answering, not one without a
-    # panel (B321, diagnostics #128: it went off adb a moment later).
+    # panel (diagnostics #128: it went off adb a moment later).
     if not dev:
         die("the emulator listed no input devices at all: it is not answering, or going down. "
             "aerie emu status says whether it is still up, aerie emu log what it said")

@@ -1,10 +1,10 @@
-"""The lab's own record (R3 step 8): what each lab suite walked, on what,
+"""The lab's own record: what each lab suite walked, on what,
 and when, written by the run that walked it.
 
 The vetted lines beside the systems a node can be (systems.py) carried
 dates typed by hand, and the code they vouch for moved on under them. A lab
 suite now prints one line for each subject it walked with nothing failed
-(lib.mjs record(): a system for lab-systems, a git host for lab-forge), and
+(lib.mjs record: a system for lab-systems, a git host for lab-forge), and
 `aerie tests lab` hands the run's output here: each line is kept in
 lab-record.json beside this file, dated, with the build it ran against.
 The file is the tree's, committed with the work and shipped in the image,

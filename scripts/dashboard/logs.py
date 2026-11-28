@@ -355,14 +355,14 @@ def download(what, principal):
     if what == "diag":
         # The controller's diagnostics whole, the report aerie diag prints
         # with what sessions have reported about AerieOS among it, as
-        # one file to keep or hand over (the operator, 24 Sep). Redacted
+        # one file to keep or hand over. Redacted
         # as they always are, and on the audit trail as a read of them
         # through the API is.
         audit(principal, "diag-download", "diagnostics", {})
         # A zip: the report as diagnostics.json, and each conversation a
         # report carries as its own file under conversations/, named on the
         # report, so one with a long conversation does not make the JSON a
-        # file nobody can open (the operator, 2 Oct).
+        # file nobody can open.
         rep = diag_report()
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:

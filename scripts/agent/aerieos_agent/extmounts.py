@@ -1,4 +1,4 @@
-"""Other disks and shares on the controller's own machine (R162 step 4):
+"""Other disks and shares on the controller's own machine:
 the hello hands the record (a USB or eSATA disk by its by-id link, an SMB
 share, an NFS export, each with a name and whether it is on), and this
 mounts each at /mnt/other/NAME when it is on and its source is here, and
@@ -31,7 +31,7 @@ def _mounted(path):
 
 def _df(path):
     try:
-        st = statvfs_within(path)     # a share gone away does not hold the census (B980)
+        st = statvfs_within(path)     # a share gone away does not hold the census
         return st.f_frsize * st.f_blocks // 1048576, st.f_frsize * (st.f_blocks - st.f_bavail) // 1048576
     except OSError:
         return 0, 0
@@ -67,7 +67,7 @@ def extmounts_now(state):
     return out
 
 
-# How often the pass looks, on its own thread (B980): once a minute, as it
+# How often the pass looks, on its own thread: once a minute, as it
 # always said, rather than at every turn of the agent's loop.
 EVERY_S = 60
 # One pass at a time: the thread's and a change of the record's (forced).
@@ -90,7 +90,7 @@ class ExtMountsMixin:
             save_state(self.state)
         # Root's alone from here: an agent that is not root (a node whose
         # agent is the jobs account) keeps the record and mounts nothing,
-        # and never raises inside the hello (B421).
+        # and never raises inside the hello.
         if os.geteuid() != 0:
             return
         if changed:
@@ -127,7 +127,7 @@ class ExtMountsMixin:
                     pass
 
     def ext_mounts_start(self):
-        """The pass once a minute on a thread of its own (B980). On the
+        """The pass once a minute on a thread of its own. On the
         agent's loop, a share that stopped answering held every turn for
         minutes (mount.nfs retrying, a stat of the dead mount), and the work
         poll, the jobs, the cancels and the keys waited behind it."""
@@ -212,7 +212,7 @@ class ExtMountsMixin:
             return [shutil.which("mount") or "mount", "-t", "cifs", f"//{m.get('host')}/{m.get('path')}", path, "-o", opts]
         if kind == "nfs":
             # retry=0: one try a pass, not mount.nfs's two minutes of its own
-            # in the foreground (B980); the pass is the retry.
+            # in the foreground; the pass is the retry.
             opts = "nfsvers=4,soft,timeo=100,retry=0,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "nfs", f"{m.get('host')}:{m.get('path')}", path, "-o", opts]
         return None

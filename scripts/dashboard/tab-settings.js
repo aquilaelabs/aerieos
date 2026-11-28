@@ -14,11 +14,10 @@
 "use strict";
 
 // What the controller offers and holds of its companions (apps.view), for
-// the Apps section here and the Library's Companions cards (the Apps page's
-// read until R170).
+// the Apps section here and the Library's Companions cards.
 let devApps = null;
 function loadApps(){
-  // Switched off on this install (R81): the route refuses, so it is not asked.
+  // Switched off on this install: the route refuses, so it is not asked.
   if (featureOff("apps")){ readMoved("apps"); return Promise.resolve(); }
   return reading("apps", async () => {
     const j = await getJSON("/api/apps");
@@ -101,7 +100,7 @@ const settingsDraft = {};
 const sdVal = (id, value) => settingsDraft[id] ?? value;
 // Each field's saved value, read when it is drawn with no draft over it,
 // so an edit back to it is no change and its section's Apply and Revert
-// sleep again (R218 step 32, as Profile's do).
+// sleep again (as Profile's do).
 const settingsSaved = {};
 const SETTINGS_FIELDS = "input[data-set], select[data-set], #idleMin, #logDays, input[data-path]";
 function settingsKeep(el){
@@ -121,7 +120,7 @@ function settingsKeep(el){
 }
 // A section's Apply and Revert awake only while one of its fields differs
 // from what is saved, or a stored secret is ticked to go: the Logs section's
-// too (the operator, 26 Oct: every save bar asleep with nothing to save).
+// too (every save bar asleep with nothing to save).
 function settingsWake(el){
   el.querySelectorAll("details.sect").forEach(sec => {
     const dirty = [...sec.querySelectorAll(SETTINGS_FIELDS)].some(i => i.id in settingsDraft)
@@ -160,18 +159,18 @@ const SETTINGS_SAYS = {
 function renderSettingsInto(i){
   const d = docSurface(i, "settings");
   if (!d) return;
-  // The build and the uptime live here now (R218 step 2, the top-bar rule):
+  // The build and the uptime live here now (the top-bar rule):
   // facts in the facts voice, where the header carried them before.
-  // ...and no sentence about the page beside them (the operator, 18 Oct).
+  // ...and no sentence about the page beside them.
   // The controller's build and how long it has been up, as a node's head
-  // says what a machine is (the operator, 25 Oct: no loose words at the top).
+  // says what a machine is (no loose words at the top).
   d.setBar("");
   const img = state?.image || {};
-  // Which build, and how long it has been up, on its line (R274).
+  // Which build, and how long it has been up, on its line.
   const head = pageHead({title: "This controller", line: [
     {text: `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`},
     {text: `up ${shortUptime(state?.uptime || 0)}`}]});
-  // Sections, like every other tab's (the operator, 11 Oct): one fold per
+  // Sections, like every other tab's: one fold per
   // group, its status on the heading, a jump bar over them, and each with
   // its own Apply and Revert. The groups' own markup is kept inside (the
   // suites and the keepers address it), the heading taking the h4's place.
@@ -180,7 +179,7 @@ function renderSettingsInto(i){
   const t = state?.settings?.tunnel;
   const sect = (key, title, status, html, opts = {}) =>
     docSection("settings", key, title, status, html.replace(/<h4>[^<]*<\/h4>\s*/, ""), opts);
-  // Before the first poll lands, the page's own placeholder (B647): every
+  // Before the first poll lands, the page's own placeholder: every
   // section it will have, shimmering, rather than the few that need no
   // state and then the rest. Drawn whole again when the settings arrive.
   if (!state?.settings){
@@ -193,11 +192,11 @@ function renderSettingsInto(i){
     sectJump(d.list.querySelector("[data-sects]"));
     return;
   }
-  // Reach from outside and Connection are the Network page's now (R165
-  // step 4, tab-network.js), drawn from the same table.
+  // Reach from outside and Connection are the Network page's now
+  // (tab-network.js), drawn from the same table.
   const groups = settingsSections().filter(g => !NETWORK_GROUPS.includes(g.key) && !(updatesOnMachine() && MACHINE_GROUPS.includes(g.key)));
   // The logs are an administrator's: a poll that has landed without them
-  // means this account has no Logs section, not one still on its way (B38).
+  // means this account has no Logs section, not one still on its way.
   const logs = logSection();
   const card = settingsCardSaid();
   patch(d.list, `${head}<div class="sectjump" data-sects></div>
@@ -217,7 +216,7 @@ function renderSettingsInto(i){
         + (g.key === "backup" ? sect("copies", "Backup copies", backupData?.made_at ? `last ${ago(backupData.made_at)}` : backupData?.on === false ? "off" : "", backupSection()) : "")).join("")}
     ${state?.can?.admin ? sect("move", "Move this controller", moveStatus(), moveSection()) : ""}
     ${
-    // Last, apart from the settings (R218 step 32); the Nodes section that
+    // Last, apart from the settings; the Nodes section that
     // only linked to the Nodes page is gone with it, the rail being the way.
     sect("reset", "Reset AerieOS", "", `<div class="field" data-group="Reset">
       <div class="hint">Start over at the setup page, un-enrolling the nodes first if you choose. Everything but space files is moved aside, not deleted.</div>
@@ -275,8 +274,8 @@ function withRevert(html, key){
 
 // What sessions and people reported about AerieOS (aerie report, the
 // header's Report a bug), every one listed with its delete, and the
-// diagnostics download under them, which carries what is left (the
-// operator, 26 Oct): a report taken out before the download is not in it.
+// diagnostics download under them, which carries what is left:
+// a report taken out before the download is not in it.
 // Whoever reads Controller settings reads them; only a session reading them
 // is debug's. Read when the page draws it and after a delete, not on the poll.
 let reportsList = null;
@@ -289,7 +288,7 @@ function loadReports(){
   });
 }
 const reportsCount = () => reportsList === null ? null : reportsList.length;
-// A bare-metal install's updates (R90 step 5): the release running, the
+// A bare-metal install's updates: the release running, the
 // newest published, and Update, which runs the installer through this
 // machine's own node; the container edition has no such section.
 // The channel picked and not yet answered for, drawn over every read until
@@ -299,13 +298,13 @@ function updatesSection(){
   const r = {...(state?.release || {}), ...(relChannelHeld ? {channel: relChannelHeld} : {})};
   const when = r.at ? `checked ${esc(ago(r.at))}` : "not checked yet";
   const os = r.os && r.os.version ? r.os : null;
-  // AerieOS (R160 step 4): the image whole into the other slot, a
-  // restart to finish; elsewhere the installer's bundle (R90 step 5).
+  // AerieOS: the image whole into the other slot, a
+  // restart to finish; elsewhere the installer's bundle.
   const runs = os ? `AerieOS ${esc(os.version)} from slot ${esc(os.slot || "?")}${os.next && os.next !== os.slot ? `, and slot ${esc(os.next)} boots next: restart to finish the update` : os.trial ? ", on trial until the health check marks it good" : ""}${os.fell_back ? `; ${esc(os.fell_back)}` : ""}`
     : esc(r.running || "an unstamped build");
   const how = os ? `Update checks the release is genuine and writes it to the slot not in use. Restart to boot it; the slot running now stays to fall back to. An offline machine takes the same files from a folder here.`
     : `Update checks the release is genuine, switches to it, and comes back by itself if it does not answer.`;
-  // The machine's own packages (R164 step 3), on a bare-metal install
+  // The machine's own packages, on a bare-metal install
   // that is not AerieOS: how many wait, the security ones among
   // them, and Apply updates, with a restart after when ticked.
   const h = r.host && typeof r.host.pending === "number" ? r.host : null;
@@ -313,8 +312,8 @@ function updatesSection(){
       ${formBox({fields: [`<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="hostReboot"> restart after, if the update asks for it</label></div>`],
         foot: [h.reboot ? `<button type="button" data-hostreboot="${esc(r.node || "")}">Restart now</button>` : "",
           `<button type="button" data-hostupdate="${esc(r.node || "")}"${r.node && h.pending ? "" : " disabled"}>Apply updates</button>`]})}`;
-  // The release channel, on any install (the operator, 2 Nov).
-  // A form (R301): the channel, the version to install (debug mode), and a
+  // The release channel, on any install.
+  // A form: the channel, the version to install (debug mode), and a
   // folder of an update file on an AerieOS machine, its verbs at the foot.
   const channel = formField("relChannel", "Channel", `<select id="relChannel" data-relchannel>
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select>
@@ -322,8 +321,8 @@ function updatesSection(){
         r.draft_fetch?.tag ? `. ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; Update runs from them` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files`}` : ""}${
         helpIcon("A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back. A draft not published yet is seen with this controller's token for AerieOS's repository, under Unpublished builds.")}`
         : `Published releases alone${helpIcon("The dev channel takes every dev build as it is published, which may not come up.")}`}</div>`, {wide: true});
-  // Debug mode alone: any version, the unpublished ones with the token
-  // (the operator, 2 Nov), older ones too, since a test goes both ways.
+  // Debug mode alone: any version, the unpublished ones with the token,
+  // older ones too, since a test goes both ways.
   const pick = r.pick?.length ? formField("relPick", "Version", `<select id="relPick">${
       r.pick.map(v => `<option value="${esc(v.tag)}">${esc(v.tag)}${v.draft ? " (not published)" : ""}</option>`).join("")}</select>`)
     + `<div class="fcell fcellbtn"><button type="button" data-relpick="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.node ? "" : " disabled"}>Install this version</button></div>` : "";
@@ -338,8 +337,8 @@ function updatesSection(){
       ${host}
     </div></div>`;
 }
-// ---- the copies kept (R161 step 4) ----
-// The root startup hooks (B1166): each STATE/startup.d/*.root.sh with what it
+// ---- the copies kept ----
+// The root startup hooks: each STATE/startup.d/*.root.sh with what it
 // says, and whether the start runs it. One runs only as an administrator
 // approved it, read here first: a new one, or one changed since, waits.
 let rootHooks = null, rootHooksAsked = false;
@@ -377,7 +376,7 @@ function wireRootHooks(root){
   });
 }
 
-// Connected services (R294 step 9, the connections rule): every credential
+// Connected services (the connections rule): every credential
 // this install holds for an outside service, the install's, a space's or
 // shared by spaces, with who added it, when it was last used and when it
 // expires, each row opening where it lives, which is where it is added and
@@ -492,8 +491,8 @@ function wireBackup(root){
     await loadBackup();
   }));
 }
-// ---- moving this controller (R90 step 12) ----
-// Prepare to move arms the move and shows the token once (R175: no life on
+// ---- moving this controller ----
+// Prepare to move arms the move and shows the token once (no life on
 // it, and the nodes hear it on every hello from then on); Download the
 // bundle packs it fresh under that key at that moment; Forget it withdraws
 // the move (the key gone here, the nodes told nothing more); Mark as moved,
@@ -507,12 +506,12 @@ function loadMove(){
     const was = JSON.stringify(moveData);
     moveData = await getJSON("/api/move?pieces=1");
     if (moveData.error) moveData = {error: "move: " + moveData.error};
-    // Drawn once it has landed, as the backup copies are (B645: the section
+    // Drawn once it has landed, as the backup copies are (the section
     // stayed its two shimmer rows after a reload, and Forget it drew nothing).
     if (JSON.stringify(moveData) !== was) readMoved("settings");
-    // ...and read again every poll while a move is armed (B646): how many
+    // ...and read again every poll while a move is armed: how many
     // nodes have heard it, the last packing and the ask's answer move on
-    // their own, while the page is on show and only then (R228 step 10: a
+    // their own, while the page is on show and only then (a
     // page left kept its tab, and this went on for good); shown again, its
     // open reads it at once.
     clearTimeout(moveTimer); moveTimer = null;
@@ -544,12 +543,12 @@ function moveSection(){
   const sizeMb = m.size ? moveSize(m.size) : "";
   const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page with this controller's address, or with the bundle.</div></div>` : "";
   // Each piece: its name on the tick's line, its size and what it holds
-  // under it (the operator, 3 Nov: the name wrapped into a narrow column
+  // under it (the name wrapped into a narrow column
   // beside the words).
   const pieces = (m.pieces || []).map(pc => `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)}</label>
       <div class="sub">${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `: ${esc(pc.about)}` : ""}</div></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
-  // A move landed here instead (the operator, 1 Nov): on a fresh controller,
+  // A move landed here instead: on a fresh controller,
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
@@ -559,7 +558,7 @@ function moveSection(){
   // What is in the bundle, as the record says it: the state always, then
   // what was ticked.
   const inside = ["the state", ...stores, ...(m.repos ? ["the repositories"] : []), ...(m.carries_key ? ["the install key"] : [])].join(", ");
-  // Armed: the facts of the move (the operator, 3 Nov: a paragraph of them
+  // Armed: the facts of the move (a paragraph of them
   // said nothing at a glance), then the one line on what happens next.
   const armed = m.prepared ? `${factGrid([["New home", m.to || "not named yet"], ["Armed", ago(m.made_at)],
       ["Nodes that heard it", `${m.heard} of ${m.nodes}`], ["Last packed", m.packed_at ? `${ago(m.packed_at)}, ${sizeMb}` : "not yet: Download packs it"],
@@ -573,7 +572,7 @@ function moveSection(){
         helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
       ${m.prepared ? `<div class="actbar"><span class="sp"></span><button type="button" data-movebundle>Download the bundle</button>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button></div>`
-        // Where it goes and what goes with it, one form (R301).
+        // Where it goes and what goes with it, one form.
         : formBox({fields: [formField("moveTo", "New home", `<input type="text" id="moveTo" placeholder="https://aerieos.new.example" data-ph-short="new address" autocomplete="off" spellcheck="false">`, {wide: true}), pieces],
             foot: [`<button type="button" data-movebackup title="a copy of what is ticked, under a token of its own; no move is armed and no node told">Download a backup</button>`,
               `<button type="button" class="primary" data-moveprep>Prepare to move</button>`]})}
@@ -585,8 +584,8 @@ function moveSection(){
 // step before is not done: only a hold the walk has not explained is said here.
 function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
   const off = ld.held ? " disabled" : "";
-  // The token given on the first page is kept for this (the operator, 10 Nov:
-  // asked twice), and where the old controller ran on this machine its
+  // The token given on the first page is kept for this
+  // (asked twice), and where the old controller ran on this machine its
   // address cannot answer, so the bundle is the one way.
   const tok = ld.token_kept ? "" : formField("landTok", "Move token", `<input type="text" id="landTok" autocomplete="off" spellcheck="false"${off}>`);
   const from = bundleOnly ? "" : formField("landFrom", ld.token_kept ? "Old controller, while it runs" : "Old controller", `<input type="text" id="landFrom" placeholder="https://aerieos.old.example" data-ph-short="old address" autocomplete="off" spellcheck="false"${off}>`);
@@ -616,7 +615,7 @@ function wireMove(root){
     const kept = !!b.closest("[data-movelandbox]")?.hasAttribute("data-tokkept");
     if (!tok && !kept) return notify("the move token is needed, with the old controller's address or the bundle", true);
     if (!(file || from)) return notify($("landFrom") ? "pick the bundle, or give the old controller's address" : "pick the bundle first", true);
-    // When it was packed, read off its plain first lines (B957): anything
+    // When it was packed, read off its plain first lines: anything
     // done on the old controller after that moment does not come.
     const packed = file ? await moveBundleAge(file) : "";
     if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.${packed ? ` It was packed ${packed}: what changed on the old controller since then does not come, so download it again if the old one has been used since.` : ""}` : `The bundle is pulled from ${from}, packed at that moment.`}`,
@@ -626,8 +625,8 @@ function wireMove(root){
     fd.append("token", tok);
     fd.append("from", file ? "" : from);
     if (file) fd.append("bundle", file, file.name);
-    // The bundle's bytes as they go, a bar under the button (the operator,
-    // 8 Nov: a large bundle sat for minutes with nothing moving); once sent,
+    // The bundle's bytes as they go, a bar under the button
+    // (a large bundle sat for minutes with nothing moving); once sent,
     // the landing itself (unpacking, the swap) with the word alone.
     const box = b.closest("[data-movelandbox]"), prog = document.createElement("div");
     prog.className = "field landprog";
@@ -658,7 +657,7 @@ function wireMove(root){
     moveToken = j.token;
     await loadMove();
   }));
-  // A backup of the controller to keep (the operator, 6 Nov): what is ticked,
+  // A backup of the controller to keep: what is ticked,
   // under a token of its own that the person records, no move armed.
   root.querySelectorAll("[data-movebackup]").forEach(b => b.onclick = () => pressing(b, async () => {
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
@@ -676,8 +675,8 @@ function wireMove(root){
     document.body.appendChild(a); a.click(); a.remove();
     notify(`downloading ${j.bundle} (${moveSize(j.size || 0)}); keep it with its token`);
   }));
-  // Packed while the button says so, then downloaded by name (the operator,
-  // 8 Nov: a plain link said nothing while a large bundle was packed, and a
+  // Packed while the button says so, then downloaded by name
+  // (a plain link said nothing while a large bundle was packed, and a
   // failure came back as a page of JSON).
   root.querySelectorAll("[data-movebundle]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Packing");
@@ -715,8 +714,8 @@ function wireMove(root){
 
 // The system job at work on a node, in words, or "": an update or a restart
 // pressed meanwhile is queued behind it, never refused
-// (nodes.system_job_for), and the press says so in one sentence (the
-// operator, 22 Nov). The node list is read again at the press, since one
+// (nodes.system_job_for), and the press says so in one sentence.
+// The node list is read again at the press, since one
 // drawn earlier may be from before that job started or ended.
 const SYS_JOB_SAID = {"host-update": "the system packages' update", "os-update": "an AerieOS update",
   "controller-update": "the controller's update", reboot: "a restart", poweroff: "a shutdown"};
@@ -735,8 +734,8 @@ function sysSaid(ahead, words){
     : typeof words === "function" ? words(j) : words);
 }
 function wireUpdates(root){
-  // The channel's pick (R179): saved, then the newest asked for again.
-  // The section says the channel picked at once (the operator, 22 Nov), and
+  // The channel's pick: saved, then the newest asked for again.
+  // The section says the channel picked at once, and
   // puts the one before it back, saying why, on a refusal.
   root.querySelectorAll("[data-relchannel]").forEach(s => s.onchange = async () => {
     const to = s.value, redraw = () => { readMoved("settings"); drawPanes(); };
@@ -814,7 +813,7 @@ function reportsSection(){
 }
 
 // A report deleted, or every report cleared, goes from the list on the press
-// (the operator, 22 Nov: a press must never look as if nothing happened),
+// (a press must never look as if nothing happened),
 // and comes back saying why on a refusal; the list is read again after.
 function reportsGone(keep){
   const was = reportsList;
@@ -842,7 +841,7 @@ async function clearReports(){
   loadReports();
 }
 
-// The settings that used to be environment variables (roadmap R29): what is
+// The settings that used to be environment variables: what is
 // left of them after the operator asked which needed to exist at all. Each
 // group is one section with one Apply, a field that has never been saved
 // says so beside it, and the bar says whether a change applies at once or at the
@@ -853,21 +852,21 @@ const CHECK_KINDS = [
   ["images", "Container images", "Asks each space container's registry for a newer image."],
   ["catalog", "Library", "Asks upstream for the toolchains' and coding agents' newest versions, and the vetted catalog for its index. A node's own check of what it holds is on its page."]];
 const SETTING_GROUPS = [
-  // The apps this controller offers its people (R272 step 3, apps.py): each
+  // The apps this controller offers its people (apps.py): each
   // one on is fetched from the release matching this controller, checked
   // against its sha256 and offered on its card in the Library (under Build); Check for updates asks the
   // release again rather than waiting for the daily look.
-  // Update checks on one clock (R176, checks.py): each check AerieOS
+  // Update checks on one clock (checks.py): each check AerieOS
   // makes by itself, how often, when it last ran, and Check for updates. A node's
   // own version check is its page's.
   {key: "checks", title: "Update checks", intro: checksIntro, status: checksStatus,
    heading: () => { const c = state?.checks || {}; const off = Object.values(c).filter(x => x.cadence === "off").length;
      return off ? `${off} off` : Object.keys(c).length ? "on" : ""; },
-   // The release check is an install that updates itself (B648): not
+   // The release check is an install that updates itself: not
    // offered on the container edition.
    fields: CHECK_KINDS.map(([k, label, hint]) => ({key: `check_${k}`, label, type: "select", hint, when: k === "release" ? () => !!state?.bare_metal : undefined,
      options: [["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off: only Check for updates"]]}))},
-  // The vetted catalog (R169): where its signed index is read, and a mirror
+  // The vetted catalog: where its signed index is read, and a mirror
   // of it imported for a controller that cannot reach it (step 6).
   {key: "catalog", title: "Vetted catalog", intro: catalogIntro, status: catalogStatus,
    heading: s => `${/aquilaelabs\/(aerieos|builderbot)-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
@@ -885,11 +884,11 @@ const SETTING_GROUPS = [
      hint: "A space's files and terminal in VS Code."},
     {key: "apps_companion", label: "Windows companion", type: "bool", dev: true,
      hint: "A folder on a Windows PC kept in step with a space, for a tool that only runs there."}]},
-  // The home tunnel the controller runs itself (R176): the public hostname
+  // The home tunnel the controller runs itself: the public hostname
   // a node off the LAN dials, the tunnel's token, and an API token that
   // writes the hostname's record and the tunnel's rules rather than having
   // them clicked. The two tokens are secrets: never shown back.
-  // Named for what it is for, not for its field (the operator, 13 Oct):
+  // Named for what it is for, not for its field:
   // "Public hostname" read as a node's or a route's, and those are on the
   // node's row and the nginx tab.
   {key: "tunnel", title: "Reach from outside", off: "tunnel", status: tunnelStatus, intro: tunnelSteps,
@@ -902,7 +901,7 @@ const SETTING_GROUPS = [
      hint: "From Zero Trust: Networks, Tunnels, Create a tunnel (Cloudflared), the long eyJ… string in its install command. The controller runs the tunnel itself with it."},
     {key: "cf_api_token", label: "Cloudflare API token (optional)", type: "secret",
      hint: "With Zone DNS Edit and Account Cloudflare Tunnel Edit: the hostname's record and the tunnel's two rules (the agent's API to the controller, everything else 404) are written on Apply rather than clicked."}]},
-  // The dashboard's own connection (R158 step 2, tls.py): http, the
+  // The dashboard's own connection (tls.py): http, the
   // install's own certificate, or Let's Encrypt for the controller's own
   // hostname; its line says what is in force, with the fingerprint a phone
   // or the companion pins and Download for the certificate itself.
@@ -922,7 +921,7 @@ const SETTING_GROUPS = [
      hint: "Where Let's Encrypt writes about the certificate. Optional."},
     {key: "trusted_proxies", label: "Reverse proxy in front", type: "text", placeholder: "192.168.1.20",
      hint: "Only if another machine's proxy stands in front of this page: its address, or several and networks parted by spaces. Wrong passwords are then counted against each visitor's own address, where without this the proxy is the one address everybody shares, and a hundred wrong passwords from anyone hold them all. The tunnel under Reach from outside needs no entry."}]},
-  // The mail server the bell's rows go out through (R149, reach.py): each
+  // The mail server the bell's rows go out through (reach.py): each
   // person picks where the bell reaches them on their Profile; email needs
   // this server.
   {key: "mail", title: "Mail", status: s => s?.settings?.smtp_host?.value ? "set" : "no server yet",
@@ -942,10 +941,10 @@ const SETTING_GROUPS = [
      hint: "Kept sealed under the install key, as the tokens are."},
     {key: "smtp_from", label: "From", type: "text", placeholder: "AerieOS <builderbot@example.com>",
      hint: "The address the mail is from; the sign-in name when empty."}]},
-  // The room a node keeps for itself (R110): the numbers the bell, the
+  // The room a node keeps for itself: the numbers the bell, the
   // build gate, a rebuild's check and the hourly prune go by, and a memory
   // limit for a container whose compose file sets none. Every node's
-  // default, a node's own Sessions section setting its own (R294 step 7).
+  // default, a node's own Sessions section setting its own.
   {key: "room", title: "Room on the nodes", status: () => "every node's unless its own page sets one; at once, a container's limit at its next start",
    heading: s => `${s?.settings?.room_floor_gb?.value ?? 10} GB kept`,
    fields: [
@@ -958,7 +957,7 @@ const SETTING_GROUPS = [
   // Maintenance mode, the owner's alone (state.can.maintenance): every
   // other account is told why and kept out until it is off, and a band on
   // every page reminds the owner it is on.
-  // The backup password (R161 step 4): the copies of the state on the
+  // The backup password: the copies of the state on the
   // machine's pools and under the state are sealed under its key; the
   // copies themselves are the Backup copies section's.
   {key: "backup", title: "Backup",
@@ -966,7 +965,7 @@ const SETTING_GROUPS = [
    fields: [
     {key: "backup_password", label: "Backup password", type: "secret",
      hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, spaces, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. A copy carries the install key, so whoever holds a copy and this password holds everything the controller keeps: keep the password where you keep the owner's. A copy without it is a sealed file."}]},
-  // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
+  // Unpublished builds: in debug mode alone, a GitHub
   // token that may read AerieOS's repository, with which the dev channel and
   // the version picker see the drafts not published yet.
   {key: "drafts", title: "Unpublished builds", debug: true,
@@ -974,10 +973,10 @@ const SETTING_GROUPS = [
    fields: [
     {key: "release_token", label: "GitHub token", type: "secret",
      hint: "A personal access token that may read AerieOS's repository (contents, read). With it, and the dev channel picked under Updates, this controller also sees the builds not published yet, and Update on AerieOS fetches one's files with it and takes the update from them, checked as a folder's are. Kept sealed here, never shown again, and cleared at any start out of debug mode."}]},
-  // The update window (R160 step 4): a newer release applied by itself at
+  // The update window: a newer release applied by itself at
   // the hour named, daily or one weekday; off by default, so nothing moves
   // the install without a press or this choice.
-  // An install that updates itself alone (B648): the container is pulled
+  // An install that updates itself alone: the container is pulled
   // by whatever runs it, so the window is not offered there, and the boot
   // menu's older versions are AerieOS's own.
   {key: "updwin", title: "Update window", bare: true,
@@ -1013,7 +1012,7 @@ async function maintAsk(rows){
   return askYes(text, {title: "Turn maintenance mode on?", verb: rows.length ? "End them and turn it on" : "Turn it on", caution: rows.length > 0});
 }
 
-// The Connection section's lines (R158 step 2): what is in force, the
+// The Connection section's lines: what is in force, the
 // certificate's fingerprint and expiry, Download, and an ACME request going.
 function connectionIntro(s){
   const t = s?.tls || {};
@@ -1033,7 +1032,7 @@ function connectionStatus(s){
 }
 
 // What the Apps section holds, over its switches, and Check for updates.
-// The clocks alone (the operator, 3 Nov): Check for updates is on each
+// The clocks alone: Check for updates is on each
 // thing's own page (Containers, the Library, Updates), so
 // this section says when each last looked and sets how often.
 function checksIntro(){
@@ -1084,7 +1083,7 @@ function catalogStatus(){
 }
 function wireCatalogMirror(root){
   const file = root.querySelector("#mirrorFile");
-  // Set, not added: the page is patched and keeps these buttons (R244).
+  // Set, not added: the page is patched and keeps these buttons.
   const imp = root.querySelector("[data-mirrorimport]");
   if (imp) imp.onclick = () => file?.click();
   if (file) file.onchange = async () => {
@@ -1131,8 +1130,8 @@ function appsStatus(){
   return held.length ? `holds ${held.map(a => a.title).join(", ")} from ${devApps.release}${devApps.matched ? "" : " (no release matches this controller: the newest)"} · ${when}` : when;
 }
 
-// How the public hostname is set up, in the section itself (the operator,
-// 11 Oct): the steps in order, with the controller's own port in them.
+// How the public hostname is set up, in the section itself:
+// the steps in order, with the controller's own port in them.
 function tunnelSteps(s){
   const port = s?.tunnel?.port || 7680;
   return `<div class="sub">A name a node off your network dials to reach this controller, carried by a tunnel the controller runs itself. Nothing on your router changes, and the node never learns your address.</div>
@@ -1144,7 +1143,7 @@ function tunnelSteps(s){
     </ol>`;
 }
 
-// The tunnel's line on its group's action bar (R176): whether cloudflared
+// The tunnel's line on its group's action bar: whether cloudflared
 // is here, running, registered, and at which name, as the server reads it.
 function tunnelStatus(s){
   const t = s?.tunnel;
@@ -1154,7 +1153,7 @@ function tunnelStatus(s){
   if (!t.configured) return "off: paste a tunnel token and Apply to run the home tunnel here";
   if (!t.running) return "starting";
   if (!t.connected) return "running, not registered yet";
-  // Registered is not routed (the operator, 11 Oct): the server asks the
+  // Registered is not routed: the server asks the
   // name itself, and says so when the answer is somebody else's.
   if (t.route?.ok === false) return `connected, but ${t.route.said}`;
   if (t.route?.ok === true) return `connected: ${t.host || "the tunnel"} reaches this controller${tunnelNodes()}`;
@@ -1174,7 +1173,7 @@ function tunnelNodes(){
 // in a box under the button, and the red verb asleep until it matches.
 // What it moves aside is said once more here, since the thing a person
 // regrets is the thing they did not read.
-// Reset AerieOS (the operator, 12 Oct): a dialog that offers to
+// Reset AerieOS: a dialog that offers to
 // un-enroll every node first, so each machine is clean to enroll again
 // afterwards, then the typed word. The controller uninstalls each and waits
 // for every one to report before anything is moved (server._reset_after),
@@ -1276,7 +1275,7 @@ function settingsSections(){
   const s = state?.settings;
   if (!s) return [{key: "wait", title: "Settings", status: "", html: `<div class="row stack2"><div class="grow"><div class="sub">the settings arrive with the first poll…</div></div></div>`}];
   const src = k => s.settings[k]?.source === "default" ? `<span class="pill">default</span>` : "";
-  // What this install switched off from its environment (R81), listed first
+  // What this install switched off from its environment, listed first
   // when there is any: set where the container starts, so nothing here
   // turns it back on.
   const offs = Object.values(state?.off || {});
@@ -1299,7 +1298,7 @@ function settingsSections(){
               return formField(id, f.label, `<input id="${id}" type="${f.type === "secret" ? "password" : "text"}" data-set="${f.key}"${f.type === "secret" ? ' data-secret="1"' : ""} value="${value}" placeholder="${ph}" autocomplete="off" spellcheck="false">${
                 f.type === "secret" && isSet ? `<label class="ndcap"><input type="checkbox" data-clear="${f.key}"> take it off</label>` : ""}`, {help: f.hint, tail});
             }
-            // A pick among a few (R158 step 2: the connection's mode).
+            // A pick among a few (the connection's mode).
             if (f.type === "select"){
               const opts = (f.options || []).map(([val, lab]) => `<option value="${esc(val)}"${sdVal(id, v ?? "") === val ? " selected" : ""}>${esc(lab)}</option>`).join("");
               return formField(id, f.label, `<select id="${id}" data-set="${f.key}">${opts}</select>`, {help: f.hint, tail: src(f.key)});
@@ -1318,7 +1317,7 @@ function settingsSections(){
                 <input id="${id}" type="checkbox" data-set="${f.key}"${sdVal(id, !!v) ? " checked" : ""}> ${esc(f.label)}${f.dev ? devMark() : ""}${helpIcon(f.hint)}</label>${src(f.key)}
               </div>`;
     };
-    // A group whose feature this install switched off (R81): its sentence
+    // A group whose feature this install switched off: its sentence
     // in place of its fields, which nothing could apply.
     if (g.off && featureOff(g.off)) return {key: g.key, title: g.title, status: "off", cls: "",
       html: `<div class="row stack2" data-group="${esc(g.title)}"><div class="grow">${deadWhy(featureOff(g.off))}</div></div>`};
@@ -1340,7 +1339,7 @@ function wireSettingsSections(el){
   wireUpdates(el);
   wireBackup(el);
   wireMove(el);
-  // Ask Let's Encrypt now (R158 step 2): the Connection section's own press.
+  // Ask Let's Encrypt now: the Connection section's own press.
   el.querySelectorAll("[data-tlsissue]").forEach(b => b.onclick = async () => {
     await sayPost(b, "Asking", "/api/tls", {action: "issue"}, "asking Let's Encrypt: the Connection section says how it goes", () => { refresh(); });
   });
@@ -1367,7 +1366,7 @@ function wireSettingsSections(el){
         }
         if (j.error) return notify(j.error, true);
         box.querySelectorAll("[data-set]").forEach(i => { delete settingsDraft[i.id]; });
-        // What the tunnel did with it (R176): the record and rules written,
+        // What the tunnel did with it: the record and rules written,
         // or why not, said here rather than only on the next poll's line.
         if (j.published?.error) notify(`saved; Cloudflare: ${j.published.error}`, true);
         else if (j.published?.did) notify(`saved; Cloudflare: ${j.published.did.join("; ")}`);
@@ -1392,7 +1391,7 @@ function wireSettingsSections(el){
 function idleSection(){
   const m = state?.idle?.minutes;
   if (m === undefined) return `<div class="sub">the idle rule arrives with the first poll…</div>`;
-  // What 0 means is in the label, where a phone reads it (B459).
+  // What 0 means is in the label, where a phone reads it.
   return `<h4>Claude sessions</h4>
     <div class="logset">
       <div class="dim">A session idle this long is ended, on every node.</div>
@@ -1481,6 +1480,6 @@ function wirePathsSection(el){
   });
 }
 
-// The global rules (R63) are not on this tab: every project's notebook lists
+// The global rules are not on this tab: every project's notebook lists
 // them under its own rules on the Briefing, with a switch for that project,
 // and an administrator changes them there for every project (nb-rules.js).

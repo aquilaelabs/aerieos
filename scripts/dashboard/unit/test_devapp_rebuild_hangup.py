@@ -1,5 +1,5 @@
 """aerie devapp rebuild when the controller hangs up on its POST before
-answering (B803, report #113): nothing was queued, and the verb stopped at
+answering (report #113): nothing was queued, and the verb stopped at
 'Remote end closed connection without response' with the container on its
 old commit. It now looks whether the build started and asks once more when
 it did not; one that did start is watched rather than asked for twice."""

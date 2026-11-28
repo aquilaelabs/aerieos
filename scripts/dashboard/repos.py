@@ -1,4 +1,4 @@
-"""Projects and their repositories (R136, R138).
+"""Projects and their repositories.
 
 A project is made first, with a name alone, and repositories are added to
 it: every repository is in exactly one project, and a project may hold none.
@@ -32,7 +32,7 @@ FILE = None
 write_json = None
 registry = None
 WORKSPACE = None
-# The mark a project's own folder carries (R208): a project with no
+# The mark a project's own folder carries: a project with no
 # repository works in /workspace/KEY, a plain folder with this file in it
 # and no git, so a session there has somewhere to lay out what a container
 # or a VM needs. The file is what the sync carries to a node for an
@@ -51,7 +51,7 @@ def configure(*, state, write_json, registry, workspace=None):
 
 
 def _load():
-    # What the file is, looked at once a request (statefile.sig, R228 step 1).
+    # What the file is, looked at once a request (statefile.sig).
     m = statefile.sig(FILE) if FILE is not None else None
     if m is not None and m == _cache["mtime"] and _cache["data"] is not None:
         return _cache["data"]
@@ -99,7 +99,7 @@ def project_of(dirname):
 
 
 def key_of(name):
-    """The project a name stands for (R138): a project's own key as itself,
+    """The project a name stands for: a project's own key as itself,
     a repository's its project's, anything else as itself. What every store
     of a project's (its people, roles, owner, marks) is keyed by, so a
     repository is reached through its project."""
@@ -133,18 +133,18 @@ def all_members():
     """{key: [members]} for every project, an empty one with []."""
     # Over a copy of the keys: the cached record is shared across the
     # server's threads, and a delete popping a key while a status read
-    # walked it was a 500 (B643).
+    # walked it was a 500.
     return {k: members(k) for k in list(_load()["projects"]) if registry.is_repos(k)}
 
 
 def empty_keys():
-    """The projects with no repository in them (R208): each a place to run
+    """The projects with no repository in them: each a place to run
     an agent that builds containers and VMs, in a folder of its own."""
     return [k for k, ms in all_members().items() if not ms]
 
 
 def is_work(name):
-    """Whether `name` is a project with no repository (R208): its own key,
+    """Whether `name` is a project with no repository: its own key,
     with nothing in it, so a session there works in its folder and has no
     git and no notebook."""
     name = str(name or "")
@@ -152,7 +152,7 @@ def is_work(name):
 
 
 def work_folder(key):
-    """The folder of a project with no repository (R208): /workspace/KEY,
+    """The folder of a project with no repository: /workspace/KEY,
     made plain when it is missing (no git, no notebook), with its mark in
     it so the sync carries it and a reader knows what it is. The path, or
     None where there is no workspace to make it in."""
@@ -171,7 +171,7 @@ def work_folder(key):
 
 
 def leftovers():
-    """The empty projects 0.8.0's B402 left: one named NAME (Pnn) with
+    """The empty projects an older release left: one named NAME (Pnn) with
     nothing in it, where Pnn is the id of a repository shown as NAME that is
     in another project. A status read placed the repository in a project of
     its own while git init ran, and the create then made the one it meant
@@ -199,7 +199,7 @@ def made_since(dirname, started):
 
 
 def create(name, folder=True):
-    """A new project with no repository in it yet (R138). {ok, key, name,
+    """A new project with no repository in it yet. {ok, key, name,
     id} or {error}. `folder` False where a repository goes into it at once,
     which needs no folder of the project's own."""
     with _lock:
@@ -209,7 +209,7 @@ def create(name, folder=True):
         d = _load()
         d["projects"][rec["key"]] = {"members": [], "at": int(time.time())}
         _save(d)
-        # Its folder from the start (R208): a session on it before any
+        # Its folder from the start: a session on it before any
         # repository works there, and a node's synced copy needs it to be.
         if folder:
             work_folder(rec["key"])
@@ -217,7 +217,7 @@ def create(name, folder=True):
 
 
 def place(listed=None):
-    """Every live repository in a project (R138): one in none (an imported
+    """Every live repository in a project: one in none (an imported
     archive, a clone, a folder recorded since migration 0010 ran) gets a
     project of its own, or, put back from the trash by hand, the one it
     was deleted from, named as it is shown, with its id beside the name
@@ -326,8 +326,8 @@ def forget(dirname):
 
 
 def delete(key):
-    """A project deleted, only with no repository left in it (R138, the
-    operator, 25 Oct): nothing ever ends up in the trash without a project
+    """A project deleted, only with no repository left in it:
+    nothing ever ends up in the trash without a project
     to go back to. {ok} or {error}."""
     key = str(key or "")
     with _lock:
@@ -341,7 +341,7 @@ def delete(key):
         d["projects"].pop(key, None)
         _save(d)
         registry.drop_repos(key)
-        # Its own folder goes with it (R208): what a session laid out there
+        # Its own folder goes with it: what a session laid out there
         # (compose files, notes) was the project's, and the press that
         # deletes the project was confirmed.
         if WORKSPACE is not None and (WORKSPACE / key / MARK).is_file():

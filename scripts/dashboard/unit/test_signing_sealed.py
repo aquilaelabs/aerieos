@@ -1,4 +1,4 @@
-"""The signing keys sealed at rest (R111 step 2): with an install key every
+"""The signing keys sealed at rest: with an install key every
 keystore and its passwords are ciphertext in /config, opened in memory for
 the one who signs; a key sealed under another secret is locked and says so;
 without one they are kept as before; keys from before are sealed at start."""

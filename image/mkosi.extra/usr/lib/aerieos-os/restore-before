@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A boot GRUB brought back to the slot before (B472): the controller's
+# A boot GRUB brought back to the slot before: the controller's
 # configuration put back to the copy the update took under this slot
 # (osimage.keep_state_before, before/VERSION.tar.gz), when the newer slot
 # moved it on so far that this build's state gate refuses it. Run before the
@@ -16,7 +16,7 @@ RELEASE="${BB_OS_RELEASE:-/usr/lib/aerieos-os/release}"
 CMDLINE="${BB_CMDLINE:-/proc/cmdline}"
 MARK="$WORK/kept-set-aside"
 
-# A visit to a kept older version (R201) ended: the configuration it set
+# A visit to a kept older version ended: the configuration it set
 # aside comes back, and what the visit did to the one it ran on is set aside.
 kept=""
 line=""
@@ -84,7 +84,7 @@ mv "$tmp/$name" "$STATE"
 for keep in "${moved[@]}"; do
     mkdir -p "$STATE/$keep"
     # A bind, then the old place let go: mount --move is refused (EINVAL)
-    # under systemd's shared mounts, which left the logs on the stick (B730).
+    # under systemd's shared mounts, which left the logs on the stick.
     if mount --bind "$aside/$name/$keep" "$STATE/$keep"; then
         umount -l "$aside/$name/$keep" || true
     else

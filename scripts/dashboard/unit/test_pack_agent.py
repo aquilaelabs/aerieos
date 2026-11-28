@@ -1,4 +1,4 @@
-"""A coding agent from a vetted pack (R169 step 8): its adapter is data in
+"""A coding agent from a vetted pack: its adapter is data in
 the manifest, held to the shapes AerieOS already writes for the shipped
 agents, and refused when it cannot take the guards or reaches past what a
 session may set."""
@@ -89,7 +89,7 @@ class PackAgent(unittest.TestCase):
 
 
 class Listed(unittest.TestCase):
-    """R169 step 9: the controller lists a pack's agent beside the shipped
+    """The controller lists a pack's agent beside the shipped
     five, only from a pack the vetted catalog pinned."""
 
     def setUp(self):
@@ -149,7 +149,7 @@ def load_hook():
 
 
 class OnTheNode(unittest.TestCase):
-    """R169 step 10: the bundle's pack row carries the adapter, and the node
+    """The bundle's pack row carries the adapter, and the node
     side holds the agent to the guards from it."""
 
     def setUp(self):
@@ -228,9 +228,9 @@ class OnTheNode(unittest.TestCase):
         self.assertTrue(node.respawnable(line.replace("kite-run", "codex-run")), "the shipped agents' as before")
 
 
-# Gemini's adapter as the catalog's pack carries it (R233): Google's
+# Gemini's adapter as the catalog's pack carries it: Google's
 # Antigravity CLI, read against 1.5.6's docs on 11 Nov. Nothing in AerieOS
-# knows its protocol by name (R234 step 3): the manifest lays its hooks file
+# knows its protocol by name: the manifest lays its hooks file
 # out (the account's one file, AerieOS's set under its own key and a
 # person's kept), says where its payload keeps each thing, and writes each
 # answer. Its prompt event is raised before every call to its model, and
@@ -254,7 +254,7 @@ def gem(**hooks):
 
 
 class AnsweredInJson(unittest.TestCase):
-    """R233, R234 step 3: an agent whose protocol is its manifest's own,
+    """An agent whose protocol is its manifest's own,
     answered in JSON for every event, held to the same guards with no line
     of AerieOS that knows it."""
 
@@ -496,7 +496,7 @@ class AnsweredInJson(unittest.TestCase):
 
 
 class AProtocolNobodyHasMet(unittest.TestCase):
-    """R234 step 3: the next agent with words of its own is a manifest. This
+    """The next agent with words of its own is a manifest. This
     one's are made up: its hooks two keys down in a settings file, its
     payload under ctx and call, its answers in words no agent here uses."""
 

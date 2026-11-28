@@ -1,5 +1,5 @@
-"""A person's conversations in a notebook's Sessions view (the operator,
-22 Oct): one deleted, or made visible to every session on the project and
+"""A person's conversations in a notebook's Sessions view:
+one deleted, or made visible to every session on the project and
 then read there as its owner's, never another of theirs."""
 import json
 import os

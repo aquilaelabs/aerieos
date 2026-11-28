@@ -1,4 +1,4 @@
-/* The page's components (R9 step 4; page-skin.css says how the four
+/* The page's components (page-skin.css says how the four
    layers stand): what more than one page draws. Wins over the skin, and
    loses to a surface's own rule. */
 @layer components {
@@ -11,7 +11,7 @@ html[data-mode="light"][data-theme="nostromo"] .pane{background:transparent;--sh
 html[data-mode="light"][data-theme="nostromo"] .pane .stack:has(> .doc.on){background-color:var(--glass)}
 html[data-mode="light"][data-theme="nostromo"] button:not(.link){
   box-shadow:inset 0 1px 0 0 rgba(255,255,255,.95),inset 0 -1px 0 0 rgba(0,0,0,.06)}
-/* The install's banner (R88): a band of the page's column under the header,
+/* The install's banner: a band of the page's column under the header,
    so the content below is shorter by it and nothing pinned to the page sits
    over it. One line at a desk, wrapping on a phone. */
 .banner{flex:0 0 auto;padding:6px 12px;font:var(--f-ui);color:var(--ink);
@@ -22,7 +22,7 @@ html[data-mode="light"][data-theme="nostromo"] button:not(.link){
 .banner.moved a{margin-left:0;color:inherit;text-decoration:underline}
 .banner.held a{margin-left:0}
 .banner[hidden]{display:none}
-/* The mark in the scheme's second color (the operator, 16 Oct); red when
+/* The mark in the scheme's second color; red when
    the controller does not answer. */
 .logo{width:22px;height:22px;flex:0 0 auto;color:var(--note);display:block;
   transition:color .2s ease}
@@ -33,9 +33,9 @@ html:not([data-theme]) .logo.off{color:var(--bad)}
 html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .meta{color:var(--dim);font:var(--f-data);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
-/* A USB device's row (R116): its picker and Give to a VM are a wide pair, so
+/* A USB device's row: its picker and Give to a VM are a wide pair, so
    under 600px they go under the words rather than squeezing the name into a
-   column beside them (B414). */
+   column beside them. */
 @media (max-width:600px){ .ndusb{flex-direction:column;align-items:stretch;gap:6px}
 }
 .popbar{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;
@@ -68,7 +68,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 /* Pushed to the end of the row so it reads as acting on the field beside it,
    and never shrunk below a tap target. */
 .logdays button{margin-left:auto;flex:0 0 auto;min-height:var(--tap)}
-/* A Settings-tab field row (R29): the label first, the control taking the
+/* A Settings-tab field row: the label first, the control taking the
    room, the source pill after it, and a text field that is not five
    characters wide, which is the number field's width above. */
 .setrow label{flex:0 0 auto}
@@ -76,12 +76,12 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
    .col stacks the row; the field takes the row's width, which the cap on
    .setrow already limits. */
 .setrow.col{flex-direction:column;align-items:stretch;gap:var(--label-gap)}
-/* A role's grant on the Roles tab (R137): the capability at the field
+/* A role's grant on the Roles tab: the capability at the field
    label's size and its sentence at the note size, the same voices a
    built-in role's summary above it speaks in. A .sub is sized only inside
    a .row, and these are field rows, so the sentence fell back to body
-   text and the tab spoke in two sizes (5 Oct). */
-/* The Roles tab (R152, R255 step 9): each section a list beside the one
+   text and the tab spoke in two sizes. */
+/* The Roles tab: each section a list beside the one
    picked, the list a column of rows (a name and its tags), the picked row
    in the accent's tint; on a phone the list, then the detail over it with
    Back. The detail: the projects an account is on, a row each (its name,
@@ -98,7 +98,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 }
 /* The picked row is a step lighter than the panel, with the second color
    (--lit) as a bar inside its left edge, the way the rail marks the group
-   on show (the operator, 24 Nov: the lit color washed over the panel read
+   on show (the lit color washed over the panel read
    brown on the default scheme, copper over navy). */
 :is(.rolestab,.userstab) .rrow.on,:is(.rolestab,.userstab) .rrow.on:hover,.snav .rrow.on,.snav .rrow.on:hover{
   background:color-mix(in srgb,var(--ink) 9%,transparent);box-shadow:inset 3px 0 0 var(--lit);border-bottom-color:var(--line)}
@@ -113,7 +113,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
    ask that removes something in --bad and the rest in the accent. */
 :is(.ntask,.phask,.ndask,.dmask){box-shadow:inset 3px 0 var(--accent)}
 :is(.ntask.bad,.ndask){box-shadow:inset 3px 0 var(--bad)}
-/* A page of settings (page-docs.js splitSects, the operator, 16 Oct): its
+/* A page of settings (page-docs.js splitSects): its
    sections a list beside the one picked, the Roles page's shape, the picked
    section's heading a heading rather than a fold (a project's Settings,
    Controller settings, Profile). On a phone one column for all of it: the
@@ -123,11 +123,11 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .ssplit{display:grid;grid-template-columns:minmax(13rem,17rem) minmax(0,1fr);align-items:start}
 .ssplit>*{grid-column:2;min-width:0}
 .ssplit>.snav{grid-column:1;grid-row:1 / span 99;align-self:stretch}
-/* A page's head (the operator, 25 Oct) in the content column, where every
+/* A page's head in the content column, where every
    band of the page starts; at a desk it spans the list too (below). */
 .ssplit>.pghead{grid-column:2}
 /* ...and at a desk a card of its own, as a node's head is on the Nodes
-   page (the operator, 26 Oct: its facts loose over the cards read as part
+   page (its facts loose over the cards read as part
    of none): on the page's margin, or on the content column's edge beside a
    settings page's list, with the cards' gap under it. */
 @media(min-width:901px){
@@ -180,7 +180,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
   font:11px/1 system-ui,sans-serif;vertical-align:middle;cursor:help;
   transition:color .15s ease,border-color .15s ease}
 .help:hover,.help:focus-visible{color:var(--ink);border-color:var(--ink)}
-/* A ? opens its words in a tooltip (the operator, 26 Oct): fixed to the
+/* A ? opens its words in a tooltip: fixed to the
    window, so no pane clips it, beside the ? and inside the screen's edges
    (helpShow places it), in the floating cards' panel and hairline. */
 .help.on{color:var(--ink);border-color:var(--ink)}
@@ -225,7 +225,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .bnote .bcmd{font:var(--f-code);color:var(--dim);overflow-wrap:anywhere;
   margin-top:3px}
 /* Its actions beside what it says while they fit, and on a line of their
-   own under it when they do not, each button's words kept whole (B332). */
+   own under it when they do not, each button's words kept whole. */
 .bnote .bfoot{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:5px;
   color:var(--dim);font:var(--f-note)}
 .bnote .bfoot .acts{margin-left:auto;display:flex;gap:8px}
@@ -233,19 +233,19 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .bnote .bfoot a{color:var(--dim)}
 /* Approve is a filled control, its text the page's dark on the amber: an
    older rule painted it the accent, which won by coming later and put
-   green on amber, hard to read in every theme (the operator, 5 Oct). */
+   green on amber, hard to read in every theme. */
 /* Pinned like a question, red like a fault: an agent from another window
    is not waiting on an answer, it is stopping work until it is updated. */
 .bnote.ask.bad{border-left-color:var(--bad);border-bottom-color:var(--bad);
   background:color-mix(in srgb, var(--bad) 13%, var(--ground))}
 .bnote.ask.bad .btag{background:var(--bad);color:var(--bg)}
 .bnote.ask.bad .bwhy{color:var(--bad)}
-/* An ask that ended (R280): plain under Earlier, its tag in the tag voice
+/* An ask that ended: plain under Earlier, its tag in the tag voice
    and the dim, where a waiting one is the gold. */
 .bnote.asked .btag{margin-bottom:3px;font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
-/* The drawer in two sections, Active and Earlier (R280, the operator,
-   24 Nov), each headed by what it is and how many (the operator, 10 Oct:
-   one amber wall). A head is a label, not a row. */
+/* The drawer in two sections, Active and Earlier,
+   each headed by what it is and how many
+   (one amber wall). A head is a label, not a row. */
 .bgroup,.uimenu h4{display:flex;align-items:center;gap:8px;padding:8px 12px 6px;
   font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);
   border-bottom:var(--hair) solid var(--line);background:var(--sunk)}
@@ -283,7 +283,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
    what is left and is the only thing that scrolls. */
 /* A question (page-ask.js): its words a note's measure, paragraphs apart. */
 .askdlg .asksaid{margin:0;font:var(--f-ui);color:var(--ink);overflow-wrap:anywhere}
-/* What one yes covers (R265): a short heading over its lines, each a point. */
+/* What one yes covers: a short heading over its lines, each a point. */
 .askdlg .askpart ul{padding:0 0 0 1.1em;list-style:disc}
 .askdlg .askpart li+li{margin-top:4px}
 .modal .box.prose{display:flex;flex-direction:column}
@@ -294,7 +294,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .abpage{overflow:auto;padding-right:4px}
 /* A guide's heading is the text's, not the dialog's: .modal h3 (the title
    band's inset, rule and voice) reached into it and set every heading
-   in from the paragraph under it (B110). */
+   in from the paragraph under it. */
 .about .abpage :is(h2,h3,h4){margin:12px 0 4px;padding:0;border:0;font:var(--f-ui);font-weight:600;
   text-transform:none;letter-spacing:normal;position:static;background:none;--sheen:none}
 .modal .box.prose>.about,.about>.abpage{flex:1 1 auto}
@@ -326,7 +326,7 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
 .row:last-child{border-bottom:0}
 /* The CI runner page's list of every node's runner, each row a press that
    picks its node; the one shown wears the accent's edge. */
-/* Home (R218 step 5): its tiles are links, the one place tiles are pressed
+/* Home: its tiles are links, the one place tiles are pressed
    (the home rule); Attention and Last jobs side by side at a desk, stacked
    on a phone; the pinned projects as small cards. */
 .hometiles .tile.link{text-align:left;cursor:pointer;color:inherit;text-decoration:none;display:block}
@@ -340,7 +340,7 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
 .hcard,.hsect{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   overflow:hidden;min-width:0}
 /* Home's cards keep the inset every card's words have, 16px, the tiles'
-   too (the operator, 17 Oct: the headings sat 4px left of the tiles'). */
+   too (the headings sat 4px left of the tiles'). */
 .hcard h3,.hsect h3{margin:0;padding:12px 16px;min-height:46px;box-sizing:border-box;display:flex;align-items:center;
   font:var(--f-sect);border-bottom:var(--hair) solid var(--line);background:var(--head-bg)}
 /* Its colors sit under the look a disabled button keeps when pointed at (a
@@ -359,7 +359,7 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
    is inert and its controls doubly so. */
 /* The row's PARTS are dimmed, not the row: a More menu opened on a dimmed
    row is drawn inside it, and an opacity on the row made the menu see-through
-   over the next row's words (R210). */
+   over the next row's words. */
 .row.off > :not(.actbar),.row.off > .actbar > :not(.more),.row.off > .actbar > .more > button{opacity:.62}
 /* A directory name can be one long unbroken token; it wraps rather than
    handing the whole page a sideways scroll. */
@@ -374,17 +374,17 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
   text-align:left;white-space:normal;cursor:pointer;display:inline}
 @media(hover:hover){ .namelink:hover{background:none;--sheen:none;text-decoration:underline}
 }
-/* ...and a finger's target all the same (R286 step 3): the box a name takes
+/* ...and a finger's target all the same: the box a name takes
    grows to the 24px WCAG asks, measured at 393 (a space's name was 18 tall
    beside its card's other presses), the words where they were, since an
    inline box's padding moves no line. */
 .namelink{padding-block:3px}
-/* One .sub, the note voice, wherever it is (the operator, 17 Nov): a line
+/* One .sub, the note voice, wherever it is: a line
    under a name says something in words. A line of facts (ids, sizes,
    paths, versions, a node and an age) is .sub.data, in the data voice. */
 .sub{color:var(--dim);font:var(--f-note);overflow-wrap:anywhere}
 /* A NOTICE: what is wrong or what to know, under a row, in a voice of its
-   own (the operator, 13 Oct: facts, warnings and settings all wore the same
+   own (facts, warnings and settings all wore the same
    dim mono and read as one gray block). Sans, in the level's color, behind
    a bar of that color, and no wider than a paragraph: the eye finds it
    without reading the facts around it. `.notice` is the same thing where
@@ -413,8 +413,8 @@ button,a.btn,.dockline .dtab{background-image:var(--sheen) !important}
 @media(hover:hover){
   .row .name.go:hover{text-decoration:underline}
   /* ...and a highlighted button carries the scheme's second color (--lit), a tint in its
-     fill and its edge, where a resting one stays the plain control (the
-     operator, 16 Oct). */
+     fill and its edge, where a resting one stays the plain control.
+     */
   button:hover{background:color-mix(in srgb, var(--btn-hi) 80%, var(--lit));
     border-color:color-mix(in srgb, var(--lit) 65%, var(--line))}
   /* The green buttons kept their color through button:hover (their own rules
@@ -522,7 +522,7 @@ div.tc{cursor:default}
    than cards of their own: each is a detour, and should hand the page back
    when it is done. */
 /* The page behind a dialog is veiled in the theme's own ground and softened
-   (--veil, Perch: the operator 23 Nov), where 68% black made it a hole. */
+   (--veil, Perch), where 68% black made it a hole. */
 .modal{position:fixed;inset:0;z-index:70;background:var(--veil);
   -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
   display:flex;align-items:safe center;justify-content:center;padding:16px;
@@ -568,7 +568,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
   width:min(520px,100%);max-height:90vh;overflow:auto;
   box-shadow:0 12px 36px rgba(0,0,0,.42)}
 /* A box held at its tallest pane's height (holdPanes) is a column whose
-   foot sits at its bottom whichever pane is on show (R273). */
+   foot sits at its bottom whichever pane is on show. */
 .modal .box.held{display:flex;flex-direction:column}
 :where(.modal .box.held,.modal .box.held>.dlgbody)>*{flex:none}
 .modal .box.held>.foot,.modal .box.held>.dlgbody>.foot{margin-top:auto}
@@ -582,8 +582,8 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 /* A dialog that scrolls keeps its title and its buttons where they are and
    its content passes under them, each with the hairline it always had: the
    frame says there is more, with no band of shade painted over what is
-   being read (the operator, 16 Oct: the black fades read as dirt). Not in a
-   box shown inline, which is a view's and scrolls with the page (B702). */
+   being read (the black fades read as dirt). Not in a
+   box shown inline, which is a view's and scrolls with the page. */
 .modal:not(.inline) .box>h3{position:sticky;top:0;z-index:2;background:var(--panel)}
 .modal:not(.inline) .box>.foot,.modal:not(.inline) .box>.dlgbody>.foot{position:sticky;bottom:0;z-index:2;background:var(--panel)}
 /* A dialog whose body a script draws (Enroll, Reset) draws it into a slot
@@ -593,7 +593,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 /* Never while it holds an open dialog: a mask makes the box a stacking
    context and clips what it paints, so a dialog opened from a page (the
    History sheet, fixed over the window) was faded with it and drawn under
-   the dock (B782). */
+   the dock. */
 .modal .sheetslot.scrolldown:not(:has(.modal:not([hidden]):not(.inline))),.pane .doc.scrolldown:not(:has(.modal:not([hidden]):not(.inline))){
   -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),var(--edge-keep));
   mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),var(--edge-keep))}
@@ -634,7 +634,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
     border:0;border-radius:0;box-shadow:none;display:flex;flex-direction:column}
   :where(.modal:not(.inline)>.box,.modal:not(.inline)>.box>.dlgbody)>*{flex:none}
   .modal:not(.inline)>.box>.foot,.modal:not(.inline)>.box>.dlgbody>.foot{margin-top:auto}
-  /* But for a question (R265, the operator, 19 Nov: two lines and two
+  /* But for a question (two lines and two
      buttons were a whole empty screen): a sheet at the foot, as tall as its
      words, its buttons under the thumb, the page dimmed above it and a press
      there Cancel. One long enough to fill the screen scrolls inside itself
@@ -648,7 +648,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
   .modal.askdlg.typed:not(.inline)>.box{border-top:0;border-bottom:var(--hair) solid var(--line);
     border-radius:0 0 var(--r-surface) var(--r-surface);padding:env(safe-area-inset-top) 0 0}
 }
-/* A dialog's title is a band as a pop-out's is (Perch, the operator 23 Nov):
+/* A dialog's title is a band as a pop-out's is (Perch):
    what the dialog is in the section voice, sentence case, as tall as the
    bell's and the doctor's title bands. Capitals in the tag voice were the
    look before Perch, and they rewrote what a title quotes (a file's name
@@ -683,7 +683,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 .field .field{padding:0}
 .prefrow{gap:var(--field-gap)}
 /* A row of fields straight in a dialog is a band like a .field, inset the
-   same, rather than flush against the dialog's edge (B192). */
+   same, rather than flush against the dialog's edge. */
 .modal .prefrow:not(.field .prefrow){padding:var(--row-y) var(--row-x)}
 .modal label,.nb label{display:block;font:var(--f-ui);color:var(--dim);
   margin-bottom:var(--label-gap)}
@@ -703,7 +703,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 .doctab input:where(:not([type="checkbox"],[type="radio"])),.doctab select,
 .nb input:where(:not([type="checkbox"],[type="radio"])),.nb select,
 /* ...and the session chooser's, which opens on a project's card, inside none
-   of those (the operator, 26 Oct: its pulldowns were the browser's size). */
+   of those (its pulldowns were the browser's size). */
 .resumemenu select{min-height:var(--ctl)}
 .modal button,.nb button,.doctab button,.uimenu button,.doc .row button{min-height:var(--ctl)}
 .modal textarea{min-height:132px;resize:vertical;white-space:pre}
@@ -736,7 +736,7 @@ textarea.proseline{resize:none;overflow:hidden;white-space:pre-wrap;
 .modal .foot .sp,.nb .foot .sp{flex:1}
 /* A note in a dialog is the quiet explainer, as it is on a row: with no rule
    here it drew at body size in full ink, larger than the label it explains
-   (project settings' People, the bug report's conversation line, B452). */
+   (project settings' People, the bug report's conversation line). */
 .modal .sub.bad{color:var(--bad)}
 .modal .sub.warn{color:var(--warn)}
 .modal .sub.ok{color:var(--pass)}
@@ -748,8 +748,8 @@ textarea.proseline{resize:none;overflow:hidden;white-space:pre-wrap;
    one answer: `.rm` used to be a second word for it and is now only what it
    also was, the dim icon that drops a row from a list. */
 .danger{color:var(--bad);border-color:var(--red2-edge)}
-/* A destructive button is filled, never an outline alone (the operator, 27
-   Oct): a tint of the scheme's own red under its red words, a little more of
+/* A destructive button is filled, never an outline alone:
+   a tint of the scheme's own red under its red words, a little more of
    it under the pointer, its edge the same red mixed down. */
 button.danger,a.btn.danger{background:color-mix(in srgb, var(--bad) 22%, var(--ground));
   border-color:color-mix(in srgb, var(--bad) 50%, var(--ground))}
@@ -761,8 +761,8 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--groun
    for "wants a decision from you". Red is kept for the controls that destroy
    something already on disk, which is the other two on this panel. */
 .nb .caution{color:var(--warn);border-color:var(--gold-edge)}
-/* A verb that interrupts and loses nothing is amber, never red (the
-   operator, 19 Nov: red is kept for what is dangerous): Restart, End, Stop,
+/* A verb that interrupts and loses nothing is amber, never red
+   (red is kept for what is dangerous): Restart, End, Stop,
    Reboot, Shut down, a job's Cancel, Sign out. What it stops starts again;
    what a red one takes is gone. Filled as the red one is, in the scheme's
    own amber. */
@@ -781,7 +781,7 @@ button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--gro
   text-decoration:underline;cursor:pointer}
 .modal .link[hidden]{display:none}
 /* The project settings' sections: folds, as a tab's sections are, one
-   open at a time (the operator, 7 Oct), and a section with no field showing
+   open at a time, and a section with no field showing
    gone with its heading. Its fields are bands with their own inset, so the
    fold's body adds none of its own. */
 /* A section shows while a setting in it does, a form's field among them; its
@@ -792,8 +792,8 @@ button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--gro
    line that wraps, each a link to its own. */
 .sectjump{display:flex;flex-wrap:wrap;gap:6px 8px;padding:var(--row-y) var(--row-x);
   border-bottom:var(--hair) solid var(--line);font:var(--f-note)}
-/* Chips, not bare words: as links alone they read as one more line of text
-   (the operator, 11 Oct). In a dialog the bar is a .field band, whose stack
+/* Chips, not bare words: as links alone they read as one more line of text.
+   In a dialog the bar is a .field band, whose stack
    is a column; the chips still sit in a row. */
 .field.sectjump,.modal .sectjump{display:flex;flex-direction:row;flex-wrap:wrap}
 .sectjump a{color:var(--note);text-decoration:none;white-space:nowrap;padding:3px 10px;
@@ -817,7 +817,7 @@ button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--gro
 /* What to know before the press, in the warning's color (Copy or move's
    data choice: a volume already there is written over). */
 .hint.warn{color:var(--warn)}
-/* The project settings' Test (the operator, 7 Oct): what is missing in red,
+/* The project settings' Test: what is missing in red,
    a list when it is more than one thing, and its notes in the quiet voice. */
 .hint.ok{color:var(--pass)}
 /* A number and its unit on one line, every such row in the settings: the
@@ -826,7 +826,7 @@ button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--gro
 /* An agent's row in parts (its sign-in, what is yours on the node), each
    under a small head in the gear's voice. */
 /* A fact whose value is news: applied in --ok, not applied in --warn (This
-   machine's From the stick, R161 step 8). */
+   machine's From the stick). */
 .facts dd.ok{color:var(--pass)}
 .facts dd.warn{color:var(--warn)}
 .facts dd.bad{color:var(--bad)}
@@ -872,7 +872,7 @@ button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--gro
 .chev[open]>summary::before{content:"\25BE"}
 /* A roadmap group's summary is its item row, which fills the line, and its
    caret is the row's own first control, in the place the send arrow had,
-   level with the first line of the words (the operator, 29 Sep). */
+   level with the first line of the words. */
 details.grp>summary>.roadmap{flex:1 1 auto;min-width:0;padding-block:0}
 .roadmap .fold{flex:0 0 auto;align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;
   color:var(--dim);font-size:11px;cursor:pointer}
@@ -891,8 +891,8 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
 /* The picked color's ring sits under the nostromo schemes' raised edge on a
    button, which outranks it. */
 .pcpick button[aria-checked="true"]{box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--ink)}
-/* The swatches a card's Color unrolls under its name (the operator, 18 Oct:
-   picked from its menu, this account's own color for the project). */
+/* The swatches a card's Color unrolls under its name
+   (picked from its menu, this account's own color for the project). */
 .pcard .pcpop,.phead~.pcpop,.pname~.pcpop{margin:6px 0 2px}
 /* An ask in a card (Group) sits on the card's own inset, not a band's. */
 .pcard .askline{padding:6px 0 2px}
@@ -906,8 +906,8 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
    short field beside two buttons on a card at every width) */
 .askline .askrow>.combo>input{flex:1 1 auto;width:100%}
 .askline .askrow>button{flex:none}
-/* A field that is also a pulldown (askInline with options; the operator,
-   26 Oct): the chevron inside its right edge as a select's, the list a
+/* A field that is also a pulldown (askInline with options):
+   the chevron inside its right edge as a select's, the list a
    floating card under it with every option, the one picked by arrow keys
    tinted in the accent. */
 .combo{position:relative;display:flex;flex:1 1 auto;min-width:0}
@@ -945,8 +945,8 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
    (the design language, Controls), so every select starts at the same x and
    is the same width whatever its label says. The label was beside the
    control before, and six labels of six lengths put six selects at six
-   positions with one label wrapping to three lines on a phone (the operator,
-   25 Sep). */
+   positions with one label wrapping to three lines on a phone.
+   */
 .prefrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));
   gap:var(--field-gap) 14px;max-width:var(--ctl-w)}
 .prefrow .pick{display:flex;flex-direction:column;gap:var(--label-gap);
@@ -964,10 +964,10 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
 }
 
 /* A lane's color: nb-git.js builds the name as gl${lane % 5}, so no file
-   holds .gl0 whole (R60 took these for dead, B79). */
+   holds .gl0 whole (a sweep for unused classes took these for dead). */
 .gl0{stroke:var(--accent)} .gl1{stroke:var(--note)} .gl2{stroke:var(--warn)}
 .gl3{stroke:var(--bad)} .gl4{stroke:var(--dim)}
-/* The branches table (R269 step 1): a line a branch, its verbs behind the
+/* The branches table: a line a branch, its verbs behind the
    ⋯ in the last column, drawn as every table is (tables), on a phone too;
    a line that opens to its comparison wears a pointer, and the comparison
    sits under it a step sunk. Behind and ahead of main are GitHub's: two
@@ -989,11 +989,11 @@ pre.diff .d-ctx{color:var(--dim)}
 /* A link wearing the button suit, wherever the browser has to navigate (a
    download, which fetch would buffer for nothing; a container's Open, a new
    tab at its address): the same box, face and fill as a button, the main
-   action's fill where it is one (the operator, 17 Oct). */
+   action's fill where it is one. */
 /* A press that ends a sentence (a hint's or a notice's button.link): words
    in the link's color, underlined, inline in the sentence, no box. A place
    that colors its own keeps its rule; the Library's "Show it", which set
-   none, drew a whole button on a line of its own on a phone (22 Nov). */
+   none, drew a whole button on a line of its own on a phone. */
 :where(.hint, .notice) button.link{background:none;--sheen:none;border:0;box-shadow:none;padding:0;min-height:0;font:inherit;color:var(--note);
   text-decoration:underline;text-underline-offset:2px;cursor:pointer;display:inline;vertical-align:baseline}
 a.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--tap);
@@ -1027,7 +1027,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* An add band with its button alone stands at the right, where a row's Edit
    and a section's actions are (the record-lists and bars rules), across the
    whole section; one with a field keeps the field and its button on one line,
-   the field taking what is left (R283: Add route stood alone at the left over
+   the field taking what is left (Add route stood alone at the left over
    a table whose Edit was at the right, and a hostname's Add fell under its
    field). As specific as the row cap (:is(.doctab,.nb) .ctlrow), which held
    it to 30rem and so to the left of a section. */
@@ -1104,7 +1104,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* Sent is dim, not struck: it is still open, counted to send and sendable
    again, so it stays where it was, the order being the record, and a step
    that was handed over and quietly not carried out is still there to send
-   again (B55). */
+   again. */
 .roadmap.sent .txt{color:var(--dim)}
 /* Done is a session's mark, not the dashboard's: struck, and the number
    becomes a tick, because a line that went and a line that is finished are
@@ -1117,9 +1117,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    is shelved entire. */
 .grp.shelved{color:var(--dim)}
 .grp.shelved .acts,.grp.shelved button{opacity:.6}
-/* Finished items (R78): below the shelved ones, behind the Finished toggle,
+/* Finished items: below the shelved ones, behind the Finished toggle,
    struck through and quiet, with no arrows: there is nothing left to send. */
-/* A finished item (R254 step 2): its title dim and struck, its details,
+/* A finished item: its title dim and struck, its details,
    steps and Reopen read as any open row's, so a live button never looks dead. */
 .grp.done > summary .txt{color:var(--dim);text-decoration:line-through}
 .grp.shelved .roadmap .txt{font-style:italic}
@@ -1150,13 +1150,13 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 @media(max-width:600px){ .roadmap .go,.roadmap .x,.roadmap .rm,.roadmap .ed{padding:5px 4px}
   .roadmap{gap:5px}
 }
-/* The notebook's own strip (R259): five groups in a row, underlined, not
+/* The notebook's own strip: five groups in a row, underlined, not
    boxed, since they switch what the page shows; a group's views in a row
    under it. A row that ever outgrows a desk scrolls sideways rather than
    spilling, with overflow-y set to hidden by hand: one axis on auto turns
    the other from visible to auto, and the strip became a vertical scroller
    too. No scrollbar: under a row of tabs it reads as a divider. */
-/* Pinned at the top of what scrolls (the operator, 7 Nov: the view strips
+/* Pinned at the top of what scrolls (the view strips
    scrolled away under the header); a view's own sticky parts sit under it. */
 .nbtabs{border-bottom:var(--hair) solid var(--line);position:sticky;top:0;z-index:6;background:var(--bg)}
 .nbtabs .nbgroups,.nbtabs .nbsub{display:flex;padding:0 calc(8px + var(--doc-in));
@@ -1169,7 +1169,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* ...and the view chosen in the group's row in the second color: the group
    and its view are two choices, and two hues say so. */
 .nbtabs .nbsub button.on{border-bottom-color:var(--note)}
-/* The open group's views (R259): a row of their own under the groups, on
+/* The open group's views: a row of their own under the groups, on
    the sunk ground and in the regular weight, so it reads as the group's
    and not as a second strip of the same rank. */
 .nbtabs .nbsub{background:var(--sunk);border-top:var(--hair) solid var(--line)}
@@ -1181,8 +1181,8 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 @media(max-width:600px){
   .nbtabs .nbgroups,.nbtabs .nbsub{padding:0 4px}
   /* ...and when there are more than fit, each keeps its words and the row
-     scrolls under a finger, its edges fading as the dock's line does (the
-     operator, 29 Oct). */
+     scrolls under a finger, its edges fading as the dock's line does.
+     */
   .nbtabs button{flex:1 0 auto;text-align:center;padding:9px 8px}
 }
 @media(hover:hover){ .nbtabs button:hover{color:var(--ink)}
@@ -1190,7 +1190,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .nbview[hidden]{display:none}
 
 /* ---- the Wiki view (nb-wiki.js) ------------------------------------------
-   Read like an encyclopedia (the operator, 2 Oct): the pages listed in a
+   Read like an encyclopedia: the pages listed in a
    narrow column beside one article at a time, the article's title large over
    a hairline, its sections headed the same way, a Contents box for a page
    with three or more, and prose at a reading width in a serif, the one place
@@ -1198,9 +1198,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    way to a picker above the article. */
 .wkreader{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);gap:22px;align-items:start}
 /* No pages yet: no nav, so the empty state is the whole width, not the
-   nav's 200px column (B457's walk). */
+   nav's 200px column. */
 .wkreader:not(:has(.wknav)){grid-template-columns:minmax(0,1fr)}
-/* Room under its last entry (the operator, 26 Oct): a list longer than the
+/* Room under its last entry: a list longer than the
    pane ends, at the page's foot, above the 22px fade at the pane's edge
    rather than inside it. */
 .wknav{position:sticky;top:0;font:var(--f-row);border-right:var(--hair) solid var(--line);padding-right:14px;padding-bottom:40px}
@@ -1209,7 +1209,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .wknav p,.wknav h2,.wknav h3{margin:0 0 6px;font-size:inherit}
 .wknav strong{display:block;color:var(--dim);font-weight:600;margin-bottom:8px}
 .wkarticle{min-width:0;max-width:820px}
-/* Help (R258): AerieOS's docs in this reader, the one on show marked in
+/* Help: AerieOS's docs in this reader, the one on show marked in
    the list, the bar's search as wide as a control, and a search's lines as
    rows that open their doc at their section, the words marked. */
 .helptab .wknav a.on{color:var(--ink);font-weight:600;text-decoration:none}
@@ -1226,8 +1226,8 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .wkmeta{color:var(--dim);font:var(--f-note);margin:4px 0 14px}
 .wktoc{display:inline-block;min-width:180px;max-width:100%;border:var(--hair) solid var(--line);border-radius:var(--r-small);
   background:var(--panel);padding:8px 14px;margin:0 0 16px;font:var(--f-row)}
-/* Room for the numbers inside the box's own inset (the operator, 26 Oct:
-   they sat on its left line). */
+/* Room for the numbers inside the box's own inset
+   (they sat on its left line). */
 .wktoc ol{margin:0;padding-left:2.2em}
 .wktoc li.l2{margin-left:1em}
 .wktoc li.l3{margin-left:2em}
@@ -1244,7 +1244,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
   border-radius:var(--r-small);overflow-x:auto;white-space:pre}
 .wkpage pre code{background:none;--sheen:none;padding:0}
 .wkpage table{border-collapse:collapse;display:block;overflow-x:auto;font-family:system-ui,sans-serif;font-size:.92em}
-/* A cell breaks between words, never inside one (B78: 'Playwrig ht', 'Pyth on'):
+/* A cell breaks between words, never inside one ('Playwrig ht', 'Pyth on'):
    the page's overflow-wrap:anywhere let a column shrink below its longest
    word; break-word only breaks a word wider than the whole table can be. */
 .wkpage th,.wkpage td{border:var(--hair) solid var(--line);padding:5px 9px;text-align:left;vertical-align:top;overflow-wrap:break-word}
@@ -1252,7 +1252,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .wkpage hr{border:0;border-top:var(--hair) solid var(--line);margin:16px 0}
 .wkpage a,.wknav a,.wktoc a,.wkfooter a{color:var(--note);text-decoration:none}
 .wkpage a:hover,.wknav a:hover,.wktoc a:hover{text-decoration:underline}
-/* Narrow is the PANE's width, not the window's (B728): a notebook in one of
+/* Narrow is the PANE's width, not the window's: a notebook in one of
    two panes in a 1000px window, or on a phone, is 500px wide, and the page
    column drawn over the article there was the window's rule not applying.
    The view is the container; under 620px the column gives way to the
@@ -1297,18 +1297,18 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    different place per tab. uniform.mjs measures that on all six views; a
    section put above the head on one tab is how it was broken once. */
 .nb .vbar{display:flex;gap:8px;align-items:center}
-/* A view's control row (R109) is a page's bar, one control high on every
+/* A view's control row is a page's bar, one control high on every
    view whatever it holds, and words never sit on it (Settings' one line
    aside); a view's glance under it is its tiles and its status line. */
 .nb .nbview>.field.nbhead{min-height:calc(var(--ctl) + 2 * var(--row-y))}
-/* A view's top in every page's order (the operator, 29 Oct): its glance
+/* A view's top in every page's order: its glance
    (the tiles and the status line) first, then its control row, then the
    rest as the view wrote it. */
 .nb .nbview:not([hidden]){display:flex;flex-flow:row wrap;align-content:flex-start}
 .nb .nbview>*{flex:1 1 100%;min-width:0}
 .nb .nbview>.nbglance{order:-1}
 /* A control row with a button or two and no words beside it shares the
-   tiles' line, at their right (the operator, 29 Oct: never a button on a
+   tiles' line, at their right (never a button on a
    line of its own; the VMs view's VMs page and New VM stood under its one
    tile): the glance takes the room, the buttons what they need, at the
    right still when a narrow phone wraps them under the tiles. */
@@ -1465,8 +1465,8 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    `overscroll-behavior: contain`, which is a scroll container that cannot
    scroll refusing to pass the gesture on. A finger landing on the list: most
    of the panel: did nothing at all, while the gaps between the rows worked. */
-/* The notebook runs the pane's width so its view strip can (the operator,
-   17 Oct: the strip goes all the way to the right edge, as the header above
+/* The notebook runs the pane's width so its view strip can
+   (the strip goes all the way to the right edge, as the header above
    it does); every other band keeps the reading width. */
 .nb,.pane .doc > .nb{display:block;max-width:none}
 /* Every band of the notebook shares it, so the rows, the banner and the
@@ -1479,7 +1479,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .nb .modal:not(.inline) .box>h3{display:block}
 /* ...except a wiki article's: a page's ## is an h3 there, and this rule hid
    every one of them, so the sections were missing and the contents box
-   linked to headings that were not drawn (the operator, 4 Oct). */
+   linked to headings that were not drawn. */
 .nb .wkpage h3,.nb .wkfooter h3{display:block}
 /* No inset and no ceiling: a document is the pane's whole content, not a box
    floating in it. The padding and the darker ground behind it read as a window
@@ -1493,7 +1493,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 /* The same reading width the notebook's bands take, so a row's controls do
    not end up an ultrawide pane away from the name they act on. */
 .projtab,.dmtab,.fxtab,.doctab{display:block;max-width:var(--doc-w);margin-inline:auto}
-/* One order for every page's top (the operator, 29 Oct: the numbers first,
+/* One order for every page's top (the numbers first,
    then the search and the page's buttons, then the list they act on): what
    a page says over everything (a notice), its head, its tiles, then its bar
    row (the search at its left, its buttons at its right), then the rest in
@@ -1510,7 +1510,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 :is(.doctab,.doctab>.skel.skt)>.docbarrow{order:4}
 .doctab>.fnote{order:6}
 .doctab>.doclist::after,.doctab.dmtab::after,.doctab.vmtab::after{order:7}
-/* ---- floating cards at a desk (R262, the operator, 17 Oct) ---------------
+/* ---- floating cards at a desk ---------------
    Every page's content floats as cards on the page's margin, the way Home
    and Projects do: no line runs to the page's edge. A page-level section is
    a card (its heading over a line, its body under it); a table straight on
@@ -1534,7 +1534,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
     border-top:var(--hair) solid var(--line);border-top-left-radius:var(--r-surface);border-top-right-radius:var(--r-surface)}
   :is(.doctab>.doclist, .doctab>.doclist>.skt, .doctab>.doclist>:is(.phonetab, [data-stnode]), .doctab>.doclist>.skt>.phonetab)>:is(.row:last-child, .row:has(+:not(.row))){margin-bottom:0;
     border-bottom:var(--hair) solid var(--line);border-bottom-left-radius:var(--r-surface);border-bottom-right-radius:var(--r-surface)}
-  /* A page's template floats as the page will (R262 with R218 step 16): a
+  /* A page's template floats as the page will (R262): a
      run of its placeholder rows is one card, its table a card. */
   .doctab>.doclist>.skt>.sk-row{margin:0 var(--row-x);background:var(--panel);
     border-left:var(--hair) solid var(--line);border-right:var(--hair) solid var(--line)}
@@ -1562,7 +1562,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
   .ssplit>.snav>.rrow:last-child,.rsplit>.rlist>.rrow:last-child{border-bottom:0}
 }
 
-/* ---- the shell (R218 step 2) ---------------------------------------------
+/* ---- the shell ---------------------------------------------
    The rail: one column of groups at the left edge, an icon each, the label
    under it from 1280px up, the one on show wearing the accent as a bar on
    its left edge (the rail rule). On a phone the same items are the bar at
@@ -1624,16 +1624,16 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.page:not(.grouped){padding-top:0;padding-bottom:0;min-height:var(--tabrow-h)}
 .pane .bar.page:not(.grouped) .subnav.pseg{margin:0}
 .nbhead .nbsum{min-width:0;flex:1 1 auto}
-/* A project's page (R218 step 3): the bar is its header, one band: the name
+/* A project's page: the bar is its header, one band: the name
    large, the branch and the node in the data face, the session's dot and
    word, and the actions at the right; the one notice under it. */
 .pane .bar.proj{padding:6px calc(var(--row-x) + var(--doc-in));flex-wrap:wrap;gap:4px 10px;font:var(--f-ui);min-height:var(--pbar-h)}
-/* A group's header (R177, R178), drawn as a notebook's (the operator, 29
-   Oct): one row the height of the project header, the node picker where the
+/* A group's header, drawn as a notebook's:
+   one row the height of the project header, the node picker where the
    project's name is and in its type, plain until it is hovered or focused,
    the facts beside it with the room they need; then the group's sub-nav in
    a band of its own under a rule, in the notebook view strip's type, the
-   group's actions at its right (the operator, 28 Oct: on the tabs' line). */
+   group's actions at its right (on the tabs' line). */
 .pane .bar.page.grouped{flex-wrap:wrap;gap:0 10px;font:var(--f-ui);padding-top:0;padding-bottom:0}
 /* Its head is one row a little taller than the tab row under it, at a desk
    and on a phone: the node's picker and its state as one pill beside it,
@@ -1667,7 +1667,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 @media(min-width:601px){ .pane .bar.page.grouped>.subrow>.subnav.pseg>button{font:600 12px/1 system-ui,sans-serif;padding:0 13px}
 }
 .pane .bar.page.grouped>.subrow>.sp{flex:1}
-.pane .bar.page.grouped>.subrow>.actbar{display:inline-flex;gap:6px;flex:0 0 auto;padding:4px 0}   /* the dock line's 4px above and below (the operator, 13 Nov) */
+.pane .bar.page.grouped>.subrow>.actbar{display:inline-flex;gap:6px;flex:0 0 auto;padding:4px 0}   /* the dock line's 4px above and below */
 .pane .bar.page.grouped>.subrow>.actbar>button,.pane .bar.page.grouped>.subrow>.actbar>.mcwide>button{min-height:var(--tap);padding:4px 12px;font:var(--f-ui)}
 /* Machines' actions: the two buttons at a desk, one + with them in its menu
    on a phone, where they cut Installed to "Insta" behind the strip's arrow
@@ -1679,7 +1679,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
   .pane .bar.page.grouped>.subrow>.mcacts>.more{display:inline-flex}
   .pane .bar.page.grouped>.subrow>.mcacts>.more>.moreb{font:600 1.15rem/1 system-ui,sans-serif}
 }
-/* A sub-tab whose feature the picked node lacks (R178): muted, a word after
+/* A sub-tab whose feature the picked node lacks: muted, a word after
    its name, still a press. */
 .pane .bar.page.grouped .subnav>button.off{color:var(--dim)}
 .pane .bar.page.grouped .subnav>button.off.on{color:var(--ink)}
@@ -1688,19 +1688,19 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.proj .pfacts{overflow-wrap:anywhere;min-width:0;max-width:40ch}
 .pane .bar.proj .sp{flex:1}
 .pane .bar.proj .phead>button{min-height:var(--tap);padding:4px 12px;font:var(--f-ui)}
-/* ...and its pulldown one height with them (the operator, 27 Oct: it sat
+/* ...and its pulldown one height with them (it sat
    short of the buttons beside it). */
 .pane .bar.proj .phead>select{min-height:var(--tap);padding:4px 10px;font:var(--f-ui);box-sizing:border-box}
 .pane .bar.proj .more{position:relative;display:inline-flex}
 .pane .bar.proj .more>button{min-height:var(--tap);min-width:var(--tap);padding:4px 8px}
 /* On a phone the actions sit on the name's row, at its right, as at a desk
-   (the operator, 7 Nov: three rows of name, sessions and buttons); the facts
+   (three rows of name, sessions and buttons); the facts
    and the sessions' states go under them, each a line; the name and the
    repository pulldown give up their width first. */
 @media(max-width:600px){
   /* A grid, not a wrapping row: a wrapping row breaks before anything in it
      shrinks, so a longer name with its pulldown and Manage agent sent the
-     menu's button to a line of its own (the operator, 11 Nov). The buttons
+     menu's button to a line of its own. The buttons
      keep their width; the name is as wide as its words while there is room;
      the pulldown takes what is left, up to its own width and never under a
      thumb's, and the name is cut before the pulldown goes under that. */
@@ -1726,16 +1726,16 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .pgrid .empty{grid-column:1/-1}
 .pcard{position:relative;display:flex;flex-direction:column;gap:6px;padding:var(--row-y) var(--row-x);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);min-width:0}
-/* A colored card, and a project page's header as its card is (the operator,
-   19 Oct): the tint over the panel, never over the bar's see-through ground,
-   which turned a header black (29 Sep). */
+/* A colored card, and a project page's header as its card is:
+   the tint over the panel, never over the bar's see-through ground,
+   which turned a header black. */
 :is(.pcard,.pane .bar.proj).pc{box-shadow:inset 3px 0 var(--pc);background:color-mix(in srgb, var(--pc) 16%, var(--panel));
   border-color:color-mix(in srgb, var(--pc) 45%, var(--line))}
-/* A colored card's buttons wear its color too (the operator, 18 Oct): a
+/* A colored card's buttons wear its color too: a
    lighter tint for the plain ones, a deeper one for Manage agent, so the card
    reads as one color and the running session still stands out on it. Every
    row of buttons the card holds: its actions and a box it asks in (Group),
-   so a form opened on it is the card's too (B863); and a project page's
+   so a form opened on it is the card's too; and a project page's
    header's, as its card's. */
 :is(.pcard.pc :is(.pcacts,.askrow,.pcname>.actbar),.pane .bar.proj.pc :is(.phead,.askrow))>button,:is(.pcard.pc .pcacts,.pane .bar.proj.pc .phead)>.more>button{background:color-mix(in srgb, var(--pc) 22%, var(--btn));
   border-color:color-mix(in srgb, var(--pc) 50%, var(--line));color:var(--ink)}
@@ -1749,12 +1749,12 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 }
 .pcard:has(.pcpop,.askrow){z-index:41}
 /* The one box a press on a card's back opens (a rename, a move, Group, the
-   swatches) takes the repositories' place while it is open (the operator,
-   26 Oct), so the two are never on the card at once; askInline holds the
+   swatches) takes the repositories' place while it is open,
+   so the two are never on the card at once; askInline holds the
    back's height until the box goes. */
 .pcard .pcback:has(>.askline,>.pcpop)>.pcrepos{display:none}
 /* One line on either face: a long name wraps within its room, its marks and
-   buttons after it on its first line (the operator, 26 Oct: pin and archive
+   buttons after it on its first line (pin and archive
    were pushed under a long name). */
 .pcard .pcname{display:flex;align-items:flex-start;gap:6px;min-width:0;flex-wrap:nowrap}
 .pcard .pcname .name{font-weight:600;font-size:1.05rem;line-height:1.3;color:var(--ink);min-width:0;overflow-wrap:anywhere}
@@ -1763,7 +1763,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    archive, the name's first line centered on them. */
 .pcard .pcname .name{flex:0 1 auto;padding-top:calc((var(--tap) - 1.3em) / 2)}
 .pcard .pcname>:not(.name):not(.sp){flex:none}
-/* Pin and Archive by the name (R138), pressed in where they are set: the
+/* Pin and Archive by the name, pressed in where they are set: the
    accent where it is, the quiet ink where it is not. */
 .pcard .pcname .pcmark{color:var(--dim)}
 .pcard .pcname .pcmark.on{color:var(--accent)}
@@ -1776,14 +1776,14 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 :is(.pfacts,.pcfacts){font:var(--f-data);color:var(--dim)}
 .pnote{font:var(--f-ui)} .pnote.bad{color:var(--bad)} .pnote.warn{color:var(--warn)} .pnote.dim{color:var(--dim)}
 .pcard .pcfacts{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* A project's repositories (R138), one line each under its facts and who
-   is there, with no rule between them (the operator, 25 Oct: the space
+/* A project's repositories, one line each under its facts and who
+   is there, with no rule between them (the space
    groups them); a finger's height only where a finger presses. */
 .pcard .pcrepos{display:flex;flex-direction:column;gap:2px;margin:4px 0 2px}
 .pcard .pcrepo{display:flex;align-items:center;gap:var(--field-gap);min-height:28px;min-width:0}
 /* A thumb's height only where the row carries presses (the back's Move and
-   Remove): the front's lines are a name and a branch, set close (the
-   operator, 27 Oct), the name's link too, which a document's button rule
+   Remove): the front's lines are a name and a branch, set close,
+   the name's link too, which a document's button rule
    otherwise makes a control's height. */
 @media(pointer:coarse){ .pcard .pcback .pcrepo{min-height:var(--tap)}
 }
@@ -1808,7 +1808,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 @media(hover:hover){ .pcard .pcrepo>button.eye.bare:hover{color:var(--ink)} .pcard .pcrepo>button.eye.bare[data-danger]:hover{color:var(--bad)}
 }
 /* A long list of repositories scrolls inside the back, which keeps the
-   front's size (R138). */
+   front's size. */
 .pcard .pcback .pcrepos{max-height:calc(var(--tap) * 5 + 2px);overflow-y:auto}
 .pcard .pcacts{margin-top:auto;padding:6px 0 0;border:0;background:none;--sheen:none}
 .pcard .pcacts .more{position:relative;display:inline-flex;margin-left:auto}
@@ -1820,7 +1820,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    tint no theme's accent can clash with. The accent fill is a
    page's main action's alone (New container, Add user), and a verb that
    looks after the page (Refresh, Check for updates) is the plain button, so
-   a choice, a chore and the action never look alike (the operator, 17 Oct). */
+   a choice, a chore and the action never look alike. */
 .pseg{display:inline-flex;gap:0;flex-wrap:nowrap;max-width:100%;border:var(--hair) solid var(--line);
   border-radius:var(--r-control);background:var(--btn);overflow:hidden}
 .pseg>button{flex:0 1 auto;min-width:0;margin:0;border:0;border-radius:0;background:none;--sheen:none;color:var(--dim);
@@ -1833,7 +1833,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
   .pseg>button.on:hover{background:color-mix(in srgb, var(--ink) 15%, var(--btn))}
 }
 /* The page's sub-nav (a group's tools: Nodes, Storage, nginx) is its own
-   thing, not a switch (the operator, 17 Oct: in the switch's box it read
+   thing, not a switch (in the switch's box it read
    as one more button, and repeated the Cards and List beside it): the tools
    as tabs standing on the bar's floor, the one on show in ink with the
    accent under it, the rest dim, no box. It runs the bar's height, so the
@@ -1855,15 +1855,15 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
   .pane .bar .subnav.pseg>button{min-height:var(--tap);flex:1 0 auto;padding:0 10px}
 }
 /* A press that is only an icon (the trash, ⋯ where it is drawn as one)
-   centers it: inline, an SVG sat on the text's baseline and two pixels off
-   (the operator, 17 Oct). */
+   centers it: inline, an SVG sat on the text's baseline and two pixels off.
+   */
 button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;align-items:center;justify-content:center}
 /* Search in the top bar: a field that jumps, its rows under it. */
 .jump{position:relative;flex:0 1 360px;min-width:0}
-/* The header's height, as the buttons beside it are (B142). */
+/* The header's height, as the buttons beside it are. */
 .jump input{width:100%;min-height:var(--tap);padding:4px 10px;background:var(--sunk);color:var(--ink);font:var(--f-data)}
 .jump input::placeholder{color:var(--dim)}
-/* Every field's placeholder in the quiet voice (R286 step 4): the browser's
+/* Every field's placeholder in the quiet voice: the browser's
    own read 2 to 3:1 on the field in the themes, measured; Firefox's own
    halves it again with an opacity. */
 ::placeholder{color:var(--dim);opacity:1}
@@ -1876,22 +1876,22 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
    press leaves its button disabled while it works), which outranks them. */
 .jrow.on,.jrow:hover{background:var(--btn-hi)}
 /* On a phone the field takes the width between the brand and the buttons:
-   the spacer beside it grew too and took half (the operator, 18 Oct: the
+   the spacer beside it grew too and took half (the
    hint cut off beside a blank gap). */
 @media(max-width:900px){ .jump{flex:1 1 90px}
 }
-/* The search keeps at least 80px at every phone width (B744, B290): the
+/* The search keeps at least 80px at every phone width: the
    narrowest phones give the header's side padding back to make room. */
 @media(max-width:900px){ .jump{min-width:80px}
 }
 @media(max-width:600px){ .jump input{padding:4px 8px}
 }
 
-/* ---- a page's status line (R274) -----------------------------------------
+/* ---- a page's status line -----------------------------------------
    What a page or a notebook view is about now, on one quiet line in the UI
    voice: phrases joined by a dot, a number in ink and its words dim, and a
-   phrase that wants doing in the warning's or the failure's color (the
-   operator, 23 Nov: tiles and facts made pages busier than they are). Home's
+   phrase that wants doing in the warning's or the failure's color
+   (tiles and facts made pages busier than they are). Home's
    tiles are the one row of tiles left. What a page knows that is not news is
    said beside what it describes, never in its head. */
 .pgline{font:var(--f-ui);color:var(--dim);line-height:1.6;overflow-wrap:anywhere}
@@ -1903,18 +1903,18 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .pghead>.name+.pgline{margin-top:4px}
 .pghead>.pgline+.pghfacts{margin-top:var(--field-gap)}
 /* ...and a node's head, the card the page head was drawn after: its line
-   over its facts as a head's is (R274). */
+   over its facts as a head's is. */
 .ndrow>.grow>.name+.pgline{margin-top:4px}
 .ndrow>.grow>.pgline+.ndfacts{margin-top:var(--field-gap)}
 
-/* ---- tiles, facts and chips (R216) --------------------------------------
+/* ---- tiles, facts and chips --------------------------------------
    The 2.0 shapes, one definition each, read by every tab that draws them
    (page-docs.js statTiles, factGrid, chipBar). A tile is a number the tab
    is about, large, with its label under it; a facts grid is what a row
    knows as labels and values; a chip narrows a list. Each is held by the
    design's rule of the same name and measured by test/uniform.mjs. */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:var(--field-gap)}
-/* One grid on a page and a notebook view alike (the operator, 29 Oct):
+/* One grid on a page and a notebook view alike:
    the tiles share the width, and a lone one keeps a tile's width rather
    than a band across the page. */
 @media(min-width:901px){ .tiles:has(>.tile:only-child){grid-template-columns:minmax(0,14rem)}
@@ -1930,12 +1930,12 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .tile .ts{font:var(--f-note);color:var(--dim);opacity:.85}
 .tile.ok .tv{color:var(--pass)}
 /* A tile that is a link and carries no news keeps the text color, as every
-   tile's number does (the operator, 18 Oct: Home's in the second color read
+   tile's number does (Home's in the second color read
    as news); its border on hover says it is a way to its page. */
 .tile.warn .tv{color:var(--warn)}
 .tile.bad .tv{color:var(--bad)}
 /* An odd number of tiles on a phone sits in threes rather than two to a row
-   with one left over (the operator, 17 Oct): three in one row, five as three
+   with one left over: three in one row, five as three
    and two, seven as three, two and two, a short row's tiles splitting its
    width. Six tracks, a tile two of them, a tile in a row of two three. */
 @media(max-width:900px){
@@ -1943,18 +1943,18 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
   .tiles:has(> .tile:last-child:nth-child(odd)) > .tile{grid-column:span 2;padding:10px 12px}
   .tiles:has(> .tile:last-child:nth-child(6n+5)) > .tile:nth-last-child(-n+2),
   .tiles:has(> .tile:last-child:nth-child(6n+7)) > .tile:nth-last-child(-n+4){grid-column:span 3}
-  /* ...and one alone is the row (B822): spanning two of six it sat in the
+  /* ...and one alone is the row: spanning two of six it sat in the
      left third. */
   .tiles > .tile:only-child{grid-column:1 / -1}
-  /* ...over the odd count's span of two, which outranked it (B222). */
+  /* ...over the odd count's span of two, which outranked it. */
   .tiles:has(> .tile:last-child:nth-child(odd)) > .tile:only-child{grid-column:1 / -1}
   .tiles:has(> .tile:last-child:nth-child(odd)) .tl,
   .tiles:has(> .tile:last-child:nth-child(odd)) .ts{overflow-wrap:anywhere}
   /* ...and a number with its unit wraps at the space rather than being cut
-     in a third of the screen ("11.1 TB" read "11.1…", B150). */
+     in a third of the screen ("11.1 TB" read "11.1…"). */
   .tiles:has(> .tile:last-child:nth-child(odd)) .tv{white-space:normal}
 }
-/* A container's card (the operator's concept, 17 Oct). Its head: the name,
+/* A container's card. Its head: the name,
    its pill and how long it has been up, a mono line of what it is (image,
    commit, compose file), and its buttons at the right on the same line,
    under it when the card is narrow. */
@@ -1964,7 +1964,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .dmid .dmstate.bad{color:var(--bad)}
 .dmsvctbl>.thead,.dmsvctbl>.tline{padding:7px 12px}
 /* What a card's settings are, read (factPills): pills on one wrapping line. */
-/* ...the same room above and below it (the operator, 17 Oct): the card's
+/* ...the same room above and below it: the card's
    grid adds its 2px row gap above at a desk, and a fold's band starts below. */
 .fpills{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:6px 12px;margin:14px 0 12px}
 @media(max-width:900px){ .fpills{margin-top:16px}
@@ -1987,19 +1987,19 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 @media(max-width:600px){ .dmhead>.actbar.dmacts{flex:1 1 100%;justify-content:flex-start;margin-left:0}
 }
 /* Cards and List are their pictures at every width (viewSeg), each in the
-   middle of a square button (B342: a block svg in an inline box sat left). */
+   middle of a square button (a block svg in an inline box sat left). */
 .dmviewseg>button{display:inline-flex;align-items:center;justify-content:center;min-width:var(--ctl);padding:4px 10px}
 .dmviewseg svg{display:block}
 .facts dd a{color:var(--note)}
 /* The row's Log fold: each container's tail under its name, the whole no
    taller than a screen, and the Follow switch on its action bar. */
 /* A page's head (pageHead): its name and state as a node's head has them,
-   its facts under it, its buttons at the right (the operator, 25 Oct). */
+   its facts under it, its buttons at the right. */
 .pghead > .name{font-weight:600;font-size:1.05rem;color:var(--ink);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .pghead > .actbar{margin-top:6px}
 /* A head with one action wears it in its top-right corner, on the head's
-   first line, as a card wears its action by its title (the operator, 29
-   Oct: never one button on a line of its own under the facts); with
+   first line, as a card wears its action by its title
+   (never one button on a line of its own under the facts); with
    several (a node's Test, Enroll script and Agent log) they keep the row
    along its foot. */
 .pghead:has(> .actbar > :is(button, a.btn):only-child){display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--field-gap);align-items:start}
@@ -2017,7 +2017,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 }
 .facts .fact{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:0 8px;align-items:baseline;min-width:0}
 /* Every value of a grid's column starts at one line, whatever its label's
-   length (B76: on a phone each value began where its own label ended, two
+   length (on a phone each value began where its own label ended, two
    ragged columns): the labels share one track per column through subgrid. */
 @supports (grid-template-columns:subgrid){
   .facts{grid-template-columns:repeat(2,minmax(5.5rem,max-content) minmax(0,1fr));column-gap:8px}
@@ -2027,7 +2027,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .facts dt{font:var(--f-note);color:var(--dim);margin:0;white-space:nowrap}
 .facts dd{font:var(--f-data);color:var(--ink);margin:0;min-width:0;overflow-wrap:anywhere}
 .facts dd code{font:inherit}
-/* Tables (R218 step 8, the tables rule): the header and every row's line
+/* Tables (the tables rule): the header and every row's line
    share one set of tracks (--tcols, from tblWrap); a cell holds one line and
    ends in an ellipsis, the lead cell may wrap. On a phone the header goes,
    the lead cell takes the line and the rest follow it, each wearing its
@@ -2040,7 +2040,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .tbl .th,.tbl .td{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* A lead cell wraps between words and breaks one only when it is longer
    than its column: anywhere cut 'nginx-bb-dev-sandbox' mid-word in a column
-   that had room for it on the next line (B112). */
+   that had room for it on the next line. */
 .tbl .td.lead{white-space:normal;overflow-wrap:break-word;font-weight:600}
 .tbl .td{font:var(--f-data);color:var(--dim)}
 .tbl .td.lead{font:var(--f-ui);font-weight:600;color:var(--ink)}
@@ -2058,7 +2058,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
   .tbl .td:empty{display:none}
   .tbl .td.act{flex:1 0 auto}
 }
-/* Charts (R218 step 9, the charts rule): one series each, a 2px line in
+/* Charts (the charts rule): one series each, a 2px line in
    the accent over a tenth-strength wash, hairline grid in --line, the axis
    and the readout in text tokens. The plot stretches; its strokes do not. */
 .charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--row-x);padding:var(--row-y) 0}
@@ -2098,18 +2098,18 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .chips{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   padding-bottom:2px;mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent)}
 .chips::-webkit-scrollbar{display:none}
-/* Its ends on a desk (the operator, 23 Oct): an arrow at each end with more
+/* Its ends on a desk: an arrow at each end with more
    past it, held there while the row scrolls under it, and the fade on that
    side only; a mouse drags the row. A touch swipes, as before. */
-/* ...and the dock's line of tabs the same (the operator, 24 Oct). */
+/* ...and the dock's line of tabs the same. */
 :is(.chips,.dockline,.hscroll):not(.chl):not(.chr){mask-image:none}
 /* The arrow is a small round press of its own at that end, on the row's
-   middle (the operator, 29 Oct: a box the panel's color read as broken), on
-   a desk and on a touch screen alike (the operator, 29 Oct), where a tap on
+   middle (a box the panel's color read as broken), on
+   a desk and on a touch screen alike, where a tap on
    it pages the row as a click does and it is a thumb's 30px. The row fades
    to nothing at that end, and the mask keeps the arrow's whole disc open
-   there, its ring drawn well inside it: the arrow never fades (the
-   operator, 24 Nov: with the circle kept open only as wide as the ring,
+   there, its ring drawn well inside it: the arrow never fades
+   (with the circle kept open only as wide as the ring,
    the ring sat on the mask's soft edge and the arrow read faded). The
    disc is the panel's color, so nothing cut off shows through it. --arw
    is the disc, --arc its center from the edge, --arr the circle kept open,
@@ -2134,11 +2134,11 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
   .chips.dragging .chip,.dockline.dragging .dtab,.hscroll.dragging>button{pointer-events:none}
   :is(.chips,.dockline,.hscroll).chl:hover::before,:is(.chips,.dockline,.hscroll).chr:hover::after{box-shadow:inset 0 0 0 1.5px var(--panel),inset 0 0 0 2.5px var(--dim)}
 }
-/* A list's narrowing band (R254 step 1): its chips at the left and a search
+/* A list's narrowing band: its chips at the left and a search
    at the right, the search taking the whole width under them on a phone.
    A row the band leaves out wears .off, so paging counts only what is shown. */
 .lfilter{display:flex;align-items:center;gap:var(--field-gap);flex-wrap:wrap}
-/* Every group of chips shares the one band (R109: the Roadmap's state and
+/* Every group of chips shares the one band (the Roadmap's state and
    release, Bugs' state and seen-in), side by side, wrapping group by group
    where the width runs out; a group wider than the line scrolls inside it.
    Each keeps the room its fading edge takes, which also sets the groups
@@ -2230,17 +2230,17 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
    top border. (This was written as #fxBar, an id the markup never carried, so
    the bar had no padding at all and its controls sat against the edge.) */
 /* (Findings' bar has no rule under it: no other page's has, and it stopped
-   short of the edge, the operator, 17 Oct.) */
+   short of the edge.) */
 /* What a page's bar says about the page (Users, Roles, Settings, Jobs) is a
-   quiet note beside its controls, not a heading (the operator, 17 Oct). */
+   quiet note beside its controls, not a heading. */
 .docbarrow>.dim,.docbarrow>.dim .sub{font:var(--f-note);color:var(--dim)}
 /* A hint placed straight in a page's list is a band like any other: it
    was the Analysis tab's own rule, so the same line on the Toolchains tab
    sat flush against the edge with every band beside it indented. Anywhere
    else it is the quiet note of what holds it (the hint rule above). */
 .doclist>.hint{padding:var(--row-y) var(--row-x)}
-/* Room under every page's last card, at every width (the operator, 17 Oct:
-   the bottom of a page ran into the dock): a spacer at the end of the
+/* Room under every page's last card, at every width
+   (the bottom of a page ran into the dock): a spacer at the end of the
    list, since a last child's margin is not kept at the end of a scrolling
    box. */
 .doctab>.doclist::after,.doctab.dmtab::after,.doctab.vmtab::after,.nb .nbview:not([hidden])::after{content:"";display:block;height:16px;flex:0 0 auto}
@@ -2273,7 +2273,7 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 /* The page bar is one row at every width (the design's page head): a band
    of its own, not a filter row, so the filter row's narrow wrap (.histbar
    under 560px) never takes it to two lines. It is one control high on every
-   page, whatever it holds (the operator, 19 Oct: a picker's word above it,
+   page, whatever it holds (a picker's word above it,
    a count alone and a count beside a button each made a bar of its own
    height): what it says and what it holds centered on that line, a
    picker's word to its left. Containers' bar alone gives its search a line
@@ -2347,14 +2347,14 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
   padding:var(--row-y) var(--row-x);font:var(--f-ui);color:var(--ink);
   min-height:max(var(--tap), 46px);box-sizing:border-box}
 .sect>summary::-webkit-details-marker{display:none}
-/* At a desk a page's sections stand open and do not fold (the operator, 18
-   Oct; sectFixed): no triangle on their heads and nothing to press. A fold
+/* At a desk a page's sections stand open and do not fold
+   (sectFixed): no triangle on their heads and nothing to press. A fold
    on purpose (data-fold) keeps both. */
 @media(min-width:901px){
   :is(.doctab,.nbview) details.sect:not([data-fold]):not(details.sect details.sect):not(.row:not(.ndrow) details.sect):not(.modal details.sect)>summary{cursor:default}
   :is(.doctab,.nbview) details.sect:not([data-fold]):not(details.sect details.sect):not(.row:not(.ndrow) details.sect):not(.modal details.sect)>summary::before{display:none}
 }
-/* A card's head, the same everywhere (the operator, 18 Oct): the Containers
+/* A card's head, the same everywhere: the Containers
    project band's height, 46px (every section's, nested or not), on a shade of its own off the card's ground
    so it reads as the head of what is under it. A page's sections and Home's
    cards wear it; a fold inside a row (a container's Log) is the row's, not
@@ -2380,14 +2380,14 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .sect>.body{padding:0 0 var(--row-y);display:flex;flex-direction:column;gap:0}
 /* A section's own explainer line, straight in its body, is the quiet note
    it is everywhere else: the Git view's Branches line read at body size
-   (the design pass, 4 Oct). */
+   (the design pass). */
 /* A control never spans its container. The cap goes on what holds it,
-   never on a control alone (R301 step 6), and every row of controls wears
+   never on a control alone, and every row of controls wears
    one class for it, .ctlrow (a filter row, a field and its label, a picker
    row, an add row), so the controls in it stop short together on one edge;
    a control in no holder is as wide as its content, and one that would
    fill its surface is put in a holder. No page is named here
-   (R218 step 64, the operator 19 Oct: three lists of row kinds had drifted
+   (three lists of row kinds had drifted
    apart): a new surface's row is capped by wearing the class. Beside it,
    the shared parts that size their own contents: an action bar, a form
    (formBox), a menu (a surface of its own whose fields run its width) and
@@ -2422,7 +2422,7 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .fgrid .ctlrow{max-width:none}
 @media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:var(--ctl-cap)}
 }
-/* A form (formBox, R301): the box is capped and never a field alone, so its
+/* A form (formBox): the box is capped and never a field alone, so its
    foot ends where its fields end at every width, 16px under the last of
    them, the primary at the right; a field's label is over it and its hint
    under it (formField). Room is the box's to give (its gap), so nothing in a
@@ -2445,7 +2445,7 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 @media(max-width:600px){ .fbox{max-width:var(--ctl-cap)}
   .modal:not(.inline) .fbox{max-width:none}
 }
-/* A dialog's form is on the same grid (R273, the operator 23 Nov): the
+/* A dialog's form is on the same grid: the
    fields that pair sit side by side at a desk, each a .field of its own in
    its band's .fgrid, and the grid fills the band at every width. A pair
    one of whose two is hidden (a mode, an install with no nodes) is one
@@ -2479,7 +2479,7 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
    right edge. The controls inside it keep their own widths.
    Three classes deep to outrank the cap above. */
 :is(.doctab,.nb) .field.docbarrow{max-width:none}
-/* ...and because a band is not a holder (R301 step 6: what holds controls
+/* ...and because a band is not a holder (what holds controls
    is capped, never a control alone), the controls in it are capped one by
    one: a search box in a band that spans the tab would run its width. */
 :is(.doctab,.nb) .field.docbarrow :is(input:not([type=checkbox]):not([type=radio]),select,textarea){
@@ -2489,8 +2489,8 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 :is(.doctab,.nb) .field.docbarrow>select{width:auto;flex:0 1 auto;min-width:0}
 /* A bar button's short words (barSaid): kept for a phone. */
 .shrt{display:none}
-/* On a phone a page's bar is one line of its picker and its buttons (the
-   operator, 18 Oct: the node pulldown and the buttons fit on one line,
+/* On a phone a page's bar is one line of its picker and its buttons
+   (the node pulldown and the buttons fit on one line,
    everywhere). The picker drops its word, which the node's name beside it
    says, and shrinks to what is left, its name cut short last; the buttons
    take their short words and never wrap; a search box gives up width
@@ -2518,7 +2518,7 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
   .lng{display:none}
   .shrt{display:inline}
 }
-/* ...the same under 440px, on a page and a notebook view (R109). */
+/* ...the same under 440px, on a page and a notebook view. */
 @media(max-width:440px){
   :is(.doctab,.nb) .field.docbarrow>input[type=search]{order:-1;flex:1 1 9rem;min-width:9rem;max-width:none}
 }
@@ -2541,11 +2541,11 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 .actbar select{width:auto;flex:0 0 auto}
 .actbar input{width:auto;flex:0 1 12em;min-width:0}
 /* MORE: a bar keeps its primary verbs and folds the rest behind one button
-   (R210; the operator, 13 Oct: seven buttons wrapped to two lines on a phone
+   (seven buttons wrapped to two lines on a phone
    and Remove sat alone on the second). The menu opens under the button, as
    the gear's does, anything else closes it, and its items are the bar's
-   own buttons, so the destructive one is still last. `actMore()` draws it
-   and `wireMore()` wires it; a single leftover is drawn inline instead. */
+   own buttons, so the destructive one is still last. `actMore` draws it
+   and `wireMore` wires it; a single leftover is drawn inline instead. */
 .actbar .more{position:relative;display:inline-flex;flex:0 0 auto}
 .actmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:40;
   min-width:11em;width:max-content;max-width:calc(100vw - 32px);
@@ -2577,8 +2577,8 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 button[aria-busy="true"]{opacity:.75}
 /* Under a reason line's own margin, which keeps its space inside the fold. */
 .ndhmore>*{margin:0}
-/* At a desk the Nodes page is cards, as a notebook view is (the operator,
-   18 Oct): the node's head one card and each of its sections one of its
+/* At a desk the Nodes page is cards, as a notebook view is:
+   the node's head one card and each of its sections one of its
    own on the page's margin; the row that holds them draws nothing but
    keeps the page's inset, so it starts where the bar does. Storage and
    Network come in a wrapper of their own (nodeConfSections), which
@@ -2593,12 +2593,12 @@ button[aria-busy="true"]{opacity:.75}
 }
 /* This machine's head says the name and the state: the node row's second copy
    is not drawn. A label beside its field, each field starting at one edge,
-   and what a section says in the prose voice, not the facts' mono (the
-   operator, 4 Nov). */
+   and what a section says in the prose voice, not the facts' mono.
+   */
 .machinetab .ndrow>.grow>.name{display:none}
-/* The controller's own machine (R90): a reference, in the reference's color. */
+/* The controller's own machine: a reference, in the reference's color. */
 .ndrow .name .tag.ndown{color:var(--purple);border-color:var(--purple-edge)}
-/* The whole of a mount's reason, under its row (B660): the cell at the end
+/* The whole of a mount's reason, under its row: the cell at the end
    of the line keeps the state's first words. */
 .ndmount .ndmwhy{white-space:normal;overflow-wrap:anywhere;padding:0 var(--row-x) var(--row-y)}
 /* The name's row is an action bar (its field, then Rename), so it lays out
@@ -2624,22 +2624,22 @@ button.eye svg,button.ic svg,#bTrashTab svg{width:16px;height:16px;display:block
   stroke:currentColor;stroke-width:1.4;stroke-linecap:round}
 /* ...and the More button's three dots, which are filled rather than stroked:
    left to the browser they were black on every dark scheme and sat on the
-   text baseline, high in the button (the operator, 16 Oct). */
+   text baseline, high in the button. */
 .more>button svg{width:16px;height:16px;display:block;margin:auto;fill:currentColor;stroke:none}
 @media(max-width:900px){ .row button,.macros button{min-height:var(--tap)}
 }
 
 /* What a Claude session is doing, at a glance: yellow and breathing while
-   it works, the accent's green once it is idle and ready for you (the
-   operator, 16 Oct; the green tab strip it once vanished into is gone). */
+   it works, the accent's green once it is idle and ready for you
+   (the green tab strip it once vanished into is gone). */
 .st{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 auto;
   margin-right:6px;vertical-align:baseline}
 .st.working{background:var(--warn);animation:pulse 1.6s ease-in-out infinite}
 .st.waiting{background:var(--accent)}
-/* On Claude Code's own permission prompt (B52): the warn color, steady, so it
+/* On Claude Code's own permission prompt: the warn color, steady, so it
    reads apart from working's pulse and from waiting's accent. */
 .st.asking{background:var(--warn)}
-/* What is live glows, softly, in its own color (R218 step 7): a session
+/* What is live glows, softly, in its own color: a session
    working or waiting, a running job, a running container. One glow, small
    and under half its color, so it reads as lit rather than as a highlight. */
 .st.working{box-shadow:0 0 0 2px color-mix(in srgb, var(--warn) 20%, transparent),
@@ -2662,17 +2662,17 @@ button.eye svg,button.ic svg,#bTrashTab svg{width:16px;height:16px;display:block
 .pill{font:var(--f-pill);padding:3px 7px;border-radius:99px;
   border:var(--hair) solid var(--line);color:var(--dim)}
 /* A STATE on a row's name line is a pill, not a parenthesis: running, stopped,
-   down, partly up, unknown, each in the level's color (R210). `.stat`: `.state` is
+   down, partly up, unknown, each in the level's color. `.stat`: `.state` is
    the action bar's status line and `.st` the session dot. */
 .row .name .pill.stat{font:var(--f-tag);text-transform:uppercase;letter-spacing:.5px;
   vertical-align:2px;margin-left:6px;margin-bottom:0}
-/* ...with a dot of its color before the word (R216): the state is read at
+/* ...with a dot of its color before the word: the state is read at
    a glance down a list, before the word is. */
 .row .name .pill.stat::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
   background:currentColor;margin-right:5px;vertical-align:1px}
 .row .name .pill.stat.off{color:var(--purple);border-color:var(--purple-edge)}
 /* A state that is good or bad wears its own green, red and amber in every
-   scheme, as the doctor does (the operator, 17 Oct: a healthy container
+   scheme, as the doctor does (a healthy container
    read red in a scheme whose accent is red): --pass, --bad and --warn,
    never the accent. */
 .pill.ok{color:var(--pass);border-color:var(--green2-edge)}
@@ -2689,8 +2689,8 @@ progress.pbar::-webkit-progress-value{background:var(--accent);border-radius:3px
 progress.pbar::-moz-progress-bar{background:var(--accent);border-radius:3px}
 /* A press still going after a moment (pressHold, page-motion.js): a small
    ring in place of its word or its picture, the button exactly its size, so
-   it reads as taken rather than missed and nothing beside it moves (the
-   operator, 22 Nov: a wheel only where it fits without making the button
+   it reads as taken rather than missed and nothing beside it moves
+   (a wheel only where it fits without making the button
    bigger). The word stays in the box, unpainted, so the box keeps its
    width; the ring is the word's color. pressRing makes a button that is not
    positioned the ring's frame (.ringrel). */
@@ -2700,15 +2700,15 @@ button.working::after,a.btn.working::after,button[data-running]::after{content:"
   box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 .ringrel{position:relative}
 /* A chip whose narrowing is being read: its count is the ring in the count's
-   own room, the chip neither wider nor taller (pressCount, the operator,
-   22 Nov). */
+   own room, the chip neither wider nor taller (pressCount).
+   */
 .chip .pill.counting{color:transparent;position:relative}
 .chip .pill.counting::after{content:"";position:absolute;left:50%;top:50%;width:.8em;height:.8em;margin:-.4em 0 0 -.4em;
   border:2px solid var(--dim);border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;box-sizing:border-box}
 /* An empty state, one style everywhere (consistency batch 5): the page's
    own was 9px 11px, a document's the tokens and a list box's 8px 10px. */
-/* An empty state is one dim line in the hint voice (the operator, 29 Oct:
-   italic here, the code face there and a bare word elsewhere said the same
+/* An empty state is one dim line in the hint voice
+   (italic here, the code face there and a bare word elsewhere said the same
    thing four ways). */
 .empty{color:var(--dim);padding:var(--row-y) var(--row-x);font:var(--f-ui);font-style:normal}
 /* ...and a placeholder that has become a failure notice: the poll's words
@@ -2718,8 +2718,8 @@ button.working::after,a.btn.working::after,button[data-running]::after{content:"
 /* A row's inset, as .empty's: one rule. */
 .loading{color:var(--dim);padding:var(--row-y) var(--row-x);font-style:italic;
   animation:waiting 1.4s ease-in-out infinite}
-/* ...and, where what is coming has a known shape, the shape itself (R218
-   step 15, page-docs.js skel()): bars where the words will be, rows where the
+/* ...and, where what is coming has a known shape, the shape itself
+   (page-docs.js skel): bars where the words will be, rows where the
    rows will be, cards and tiles where they will stand, a light passing over
    them left to right. Their color is the ink at a whisper, so every scheme
    tints them its own way; the words stay for a screen reader. A failure
@@ -2743,7 +2743,7 @@ button.working::after,a.btn.working::after,button[data-running]::after{content:"
 .docbarrow>.skv.ctl{display:inline-block;flex:none}
 .skel .sk-b.sub{height:.62em;margin-top:9px}
 /* A placeholder row is inset as the row that replaces it (.row), wherever
-   it stands: a card, a section's body, a list (B864: Home's Last jobs had
+   it stands: a card, a section's body, a list (Home's Last jobs had
    its bars on the card's edge, one of six places that each set it). Only
    where its box is the inset already (a .field, the plain loading line's
    own) does it start at the edge. */
@@ -2786,7 +2786,7 @@ span.skel.sk-word{display:inline-block;vertical-align:middle;padding:0}
 .col.term{min-height:0;min-width:0;gap:0}
 
 /* Panes -------------------------------------------------------------- */
-/* Closed on every side (the operator, 16 Oct): its top was left open for
+/* Closed on every side: its top was left open for
    the tab strip that sat on it, and with the strip gone the box read as
    open at the top while the dock's line closed its foot. */
 .panes{flex:1;min-height:0;display:grid;gap:6px;grid-template-columns:1fr;
@@ -2797,7 +2797,7 @@ span.skel.sk-word{display:inline-block;vertical-align:middle;padding:0}
    stay at the right edge on every width (a phone's line once pushed the
    chevron off the screen). */
 .dockline{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
-/* A sideways swipe never takes the page back (B820): at the end of a
+/* A sideways swipe never takes the page back: at the end of a
    strip's scroll (the dock's line, a chip row, the notebook's views) the
    gesture fell through to the page, and the page's sideways overscroll is
    the phone browser's swipe-back, so the page went back a page. The strips
@@ -2845,7 +2845,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    here becomes a name at one end of two thousand pixels and the control that
    acts on it at the other (the bin, the Revert, the version pill) with the
    eye traveling the whole way between them. Capped and centered in the pane,
-   as the design's page says (the operator, 19 Oct: pinned left, a desk's
+   as the design's page says (pinned left, a desk's
    pane kept 214px empty at the right); a band spanning the pane sets its
    contents in by --doc-in to start where the column does. */
 .pane .doc > *{max-width:var(--doc-w);margin-inline:auto}
@@ -2855,7 +2855,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 .pane .stack > *{position:absolute;inset:0}
 .pane .stack > *:not(.on){visibility:hidden;pointer-events:none}
 /* A page left behind the one on show (kept with its scroll, its view and
-   what is typed in it) is not laid out or painted (R228 step 10):
+   what is typed in it) is not laid out or painted:
    visibility kept every one of them laid out on every change to the page.
    Only the page's pane: the dock's terminals measure their box while
    hidden. Not the page fading out, which is still on show. */
@@ -2866,7 +2866,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    takes what it needs; the input picks up the global field skin like every
    other control, so nothing is restyled here beyond the layout. */
 .pane .slot:has(.consbar){flex-direction:column}
-/* The chat, the dock's Chat tab (R250 step 2): the people and the project
+/* The chat, the dock's Chat tab: the people and the project
    channels in a column beside the open conversation at a desk, one at a
    time on a phone (the list until one is picked, then the conversation with
    ‹ all back to it). Only the layout is here: the input picks up the global
@@ -2887,7 +2887,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 /* A phone's alone: the hot bar of the terminal in front, its keys in a line
    that scrolls under a thumb and Links at its end. A desk's keys float over
    the terminal, so there is no band there. (The Keys panel and the Commands
-   panel that opened from it are gone: the operator, 12 Nov.) */
+   panel that opened from it are gone.) */
 .mobar[hidden]{display:none}
 .mobar{display:none;gap:6px;padding:6px;flex:0 0 auto;background:var(--panel);position:relative;
   border:var(--hair) solid var(--line);border-top:0;border-radius:0 0 var(--r-surface) var(--r-surface)}
@@ -2903,7 +2903,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   .mobar{display:flex}
   .mobar[hidden]{display:none}
   .mobar button[hidden]{display:none}
-  /* The hot bar is the band (the operator, 12 Nov): the terminal's keys in a
+  /* The hot bar is the band: the terminal's keys in a
      line that scrolls, and it reads as the dock's line of tabs at the
      terminal's head does: the same gap, a key the height of a tab, the
      line's faded ends and its round arrows where more keys lie past an
@@ -2925,7 +2925,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   margin-bottom:10px;background:var(--panel);overflow:hidden}
 .fx .grp>summary{padding:var(--row-y) var(--row-x);font-weight:600;flex-wrap:wrap;
   transition:background-color .15s ease}
-/* A rule is a row that opens (R234): the summary is the closed row, its
+/* A rule is a row that opens: the summary is the closed row, its
    body the places, the description and the message. */
 .fx .rule{border-top:var(--hair) solid var(--line);padding:0 var(--row-x)}
 .fx .rule>summary{flex-wrap:wrap;padding:var(--row-y) 0}

@@ -1,4 +1,4 @@
-"""A space's test node that cannot be used ends the test run with why (B994).
+"""A space's test node that cannot be used ends the test run with why.
 
 aerie tests run, aerie dashboard test and the gate each asked
 tests_away_node whether the suites go to the space's test node, with its

@@ -1,4 +1,4 @@
-"""A home's sign-in link with no seal behind it (B386): the token pass takes
+"""A home's sign-in link with no seal behind it: the token pass takes
 it away, so a terminal on the node says to sign in rather than that a
 sealed sign-in is waiting; a link with a seal or an opened copy stays."""
 import os

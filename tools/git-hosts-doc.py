@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes docs/git-hosts.md from forgeaccess.ABILITIES (R188): what an agent
+"""Writes docs/git-hosts.md from forgeaccess.ABILITIES: what an agent
 can do on a project's git host, and what to enable on GitHub, GitLab and
 Gitea for each. The table is the one the controller measures a token
 against and the relay refuses by, so the page is that table, never a copy

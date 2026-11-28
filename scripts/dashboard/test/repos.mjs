@@ -1,4 +1,4 @@
-// Projects first (R138): a project made with a name alone through
+// Projects first: a project made with a name alone through
 // /api/repos, repositories moved into it and back out, a repository made
 // into it with the create dialog, renamed, refused where it should be, and
 // deleted only once it is empty. What goes by the project: a project that
@@ -56,7 +56,7 @@ const e = await post('/api/repos', { action: 'move', name: 'ep.silon', to: key }
 ok(await gitOf('ep.silon') === epGit, `...ep.silon's too, a repository with a branch (${epGit})`);
 ok(e.status === 200 && JSON.stringify(reposFile()[key]?.members) === '["gamma","ep.silon"]',
    `...and ep.silon, after it (${JSON.stringify(reposFile()[key])})`);
-// A read goes by the project (the operator, 24 Oct): beta read the project
+// A read goes by the project: beta read the project
 // ep.silon was in, and still reads that one, not the repository it moved.
 const betaReads = () => prefsFile()[home('beta')]?.reads;     // a project's setting, on its key
 ok(JSON.stringify(betaReads()) === JSON.stringify([epWas]), `beta still reads the space it was granted (${JSON.stringify(betaReads())})`);
@@ -124,7 +124,7 @@ await section("The old address still opens the page, which says its own address"
     lines: new Set([...c.querySelectorAll('.pcback .pcacts > button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
     frontLines: new Set([...c.querySelectorAll('.pcfront .pcacts > button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
     rename: !!c.querySelector('.pcback .pcname [data-prn]'),
-    // Settings at the back's top right, out of its foot (the operator, 18 Nov).
+    // Settings at the back's top right, out of its foot.
     gear: c.querySelector('.pcback [data-rn]:not(.pcacts *)')?.getAttribute('aria-label') || '' }));
   ok(Math.abs(back.h - h0) < 1 && back.frontInert, `Edit turns the card over at its size (${h0} then ${back.h})`);
   ok(back.rows.length === 3 && back.rows.every(r => ['rrn', 'rmove', 'del'].every(k => r.includes(k))) && back.rename,
@@ -140,7 +140,7 @@ await section("The old address still opens the page, which says its own address"
   ok(rep.shown && rep.picked === 'gamma' && rep.all.length === 3, `Report bug picks a repository, the first by default (${JSON.stringify(rep)})`);
   await page.evaluate(() => { $('reportModal').hidden = true; });
   // A poll that changes the page leaves a rename box alone, with what was typed
-  // in it (the operator, 2 Nov: each rename on a card's back was thrown out).
+  // in it (each rename on a card's back was thrown out).
   await page.click(`${card} .pcback [data-prn]`);
   await page.waitForSelector(`${card} .askline input`, { timeout: 3000 });
   await page.fill(`${card} .askline input`, 'half typed');
@@ -158,7 +158,7 @@ await section("The old address still opens the page, which says its own address"
   await page.waitForFunction(c => !document.querySelector(`${c} .askline`), card, { timeout: 3000 });
   // Renamed, the card takes its new name and its new place at once, from
   // the answer and not the next read (held back here), sliding there with
-  // the page scrolled to keep it in sight on a phone (the operator, 26 Oct).
+  // the page scrolled to keep it in sight on a phone.
   await page.setViewportSize({ width: 393, height: 700 });
   // Laid out at the phone's width: the breakpoint's listeners run before a frame's callbacks, and what they move has landed.
   await page.waitForFunction(() => innerWidth === 393, null, { timeout: 10000 });
@@ -175,7 +175,7 @@ await section("The old address still opens the page, which says its own address"
     await page.press(`${card} .askline input`, 'Enter');
   };
   // Each slide a card starts is counted as it starts: sampled once, a slide
-  // WebKit had not begun or had ended read as none (B1126).
+  // WebKit had not begun or had ended read as none.
   await page.evaluate(() => { window.__slid = 0;
     if (!window.__slideCounted){ const was = Element.prototype.animate;
       Element.prototype.animate = function(k, o){ try { if (this.classList?.contains('pcard') && /translate/.test(JSON.stringify(k))) window.__slid++; } catch {} return was.call(this, k, o); };
@@ -207,15 +207,15 @@ await section("The old address still opens the page, which says its own address"
              sw: [...d.querySelectorAll('select[data-reposw] option')].map(o => o.textContent.trim() + (o.selected ? '*' : '')) }; });
   ok(head.name === 'Shop & Co' && head.at === 'gamma' && JSON.stringify(head.sw) === '["gamma","ep.silon*","shopweb"]',
      `a repository's page names its space, its repositories a pulldown with it picked, Start on the first (${JSON.stringify(head)})`);
-  // Picking another opens that one's notebook (the operator, 27 Oct: a
+  // Picking another opens that one's notebook (a
   // pulldown, a list that may be long).
   await page.evaluate(() => openNotebook('ep.silon'));
   await page.waitForSelector('.pane .bar.proj select[data-reposw]', { timeout: 15000 });
   const heights = await page.evaluate(() => { const h = e => e ? Math.round(e.getBoundingClientRect().height) : 0;
     return { sel: h(document.querySelector('.pane .bar.proj .phead>select[data-reposw]')), btn: h(document.querySelector('.pane .bar.proj .phead>button')) }; });
   ok(heights.sel && Math.abs(heights.sel - heights.btn) <= 1, `the pulldown is the height of the buttons beside it (${JSON.stringify(heights)})`);
-  // On a phone the name, the pulldown and the actions keep one row (the
-  // operator, 11 Nov: with a longer name and Manage agent the menu's button
+  // On a phone the name, the pulldown and the actions keep one row
+  // (with a longer name and Manage agent the menu's button
   // went to a line of its own, since a wrapping row breaks before anything
   // in it gives up width): the name and the pulldown give up theirs.
   const rows = [];
@@ -269,8 +269,8 @@ const said = await t.text();
 ok(t.status === 403 && /whose sessions start on gamma/.test(said),
    `a session on the space's second repository is refused, naming where it starts (${t.status} ${said.slice(0, 160)})`);
 
-// A dial set through one repository is that repository's own override
-// (R208 step 6); from the project's door it is the project's, the default
+// A dial set through one repository is that repository's own override;
+// from the project's door it is the project's, the default
 // for every repository in it.
 const dial = await post('/api/prefs', { project: 'ep.silon', devbuild: 'auto' });
 ok(dial.status === 200 && prefsFile()['ep.silon']?.devbuild === 'auto' && (prefsFile()['ep.silon']?.overrides || []).includes('devbuild')
@@ -292,7 +292,7 @@ ok(clash.status === 400 && /already a space's name/.test(clash.error || ''), `no
 
 // The trash names the project; with the project gone, Put back asks where.
 // A container built from it keeps running when it goes to the trash, given
-// to no project, and its delete says so first (the operator, 26 Oct).
+// to no project, and its delete says so first.
 const appsFile = `${DIR}/state/devapps.json`;
 const apps = () => { try { return JSON.parse(readFileSync(appsFile, 'utf8')); } catch { return {}; } };
 writeFileSync(appsFile, JSON.stringify({ ...apps(), shopweb: { main: { node: '' } } }));
@@ -310,7 +310,7 @@ const b2 = await post('/api/repos', { action: 'move', name: 'ep.silon', to: epWa
 ok(b1.status === 200 && b2.status === 200, `both move back where they were (${b1.status} ${b1.error || ''} ${b2.status} ${b2.error || ''})`);
 const gone = await post('/api/repos', { action: 'delete', key });
 ok(gone.status === 200 && !(await status()).repos[key], `an empty space is deleted (${JSON.stringify(gone)})`);
-// Before a move, what it changes (the operator, 26 Oct): the nodes the
+// Before a move, what it changes: the nodes the
 // project it leaves has and the one it goes to has not, the dev instances on
 // them, offered to bring along, ticked; a move with them ticked adds them.
 await section("Before a move, what it changes", async () => {

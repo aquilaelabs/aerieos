@@ -1,4 +1,4 @@
-/* What must win whatever else says (R9 step 4; page-skin.css says how the
+/* What must win whatever else says (page-skin.css says how the
    four layers stand). */
 @layer overrides {
 /* hidden means hidden, whatever display a class gives the element. Without
@@ -28,8 +28,8 @@ html.theming,html.theming *,html.theming *::before,html.theming *::after{
 }
 html[data-motion="reduce"] .tourring{transition:none}
 /* ...and at a desk, where the list and the section stand side by side, the
-   section picked fades through as a rail page does (fadeThrough, the
-   operator 17 and 18 Oct). */
+   section picked fades through as a rail page does (fadeThrough).
+   */
 @media(prefers-reduced-motion:reduce){ .ssplit[data-move]>*{animation:none}
 }
 @media(prefers-reduced-motion:reduce){ .rsplit[data-move]>*{animation:none}
@@ -49,11 +49,11 @@ html[data-motion="reduce"] .tourring{transition:none}
 }
 @media (prefers-reduced-motion: reduce){.pcard.pjnew{animation:none;outline:2px solid var(--accent);outline-offset:-1px}
 }
-/* A menu floated over the page (floatAt in page-docs.js, the operator, 18
-   Oct): the ⋯ menus and the Claude chooser, fixed to the screen so no fold
+/* A menu floated over the page (floatAt in page-docs.js):
+   the ⋯ menus and the Claude chooser, fixed to the screen so no fold
    or card it sits in can cut it off, scrolling inside itself when it is
    taller than the room it has. One that opens above its button rises into
-   place and one below drops, at every width (the operator, 18 Oct). */
+   place and one below drops, at every width. */
 /* A menu floated is placed where floatAt puts it whatever its own rule
    says (the chooser is a .pinmenu, absolute against its pane). */
 .floatm{position:fixed;z-index:60;overflow-y:auto;overscroll-behavior:contain}
@@ -66,7 +66,7 @@ html[data-motion="reduce"] .tourring{transition:none}
   .loading{animation:none} .justpainted{animation:none} .skel .sk-b,.skv{animation:none}
 }
 /* ...and the same less motion where the account asked for it in the gear's
-   menu (the operator, 19 Oct; noMotion reads it too): every animation
+   menu (noMotion reads it too): every animation
    and transition ends where it would have, at once, and the two the
    device's rules above give a still state of their own keep it. */
 html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-motion="reduce"] *::after{
@@ -76,7 +76,7 @@ html[data-motion="reduce"] #bBell.waiting{background:var(--warn)}
 html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
 @media(prefers-reduced-motion:reduce){ .helppop,.bellpanel,.uimenu,.actmenu,.railmore,.pane .doc.on,.panes.dockup .pane.dock,.panes.dockdown .pane.dock{animation:none} .pane .stack > .doc.leaving{visibility:hidden;animation:none} .help{transition:none}
 }
-/* A reason line in red wherever it is drawn (B426), whatever color a
+/* A reason line in red wherever it is drawn, whatever color a
    surface gives its plain .sub: it was red in a project row and a toolchain
    row only, and the dialog's "never backed up", the Claude chooser's
    reasons and a sign-in's refusals were not. */
@@ -84,10 +84,10 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
 .sub.data{font:var(--f-data)}
 /* ...and a warning the same everywhere: what has to happen first (end the
    sessions before signing out) is a warning, never red, which is for what
-   failed (the operator, 22 Oct). */
+   failed. */
 .sub.warn{color:var(--warn)}
 /* A pulldown in a bar or a row of controls is as wide as its longest answer
-   and no wider (the operator, 18 Nov: a sort, a page, a key or a mode
+   and no wider (a sort, a page, a key or a mode
    stretched across its row with its words at one end): it never grows into
    the room around it, a grid cell no longer stretches it, and where its row
    runs short it shrinks to a thumb's width at least, its words clipped with
@@ -104,7 +104,7 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
    compact buttons (.pickshare: the Library's topic and order beside Cards
    and Rows, the Design view's platform, template and copy beside Add page)
    take the line between them, an equal share each, and each fills its
-   share flush to the buttons (the operator, 22 Nov: Firefox drew each as
+   share flush to the buttons (Firefox drew each as
    wide as its answers, a gap before the buttons; "make sure that fits
    website wide"), their answers clipped with an ellipsis; the list opens
    whole. A row that wraps names the least a pulldown takes before it

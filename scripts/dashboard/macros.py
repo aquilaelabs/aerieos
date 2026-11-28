@@ -6,7 +6,7 @@ operator's own command lists are the one stored kind, typed into a terminal
 the same way and never run in the server's process; the pins are which of
 the Linux and git commands sit at the top of the Commands panel.
 
-Out of server.py whole (R77): the tables, the pins and the lists, the
+Out of server.py whole: the tables, the pins and the lists, the
 command cards' part of the status poll, and the three ways the page types
 into a session (a key, a macro's lines, a message into Claude's input box).
 The server holds the routes, and whose a session is.
@@ -23,8 +23,8 @@ import agents
 # command string would be a remote shell with extra steps, and there is already
 # a real terminal one port over for anything not listed here.
 #
-# The bb commands a page sends from where it is about (the operator, 17 Oct:
-# no card of bb commands, since every one of them has its page now: status
+# The bb commands a page sends from where it is about
+# (no card of bb commands, since every one of them has its page now: status
 # on Home, the emulator on its page, the logs in Settings, the sign-in on
 # its own). Typed into the real terminal rather than captured, so one that
 # follows is ended with Ctrl-C exactly as if it had been typed.
@@ -47,7 +47,7 @@ LINUX_MACROS = {
     "lx-ls":    "ls -lah",
     "lx-du":    "du -sh * | sort -rh | head -20",
     # Here and home: a shell is a node's, where /config (the controller's)
-    # is not (the operator, 17 Oct).
+    # is not.
     "lx-df":    "df -h . ~",
     "lx-free":  "free -h",
     "lx-ps":    "ps aux --sort=-%mem | head -15",
@@ -63,7 +63,7 @@ GIT_MACROS = {
     "git-fetch":  "git fetch --all --prune",
     "git-pull":   "git pull",
 }
-# No gh: a node carries none (the operator, 17 Oct), so its four buttons
+# No gh: a node carries none, so its four buttons
 # could only fail; a push is aerie git push's, under the project's policy.
 SHELL_MACROS = {**LINUX_MACROS, **GIT_MACROS}
 

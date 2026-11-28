@@ -1,4 +1,4 @@
-"""termws.term_follow (R133 step 12): a log in a dock tab, followed. What is
+"""termws.term_follow: a log in a dock tab, followed. What is
 new is sent as it is written, a log rewritten (not the same text grown) is
 drawn again, the end is said and the socket closed, and the reader's grant
 going ends it."""

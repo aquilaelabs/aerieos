@@ -14,8 +14,8 @@ import { execFileSync } from 'child_process';
 // of this directory. CJS resolution honors NODE_PATH, which run.sh sets.
 const playwright = createRequire(import.meta.url)('playwright');
 const { chromium } = playwright;
-// Which engine this run of the suite is in (R263 step 5, the operator, 23
-// Nov: every suite in all three): run.sh runs each suite once per engine the
+// Which engine this run of the suite is in
+// (every suite in all three): run.sh runs each suite once per engine the
 // store carries and says which here. Chromium unless told.
 export const ENGINE = process.env.DASHBOARD_TEST_ENGINE || 'chromium';
 if (!playwright[ENGINE]) throw new Error(`no Playwright engine called ${ENGINE}`);
@@ -46,13 +46,13 @@ export const ok = (cond, name) => {
   console.log((cond ? 'PASS' : 'FAIL') + '  ' + gap + (ENGINE === 'chromium' ? '' : `[${ENGINE}] `) + name);
   cond ? pass++ : fail++;
 };
-// What a lab suite walked, for the lab's own record (R3 step 8): one line
+// What a lab suite walked, for the lab's own record: one line
 // for a subject (a system, a git host) and what it said it was, printed only
-// when nothing has failed since `since` (failed(), read before the
+// when nothing has failed since `since` (failed, read before the
 // subject's first check). `aerie tests lab` reads these lines off the run and
 // keeps each, dated, in scripts/dashboard/lab-record.json, which the vetted
 // lines are read from.
-// A check this engine cannot make (R263 step 6): said as skipped, with why,
+// A check this engine cannot make: said as skipped, with why,
 // never passed. The register reads SKIP lines as their own status.
 export const skip = (name, why) => console.log(`SKIP  ${ENGINE === 'chromium' ? '' : `[${ENGINE}] `}${name}: ${why}`);
 export const failed = () => fail;
@@ -62,7 +62,7 @@ export const record = (suite, subject, said, since = 0) => {
   return true;
 };
 // A part of a suite, run so that what throws inside it is one FAIL under
-// its name and the file goes on to its next part (R7 step 6). A suite is a
+// its name and the file goes on to its next part. A suite is a
 // run of blocks, each about one thing; a wait that ran out or a press on
 // something that was not there threw, the file ended there with no total,
 // and everything after it in the file went unrun and unsaid: the next
@@ -95,7 +95,7 @@ export const done = async browser => {
   process.exit(fail ? 1 : 0);
 };
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
-// What in an answer breaks a released app's pin (R79 step 8): a field the
+// What in an answer breaks a released app's pin: a field the
 // pin names gone or of another type, on the answer or on a row. The
 // language is test/device-api.json's: types are string, number, boolean,
 // object, array, null, any or a union like string|null; KEY? is checked
@@ -130,8 +130,8 @@ export function pinBreaks(body, reads, where){
 // The page's requests have landed and nothing new has been asked for
 // `quiet` ms: what a fixed sleep after opening a tab or a view was standing
 // in for. A sleep of 400ms paid 400ms whether the fetch took 30ms or 300,
-// and uniform.mjs paid it on every one of its 27 kinds in every section
-// (R211). Capped, because a page that keeps asking (a poll in flight) is
+// and uniform.mjs paid it on every one of its 27 kinds in every section.
+// Capped, because a page that keeps asking (a poll in flight) is
 // still a page to measure.
 export async function settled(page, { quiet = 150, cap = 3000 } = {}){
   const t0 = Date.now();
@@ -144,7 +144,7 @@ export async function settled(page, { quiet = 150, cap = 3000 } = {}){
   }
 }
 
-// A window says it has left its notebooks before it goes (B144). A person's
+// A window says it has left its notebooks before it goes. A person's
 // browser does this itself, on pagehide, with its session cookie; a harness
 // page authenticates with an injected header, which a request sent during
 // unload does not carry, and Playwright's close runs no pagehide at all. So
@@ -157,7 +157,7 @@ export async function leaveNotebooks(p){
     .catch(() => {});
 }
 
-// Function coverage (roadmap R76): under `aerie tests coverage` the copy the
+// Function coverage: under `aerie tests coverage` the copy the
 // run is made from is instrumented and every page keeps its counts in
 // window.__bbcovc; they are written out when a page closes and when a
 // suite is done, one file per page, for the run to merge into the tree's
@@ -206,7 +206,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     extraHTTPHeaders: { Authorization: 'Basic '
       + Buffer.from(`${CREDS.username}:${CREDS.password}`).toString('base64') },
     ...opts });
-  // The first-use tour (R94) would stand over every page a suite looks at:
+  // The first-use tour would stand over every page a suite looks at:
   // off unless the suite asks for it.
   if (!tour) await ctx.addInitScript(() => { window.BB_NO_TOUR = true; });
   const page = await ctx.newPage();
@@ -223,11 +223,11 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // absent element.
   // Each request by when it began, not a count that goes up and down: a
   // request cut off by a reload or a navigation never says it finished or
-  // failed (measured 14 Nov: twelve in flight at a reload stayed counted
+  // failed (twelve in flight at a reload stayed counted
   // for good, and cards.mjs, which reloads often, read 34 in flight on a
   // page at rest), so a suite that reloads read as asking the server
   // forever: every wait that ran out was given three budgets, and
-  // settled() never saw the page at rest (R228 step 19). What
+  // settled never saw the page at rest. What
   // is still open when the page asks for a new document of its own is the
   // old document's and is dropped; and a request that began longer ago
   // than BUSY_MS is not a page about to answer.
@@ -261,8 +261,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
         active: typeof active !== "undefined" ? active : null,
         // Which tab each pane shows and which view a shown notebook is
         // on: a wait for something drawn in a panel that is not on
-        // screen times out looking exactly like one that never drew
-        // (B297).
+        // screen times out looking exactly like one that never drew.
         panes: (typeof panes !== "undefined" ? panes : []).map(id =>
           id ? ((typeof tabs !== "undefined" ? tabs : []).find(t => t.id === id)?.kind || "?") + ":" + id : null),
         nbView: [...document.querySelectorAll(".nbview:not([hidden])")]
@@ -290,7 +289,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     page[m] = async (...args) => {
       // waitForFunction(fn, arg, options): options passed second, where the
       // function's argument goes (208 waits did), were the 30s default with
-      // the object handed to the page (B556). Moved to where they belong
+      // the object handed to the page. Moved to where they belong
       // when there is nothing third, never below that default, which every
       // one of them has run on: a 40s wait now waits 40s, and a 10s one
       // keeps the 30s it was proven against.
@@ -301,13 +300,13 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       const last = args[args.length - 1];
       if (last && typeof last === "object" && typeof last.timeout === "number")
         args[args.length - 1] = { ...last, timeout: patience(last.timeout) };
-      // A wait has one budget (R7 step 7). It had three: one that ran out
+      // A wait has one budget. It had three: one that ran out
       // while the page had requests in flight, or while the machine's load
       // was at its cores, was given the same time twice more, since four
-      // workers on four cores timed out a dozen checks a day (27 Sep). The
+      // workers on four cores timed out a dozen checks a day. The
       // suites wait on what they check now and run at half the cores, and a
       // whole run with one budget and no doubling flaked no more than one
-      // with three (15 Nov); what the spare budgets did by then was make a
+      // with three; what the spare budgets did by then was make a
       // wait that could never come true cost three times as long.
       const budget = () => (typeof args[args.length - 1]?.timeout === "number" ? args[args.length - 1].timeout : patience(30000));
       // A predicate that answers with a Promise (an async function, or one
@@ -370,7 +369,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // With the URL, because "Failed to load resource: 400" names neither what
   // asked nor what was asked for, and a console error nobody can locate is
   // one nobody fixes.
-  // The box's own networks changing under the browser (B753): a suite that
+  // The box's own networks changing under the browser: a suite that
   // brings a compose project up or down beside this one makes or takes a
   // Docker network, and Chromium cuts what it has in flight with
   // ERR_NETWORK_CHANGED. That is this machine, not the page: what it cut
@@ -387,11 +386,11 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   });
   // Only what names the cut itself: the three seconds after one in which a
   // failed fetch or a name not defined was let through as its doing came
-  // off with the other layers (R7 step 7).
+  // off with the other layers.
   const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);
   // WebKit's line for a load of the page's own origin it canceled itself,
   // under a gate's load ("Fetch API cannot load URL due to access control
-  // checks", B1141). Nothing the server does is worded so (proven 24 Nov in
+  // checks"). Nothing the server does is worded so (proven 24 Nov in
   // WebKit: a dropped or reset connection is "Connection terminated
   // unexpectedly", a refusal "the server responded with a status of N", a
   // real cross-origin refusal "Origin ... is not allowed by
@@ -402,9 +401,9 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     const m = /Fetch API cannot load (\w+:\s*\/+\S+?)\.?\s+due to access control checks\.?\s*$/.exec(String(text).trim());
     if (!m) return false;
     // The page's origin, or the harness's own server's: mid-reload WebKit
-    // can say the page is elsewhere (sessions.mjs's phone, 26 Nov, B1133).
+    // can say the page is elsewhere (sessions.mjs's phone).
     // Any loopback name for the same port is the same server: the page and
-    // the harness name it 127.0.0.1 or localhost by turns (B1133, 26 Nov).
+    // the harness name it 127.0.0.1 or localhost by turns.
     const loop = h => ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(h) ? 'loopback' : h;
     const key = u => { try { const x = new globalThis.URL(u); return `${x.protocol}//${loop(x.hostname)}:${x.port}`; } catch { return ''; } };
     const own = [page.url(), URL].map(key).filter(Boolean);
@@ -416,8 +415,8 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     if (url.includes('/term') || cutByNet(m.text()) || cutByWebKit(m.text())) return;
     const at = url ? ` [${url.replace(/^https?:\/\/[^/]+/, '')}]` : '';
     // Firefox and WebKit write an Error logged whole as JSHandle@object:
-    // its name and message are read off it, so the failure says what it was
-    // (R263). Its place in the list is taken at once, filled when read.
+    // its name and message are read off it, so the failure says what it was.
+    // Its place in the list is taken at once, filled when read.
     if (!/JSHandle@/.test(m.text())){ page.errors.push(m.text() + at); return; }
     const i = page.errors.push(m.text() + at) - 1;
     Promise.all(m.args().map(a => a.evaluate(v => v instanceof Error ? `${v.name}: ${v.message}` : typeof v === 'object' ? JSON.stringify(v) : String(v)).catch(() => '?')))
@@ -436,7 +435,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     page.errors.push(t);
   });
   page.on('dialog', d => { page.dialogs.push(d.message()); d.accept(); });
-  // The page's own questions (page-ask.js, R121) are answered the way the
+  // The page's own questions (page-ask.js) are answered the way the
   // browser's were: their words recorded on page.dialogs, and the first
   // answer pressed on the modal, unless a test queued another on
   // page.answers: an index into the choices, -1 for Cancel, {index, text}
@@ -447,8 +446,8 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     const a = page.answers.length ? page.answers.shift() : 0;
     return typeof a === 'function' ? a(q) : a;
   });
-  // The project settings are sections, one open at a time (the operator,
-  // 7 Oct). A person opens the section a field is in before using it, and so
+  // The project settings are sections, one open at a time.
+  // A person opens the section a field is in before using it, and so
   // does a suite: before an action on, or a wait for, a field inside a shut
   // section, its heading is pressed. Only those sections; a check of which
   // one a door opens reads the folds with $eval, which this leaves alone.
@@ -641,7 +640,7 @@ export const SLOW = Number(process.env.BB_TEST_SLOW || 1) || 1;
 export const patience = ms => Math.round(ms * SLOW);
 // Until `fn` answers something true, looked at every `every` ms, for `ms`
 // at most (stretched as every wait here is): what a fixed sleep was a guess
-// at (R7 step 4). It answers what `fn` last did, so the check after it
+// at. It answers what `fn` last did, so the check after it
 // reads the thing that was waited for and fails in its own words when it
 // never came. For the page itself, page.waitForFunction; this is for what
 // a suite reads from outside it: a file, a tmux session, a job's row.
@@ -659,15 +658,15 @@ export const until = async (fn, ms = 5000, every = 50) => {
 // sleep so that what is left of the fixed pauses says it is one of these.
 export const quiet = ms => sleep(ms);
 
-// A project's settings save a section at a time (the operator, 10 Oct):
+// A project's settings save a section at a time:
 // each section's bar has Save, or with a session of this account running and
 // a change it takes only at its start (the author, reads, the model) both
 // Save, keep it running and Save and end it at once. sectSave presses one
 // section's and waits for it to finish: "" when it saved, else what its bar
 // says went wrong. `end` picks Save and end it where the bar offers it.
 // A page of settings (a project's Settings view, Controller settings,
-// Profile) shows one section at a time, picked from the list beside it (the
-// operator, 16 Oct); the project's dialog shows them all. A suite picks the
+// Profile) shows one section at a time, picked from the list beside it;
+// the project's dialog shows them all. A suite picks the
 // section before it touches a field there; where there is no list this does
 // nothing.
 export async function splitPick(page, id){
@@ -706,7 +705,7 @@ export async function saveDialog(page, { end = false, timeout = 15000 } = {}){
   // The dialog wakes its bars on a 0 ms timer after a change (index.html's
   // rnmodal wiring), and a check that has just resolved is in the same tick:
   // read the bars after the page's own timers have run, or a change made
-  // this instant reads as nothing to save (B691).
+  // this instant reads as nothing to save.
   await page.evaluate(() => new Promise(r => setTimeout(r, 0)));
   for (let i = 0; i < 12; i++){
     const sect = await page.evaluate(() => [...document.querySelectorAll('.rnbar')]
@@ -744,14 +743,14 @@ export async function refreshUntil(page, fn, { timeout = 60000, every = 1000 } =
 // (state.docker = {on:false}, an attention row, a session that is not there)
 // and then makes several assertions about it is racing that timer: usually
 // it wins, and about one run in three a tick lands mid-block and the page
-// redraws from the truth instead. That is bug B99's whole family, and it
+// redraws from the truth instead, which
 // cost a bisect that blamed a commit.
 //
 // So: plant, assert, release. `refresh` is a top-level function declaration,
 // so the binding can be swapped and put back; nothing in the page has to
 // know about this. A poll already out when the hold goes on still lands, so
 // the hold waits for it: landing after the caller planted its rows, it put
-// the server's back over them (B295).
+// the server's back over them.
 //
 // Every read already out is waited for too: one asked just before
 // the hold landed after it, under a gate's load where a read takes long
@@ -768,8 +767,8 @@ export const holdPoll = async page => {
 export const freePoll = page => page.evaluate(() => {
   if (window.__heldRefresh){ refresh = window.__heldRefresh; window.__heldRefresh = null; }
   if (window.__heldLoadNodes){ loadNodes = window.__heldLoadNodes; window.__heldLoadNodes = null; }
-  // The status poll is a chain each read schedules the next of (R218 step
-  // 10): a timer that fired into the held no-op scheduled nothing.
+  // The status poll is a chain each read schedules the next of:
+  // a timer that fired into the held no-op scheduled nothing.
   if (typeof statusLater === 'function') statusLater();
 });
 // The hold for a walk that plants a node of its own (its report, its
@@ -799,7 +798,7 @@ export async function openSection(page, key, scope = ''){
   await page.waitForFunction(s => document.querySelector(s)?.open, sel, { timeout: 5000 }).catch(() => {});
 }
 
-// The Projects page's Archived fold opened (the operator, 18 Oct: a locked
+// The Projects page's Archived fold opened (a locked
 // project is archived, its card folded away at the page's foot), so an
 // archived card can be read and pressed; the fixture's delta is one.
 export async function openArchived(page){
@@ -870,7 +869,7 @@ export async function closeFold(page, sel){
 // The Doctor's first verdict, which under a whole gate's load comes late:
 // its budget is an option, the third argument. Passed as the second it was
 // the function's argument, and every suite's first wait gave up at
-// Playwright's own thirty seconds, "before its first check" (B1178, B1133).
+// Playwright's own thirty seconds, "before its first check".
 export const ready = page => page.waitForFunction(() => {
   const d = document.getElementById('docDot');
   return d && !d.hidden && d.className.includes('ok');
@@ -908,7 +907,7 @@ export const nbShown = (page) =>
 // the others says so once, here, rather than every test in it knowing which
 // tab the panel happens to start on.
 // A notebook view by its button, its group first when the button is in a
-// group that is shut (R259: the strip is five groups, a group's views in a
+// group that is shut (the strip is five groups, a group's views in a
 // row under it). `scope` narrows to one notebook.
 export async function nbGo(page, v, scope = '.pane .nb'){
   // Found as Playwright finds it, so a scope in its own selector language
@@ -946,7 +945,7 @@ export const nbGone = (page) =>
   page.waitForFunction(() => !document.querySelector('.pane .nb'),
                        { timeout: 20000 });
 
-// A repository's settings as the server reads them (R138): its own record
+// A repository's settings as the server reads them: its own record
 // with its project's laid over it, where the node, the dials and what it
 // reads, sees and reaches are kept. Read straight from the state file, so a
 // suite sees what was written, not what the page last polled.
@@ -966,7 +965,7 @@ export function prefsOf(name){
   return { ...(all[name] || {}), ...Object.fromEntries(GROUP_FIELDS.filter(f => f in proj).map(f => [f, proj[f]])) };
 }
 
-// A project's controls are on its card's back (R138): a check that presses
+// A project's controls are on its card's back: a check that presses
 // one of them turns the card over with Edit first, the way a person would.
 export async function unfold(page, project){
   await page.evaluate(() => { if (tabOf(panes[active])?.kind !== 'projects') openProjectsTab(); });
@@ -987,11 +986,11 @@ export async function unfold(page, project){
   if (turning) await sleep(Math.max(0, 500 - (Date.now() - pressed)));
 }
 
-// The owner takes a project on (R135): a suite that drops a project
+// The owner takes a project on: a suite that drops a project
 // directory into the workspace, or makes one outside the create dialog,
 // gives it to the owner's own list the way the Users tab does, since "*"
 // lists every project and takes none on.
-// A folder made by hand is no project since R154 (the operator, 8 Oct): only
+// A folder made by hand is no project: only
 // create, clone and import record one. A suite that drops a project directory
 // into the workspace records it the way an import would, in projects.json,
 // which the server reads again when the file changes.
@@ -1029,15 +1028,15 @@ export async function takeOn(...names) {
   return (await r.json()).projects || [];
 }
 
-// What a plain account could do before R152 (the operator, 7 Oct: there is
+// What a plain account does (there is
 // no user role now, and an account holds nothing until given a role), as a
 // role a suite gives the accounts it makes, the way an administrator would
 // on the Roles tab: work on the projects the account is on, and read their
 // settings, releases, credential and containers, with the shielded console.
-// ---- asking the server from outside the page (R7 step 5) --------------------
+// ---- asking the server from outside the page --------------------
 // Who asks and how were written out in suite after suite: the owner's Basic
-// header by hand in fifty-six files, an api() of one of two shapes in
-// thirty-three, asUser() in four, a session's token minted by a python
+// header by hand in fifty-six files, an api of one of two shapes in
+// thirty-three, asUser in four, a session's token minted by a python
 // snippet in four. One of each, here.
 //
 // asUser(name, password): the headers an account asks with. OWNER is the
@@ -1119,7 +1118,7 @@ export async function member(...names) {
   const base = URL.replace(/\/$/, '');
   await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'set', name: 'member', scope: 'projects', perms: MEMBER, note: 'a suite\'s plain account' }) });
-  // A role on a project is given on the project (R155). A suite's plain
+  // A role on a project is given on the project. A suite's plain
   // account holds it on every project, and the projects it is on (set
   // before this or after) decide which it reaches, as its list did before.
   const d = await (await fetch(`${base}/api/roles`, { headers: h })).json();
@@ -1134,7 +1133,7 @@ export async function member(...names) {
   }
 }
 
-// The Library narrowed as a person would (R256): it opens on shelves of
+// The Library narrowed as a person would: it opens on shelves of
 // eight, so a suite after a card past them, or every card of a kind, asks
 // for it: `q` its search, `kind` a chip (its every page brought in), `all`
 // the cards for other systems too (left out, as the page leaves them). Resolves once the list is drawn whole.
@@ -1151,7 +1150,7 @@ export async function libraryShow(page, { q = '', kind = '', all = false } = {})
 }
 // ...and back to the front page's shelves.
 export async function libraryFront(page){ await libraryShow(page, { all: false }); }
-// What is wrong with the Library's Rows as drawn, card by card (R256): the
+// What is wrong with the Library's Rows as drawn, card by card: the
 // verbs on the card's own lines (its name, who made it and its pills) at
 // the card's right edge, the name never squeezed under a few words' width,
 // anything else the card carries (the driver's version, a failed job's
@@ -1188,7 +1187,7 @@ export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrow
 }
 
 // A Kubernetes API server the suites stand up the way agent-stub stands in
-// for a node (R281): it answers /version, nodes and namespaces, and keeps
+// for a node: it answers /version, nodes and namespaces, and keeps
 // what it is sent (POST makes, PUT replaces) by path, so a space's
 // environment saved through the page makes its namespace, its deployer and
 // their Role here. `token` is what it takes as a bearer token; `forbid` the
@@ -1206,7 +1205,7 @@ export async function kubeApi({ token = 'good', namespaces = [] } = {}){
     req.on('end', () => {
       const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
       api.calls.push(`${req.method} ${req.url}`);
-      // A deployer's token (R281 step 5) reaches its own namespace and
+      // A deployer's token reaches its own namespace and
       // nothing else, as its Role does on a real cluster.
       const bearer = String(req.headers.authorization || '').replace(/^Bearer /, '');
       const nsOf = api.deployers.get(bearer);
@@ -1256,7 +1255,7 @@ export async function kubeApi({ token = 'good', namespaces = [] } = {}){
       return send(405, { message: 'not here' });
     });
   });
-  // A pod's exec (R281): the channel protocol over a websocket, its token
+  // A pod's exec: the channel protocol over a websocket, its token
   // held to its namespace as above; what comes in on stdin goes back on
   // stdout as "echo: ...", and each resize is kept on `resizes`.
   api.resizes = [];

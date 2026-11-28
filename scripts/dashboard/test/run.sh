@@ -28,10 +28,10 @@ set -euo pipefail
 # A Claude session's own git identity and credential helper ride in
 # GIT_CONFIG_n, which every git the fixture runs would read as its config,
 # and bb-tty leaves alone as somebody else's: not the fixture's to inherit
-# (B151; settings.mjs met it as B146).
+# (settings.mjs met it too).
 while IFS= read -r v; do unset "$v"; done < <(compgen -e | grep -E '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)$' || true)
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Which engines (R263 step 5, the operator, 23 Nov: every suite in all
+# Which engines (every suite in all
 # three): --engine NAME, again for more, or BB_TEST_ENGINES; else every
 # engine the store carries (test_engines below). Taken off the arguments
 # here, so the rest sees suite names alone.
@@ -46,7 +46,7 @@ done
 set -- ${_args[@]+"${_args[@]}"}
 export BB_TEST_ENGINES
 # Its own: the harness sources nothing of bb's, and the sentence a failed copy
-# meant to say ended as "die: command not found" (B231).
+# meant to say ended as "die: command not found".
 die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
 # What a run takes out of the environment it starts in, for a fresh world's
 # own shell and for a suite attached to a kept one. Run from a session ON A
@@ -60,7 +60,7 @@ die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
 SCRUB=(BUILDERBOT_ROLE BB_CONTROLLER BB_CONTROLLER_PIN BB_NODE BUILDERBOT_NODE
        BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_CI_LOG_DIR
        BB_NODE_TOOLCHAINS BB_EMU_LOCAL)
-# The root tier is the one thing here that is root's to run (R240 step 5):
+# The root tier is the one thing here that is root's to run:
 # what the root agent does in a folder an account controls. `aerie devapp test
 # root-tier` reaches it through the space's test command inside its dev
 # instance, where the exec is root, in a container.
@@ -106,7 +106,7 @@ suite_takes() {
 suite_why() { head -40 "$1" | sed -n 's|^// engines: *[a-z ]*[:,(-]* *||p' | head -1; }
 PW_BROWSERS="$(bash "$HERE/../../aerie" capture shot --print-browsers-path 2>/dev/null || true)"
 
-# ---- a kept fixture (roadmap R75 step 2) ------------------------------------
+# ---- a kept fixture ------------------------------------
 # `aerie tests keep` runs this script with BB_TEST_HOLD=1: the whole set-up, then
 # instead of suites it writes its address to $KEEPF and waits to be stopped.
 # Any run after that ATTACHES: no copy, no fixtures, no server, just the
@@ -122,31 +122,31 @@ PW_BROWSERS="$(bash "$HERE/../../aerie" capture shot --print-browsers-path 2>/de
 KEEPF="${TMPDIR:-/tmp}/bb-suite.keep"
 # A worker never attaches: its parent decided that a fresh world per file is
 # what this run gets, and one kept world cannot be three workers' worlds. Nor
-# does a house rule's check or the pre-push gate (BB_TEST_FRESH, B785, B240): a
+# does a house rule's check or the pre-push gate (BB_TEST_FRESH): a
 # verdict is on the change, not on whatever a probe left in the kept world.
 if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST_FRESH:-}" ] && [ -f "$KEEPF" ]; then
     # shellcheck source=/dev/null
     . "$KEEPF"
     # A fixture kept from another tree (a worktree, another session's
     # checkout) is not this run's: its server is that tree's python, and
-    # copying this tree's page into it would disturb its keeper (B60). Such
+    # copying this tree's page into it would disturb its keeper. Such
     # a run is an ordinary one, so the keeper's lock holds it like any other.
     _here_root="$(cd "$HERE/../../.." && pwd)"
     if kill -0 "${KEEP_PID:-0}" 2>/dev/null && [ -n "${KEEP_ORIGIN:-}" ] && [ "$KEEP_ORIGIN" != "$_here_root" ]; then
         printf '[dashboard-test] a fixture is kept from %s, not this tree (%s): not attaching to it\n' "$KEEP_ORIGIN" "$_here_root" >&2
     elif kill -0 "${KEEP_PID:-0}" 2>/dev/null; then
         [ $# -gt 0 ] || { printf '[dashboard-test] ERROR: a fixture is kept (%s): name a suite or a probe to run against it, or aerie tests keep stop\n' "$KEEP_URL" >&2; exit 1; }
-        # One attached run at a time, as a fresh run is (B240). The keeper
+        # One attached run at a time, as a fresh run is. The keeper
         # holds the harness's lock, so an attached run keeps its own beside
         # it: two pages on the test account in one kept world fight over its
         # tabs, and the hand-back hook's design check, attaching in the
         # middle of a session's own suites, failed both on waits that had
         # nothing to do with the change. The sentence is the fresh run's, so
-        # the hook passes it through as a check that could not run (B232).
+        # the hook passes it through as a check that could not run.
         ALOCK="${TMPDIR:-/tmp}/dashboard-test.d/attached"
         # Not our own pid: on an NFS tree this script takes the lock, then
         # execs its copy under the same pid, which read the lock back as a
-        # competitor that had started 00:00 ago and refused itself (B263).
+        # competitor that had started 00:00 ago and refused itself.
         if [ -z "${BB_TEST_CONCURRENT:-}" ] && [ -f "$ALOCK" ]; then
             other="$(cat "$ALOCK" 2>/dev/null || true)"
             if [ -n "$other" ] && [ "$other" != "$$" ] && [ -d "/proc/$other" ]; then
@@ -175,7 +175,7 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
                 # The kept world's own environment, the same as a fresh run sets
                 # below: its private tmux server, its git config, and none of the
                 # node's or the session's own variables (SCRUB). Without it a suite
-                # that ends or makes a tmux session refused to run attached (B230).
+                # that ends or makes a tmux session refused to run attached.
                 env -u TMUX "${scrub[@]}" \
                     TMUX_TMPDIR="$KEEP_S/tmux" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$KEEP_S/gitconfig" \
                     DASHBOARD_TEST_URL="$KEEP_URL" DASHBOARD_TEST_CHROME="$KEEP_CHROME" \
@@ -196,7 +196,7 @@ fi
 # box (load 0.06), same commit, same file: testreg.mjs takes 22.7s from the
 # share and fails its ten-second waits, and 8.9s from local disk and passes.
 # Two and a half times, which is the difference between a budget that holds
-# and one that does not, and it is why a run here could not be trusted (B124).
+# and one that does not, and it is why a run here could not be trusted.
 #
 # So the run happens from a copy on local disk: the same bytes, uncommitted
 # work included, with the network out of the way. Left behind: the android
@@ -204,7 +204,7 @@ fi
 # read apps/android/api-surface.json and app/build.gradle.kts, so the app itself
 # comes along); dist/, for the same reason; and .git, because nothing here runs
 # git against this repository, only against the fixtures it makes.
-# What a run ended by its process group left behind (B347): its copy of
+# What a run ended by its process group left behind: its copy of
 # the tree, its state dir and its private tmux server. The cleanup below
 # runs on a normal exit only, so each is stamped with the pid that made it
 # and the next start removes the ones whose maker is gone. A kept fixture's
@@ -217,12 +217,12 @@ sweep_leftovers() {
         if [ -z "$p" ] || ! kill -0 "$p" 2>/dev/null; then
             # ...and the tmux server that ran inside it, by its socket, which
             # tmux keeps a level down (tmux/tmux-UID/default): the glob one
-            # level up matched a directory and left every server running (B608).
+            # level up matched a directory and left every server running.
             [ -d "$d/tmux" ] && for sock in "$d"/tmux/*/*; do
                 [ -S "$sock" ] && tmux -S "$sock" kill-server 2>/dev/null || true
             done
             # ...and its ssh-agent, by the pid it wrote, once that pid is
-            # still an ssh-agent on this run's socket (B608).
+            # still an ssh-agent on this run's socket.
             p="$(sed -n 's/^SSH_AGENT_PID=\([0-9]*\);.*/\1/p' "$d/agent.env" 2>/dev/null || true)"
             if [ -n "$p" ] && tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -qF "ssh-agent -a $d/"; then
                 kill "$p" 2>/dev/null || true
@@ -236,12 +236,12 @@ sweep_leftovers() {
 # serves the page's scripts from disk on every load while its server keeps
 # the python it started with, so an edit made during the run (a session
 # carrying on while the suite runs) gave a run of neither version, and a
-# verdict about nothing. On NFS the copy also spares the suite's own waits
-# (B124), and a covered run rewrites the files it runs (B616). Since every
-# node holds its projects on its own disk (R163) nothing else made a copy.
+# verdict about nothing. On NFS the copy also spares the suite's own waits,
+# and a covered run rewrites the files it runs. Since every
+# node holds its projects on its own disk nothing else made a copy.
 # BB_TEST_INPLACE=1 runs from the checkout for anyone debugging this, and
 # then nothing under the dashboard is edited until it ends.
-# A run on a commit (R55): --at REF, or BB_TEST_AT=REF, copies the tree as
+# A run on a commit: --at REF, or BB_TEST_AT=REF, copies the tree as
 # that commit has it (git archive) rather than the working tree, so a
 # before-and-after needs no stash; the map the plan reads comes along as
 # ever. A copy without the repository (a test node's snapshot) cannot.
@@ -273,7 +273,7 @@ if [ -z "${BB_TEST_COPY:-}" ] && [ -z "${BB_TEST_INPLACE:-}" ]; then
     # What git ignores stays behind too, but for the map the plan reads
     # (.bb-map): an ignored folder is a build's output or somebody's scratch,
     # and /tmp is memory on a node. An 11 GB trial install ignored at the
-    # root was being copied into it when the run was cut (B433).
+    # root was being copied into it when the run was cut.
     if [ -n "$_sha" ]; then
         git -C "$_src" -c safe.directory="$_src" archive "$_sha" | tar -C "$_dst" -xf - \
             || { rm -rf "$_dst"; die "could not copy commit $_sha to $_dst"; }
@@ -293,7 +293,7 @@ if [ -z "${BB_TEST_COPY:-}" ] && [ -z "${BB_TEST_INPLACE:-}" ]; then
     BB_TEST_COPY="$_dst" BB_TEST_ORIGIN="$_src" exec bash "$_dst/scripts/dashboard/test/run.sh" "$@"
 fi
 DASH="$(dirname "$HERE")"
-# Function coverage (roadmap R76), under `aerie tests coverage`: the page files
+# Function coverage, under `aerie tests coverage`: the page files
 # of THIS copy are rewritten to count every function body they enter (never
 # the tree: with no copy, BB_TEST_INPLACE, it is refused), the server
 # records the functions it enters, and the counts are merged into the
@@ -316,7 +316,7 @@ fi
 
 # Missing pieces FAIL, by name. They used to print [skip] and exit 0, and
 # on a node, where the runner's jobs had no node or Playwright on PATH,
-# every CI run of this suite was green without running a test (bug B74).
+# every CI run of this suite was green without running a test.
 # A run that could not start is not a pass.
 #
 # The same search aerie uses, for both: the module and the browsers live on the
@@ -363,7 +363,7 @@ PY
 free_port() { free_ports 1; }
 PORT="${DASHBOARD_TEST_PORT:-$(free_port)}"
 # A port a person pinned is theirs; one the run picked for a worker, or here,
-# may be picked again if it is taken before the server binds it (B1114).
+# may be picked again if it is taken before the server binds it.
 PORT_PINNED=""
 [ -n "${DASHBOARD_TEST_PORT:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && PORT_PINNED=1
 [ -n "$PORT" ] || die "could not find a free port for the test server"
@@ -419,17 +419,17 @@ if [ -z "${BB_TEST_WORKER:-}" ]; then
 # BB_TEST_WAIT_LOCK=SECONDS waits that long for a run that holds it to end
 # rather than refusing at once: a preflight started in the background met
 # the hand-back hook's own check run, which ends in minutes, and stopped
-# having run nothing (B572). Fifteen minutes by default for every run, not
+# having run nothing. Fifteen minutes by default for every run, not
 # only preflight's: a session's own suite started as a turn ended met the
-# hook's check the same way and was refused (B759); 0 refuses at once.
+# hook's check the same way and was refused; 0 refuses at once.
 waited=0
 for l in "$LOCK" "${TMPDIR:-/tmp}/dashboard-test.lock"; do
     [ -z "${BB_TEST_CONCURRENT:-}" ] && [ -f "$l" ] || continue
     other="$(cat "$l" 2>/dev/null || true)"
     while [ -n "$other" ] && [ -d "/proc/$other" ] && [ "$waited" -lt "${BB_TEST_WAIT_LOCK:-900}" ]; do
         if [ "$waited" -eq 0 ]; then
-            # A kept fixture holds it until it is stopped, which no wait ends
-            # (B343): said, with how.
+            # A kept fixture holds it until it is stopped, which no wait ends:
+            # said, with how.
             if [ -f "$KEEPF" ] && [ "$(sed -n 's/^KEEP_PID=//p' "$KEEPF" 2>/dev/null)" = "$other" ]; then
                 echo "[dashboard-test] waiting for the lock, which the fixture aerie tests keep holds (pid $other): aerie tests keep stop releases it" >&2
             else
@@ -449,7 +449,7 @@ done
 rm -f "$LOCK" 2>/dev/null || true
 ( umask 000; printf '%s' "$$" > "$LOCK" ) 2>/dev/null \
     || die "cannot take $LOCK: $(stat -c %U "$LOCK" 2>/dev/null || echo somebody)'s, and $LOCKDIR is not world-writable; fix the directory's mode (chmod 0777) and re-run"
-# ...and one run on the machine, whoever starts it (B986). A session's /tmp
+# ...and one run on the machine, whoever starts it. A session's /tmp
 # and its pids are its own, so the lock above kept two runs of one session
 # apart and nothing else: two sessions' gates, or a session's and the CI
 # runner's, ran at once with all their workers each. The node's agent makes
@@ -486,7 +486,7 @@ S="$(mktemp -d "${TMPDIR:-/tmp}/dashboard-test.XXXXXX")"
 # writing it, which is all an update of AerieOS does to one.
 cp "$DASH/service-images.json" "$S/service-images.json"
 # Where each suite's seconds are kept for the run's queue (run_file, the
-# queue's order, R130): beside the code map in the tree the run was made from, which
+# queue's order): beside the code map in the tree the run was made from, which
 # is this node's own and gitignored; workers inherit the path.
 if [ -z "${SUITE_TIMES:-}" ]; then
     _o="${BB_TEST_ORIGIN:-$(cd "$HERE/../../.." && pwd)}"
@@ -502,7 +502,7 @@ if [ -n "${BB_COVERAGE:-}" ]; then
     fi
     mkdir -p "$BB_COVERAGE_DIR"
     # A counted page is a slower page, and the suites' waits are budgets
-    # for the real one (B219): every patience() gets twice the time here.
+    # for the real one: every patience gets twice the time here.
     export BB_TEST_SLOW="${BB_TEST_SLOW:-2}"
 fi
 coverage_merge() {
@@ -516,7 +516,7 @@ coverage_merge() {
     log "coverage from $n file(s) merged into $origin/.bb-map/coverage.json; aerie map coverage reads it"
 }
 # Every suite but the library and the lab's: a lab-*.mjs runs against a
-# real service (roadmap R54) and is asked for by name, `aerie tests lab`.
+# real service and is asked for by name, `aerie tests lab`.
 default_suites() {
     local t
     for t in "$HERE"/*.mjs; do
@@ -524,7 +524,7 @@ default_suites() {
     done
 }
 
-# ---- N workers at once (roadmap R81) ----------------------------------------
+# ---- N workers at once ----------------------------------------
 # BB_TEST_WORKERS=N, N above one, runs the suites across N children of this
 # process at once. A worker is this same script with BB_TEST_WORKER set: it
 # skips what the parent did once (the copy to local disk, the coverage
@@ -556,7 +556,7 @@ stream_log() {
         cat "$f"
     fi
 }
-# A run whose launcher is gone ends (B926): a gate ended by its own pid
+# A run whose launcher is gone ends: a gate ended by its own pid
 # left this script under nobody, its workers going on through the queue,
 # servers and all, and tidy spared them for the lock it held. Every three
 # seconds it asks whose child it is now; another than the one it started
@@ -589,7 +589,7 @@ workers_cleanup() {
         log "the tree it ran from is kept at $BB_TEST_COPY"
     fi
 }
-# The machine's load as a run ends (R108), the one-minute and five-minute
+# The machine's load as a run ends, the one-minute and five-minute
 # averages and its cores: what a timing in this log was taken under, which
 # aerie tests ingest keeps with the run so the Tests tab can tell a quiet run's
 # seconds from a busy one's.
@@ -619,7 +619,7 @@ run_workers() {
         case "$t" in /*) f="$t" ;; *) f="$HERE/${t%.mjs}.mjs" ;; esac
         printf '%s\t%s\n' "$t" "$(wc -l < "$f" 2>/dev/null || echo 0)"
     done > "$S/sizes"
-    # The queue (R130): every suite, longest first by its last measured
+    # The queue: every suite, longest first by its last measured
     # seconds (its line count where it has none), taken by whichever worker
     # is free.
     SIZES="$S/sizes" TIMES="${SUITE_TIMES:-}" python3 - > "$S/queue" <<'QUEUE'
@@ -646,7 +646,7 @@ QUEUE
     else
     log "workers: $n taking from a queue of ${#names[@]} suites, longest first, each the next while the machine has room"
     fi
-    # What bounds this run (R130): when it started, the suites' timings
+    # What bounds this run: when it started, the suites' timings
     # appended from here, and the machine's load every ten seconds.
     local t_start t_phase times_from=0 sampler=""
     t_start="$(date +%s)"
@@ -670,7 +670,7 @@ QUEUE
         log "worker $((i + 1)) of $n (port ${ports[i]}, pid $!)"
     done
     if [ -n "${LOADED_SUITE:-}" ]; then
-        # One suite beside the rest (R250 step 1): its verdict is the run's,
+        # One suite beside the rest: its verdict is the run's,
         # and once it has one the others are stopped where they are.
         local lrc="" w="" alive p
         while :; do
@@ -712,7 +712,7 @@ QUEUE
         fi
     done
     WORKER_PIDS=()
-    # Every suite queued is accounted for (B919): one no worker finished,
+    # Every suite queued is accounted for: one no worker finished,
     # never taken or taken by a worker that ended under it, is named and run
     # once more alone, as a failed one is. A run that failed with every
     # suite passed and none named was such a suite, and said nothing.
@@ -729,9 +729,9 @@ QUEUE
         | awk '/^[0-9]+ passed, [0-9]+ failed/ { p += $1; f += $3 } END { print p + 0, f + 0 }')
     log "workers: $tp passed, $tf failed across $n workers, ${#names[@]} suites${failed[*]:+; failed in the run: ${failed[*]}}"
     # Once more for each suite that failed, in a world of its own, three at
-    # a time (R228 step 19; BB_TEST_RERUNS_AT_ONCE says otherwise). One at a
+    # a time (BB_TEST_RERUNS_AT_ONCE says otherwise). One at a
     # time, each built its world while the rest of the box sat idle: 23 of a
-    # run's 40 minutes at its worst (14 Nov). Three worlds on a machine that
+    # run's 40 minutes at its worst. Three worlds on a machine that
     # ran eight beside each other with nothing failed are alone as far as a
     # suite can tell, so "flaky" still means failed under the whole run's
     # load and passed without it. Each on a port picked for it here, since
@@ -780,7 +780,7 @@ QUEUE
     done
     if [ "${#flaky[@]}" -gt 0 ]; then
         warn "flaky: ${flaky[*]} failed in the whole run and passed again alone"
-        # ...and remembered (R7 step 3): a line each beside the suites'
+        # ...and remembered: a line each beside the suites'
         # timings, with the first check that failed in the run, which
         # aerie tests flakes counts.
         flakes_record "$n" "${logs[*]}" "${flaky[@]}"
@@ -788,14 +788,14 @@ QUEUE
     # ...and named, the ones that failed again: a suite that ends before its
     # first check (an uncaught timeout in its set-up) prints no FAIL line and
     # adds nothing to the count, so "0 failed" sat above two suites that had
-    # run nothing, and they read as flakes (B464).
+    # run nothing, and they read as flakes.
     if [ "${#again_failed[@]}" -gt 0 ]; then
         warn "failed again alone: ${again_failed[*]} (a suite that ends before its checks finish counts no FAIL: read its output above)"
     fi
     [ -n "$sampler" ] && kill "$sampler" 2>/dev/null
     # ...and said: the run's wall, how busy the workers were, the worker and
     # the suite that set the floor, the reruns' share and the load, then the
-    # one thing that would make it faster (R130).
+    # one thing that would make it faster.
     BB_PLAN="$(cat "$S/queue.ran" 2>/dev/null)" BB_HELD="$(cat "$S/queue.held" 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 0)" BB_T0="$t_start" BB_T1="$t_phase" BB_TIMES="${SUITE_TIMES:-}" BB_FROM="$times_from" \
     BB_N="$n" BB_LOGS="${logs[*]}" BB_RERUNS="${failed[*]}" BB_AGAIN="${again_failed[*]}" BB_LOAD="$S/load.samples" \
     BB_OUT="$(dirname "${SUITE_TIMES:-$S/x}")/last-run-bound.json" python3 - "$S/bound.json" <<'BOUND' && python3 "$DASH/../lib/bottleneck.py" "$S/bound.json" || true
@@ -840,7 +840,7 @@ BOUND
     [ "$rc" = 0 ] && log "dashboard tests: all passed" || warn "dashboard tests: FAILURES above"
     exit "$rc"
 }
-# One suite beside a whole run's load (R250 step 1, --loaded): the workers a
+# One suite beside a whole run's load (--loaded): the workers a
 # gate has here, the suite first and the longest of the rest beside it,
 # stopped once it has a verdict, so a suite that fails only in a gate fails
 # on demand.
@@ -861,11 +861,11 @@ if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ]
     if [ $# -gt 0 ]; then _names=("$@"); else mapfile -t _names < <(default_suites); fi
     # No more workers than suites, and one suite is the single path below.
     _n="$BB_TEST_WORKERS"
-    # ...and no more than half the machine's cores (R228 step 19). A suite
+    # ...and no more than half the machine's cores. A suite
     # is a server, a browser and its node beside each other, so a worker a
     # core runs the box at twice its cores and the suites time each other
-    # out. Measured on sixteen cores, a quiet machine, the whole run (14
-    # Nov): eight workers 9m16s with nothing failed; ten 14m21s, three
+    # out. Measured on sixteen cores, a quiet machine, the whole run:
+    # eight workers 9m16s with nothing failed; ten 14m21s, three
     # suites failed under load and run again; sixteen 39m54s, ten of them.
     # BB_TEST_WORKERS is what a test run here may use at most (the node's
     # setting, every core unless it says); BB_TEST_SUITES_AT_ONCE is this
@@ -880,7 +880,7 @@ if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ]
         *) _n="$BB_TEST_SUITES_AT_ONCE" ;;
     esac
     # ...and no more than the room here holds, a suite's 1.5 GB each, at
-    # least one (R271): the run's own servers, browsers and doctors are what
+    # least one: the run's own servers, browsers and doctors are what
     # filled a node beside a session's build. Each next suite waits for its
     # room as well (room_wait), so a build that starts meanwhile is given it.
     if [ -z "${BB_TEST_SUITES_AT_ONCE:-}" ]; then
@@ -892,11 +892,11 @@ if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ]
         fi
     fi
     [ "$_n" -le "${#_names[@]}" ] || _n="${#_names[@]}"
-    # Beside each other the suites wait as they do alone (R7 step 7): every
+    # Beside each other the suites wait as they do alone: every
     # wait was doubled here (BB_TEST_SLOW=2), from when four on four cores
-    # timed out a dozen checks a day that passed alone (26 and 27 Sep). At
+    # timed out a dozen checks a day that passed alone. At
     # half the cores, with the suites waiting on what they check, a whole
-    # run with nothing doubled flaked no more than one with (15 Nov).
+    # run with nothing doubled flaked no more than one with.
     # BB_TEST_SLOW is still read, for a machine that wants every wait longer.
     [ "$_n" -le 1 ] || run_workers "$_n" "${_names[@]}"
 fi
@@ -913,13 +913,13 @@ unset TMUX
 # Below everything else on the box: the servers, the browsers and node this
 # run starts all inherit it, so the emulator, a docker build and a session's
 # own work keep the CPU when they want it, and on a quiet box nothing is
-# slower (the operator, 27 Sep). Best effort: a shell that may not lower
+# slower. Best effort: a shell that may not lower
 # its own priority runs as it is.
-# The lowest CPU priority there is (the operator, 23 Oct: the emulator and a
+# The lowest CPU priority there is (the emulator and a
 # docker build first), and the queue's room_wait holds a run back further
 # while they are working the machine.
 renice -n 19 -p $$ >/dev/null 2>&1 || true
-# ...and the kernel's to take before the session that ran it (R271).
+# ...and the kernel's to take before the session that ran it.
 command -v heavy_first >/dev/null 2>&1 && heavy_first
 command -v ionice >/dev/null 2>&1 && ionice -c 2 -n 7 -p $$ >/dev/null 2>&1 || true
 # Same reasoning, for the credential. This script is usually run FROM a Claude
@@ -931,7 +931,7 @@ command -v ionice >/dev/null 2>&1 && ionice -c 2 -n 7 -p $$ >/dev/null 2>&1 || t
 # that looked like was agent.mjs dying on "no node called agentbox" (a 401
 # the caller reads as an empty node list) hours into a session, with nothing
 # in the diff to explain it.
-# ---- the container is the boundary, where the project says so (R65) --------
+# ---- the container is the boundary, where the project says so --------
 #
 # `aerie test` routes a project's tests into its dev instance and refuses when the
 # instance is down and the Docker row says the container is the only place they
@@ -1009,7 +1009,7 @@ cleanup() {
         "$S"/*) tmux kill-server 2>/dev/null || true ;;
     esac
     # ...and by its socket under this run's own directory, which needs no
-    # client to answer display-message first (B608).
+    # client to answer display-message first.
     for sock in "$S"/tmux/*/*; do
         [ -S "$sock" ] && tmux -S "$sock" kill-server 2>/dev/null || true
     done
@@ -1063,11 +1063,11 @@ mkdir -p "$S/ws/toolstore" && : > "$S/ws/toolstore/.bbignore"
 # container about it. It is not a project because the Projects card did not
 # accept it, which is the only test that matters now.
 mkdir -p "$S/ws/vendored-junk/deep" && echo x > "$S/ws/vendored-junk/deep/thing.py"
-# delta is locked by an administrator (R119): held against everybody, its
+# delta is locked by an administrator: held against everybody, its
 # owner included. It is archived for the test owner too, once that account
 # is made below: an archive is each person's own.
 echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"
-# The world's Docker apps (R238): none is shipped, so the two this world
+# The world's Docker apps: none is shipped, so the two this world
 # offers are kept here as the Library keeps one from the catalog, each from
 # a pin in a catalog that is made up (catalog-apps.json), every image by
 # its digest. A suite that wants another writes it beside them.
@@ -1127,7 +1127,7 @@ echo '{}' > "$S/home/.claude/projects/$(echo "$S/ws/alpha" | tr / -)/abc123.json
 # one file that is there is not in the index. Re-seeded before every test file
 # because memory.mjs edits and deletes these for real.
 # Named as Claude Code names a tree's folder: every character that is not a
-# letter or a digit a dash (B349).
+# letter or a digit a dash.
 M="$S/home/.claude/projects/$(echo "$S/ws/alpha" | sed 's/[^A-Za-z0-9]/-/g')/memory"
 seed_memories() {
 rm -rf "$M"; mkdir -p "$M"
@@ -1165,8 +1165,8 @@ ssh-keygen -q -t ed25519 -N '' -C github_testkey -f "$S/testkey"
 ssh-agent -a "$S/ssh-agent.sock" > "$S/agent.env"
 agent_pid="$(sed -n 's/^SSH_AGENT_PID=\([0-9]*\);.*/\1/p' "$S/agent.env")"
 SSH_AUTH_SOCK="$S/ssh-agent.sock" ssh-add -q "$S/testkey" 2>/dev/null
-# The file each toolchain's layout runs, which is what says it is installed
-# (B255): the stub's install lays it down beside its marker.
+# The file each toolchain's layout runs, which is what says it is installed:
+# the stub's install lays it down beside its marker.
 python3 - "$HERE/../../../config/toolchains.json" > "$S/tc-needs.tsv" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
@@ -1354,7 +1354,7 @@ if [ "$3" = install ]; then
         *) printf 'Performing Streamed Install\nSuccess\n'; exit 0 ;;
     esac
 fi
-# adb -s SERIAL shell "a line": a lent phone's (R113). A screenshot is a
+# adb -s SERIAL shell "a line": a lent phone's. A screenshot is a
 # one-pixel PNG in base64, and a guarded touch or a start answers quietly.
 if [ "$3" = shell ]; then
     case "$4" in
@@ -1402,7 +1402,7 @@ if [ -n "${DOCKER_HOST:-}" ] && [ -f "$ST/deadhosts" ] \
    && grep -qF "$DOCKER_HOST" "$ST/deadhosts"; then
   echo "cannot connect to the daemon at $DOCKER_HOST"; exit 1
 fi
-# What a node pulled of an image (imagecheck.py, R195): its RepoDigests from
+# What a node pulled of an image (imagecheck.py): its RepoDigests from
 # a file the suite leaves, named for the image; none is an image never pulled.
 if [ "$1" = inspect ] && [ "$2" = --type ] && [ "$3" = image ]; then
   f="$ST/repodigests/$(printf %s "${*: -1}" | tr '/:' '__')"
@@ -1415,7 +1415,7 @@ case "$1" in
   # control on, so the suite has to be able to take it away.
   # Shaped like docker's real connect error, which leads with the command it
   # ran and hides the reason at the end after `stderr=`, the shape the row
-  # used to cut the reason off (B106).
+  # used to cut the reason off.
   version) [ -f "$ST/version.fail" ] && {
       echo 'error during connect: Get "http://docker.example.com/v1.56/version": command [ssh -l bb -o ConnectTimeout=30 -T -- 10.0.0.9 docker system dial-stdio] has exited with exit status 255, make sure the URL is valid, and Docker 18.09 or later is installed on the remote host: stderr=ssh: connect to host 10.0.0.9 port 22: No route to host'
       exit 1; }
@@ -1432,7 +1432,7 @@ case "$1" in
     uid="STUBDAEMON1"
     [ -f "$ST/uid" ] && uid="$(cat "$ST/uid")"
     # The runtimes the daemon lists: nvidia's once the container toolkit's
-    # stand-in has "configured" it (R102).
+    # stand-in has "configured" it.
     rt='{"runc":{}}'
     [ -f "$ST/nvidia-runtime" ] && rt='{"nvidia":{"path":"nvidia-container-runtime"},"runc":{}}'
     printf '{"ID":"%s","Labels":%s,"ServerVersion":"99.stub","Runtimes":%s}\n' "$uid" "$lbl" "$rt"
@@ -1445,8 +1445,8 @@ case "$1" in
     # about what was running, which is a test lying in the shape of a bug.
     # Shaped like docker's real connect error, the same as `version` above:
     # the reason is at the END after `stderr=`, and the manager now shows a
-    # failed LISTING on the row (B111 split the listing from availability), so
-    # this side has to be cut from the tail too or it says nothing (B106).
+    # failed LISTING on the row (the listing is apart from availability), so
+    # this side has to be cut from the tail too or it says nothing.
     [ -f "$ST/ps.fail" ] && {
       echo 'error during connect: Get "http://docker.example.com/v1.56/containers/json": command [ssh -l bb -o ConnectTimeout=30 -T -- 10.0.0.9 docker system dial-stdio] has exited with exit status 255, make sure the URL is valid, and Docker 18.09 or later is installed on the remote host: stderr=ssh: connect to host 10.0.0.9 port 22: No route to host'
       exit 1; }
@@ -1455,7 +1455,7 @@ case "$1" in
       pn="$(basename "$f" .up)"
       # A stack of more than one container, where a test lays one out in
       # $pn.svcs: a line per published port, "SERVICE HOSTPORT TARGET",
-      # and one container per service carrying all of its lines (B252).
+      # and one container per service carrying all of its lines.
       if [ -f "$ST/$pn.svcs" ]; then
         for sv in $(awk '{print $1}' "$ST/$pn.svcs" | sort -u); do
           pp="$(awk -v s="$sv" '$1 == s {printf "%s0.0.0.0:%s->%s/tcp", (n++ ? ", " : ""), $2, $3}' "$ST/$pn.svcs")"
@@ -1465,7 +1465,7 @@ case "$1" in
         continue
       fi
       # ...wearing the health its marker says ($pn.health: healthy, unhealthy
-      # or starting), the way docker's own Status column does (R216).
+      # or starting), the way docker's own Status column does.
       hs=""; [ -f "$ST/$pn.health" ] && hs=" ($(cat "$ST/$pn.health"))"
       printf '{"ID":"aaaa%s","Names":"%s-app-1","Image":"%s-img","State":"running","Status":"Up 3 minutes'"$hs"'","Ports":"0.0.0.0:7475->7474/tcp, [::]:7475->7474/tcp","Labels":"com.docker.compose.project=%s,com.docker.compose.service=app"}\n' \
         "$pn" "$pn" "$pn" "$pn"
@@ -1485,7 +1485,7 @@ case "$1" in
     printf '%s\n' '{"ID":"ccccccccccccdddd","Names":"someone-elses","Image":"sha256:a0fbc67216996c701389f3e3662951bb24cebfc1510cce1a0b0b55802d2d0c11","State":"exited","Status":"Exited (0) 2 hours ago","Ports":"","Labels":"com.docker.compose.project=other"}'
     exit 0 ;;
   images)
-    # The daemon's images (R216): one in use by the fixture's container and
+    # The daemon's images: one in use by the fixture's container and
     # one dangling, in docker's own json shape.
     printf '%s\n' '{"Repository":"ep-silon-img","Tag":"latest","ID":"sha256:1111aaaa2222","Size":"123MB","CreatedSince":"2 days ago"}'
     printf '%s\n' '{"Repository":"<none>","Tag":"<none>","ID":"sha256:3333bbbb4444","Size":"45.6MB","CreatedSince":"3 weeks ago"}'
@@ -1508,7 +1508,7 @@ case "$1" in
     printf '%s\n' '{"Type":"Local Volumes","TotalCount":"2","Active":"1","Size":"8.4MB","Reclaimable":"2.1MB (25%)"}'
     exit 0 ;;
   stats)
-    # What each running container uses now (R216): one line per `up`
+    # What each running container uses now: one line per `up`
     # marker, in docker's own json shape and units, with the service
     # names the ps above gives. Fixed figures: a test reads the row's
     # strip, not the daemon's arithmetic.
@@ -1525,7 +1525,7 @@ case "$1" in
     done
     exit 0 ;;
   start|stop|restart)
-    # One container by name, which is all the guard lets through (R68). The
+    # One container by name, which is all the guard lets through. The
     # stub records what it was asked so a test can see the verb reached the
     # daemon, and answers the way docker does: the name back.
     printf '%s\n' "$2" >> "$ST/ctl.log"
@@ -1551,7 +1551,7 @@ case "$1" in
       exec)
         # `compose exec [-T] [-e K=V]... SERVICE CMD...`: the command runs
         # right here, which is what proves the wiring of a test inside a
-        # dev instance (roadmap R48) without a container.
+        # dev instance without a container.
         [ -f "$ST/$proj.up" ] || { echo "service \"app\" is not running"; exit 1; }
         echo "exec $*" >> "$ST/docker.log"
         while [ $# -gt 0 ] && [ "$1" != exec ]; do shift; done; shift
@@ -1702,7 +1702,7 @@ open(sys.argv[3], "w").write(json.dumps({u: ws} if u else {}))' "$S/state/users.
     rm -f "$S/state/claude-prefs.json"
     # ...and then the one binding every file starts from: the compose
     # fixture project works on the sandbox node, the way an operator binds
-    # one, since a project with none has no Docker row at all (R82).
+    # one, since a project with none has no Docker row at all.
     bind_fixture_node
     # ...nor one that built a dev instance. agent.mjs runs a compose action
     # on its node now, which records what was built and on which daemon;
@@ -1796,7 +1796,7 @@ start_server() {
 # The agent this world's controller ships, a copy of its own made fresh for
 # each suite: agent.mjs appends to it to make its controller ship a newer
 # agent, which in the run's shared copy held every other worker's nodes as
-# running an agent "newer than its number" (B718, B751, B510).
+# running an agent "newer than its number".
 rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
 ( env WORKSPACE="$S/ws" DASHBOARD_PORT="$PORT" BUILDER_HOME="$S/home" \
     BB_AGENT_DIR="$S/agentsrc" \
@@ -1839,7 +1839,7 @@ for _ in $(seq 40); do
         # A port the run picked is bound and let go (free_ports), and the
         # worker's set-up then takes seconds, in which anything binding port 0
         # can be handed the same number: the server dies on EADDRINUSE and the
-        # worker ended with its suites unrun, the whole run red (B1114). Such a
+        # worker ended with its suites unrun, the whole run red. Such a
         # port is picked again, twice at most; a pinned one is not.
         if [ -z "$PORT_PINNED" ] && [ "${PORT_TRIES:-0}" -lt 2 ] && grep -q "Address already in use" "$S/server.log"; then
             PORT_TRIES=$(( ${PORT_TRIES:-0} + 1 ))
@@ -1854,7 +1854,7 @@ for _ in $(seq 40); do
     sleep 0.25
 done
 }
-# Discord's API, stood in for (R293): the controller's BB_DISCORD_API. Its
+# Discord's API, stood in for: the controller's BB_DISCORD_API. Its
 # server is a file under the world, put back with the rest before each
 # suite, and read on every call, so the stand-in runs once for the run.
 DISCORD_PORT="$(free_port)"
@@ -1878,7 +1878,7 @@ spec = importlib.util.spec_from_file_location("users", sys.argv[1])
 u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
 u.configure(state=sys.argv[2], write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
 d = u.load()
-# The fixture projects by name (R135): "*" lists every project and takes
+# The fixture projects by name: "*" lists every project and takes
 # none on, and this seed lands after the server started, past the start-time
 # migration that turns an existing owner's "*" into names.
 fixtures = sorted(n for n in os.listdir(sys.argv[3])
@@ -1933,13 +1933,13 @@ sandbox_node=$(curl -fs -H "Authorization: Bearer $sandbox_tok" \
 # and not the shipped agent.
 stub_token="$(printf '%s' "$sandbox_node" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
 # The compose fixture project works on the sandbox node, the way an operator
-# binds one: there is no default node for a project's containers to fall to
-# (R82, 25 Sep), so a project with none has no Docker row at all. Bound
-# again by fresh() before every file, which wipes the settings first.
+# binds one: there is no default node for a project's containers to fall to,
+# so a project with none has no Docker row at all. Bound
+# again by fresh before every file, which wipes the settings first.
 sandbox_id="$(printf '%s' "$sandbox_node" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("node_id") or d.get("id") or "")')"
 bind_fixture_node
 # ...and the tester's Claude sign-in on that node. The controller holds no
-# credential (R47): a login is one account's on one node, and what is kept
+# credential: a login is one account's on one node, and what is kept
 # here is the RECORD of what each node reported. Without one the fixture
 # node reads as not signed in, and every Claude press in the suite would go
 # to its sign-in instead of to a session.
@@ -1958,12 +1958,12 @@ start_stub() {
 }
 start_stub
 
-# ---- one world per file (B124) ---------------------------------------------
+# ---- one world per file ---------------------------------------------
 # Every file starts from the same world, whatever the one before it did. The
 # fixture above is built once and kept whole (everything under $S but the
 # private tmux server, the ssh-agent's socket, the logs and the copy itself);
 # before each file the server and the stub agent stop, the copy is put back
-# and both start again. Before this, fresh() below kept a hand-written list
+# and both start again. Before this, fresh below kept a hand-written list
 # of files to reset, and every leak it missed was a failure that showed only
 # in a whole run: a node, an account or a setting one file made, in the
 # database, in memory, read by the next. A list cannot keep up with that; a
@@ -1982,7 +1982,7 @@ stop_world() {
     pid=""; stub_pid=""
 }
 # ...and the coverage counts, which every suite adds to and a restore must not
-# take back to the empty directory the snapshot holds (R76).
+# take back to the empty directory the snapshot holds.
 WORLD_OUT=(tmux ssh-agent.sock server.log agent-stub.log discord-stub.log discord-stub.pid .world.tar coverage)
 snapshot_world() {
     local ex=() n
@@ -2000,7 +2000,7 @@ restore_world() {
 wait_stub() {
     # Ten seconds, stretched as the suites' waits are (BB_TEST_SLOW): one
     # worker's server among eight on a loaded box answered after it, and the
-    # worker ended without running its suites (B756).
+    # worker ended without running its suites.
     local since="$1" _ tries
     tries="$(awk -v s="${BB_TEST_SLOW:-1}" 'BEGIN { printf "%d", 40 * (s > 1 ? s : 1) }')"
     for _ in $(seq "$tries"); do
@@ -2086,8 +2086,8 @@ else
     mapfile -t names < <(default_suites)
     for t in "${names[@]}"; do tests+=("$HERE/$t.mjs"); done
 fi
-# A suite in every engine the run uses, each in a world of its own (R263
-# step 5); one that takes Chromium alone is said skipped in the others,
+# A suite in every engine the run uses, each in a world of its own;
+# one that takes Chromium alone is said skipped in the others,
 # never passed. Its cost, all engines together, for the next run's plan.
 run_file() {
     local e rc=0 t0
@@ -2105,7 +2105,7 @@ run_file() {
 run_engine() {
     local engine="$2"
     set -- "$1" "${3:-}"
-    # The suite's name, for the server's coverage counts to carry (R76):
+    # The suite's name, for the server's coverage counts to carry:
     # the server is started fresh for every file, so its counts are that
     # file's and the map can say which suite reached a handler.
     BB_COVERAGE_SUITE="$(basename "${1%.mjs}")"
@@ -2115,11 +2115,11 @@ run_engine() {
     fresh_world
     phase fresh
     log "== $(basename "$1") [$engine]${2:+ $2} =="
-    # A time limit per file (B514): a check that awaited a request it held
+    # A time limit per file: a check that awaited a request it held
     # open itself hung cards.mjs for four hours, holding the run's lock, with
     # nothing saying so. SUITE_TIMEOUT seconds (1500: the longest file takes
     # about 230 on this node, doubled waits included many times over).
-    # Waited on rather than run in the foreground (B780): timeout puts the
+    # Waited on rather than run in the foreground: timeout puts the
     # suite in a process group of its own, and bash holds a TERM trap until a
     # foreground child ends, so a run cut by its group kept its suite going
     # and itself waiting on it. A wait is interrupted by the trap, and the
@@ -2133,13 +2133,13 @@ run_engine() {
     [ "$rc" != 124 ] && [ "$rc" != 137 ] \
         || log "FAIL  $(basename "$1") ran out of its ${SUITE_TIMEOUT:-1500} s: something in it waited on nothing"
     # What the server said about the agent's sources moving under it, into
-    # the run's own log where a failure is read (B718, B751): a node then held
+    # the run's own log where a failure is read: a node then held
     # for an agent "newer than its number" names the file that moved, which
     # only the server's log carried, and that went with the world.
     [ "$rc" = 0 ] || grep -h "the agent's sources changed on disk" "$S/server.log" 2>/dev/null \
         | tail -3 | while IFS= read -r l; do log "server: $l"; done
     # ...and the last traceback the server wrote, whole: a status read that
-    # answered 500 under the harness lost its cause with the world (B591),
+    # answered 500 under the harness lost its cause with the world,
     # so the run's own log carries it where the failure is read.
     if [ "$rc" != 0 ] && grep -q "^Traceback (most recent call last)" "$S/server.log" 2>/dev/null; then
         awk '/^Traceback \(most recent call last\)/{buf=""; on=1} on{buf=buf $0 "\n"} on && /^[A-Za-z_.]*(Error|Exception)[:]?/ && !/^  /{last=buf; on=0} END{printf "%s", last}' "$S/server.log" \
@@ -2152,7 +2152,7 @@ run_engine() {
 rc=0
 failed=()
 failed_names=()
-# A worker on the run's queue (R130) takes the next suite as it is free, the
+# A worker on the run's queue takes the next suite as it is free, the
 # longest first, instead of a share fixed before the run: none sits idle
 # while another has three left. And it takes the next one only while the
 # machine has room (room_wait), so a busy node holds the run back rather
@@ -2195,7 +2195,7 @@ if [ -n "${BB_TEST_QUEUE:-}" ]; then
         # a minute behind, and every worker waiting on it would be no run.
         # A worker that waited and still has no memory to start one stands
         # down, its suites left to the others; the first never does, so the
-        # run ends whatever the machine is doing (R271).
+        # run ends whatever the machine is doing.
         if [ "$took" != 0 ] && ! room_wait && [ "${BB_TEST_WORKER:-1}" != 1 ]; then
             log "worker $BB_TEST_WORKER: stands down, no memory to start another suite after five minutes; the others take the rest"
             break

@@ -1,4 +1,4 @@
-"""An index entry's older pins (the operator, 20 Nov): a pack that moved
+"""An index entry's older pins: a pack that moved
 to a newer pack format keeps the pin of the manifest written in the one
 before, and a build that reads only that one is offered it, with nothing
 said of the newer. One function answers the entry as a build takes it

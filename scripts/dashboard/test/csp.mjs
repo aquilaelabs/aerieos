@@ -1,4 +1,4 @@
-// The page under its Content-Security-Policy (R158 step 4). Every refusal
+// The page under its Content-Security-Policy. Every refusal
 // the browser makes is an event on the document; the suite listens from the
 // first script, walks the pages and the notebook's views, and says what was
 // refused, if anything, and whether a data-style element got its style.

@@ -1,5 +1,5 @@
 // aerie browser: a browser with an extension loaded, Chrome or Firefox, that a
-// session drives from one verb (R247).
+// session drives from one verb.
 //
 //   aerie browser open --ext DIR [--firefox] [--url URL] [--headed]
 //   aerie browser go ID URL          (ext:popup.html is the extension's own page)
@@ -11,7 +11,7 @@
 // Each browser runs detached in its own process group, on a debugging port
 // of its own and a profile of its own under ~/.cache/builderbot/browser, and
 // is ended by that group, never by a pattern: Turing Lens built a harness of
-// its own for this (14 Oct), and lost 45 minutes to browsers left from
+// its own for this, and lost 45 minutes to browsers left from
 // earlier runs holding the port and to a cleanup that matched itself.
 //
 // Chrome is Playwright's Chrome for Testing, which still takes
@@ -179,7 +179,7 @@ async function open(args){
   writeFileSync(recPath(id), JSON.stringify(rec));
   // Up when its port answers, within a minute: a cold Firefox takes about
   // fifteen seconds on a quiet box, and the old fifteen-second cap ran out on
-  // a busy one with the browser still starting (B758). One that dies stops
+  // a busy one with the browser still starting. One that dies stops
   // the wait at once.
   let up = false;
   for (let i = 0; i < 240 && !up; i++){

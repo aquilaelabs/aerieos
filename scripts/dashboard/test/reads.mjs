@@ -45,9 +45,9 @@ const look = await page.$eval('#rnReads', e => ({ overflow: getComputedStyle(e).
 ok(look.overflow === 'auto' && look.border === '1px' && look.tap > 0 && look.row >= look.tap && look.display === 'flex',
    `a listbox is a bordered box that scrolls, its rows a thumb high (${JSON.stringify(look)})`);
 // ...and no Debug grants beside them: every project's are the Debug page's
-// (R147, the operator, 26 Oct; settings.mjs). diag.mjs holds the refusals.
+// (settings.mjs). diag.mjs holds the refusals.
 ok(!(await page.$('#rnDebugField')), 'the space\'s settings carry no Debug grants: they are the Debug page\'s');
-// A read is a project's (R138): beta's project, ticked by its key.
+// A read is a project's: beta's project, ticked by its key.
 const betaKey = await page.evaluate(() => reposOf('beta'));
 await page.check(`#rnReads input[value="${betaKey}"]`);
 await saveDialog(page);
@@ -66,7 +66,7 @@ ok(self.status === 200 && (await api('/api/status')).projects.find(p => p.name =
 
 // ---- the session: reads go through, writes are refused by name -----------------------
 const tok = token('alpha');
-// Asked of the routes a session's token reaches (R227 step 4): its brief
+// Asked of the routes a session's token reaches: its brief
 // for a read, its wiki for a write. The page's status read and the
 // notebook's own routes are a person's; aerie roadmap goes by the relay,
 // which the next part holds.
@@ -91,13 +91,13 @@ const relay = (argv, project) => api('/api/v1/bb', { argv, project, cwd: `${DIR}
 const list = await relay(['roadmap'], 'beta');
 ok(list.status === 200 && !list.error, `aerie roadmap relayed for beta from alpha's session answers (${list.status} ${(list.error || '').slice(0, 60)})`);
 // A new install's setup from a shell is an administrator's: the relay
-// refuses it to a session on its own project, whatever the verb does (R84).
+// refuses it to a session on its own project, whatever the verb does.
 for (const argv of [['nodes', 'enroll-token', 'sneaky'], ['settings', 'node', 'shed']]){
   const r = await relay(argv, 'alpha');
   ok(r.status === 403 && /an administrator's, from a shell on the controller, never a session's/.test(r.error || ''),
      `bb ${argv.slice(0, 2).join(' ')} from a session is refused at the relay (${r.status} ${(r.error || '').slice(0, 60)})`);
 }
-// list is the bare verb's own form, and reads (diag report #115, B119).
+// list is the bare verb's own form, and reads (diag report #115).
 for (const argv of [['roadmap', 'list'], ['bug', 'list']]){
   const r = await relay(argv, 'beta');
   ok(r.status === 200 && !r.error, `bb ${argv.join(' ')} relayed for beta from alpha's session answers (${r.status} ${(r.error || '').slice(0, 60)})`);
@@ -117,7 +117,7 @@ ok(unreadR.status === 403 && /alpha does not read gamma: its owner adds it under
 const noneR = await relay(['roadmap'], 'nosuch');
 ok(noneR.status === 400 && /there is no space called nosuch/.test(noneR.error || ''),
    `...and a name that is no space says so (${noneR.error})`);
-// A long command arrives whole (B3): 40 steps are 81 words, which a cap of
+// A long command arrives whole: 40 steps are 81 words, which a cap of
 // 64 cut to a --step with nothing after it; past the cap it is refused by
 // name rather than run as a shorter command.
 await section("A long command arrives whole", async () => {
@@ -132,7 +132,7 @@ await section("A long command arrives whole", async () => {
   ok(huge.status === 400 && /sent 1102 words, and a relayed command carries 1024 at most/.test(huge.error || ''),
      `...and one past the cap is refused, naming it (${huge.error})`);
 });
-// The name the dashboard shows answers for its directory (B1): the person
+// The name the dashboard shows answers for its directory: the person
 // says it, and the session repeats it.
 await section("The name the dashboard shows answers for its directory", async () => {
   const rn = await api('/api/rename', { name: 'beta', to: 'beta-shown' });
@@ -141,7 +141,7 @@ await section("The name the dashboard shows answers for its directory", async ()
   await api('/api/rename', { name: 'beta', to: 'beta' });
   ok(rn.status === 200 && byLabel.status === 200 && !byLabel.error,
      `bb -p with the name beta is shown under answers for beta (${rn.status} ${byLabel.status} ${(byLabel.error || '').slice(0, 60)})`);
-  // ...and said by the name it is shown under, not its directory (B58).
+  // ...and said by the name it is shown under, not its directory.
   ok(addL.status === 403 && /^beta-shown is read-only from a session on alpha/.test(addL.error || ''),
      `...and is held to beta's reads like its directory is, by its shown name (${addL.error})`);
 });
@@ -151,7 +151,7 @@ const grant = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(
 ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
    `the terminal's grant names the spaces the session reads, for bb-session and Claude's walls (${JSON.stringify(grant).slice(0, 160)})`);
 
-// ---- the places on its node a project is shown (prefs.sees, B378) ------------------------
+// ---- the places on its node a project is shown (prefs.sees) ------------------------
 // A session's view is built from what it is given, so a share mounted on
 // the node is out of it unless the project's settings name it.
 await section("the places on its node a project is shown", async () => {
@@ -177,7 +177,7 @@ await section("the places on its node a project is shown", async () => {
   const g = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(tok));
   ok(Array.isArray(g.sees) && g.sees.join() === '/mnt/media,/srv/samples',
      `the terminal's grant names them, for bb-session (${JSON.stringify(g.sees)})`);
-  // Whether the session may compute on its node's NVIDIA card (R102) rides
+  // Whether the session may compute on its node's NVIDIA card rides
   // the same grant: on unless the project's setting, or the node's switch,
   // says otherwise, and the grant says which.
   ok(g.gpu === 'on', `the grant says the card is the session's to compute on by default (${g.gpu})`);
@@ -268,12 +268,12 @@ await section("what its sessions may still reach where the node filters", async 
   ok(mine.status === 403, `a session cannot open its own network (${mine.status} ${mine.error})`);
   // In the dialog: a row per address under Also sees, and Add an address.
   await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.reaches?.length === 2, { timeout: 20000 });
-  // What sessions reach is the space's (R223): its own dialog, the card's door.
+  // What sessions reach is the space's: its own dialog, the card's door.
   await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   // As records (the record-lists rule): an address a read-only row with
   // Edit, Add an address over them, and a record's Save or Delete written at
-  // once (the operator, 17 Nov).
+  // once.
   const rows = await page.$$eval('#rnReachRows .rnreach .tline .td.lead', es => es.map(e => e.textContent.trim()));
   ok(rows.join() === '192.168.1.50,192.168.1.60:8123' && !(await page.$('#rnReachRows input')),
      `the dialog draws a read-only row per address (${rows.join(', ')})`);
@@ -294,7 +294,7 @@ await section("what its sessions may still reach where the node filters", async 
   await api('/api/prefs', { project: 'alpha', reaches: [] });
 });
 
-// ---- a read project's containers are read from here (B551, B552) ----------------------
+// ---- a read project's containers are read from here ----------------------
 // bb -p beta devapp from a session on alpha, which reads beta: its listing
 // and its dev instance's state answer for beta, and changing anything of
 // beta's is still refused. Reads are set again here, since a check above
@@ -324,7 +324,7 @@ await api('/api/prefs', { project: 'alpha', reads: [] });
 ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
    '...and says nothing about reads when there are none');
 
-// What every repository of a space shares is the space's (R223): on a
+// What every repository of a space shares is the space's: on a
 // repository's settings it is drawn as the space's, its controls dead, with
 // a press to the space's own dialog; there it is live.
 await section("What every repository of a space shares is the space's", async () => {
@@ -354,7 +354,7 @@ await section("What every repository of a space shares is the space's", async ()
      `...and the press opens the space's own dialog, where they are live (${JSON.stringify(got.space)})`);
 });
 // ...and the space's dialog says under a dial which repository sets it
-// apart (R223), and nothing where none does.
+// apart, and nothing where none does.
 await section("and the space's dialog says under a dial which repository sets it", async () => {
   await page.evaluate(async () => {
     const H = { 'Content-Type': 'application/json' };

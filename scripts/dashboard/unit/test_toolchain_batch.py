@@ -1,4 +1,4 @@
-"""A toolchain batch from a fresh store (the operator, 12 Oct): every name
+"""A toolchain batch from a fresh store: every name
 runs, the tab counts through the batch, a meter is its last frame in the
 log, and a JDK written with its build is the release that is installed."""
 import os
@@ -84,7 +84,7 @@ class SameRelease(unittest.TestCase):
 
     def test_a_trailing_zero_is_the_same_release(self):
         # Swift 6.4 as the compiler prints it, against swift-6.4.0-RELEASE as
-        # the resolver reads the tag: the row offered that update forever (B715).
+        # the resolver reads the tag: the row offered that update forever.
         self.assertEqual(self.verdict("6.4", "6.4.0"), "current")
         self.assertEqual(self.verdict("6.4.0", "6.4"), "current")
         self.assertEqual(self.verdict("6.4", "6.4.1"), "update")

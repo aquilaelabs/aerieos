@@ -1,4 +1,4 @@
-"""The machine's power and its own packages (R164 step 3): a UPS through
+"""The machine's power and its own packages: a UPS through
 NUT, read for the census (on line, on battery, low battery; charge, the
 minutes left, the load) so the bell says when the machine runs on battery,
 with upsmon's clean shutdown the feature's own; and the host's own package

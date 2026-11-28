@@ -29,7 +29,7 @@ DEFAULT_STORES = {"data": VAR + "/data",
                   "artifacts": VAR + "/artifacts",
                   # What a dev instance KEEPS: the databases, the uploads, the
                   # caches its containers write, under <appdata>/<project>/
-                  # <instance>. A store like the other four (R17 step 2), so
+                  # <instance>. A store like the other four, so
                   # the node reports its path and its headroom and the config
                   # plane edits it there. It used to be BB_DEV_DATA_DIR on the
                   # CONTROLLER, which is a fact about a node kept on the wrong
@@ -37,7 +37,7 @@ DEFAULT_STORES = {"data": VAR + "/data",
                   "appdata": VAR + "/appdata"}
 
 # The session half (roadmap #24): the screen relay's port, the one a
-# terminal (R133) and a VM's screen (R99) come in on, and the address it
+# terminal and a VM's screen come in on, and the address it
 # binds. The bind address defaults to the address the default route leaves
 # by (the LAN one the controller reaches), not the loopback: the controller
 # dials in from another machine, and the firewall keeps the port to it. The
@@ -49,12 +49,12 @@ SESSION_BIND = os.environ.get("BUILDERBOT_SESSION_BIND", "")
 # the census is a function of the machine, and the session's state is the
 # one part of the machine this process itself is holding.
 SESSION = {}
-# The bundle this node refused and still refuses (release.may_keep_bundle,
-# R267 step 6), as the census reports it: {"digest", "why"}, the digest the
+# The bundle this node refused and still refuses (release.may_keep_bundle),
+# as the census reports it: {"digest", "why"}, the digest the
 # controller named and what was wrong with it as one phrase, REFUSED_MOST
 # characters at most, with nothing of which keys this node takes; empty
 # while none is refused. Kept by the Agent's
-# bundle() and read by census(), as SESSION is: a refusal said only in this
+# bundle and read by census, as SESSION is: a refusal said only in this
 # node's log left its row on the controller saying nothing.
 REFUSED = {}
 REFUSED_MOST = 200
@@ -63,10 +63,10 @@ REFUSED_MOST = 200
 # under it has not been made (the agent's channel_move): {"why": ...}, empty
 # once it has moved or where nothing was named. The census says it.
 CHANNEL = {}
-# What the screen relay says of itself in the hello (census, R243): its
+# What the screen relay says of itself in the hello (census): its
 # certificate's sha256 once it has one, which the controller pins, that it
 # takes a signed request once, and that it takes only the key derived from
-# the token it holds (R288), never the token's hash the controller's
+# the token it holds, never the token's hash the controller's
 # database keeps. Set by screen.py.
 RELAY = {"tls": "", "once": True, "derived": True}
 # How often a node whose loop is held by a census says it is still there
@@ -88,8 +88,8 @@ STORE_DENY_UNDER = ("/bin/", "/boot/", "/dev/", "/etc/", "/lib/", "/lib32/",
                     "/lib64/", "/libx32/", "/proc/", "/root/", "/run/",
                     "/sbin/", "/sys/", "/usr/", "/var/run/",
                     "/var/lock/", "/var/spool/", "/var/cache/")
-# ...and a folder of its own under /var/log is a place for one (the operator,
-# 23 Oct), though /var/log itself is not. Held equal on both sides by
+# ...and a folder of its own under /var/log is a place for one,
+# though /var/log itself is not. Held equal on both sides by
 # unit/test_store_paths.py.
 
 
@@ -99,11 +99,11 @@ STORE_DENY_UNDER = ("/bin/", "/boot/", "/dev/", "/etc/", "/lib/", "/lib32/",
 # `system` job is refused without it. The netplan seams exist so the tests
 # can stand in for both without a root shell.
 SANDBOX_BIN = os.environ.get("BUILDERBOT_SANDBOX_BIN", names.sandbox_bin())
-# Where the agent's own unit is kept through a restart it did not ask for
-# (B538): a systemd drop-in, and needrestart's configuration directory.
+# Where the agent's own unit is kept through a restart it did not ask for:
+# a systemd drop-in, and needrestart's configuration directory.
 UNIT_DROPIN = f"/etc/systemd/system/{names.unit()}.service.d/builderbot.conf"
 NEEDRESTART_DIR = "/etc/needrestart"
-# What the GPU display's unit last said (bb-sandbox gpu-display, R20): one
+# What the GPU display's unit last said (bb-sandbox gpu-display): one
 # line, read into the census so the row says it.
 GPU_DISPLAY_STATE = os.environ.get("BUILDERBOT_GPU_DISPLAY_STATE", "/run/builderbot-gpu-display")
 # The machine's sysfs, where the card and its driver are read from. The
@@ -115,7 +115,7 @@ SYS_ROOT = os.environ.get("BUILDERBOT_SYS_ROOT", "/sys")
 DRIVER = "nvidia-driver"
 # ...and the container toolkit, the second of the machine's own rows there.
 TOOLKIT = "nvidia-container-toolkit"
-# The session's view (R35): the root helper that builds it, the file that
+# The session's view: the root helper that builds it, the file that
 # tells it this machine's layout, and the sudo rule that is the session
 # account's only way to it. Installed and kept by this agent from the bundle,
 # on a node set up as a sandbox; the seams are for the suite.
@@ -127,12 +127,12 @@ SESSION_BIN = os.environ.get("BUILDERBOT_SESSION_BIN", "/usr/local/sbin/bb-sessi
 # and so any session through aerie run, plant root code that landed on the
 # next hello (the review of 26 Sep).
 TOOLS_DIR = os.environ.get("BUILDERBOT_TOOLS_DIR", VAR + "/agent/tools")
-# The bundle a terminal runs where accounts are their own users (R125): a
+# The bundle a terminal runs where accounts are their own users: a
 # root-owned copy on the node's own disk, unpacked from the checked tar, so
 # nothing outside a view can change what every account's terminal runs (the
 # toolchain store is a share squashed to one uid).
 ROOT_BUNDLE_DIR = os.environ.get("BUILDERBOT_ROOT_BUNDLE", "/usr/local/lib/builderbot/bundle")
-# Where a signing job works with a key (B315): this machine's own memory,
+# Where a signing job works with a key: this machine's own memory,
 # never a store. A data store may be a share squashed to one uid, the session
 # account's on the documented one, and a key written there was a session's to
 # read while the job ran. Root's, 0711, each job's folder its account's, 0700.
@@ -140,14 +140,14 @@ SIGN_WORK = os.environ.get("BUILDERBOT_SIGN_WORK", "/run/builderbot/sign")
 ROOT_TOOLS = ("nodes/provision-linux.sh", "nodes/bb-session", "nodes/bb-netcut")
 # The list of every file a release ships in the bundle, a line each with its
 # sha256, and the release's signature over that list's digest, as the bundle
-# carries them (release.may_keep_bundle, R267 step 6). The list is a few
+# carries them (release.may_keep_bundle). The list is a few
 # kilobytes; one past LIST_MOST is read as none.
 BUNDLE_LIST = "nodes/bundle.list"
 BUNDLE_SIG = "nodes/bundle.sig"
 LIST_MOST = 1 << 20
 # Where an updated Claude Code is pinned, root-owned, for the sessions (claude_update).
 CLAUDE_DIR = "/usr/local/lib/builderbot/claude"
-# ...and the other coding agents (R95 step 2), each in a folder of its own
+# ...and the other coding agents, each in a folder of its own
 # under this one: AGENTS_DIR/codex/codex, AGENTS_DIR/copilot/copilot.
 AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/agents")
 # Which coding agent a job installs, by the job the controller's agent
@@ -157,7 +157,7 @@ AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/
 # removal clears in `also`), which the census, a session's PATH and a
 # removal read. How it is installed is not here: that is the recipe the
 # controller hands over with the job (its table's, or its signed catalog's
-# where that is newer: R169 step 13), held to one shape by recipe_checked
+# where that is newer), held to one shape by recipe_checked
 # below. Every controller that ships this agent sends one, so these rows
 # carry no installer of their own to fall back on: an install asked for
 # with no recipe is refused, never run from a copy here that nothing
@@ -173,7 +173,7 @@ AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/
 # rather than imported since the agent carries no dashboard module;
 # unit/test_shipped_signin.py holds the two to each other. A pack's agent's
 # comes from its manifest the same way (pack_signins below), so the seal,
-# the watch and a seal's header read every agent's from data (R234 step 6).
+# the watch and a seal's header read every agent's from data.
 SIGNINS = {
     "claude": {"kept": ".claude/.credentials.json", "provider": "Anthropic",
                "who": {"file": ".claude.json", "email": ["oauthAccount", "emailAddress"]}},
@@ -193,7 +193,7 @@ AGENT_INSTALLS = {
                        "bin": ".local/bin/copilot"},
     "grok-update": {"id": "grok", "command": "grok", "product": "Grok Build", "reported": "grok",
                     "bin": ".local/bin/grok"},
-    # OpenCode (R144 step 2), the open agent any model runs through: its
+    # OpenCode, the open agent any model runs through: its
     # installer puts the program in ~/.opencode/bin, whatever it is told
     # (read off the script on 11 Nov), and the old place is still taken
     # away with it on a removal.
@@ -405,7 +405,7 @@ def installer_stub(agent_id):
 SESSION_CONF = os.environ.get("BUILDERBOT_SESSION_CONF", "/etc/bb-session.conf")
 SESSION_SUDOERS = os.environ.get("BUILDERBOT_SESSION_SUDOERS", "/etc/sudoers.d/builderbot-session")
 # The root helper that cuts the network for a declared pack's install steps
-# where the job account cannot make a network namespace itself (R234), and
+# where the job account cannot make a network namespace itself, and
 # the one sudo rule that lets that account run it.
 NETCUT_BIN = os.environ.get("BUILDERBOT_NETCUT_BIN") or "/usr/local/sbin/bb-netcut"
 NETCUT_SUDOERS = os.environ.get("BUILDERBOT_NETCUT_SUDOERS", "/etc/sudoers.d/builderbot-netcut")
@@ -425,7 +425,7 @@ def root_docker_env():
             "HOME": "/root", "USER": "root", "LOGNAME": "root"}
 
 
-# Each session kept to its own project's network (R79): the folder this agent
+# Each session kept to its own project's network: the folder this agent
 # shares with bb-session (its resolver file for sessions, its mark that the
 # table is in place, and a file per session saying which project an address
 # is), the table it keeps, the range sessions are addressed from, and the mark
@@ -442,11 +442,11 @@ RESOLV_UPSTREAM = ("/run/systemd/resolve/resolv.conf", "/etc/resolv.conf")
 # multicast range. A session reaches none of it but what the sets name.
 SESSNET_LOCAL = ("0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
                  "172.16.0.0/12", "192.168.0.0/16", "198.18.0.0/15", "224.0.0.0/3")
-# Where the node's synced copy of its projects is (R162), which is what a
+# Where the node's synced copy of its projects is, which is what a
 # session works in. The seam is for the suite: it runs its agent as a session account, and inside a
 # session's view /workspace is the view's own read-only root.
 SHARE = os.environ.get("BUILDERBOT_SHARE", "/workspace")
-# The live coding agents (R95), each its id, its command and its session's
+# The live coding agents, each its id, its command and its session's
 # prefix at once: the live rows of the controller's agent table
 # (scripts/dashboard/agents.py), copied rather than imported since the agent
 # carries no dashboard module; unit/test_agents.py holds the two to each
@@ -455,7 +455,7 @@ SHARE = os.environ.get("BUILDERBOT_SHARE", "/workspace")
 AGENT_IDS = ("claude", "codex", "copilot", "grok", "open")
 # The pane a respawn may run again: bb-tty's launcher of a coding agent
 # (claude-run.sh, codex-run.sh, copilot-run.sh, grok-run.sh; a second slot's
-# claude-2-run.sh, R143), in the project's cache
+# claude-2-run.sh), in the project's cache
 # folder and started inside the project's view when the node builds one.
 _PATHCH = r"[A-Za-z0-9._/@+-]"
 RESPAWNABLE = (rf"(?:sudo -n {re.escape(SESSION_BIN)} enter(?: --[a-z]+ {_PATHCH}+)* -- )?"
@@ -481,7 +481,7 @@ _pack_ids = {"stamp": None, "ids": ()}
 
 
 def pack_agent_ids():
-    """The coding agents vetted packs bring (R169 step 10), by the rows of
+    """The coding agents vetted packs bring, by the rows of
     the root bundle's config/toolpacks.json that carry an adapter: read
     again only when the file changes. Never a shipped agent's id."""
     path = os.path.join(ROOT_BUNDLE_DIR, "current", "config", "toolpacks.json")
@@ -529,8 +529,8 @@ def _who(w):
 
 def pack_signins(bundle=""):
     """{agent: {"kept": file under the home, "provider": whose account}} for
-    the packs' coding agents whose pack describes a sign-in's flow (R233
-    step 6): the file each keeps its sign-in in, which is sealed and watched
+    the packs' coding agents whose pack describes a sign-in's flow:
+    the file each keeps its sign-in in, which is sealed and watched
     as a shipped agent's is. From the root bundle's config/toolpacks.json
     (or the bundle named, for a job that runs from one on the store), read
     again only when the file changes; a path that is not a plain one under
@@ -572,7 +572,7 @@ def agent_prefixes():
 
 def respawnable(cmd):
     """Whether a pane's start command is a coding agent's launcher bb-tty
-    wrote, the shipped agents' or a pack's (R169 step 10)."""
+    wrote, the shipped agents' or a pack's."""
     if re.fullmatch(RESPAWNABLE, cmd):
         return True
     ids = pack_agent_ids()
@@ -580,7 +580,7 @@ def respawnable(cmd):
 
 
 def harden():
-    """What this process does about the keys it holds (R158 step 6): the
+    """What this process does about the keys it holds: the
     boot secret a terminal's seal keys travel under and every opened
     sign-in pass through here. Core dumps off and the process not dumpable
     (so a process of the same user cannot read it through ptrace or
@@ -615,7 +615,7 @@ def harden():
 
 def wipe(b):
     """A bytes or bytearray value overwritten with zeros in place, for a key
-    or an opened sign-in let go (R158 step 6); CPython's layout alone."""
+    or an opened sign-in let go; CPython's layout alone."""
     if isinstance(b, bytearray):
         for i in range(len(b)):
             b[i] = 0
@@ -704,10 +704,10 @@ _said = {}
 
 
 def log_once(key, msg, every=3600):
-    """log(), but the same `msg` under `key` at most once per `every`
+    """log, but the same `msg` under `key` at most once per `every`
     seconds, with how many times it came up meanwhile. For a loop that
     meets the same fault on every tick: a sync step failing every five
-    seconds was 17,000 identical journal lines a day (the operator, 12 Oct)."""
+    seconds was 17,000 identical journal lines a day."""
     now = time.monotonic()
     last, n, was = _said.get(key, (-1e9, 0, None))
     if msg == was and now - last < every:
@@ -717,7 +717,7 @@ def log_once(key, msg, every=3600):
     _said[key] = (now, 0, msg)
 
 
-# One test run at a time on this machine, whoever starts it (B986): the
+# One test run at a time on this machine, whoever starts it: the
 # harness takes a lock on this file. Every session's view has its own /tmp
 # and its own pids, so a lock there kept apart only one session's runs; /run
 # is the host's in every view, and only root can make a file in it, so the
@@ -744,7 +744,7 @@ def test_lock_ready():
 
 
 # A statvfs still out, by path: a store or a mount on a share that stopped
-# answering blocks the call in the kernel, where no timeout reaches it (B980).
+# answering blocks the call in the kernel, where no timeout reaches it.
 _stat_out = {}
 _stat_lock = threading.Lock()
 
@@ -758,7 +758,7 @@ def statvfs_within(path, limit=3.0):
     """os.statvfs(path) on a thread of its own, waited on for `limit`
     seconds. StatTimeout when it has not answered by then, and at once while
     an earlier call for the same path is still out, so a dead share costs
-    one stuck thread, not one a turn and not the turn itself (B980)."""
+    one stuck thread, not one a turn and not the turn itself."""
     with _stat_lock:
         t = _stat_out.get(path)
         if t is not None:
@@ -805,7 +805,7 @@ def cap_file(path, limit=NODE_LOG_MAX):
     """Copy-truncate `path` into `path`.1 once it passes `limit`: the
     writers hold it open with O_APPEND, so they go on at the new end. True
     when it was cut. Only a regular file, through no link at either name:
-    runner.log sits in a store the jobs account may write (R247 step 5)."""
+    runner.log sits in a store the jobs account may write."""
     import stat
     try:
         fd = os.open(path, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY)
@@ -856,8 +856,8 @@ HOST_BINDING = "com.docker.network.bridge.host_binding_ipv4"
 
 def daemon_json_with_ip(text, on):
     """/etc/docker/daemon.json as it should read with published ports bound
-    to 127.0.0.1 by default (`ip`, docker's own default bind address) or not
-    (R190): the file's other keys kept, a file that is not JSON left alone.
+    to 127.0.0.1 by default (`ip`, docker's own default bind address) or not:
+    the file's other keys kept, a file that is not JSON left alone.
     Returns the new text, or None when nothing has to change."""
     try:
         d = json.loads(text) if text.strip() else {}
@@ -887,7 +887,7 @@ def daemon_json_with_ip(text, on):
         d["default-network-opts"] = opts
     else:
         d.pop("default-network-opts", None)
-    # ...and every container's log bounded (the operator, 12 Oct): the
+    # ...and every container's log bounded: the
     # json-file driver keeps all of it by default, so a chatty container
     # filled the disk under /var/lib/docker. Only where nobody chose a
     # driver or its options: a node's own logging arrangement is kept.
@@ -1416,7 +1416,7 @@ def read_json(path, default, kind=dict):
 # there, and a package that cannot be loaded or a start past its count puts
 # the old file back, leaving why in FILE.back. This side begins a trial, ends
 # it at the first answer from the controller, gives way when none came in
-# TRIAL_S, and says a way back taken to the controller (R241).
+# TRIAL_S, and says a way back taken to the controller.
 TRIAL_S = int(os.environ.get("BUILDERBOT_AGENT_TRIAL_S", "600") or 600)
 SELFCHECK_S = 120
 
@@ -1553,7 +1553,7 @@ def _probe_as(exe):
     alone, and as nobody otherwise. The agent is root, and the binaries it
     asks for a version (a toolchain store's java, a session's own claude)
     are files a build or a session can replace or point elsewhere, which
-    root then ran (B523); a link looked at once and run by its name again
+    root then ran; a link looked at once and run by its name again
     could lead somewhere else by then. As whom they answer changes nothing
     of what they print."""
     if os.geteuid() != 0:
@@ -1628,7 +1628,7 @@ def _probe_died(name, path, out, why):
         f"this node's census" + (f". It said: {said}" if said else ""))
 
 
-# What the kernel takes first when a node's memory runs out (R271): a build,
+# What the kernel takes first when a node's memory runs out: a build,
 # a test run or a command run as a job (500, as aerie's heavy_first marks
 # one a session runs, and as GitHub's runner marks its jobs), then a CI
 # runner itself (300), before this agent and the sessions it starts (200,

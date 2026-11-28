@@ -1,4 +1,4 @@
-// What the app holds a dashboard's https address to (R290): learned once,
+// What the app holds a dashboard's https address to: learned once,
 // at sign-in, and every later connection held to it. Where the system's
 // authorities vouch for the address's name (a Let's Encrypt hostname, an
 // edge in front), that is the check, as a browser's is. Otherwise the

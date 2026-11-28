@@ -1,10 +1,10 @@
 """A project's CI runs on the forge's own machines, read through the
-controller's credential (R115).
+controller's credential.
 
 A self-hosted job keeps its log where `aerie ci-log` reads it; a job on
 GitHub's runners keeps it on GitHub, and the API that hands it out wants a
 token even for a public repository. A session holds no token, so it asked
-the person to paste the failing part (Shebang-DevBoard, 2 Oct). The
+the person to paste the failing part (Shebang-DevBoard). The
 controller does hold one: the project's own (gitcreds) or the shared PAT gh
 answers with, and asks GitHub on the session's behalf. Read only: a run is
 listed and a job's log is read, nothing is re-run or stopped.
@@ -30,7 +30,7 @@ API = "https://api.github.com"
 TAIL_LINES = 400        # of each failed job's log, the end, where the failure is
 # ...but not always: Gradle names the device test that failed well before its
 # closing stack trace, and a 1949-line device-tests log kept its name outside
-# the last 400 (report #63, B525). The lines above the tail that name a
+# the last 400 (report #63). The lines above the tail that name a
 # failure come too, up to EARLIER_LINES, in the order they were printed.
 EARLIER_LINES = 60
 FAILURE_LINE = re.compile(r"FAILED|\bFAIL\b|AssertionError|AssertError|Exception:|##\[error\]"
@@ -69,7 +69,7 @@ def repo_of(project):
 
 def _token(project, uid=None):
     """A GitHub token for the project: the asking person's own while they
-    are signed in, else any signed-in giver's (R159: reading CI is nobody's
+    are signed in, else any signed-in giver's (reading CI is nobody's
     work in the moment), else the shared PAT; "" when none."""
     import gitcreds                                         # noqa: PLC0415
     line = (gitcreds.read_line(project, uid=uid) or gitcreds.read_line(project, uid="")) if gitcreds.STATE else ""

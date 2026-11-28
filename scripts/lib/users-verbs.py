@@ -32,8 +32,8 @@ users.configure(state=os.environ["DASHBOARD_STATE"], write_json=write_json)
 
 
 def stamp_if_fresh(fresh):
-    """The owner made from a shell on a new install, before its first start
-    (B436): the store is stamped with this build's state, as a first start
+    """The owner made from a shell on a new install, before its first start:
+    the store is stamped with this build's state, as a first start
     stamps a fresh one, or that start reads a users file with no stamp as a
     /config from before the stamp and refuses it."""
     if not fresh:
@@ -71,18 +71,18 @@ def accounts():
             print(f'{u["name"]:<24} {u["role"]:<8} seen {seen:<10} {projects}')
         raise SystemExit(0)
     name = rest[0]
-    # --seen (B135): the account starts having read the guide and this
+    # --seen: the account starts having read the guide and this
     # image's changelog, for one a script makes for somebody it shows the
     # dashboard to already (a seeded teammate, a classroom's accounts), where
     # the welcome window opened over everything at the first sign-in. The
-    # first-use tour (R94) is off for it too, for the same reason.
+    # first-use tour is off for it too, for the same reason.
     seen = "--seen" in rest
 
     def mark_seen():
         if seen:
             users.prefs_set(name, {"welcome_seen": True, "tour_off": True,
                                    "image_seen": os.environ.get("BB_IMAGE_REV", "").strip()[:40]})
-    # The owner, as the first-run page makes it (R84): for a setup scripted
+    # The owner, as the first-run page makes it: for a setup scripted
     # from a shell rather than clicked through. Refused once there is one.
     if sub == "claim":
         fresh = fresh_store()
@@ -127,7 +127,7 @@ def accounts():
 
 
 def reset_2fa():
-    """Every second factor of one account gone (R127), and said."""
+    """Every second factor of one account gone, and said."""
     u = users.load()["users"].get(args[0])
     if not u:
         sys.exit(f"[builderbot] ERROR: no account called {args[0]}")

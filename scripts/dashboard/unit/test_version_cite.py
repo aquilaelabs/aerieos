@@ -1,5 +1,5 @@
-"""A cut dates the changelog's entries from one walk of its history (R228
-step 22), where each entry was a `git log -S` of its own: the commit that
+"""A cut dates the changelog's entries from one walk of its history,
+where each entry was a `git log -S` of its own: the commit that
 added an entry's line is the one it names, a stamp given by hand is kept,
 and an entry asks git nothing more once the history is read."""
 import os

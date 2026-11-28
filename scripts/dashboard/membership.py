@@ -1,4 +1,4 @@
-"""Who a project belongs to and who joins it (the operator, 1 Oct).
+"""Who a project belongs to and who joins it.
 
 Every project has an OWNER, an account: whoever made it, and AerieOS's
 owner for one with no owner of its own (made with no account, or its
@@ -11,10 +11,10 @@ sees every project and could always put any of them on any account's list,
 their own included (by a role on it, on the Roles page); on an invite-only project only its
 owner and AerieOS's owner change who is on it, and everybody else comes
 in by accepting an invitation. AerieOS's owner is never kept out: it can
-add itself to any project (the operator, 1 Oct).
+add itself to any project.
 
 HANDING IT ON: AerieOS's owner moves a project to another account at
-once. The project's own owner OFFERS it instead (the operator, 1 Oct): the
+once. The project's own owner OFFERS it instead: the
 offer waits in the other person's bell like an invitation, and the project
 changes hands only when they accept, and only if the one who offered still
 owns it then. One offer per project at a time; a new one replaces it.
@@ -64,13 +64,13 @@ def _write(name, d):
 
 def _read(name, empty):
     # A role check reads the owners for every space a status read draws:
-    # read once while it is the same file (statefile.read_json, R228 step 1).
+    # read once while it is the same file (statefile.read_json).
     d = statefile.read_json(_st() / name)
     return d if isinstance(d, dict) else empty
 
 
 def _keyed(ps, merge=None):
-    """{project: value} by project key (R138): an entry written under a
+    """{project: value} by project key: an entry written under a
     repository's name before it was put in a project (an import, a clone, a
     folder recorded since migration 0010 ran) counts for its project, the
     project's own entry first; `merge` joins two that land on one key."""
@@ -108,7 +108,7 @@ def _name_of(uid):
 
 def owner_of(project):
     """The owning account's uid: the record's, or AerieOS's owner. Kept
-    by project (R138): a repository's owner is its project's."""
+    by project: a repository's owner is its project's."""
     rec = _owners()["projects"].get(users.key_of(project)) or {}
     return rec.get("owner") or users.owner_uid()
 
@@ -146,7 +146,7 @@ def may_change_members(me, project):
 def member_refusal(me, project, joining=False):
     """"" when `me` may change who is on `project`, else why not. `joining`
     is `me` adding themselves: AerieOS's owner may join an invite-only
-    project that way (R135), the one difference from an administrator,
+    project that way, the one difference from an administrator,
     who waits for an invitation."""
     if may_change_members(me, project):
         return ""
@@ -169,12 +169,12 @@ def on_create(project, account):
         d = _owners()
         d["projects"].setdefault(project, {})["owner"] = u["uid"]
         _write("project-owners.json", d)
-    # ...and holds PROJECT_owner on it (R152).
+    # ...and holds PROJECT_owner on it.
     users.give_owner_role(project, u["uid"])
 
 
 def adopt(key, first):
-    """A project (R138) owned as the repository it was made from was, invite
+    """A project owned as the repository it was made from was, invite
     only if that one was: what migration 0010 does for every repository."""
     with _lock:
         d = _owners()
@@ -211,7 +211,7 @@ def forget_account(uid):
 def forget_project(project, live=()):
     """A project that will never be listed again (a create that never took,
     one deleted for good): its owner, its invitations, every account's roles
-    on it and its PROJECT_owner role go (B95). Left, the Profile and the
+    on it and its PROJECT_owner role go. Left, the Profile and the
     Roles page went on naming an owner of a clone that had failed and of
     one purged, two of them under one label. `live` is every live
     project's directory: a role name is cut to a length, so one another
@@ -236,8 +236,8 @@ def forget_project(project, live=()):
 def prune_gone(registry):
     """Every project's owner, owner role and account entries put away where
     the project is gone for good or was never made (no record, or purged):
-    what forget_project does at the time, for what happened before it did
-    (B95). A trashed project keeps them, for Put back. How many went."""
+    what forget_project does at the time, for what happened before it did.
+    A trashed project keeps them, for Put back. How many went."""
     recs = {k: (registry.get(k) or {}).get("state") for k in registry.labels()}
     if not recs:
         return 0                  # no record read at all is no reason to drop anything
@@ -288,10 +288,10 @@ def view(me, project):
                 {"id": r["id"], "name": _name_of(r["uid"]), "by": _name_of(r.get("by") or ""),
                  "at": r.get("at", 0), "role": r.get("role") or ""} for r in rows],
             # Who could be invited or made owner: every account, named, and
-            # only to somebody who may invite or manage (B21); a member has
+            # only to somebody who may invite or manage; a member has
             # no use for the controller's whole list of accounts.
             "accounts": sorted(u.get("name") or "" for u in users.all_users()) if invite else [],
-            # The roles an invitation may offer: those on a project (R155).
+            # The roles an invitation may offer: those on a project.
             "roles": sorted(n for n, r in roles.all_roles().items()
                             if r.get("scope") == "projects" and not n.endswith("_owner"))}
 
@@ -340,7 +340,7 @@ def set_owner(me, project, owner="", restrict=None):
 
 def invite(me, project, name, role=""):
     """Invite an existing account to the project, as a role on it: being on
-    a project is holding a role there (R155), so an invitation says which
+    a project is holding a role there, so an invitation says which
     one, and accepting gives it. (payload, status)."""
     project = users.key_of(project)
     if not (may_manage(me, project) or (users.is_admin(me) and not invite_only(project))):
@@ -412,7 +412,7 @@ def answer(me, iid, accept):
         got = users.take_on(me.get("name") or "", p)
         if got.get("error"):
             return got, 400
-        # The role it was offered as: what makes them on it (R155).
+        # The role it was offered as: what makes them on it.
         if r.get("role"):
             users.give_project_role(p, users.uid_of(me), r["role"])
     return {"ok": True, "project": p, "joined": bool(accept),

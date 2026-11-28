@@ -1,4 +1,4 @@
-"""Each session kept to its own project's network (R79): the tables, the firewall and the session account's sudoers."""
+"""Each session kept to its own project's network: the tables, the firewall and the session account's sudoers."""
 import contextlib
 import ipaddress
 import json
@@ -38,13 +38,13 @@ def session_sudoers(user, accounts=False):
     """The sudo rule that lets the session account start a session inside its
     project's view, and nothing else. !use_pty keeps the session on the pane's
     own terminal rather than a pty sudo would relay. Where accounts are their
-    own users (R125), each of them may start its own session the same way
+    own users, each of them may start its own session the same way
     (bb-session holds it to its own account), and nothing more."""
     return (f"# Written by the AerieOS agent (R35): the one command {user} may run as root,\n"
             f"# which starts a session inside a view of this node that holds only its space.\n"
             f"Defaults!{SESSION_BIN} !use_pty, !lecture\n"
             f"{user} ALL=(root) NOPASSWD: {SESSION_BIN}\n"
-            # ...and its worktree, made for it as the tree's owner (R125 step 7).
+            # ...and its worktree, made for it as the tree's owner.
             + (f"%bbu ALL=(root) NOPASSWD: {SESSION_BIN} enter *, {SESSION_BIN} check, {SESSION_BIN} check-net, "
                f"{SESSION_BIN} worktree *\n"
                if accounts else ""))
@@ -53,8 +53,8 @@ def session_sudoers(user, accounts=False):
 def session_conf(state, user, net=False, accounts=None):
     """This machine's layout for bb-session: the session account and the
     stores whose other projects' parts a session's view leaves out, and,
-    once the table is in place, that each session gets a network of its own
-    (R79). Off, the lines are not written at all."""
+    once the table is in place, that each session gets a network of its own.
+    Off, the lines are not written at all."""
     stores = state.get("stores") or {}
     return (f"# Written by the AerieOS agent (R35) for bb-session.\n"
             f"SESSION_USER={user}\n"
@@ -65,14 +65,14 @@ def session_conf(state, user, net=False, accounts=None):
             f"RUNNER_DIR={RUNNER_DIR}\n"
             f"HIDE=/devdata\n"
             + (f"SESSION_NET=on\nSESSION_NET_CIDR={SESSNET_CIDR}\n" if net else "")
-            # Accounts as their own users (R125): who to ask whose a terminal
+            # Accounts as their own users: who to ask whose a terminal
             # is, and the root-owned bundle it then runs from.
             + (f"ACCOUNT_USERS=on\nCONTROLLER={accounts['controller']}\n"
                f"CONTROLLER_PIN={accounts['pin']}\nBUNDLE={accounts['bundle']}\n" if accounts else ""))
 
 
 def isolation_now():
-    """Whether a session here runs inside a view of its own project (R35), and
+    """Whether a session here runs inside a view of its own project, and
     why not when it does not: asked of the helper itself, which makes the
     namespaces a view needs and lets them go."""
     if os.geteuid() != 0:
@@ -93,7 +93,7 @@ def isolation_now():
 
 
 # ---------------------------------------------------------------------------
-# each session kept to its own project's network (R79)
+# each session kept to its own project's network
 #
 # bb-session gives the session a network namespace and a veth to the node,
 # addressed from SESSNET_CIDR, and writes which project the address is; this
@@ -145,7 +145,7 @@ def sessnet_clash(addrs, routes, cidr=SESSNET_CIDR):
     show table all`) other than a session's own link. A session's /30 would
     hide its addresses from everything on the machine, and the masquerade
     would rewrite its traffic, which on a machine used for other things is
-    somebody else's network (the operator, 24 Sep)."""
+    somebody else's network."""
     net = ipaddress.ip_network(cidr)
     for a in addrs if isinstance(addrs, list) else []:
         if not isinstance(a, dict) or str(a.get("ifname") or "").startswith("bbs"):
@@ -284,7 +284,7 @@ def sessnet_table(cidr=SESSNET_CIDR, mark=SESSNET_MARK):
 def sessnet_fill(ctl, dns, own, peers=(), hosts=(), vms=()):
     """The sets, replaced in one transaction: the controller's address and
     port, the resolvers, (session address, container address) for every
-    container each session's project owns here, and (R82) what its project
+    container each session's project owns here, and what its project
     has on its other nodes: (session, node address, published port) for a
     container there, (session, node address) for a Mac or Windows node,
     which has no containers to narrow to and is reached whole."""
@@ -353,7 +353,7 @@ def sessnet_containers():
             with contextlib.suppress(ValueError):
                 if isinstance(n, dict) and n.get("IPAddress"):
                     ips.add(str(ipaddress.IPv4Address(str(n["IPAddress"]))))
-        # The bridges it is on (R178): a compose network is a user-defined
+        # The bridges it is on: a compose network is a user-defined
         # bridge whose interface is br- and the first twelve of its id; the
         # default network's is docker0.
         bridges = set()
@@ -364,7 +364,7 @@ def sessnet_containers():
             elif re.fullmatch(r"[0-9a-f]{12,64}", nid):
                 bridges.add("br-" + nid[:12])
         # ...and the host ports it publishes, for the node's own ports a
-        # container may reach by the node's address (R178).
+        # container may reach by the node's address.
         ports = set()
         for binds in ((c.get("NetworkSettings") or {}).get("Ports") or {}).values():
             for b in binds or []:
@@ -396,7 +396,7 @@ def sessnet_pairs(sessions, own, containers):
 def sessnet_peers(sessions, own):
     """(session address, node address, port) for every session and every
     published port its project's containers hold on the project's other
-    nodes (R82), and the model router its project may use (R144), on this
+    nodes, and the model router its project may use, on this
     node too: the controller names them per project as `peers`. A port
     published on this node's own address is reached by the address the
     connection was made to (ct original), after Docker's DNAT."""
@@ -415,7 +415,7 @@ def sessnet_peers(sessions, own):
 
 def sessnet_hosts(sessions, own):
     """(session address, node address) for every session and every node of
-    its project that is reached whole (R82): a Mac or Windows node, or a
+    its project that is reached whole: a Mac or Windows node, or a
     guest, which has no containers to narrow to."""
     out = set()
     for s in sessions:
@@ -428,7 +428,7 @@ def sessnet_hosts(sessions, own):
 
 def sessnet_vms(sessions, own):
     """(session address, VM network) for every session and every network its
-    project's VMs are on here (R91 step 8): a session reaches its own
+    project's VMs are on here: a session reaches its own
     project's VMs, by ssh and anything else, and no other's."""
     out = set()
     for s in sessions:
@@ -454,9 +454,9 @@ def sessnet_ctl(url):
     return sorted({(i[4][0], port) for i in infos})
 
 
-# ---- each project's containers kept to their own network (R178) ------------
+# ---- each project's containers kept to their own network ------------
 #
-# Measured on the dev pair (11 Oct): a container reaches another project's
+# Measured on the dev pair: a container reaches another project's
 # container through the node's address (its published port, after Docker's
 # DNAT: forward from one bridge to the other), and the node's own ports
 # (sshd); its bridge address is already dropped by Docker's isolation. So a
@@ -534,7 +534,7 @@ def ctrnet_reach(containers, ctr):
     pairs, ports, lan = set(), set(), set()
     for comp, e in by.items():
         to = {comp} | {str(x) for x in ((ctr or {}).get(comp) or {}).get("to") or []}
-        # AerieOS's own (R180, the controller's `all`): every compose
+        # AerieOS's own (the controller's `all`): every compose
         # project here, the ones the controller never heard of included.
         if ((ctr or {}).get(comp) or {}).get("all"):
             to |= set(by)
@@ -631,7 +631,7 @@ TABLE_LOOK_S = 30
 
 class SessionNet:
     """Each session kept to its own project's network, where the controller
-    asks for it and this node can (R79). A thread of its own: a session that
+    asks for it and this node can. A thread of its own: a session that
     has just started should reach its own containers within seconds, and the
     main loop turns over once a long-poll.
 
@@ -663,7 +663,7 @@ class SessionNet:
         # network; the ready mark decides whether that session starts.
         self.conf_on = self.wanted()
         self.said = ""
-        # The containers' table (R178): up, what its sets last held, and
+        # The containers' table: up, what its sets last held, and
         # what was last said about it.
         self.ctr_up = False
         self.ctr_filled = None
@@ -674,7 +674,7 @@ class SessionNet:
     def table_gone(self, table, now):
         """Whether a table this thread put in place has gone (a flush, a
         firewall reload), looked at every TABLE_LOOK_S and taken as there
-        between (R228 step 18): listed every two seconds, two tables were
+        between: listed every two seconds, two tables were
         two processes a step for what changes once in a long while."""
         if now - self.looked.get(table, 0) < TABLE_LOOK_S:
             return False
@@ -739,9 +739,9 @@ class SessionNet:
         # answer from before the switch for ten minutes. The count of
         # sessions is not a change worth a hello.
         # Compared on this report's own keys: the stored copy also carries
-        # the containers' entry (ctr, R178), and against that the two were
+        # the containers' entry (ctr), and against that the two were
         # never equal, so every step of this thread asked for a hello and
-        # the node said hello every hundred seconds (B647).
+        # the node said hello every hundred seconds.
         now_s = {k: v for k, v in now_is.items() if k != "sessions"}
         was_s = {k: SESSNET_STATUS.get(k) for k in now_s}
         if now_s != was_s:
@@ -754,7 +754,7 @@ class SessionNet:
         self.step_vms(now)
         self.step_bridge(now)
 
-    # -- frames bridged on br0 past Docker's forwarding (R219) -------------------
+    # -- frames bridged on br0 past Docker's forwarding -------------------
     def step_bridge(self, now):
         if now - getattr(self, "bridge_at", 0) < 60:
             return
@@ -764,7 +764,7 @@ class SessionNet:
         if err:
             self.say(f"LAN bridge: {err}")
 
-    # -- the VMs' own network rules (R91 step 8) -------------------------------
+    # -- the VMs' own network rules -------------------------------
     def step_vms(self, now):
         """The VMs' table kept while a project network is here, with the
         controller's address resolved as the sessions' is, and the LAN let in
@@ -777,7 +777,7 @@ class SessionNet:
         if err:
             self.say(f"VM network: {err}")
 
-    # -- each project's containers kept to their own network (R178) ----------
+    # -- each project's containers kept to their own network ----------
     def ctr_wanted(self):
         return bool((self.agent.state.get("session_net") or {}).get("ctr_on"))
 

@@ -1,4 +1,4 @@
-// The Keys page (R154): an install whose key the install made shows it under
+// The Keys page: an install whose key the install made shows it under
 // Controller with where it is kept, its fingerprint and that it is not yet
 // saved; Show puts the key on the page with Copy, Download and I saved it;
 // Change makes a new key and everything kept under the old one is sealed
@@ -111,7 +111,7 @@ try {
   const after = await keys({ action: 'status' });
   ok(now !== FIRST && /^[0-9a-f]{64}$/.test(now), 'Change writes a new key to the key folder');
   // The one before is kept until the next start has sealed everything again
-  // with both (B550); what the change sealed opens under the new key alone.
+  // with both; what the change sealed opens under the new key alone.
   ok(!after.install.saved && after.install.previous && !(after.install.left || []).length,
      `...not saved yet, every store sealed again, and the one before kept until the next start (${JSON.stringify(after.install)})`);
   const resealed = execFileSync('python3', ['-c', `
@@ -140,12 +140,12 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   ok((await keys({ action: 'change-mine', key: 'zz' })).error, '...and a pasted key that is not 64 hex characters is refused');
 
   // ---- Profile: the account's key store -----------------------------------------
-  // A token given in a space's settings goes into the giver's store (the
-  // operator, 27 Oct); one kept as the space's own stays its own (R157:
-  // the move of those from before 0.8 at every start is gone, R295).
+  // A token given in a space's settings goes into the giver's store;
+  // one kept as the space's own stays its own
+  // (the move of those from before 0.8 at every start is gone).
   // Nothing is linked on Profile itself.
   // The owner takes the projects on, as a fresh install's owner does on the
-  // Users page: a role on each (lib's member(), on this controller).
+  // Users page: a role on each (lib's member, on this controller).
   const rl = await (await fetch(base + '/api/roles', { headers: H })).json();
   await fetch(base + '/api/roles', { method: 'POST', headers: H,
     body: JSON.stringify({ action: 'set', name: 'keyrole', scope: 'projects', perms: { ...MEMBER, gitauth: 'write', settings: 'write' }, note: 'the suite' }) });

@@ -1,6 +1,6 @@
-// The Storage tab (R169): what a node's disks hold, and whose. One node at
-// a time, picked in the bar like Toolchains (the node-switcher rule; the
-// operator, 11 Oct): a state row saying when it was measured, its
+// The Storage tab: what a node's disks hold, and whose. One node at
+// a time, picked in the bar like Toolchains (the node-switcher rule):
+// a state row saying when it was measured, its
 // filesystems as a meter stack, its stores and Docker's share, then each
 // project's folders on it (the synced copy, the build cache, artifacts, a
 // dev instance's data, emulators, the accounts' build caches), largest
@@ -8,7 +8,7 @@
 // line. The numbers are the agent's hourly walk, said with their age;
 // Measure now asks for a fresh one, which the next hello brings.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Data from
+// Chrome from docSurface; the hard rules are uniform.mjs's. Data from
 // /api/storage, read when the tab opens and after Measure now; redrawn on
 // the nodes revision, since a hello carries a new walk.
 
@@ -19,7 +19,7 @@ let storageErr = "";
 let storageMay = false;          // whether this account may measure now
 let storageNode = "";            // the node the tab shows
 let storageDisk = "";
-const storageAskedNodes = new Set();   // nodes read into the node list for the header (R177)            // the disk its chips picked, "" for all (R122)
+const storageAskedNodes = new Set();   // nodes read into the node list for the header            // the disk its chips picked, "" for all
 
 function openStorageTab(node){
   if (node) storageNode = node;
@@ -35,7 +35,7 @@ function loadStorage(){
 }
 
 // A record forgotten from this page (a backup, a mount, a schedule) goes on
-// the press (the operator, 22 Nov): its "kind:id" is held here and left out
+// the press: its "kind:id" is held here and left out
 // of each drawing until the read after the answer, and a refusal brings it
 // back saying why.
 async function storageForget(key, path, body, said, row){
@@ -48,7 +48,7 @@ async function storageForget(key, path, body, said, row){
 // What a machine job's press says once it is in: `what`, then how it runs,
 // or, with a system job already at work on the node, that it is queued
 // behind that one (nodes.system_job_for: queued, never refused) and starts
-// once it has ended (the operator, 22 Nov). Read when the press is made.
+// once it has ended. Read when the press is made.
 function storageJobSaid(n, what, runs){
   const ahead = ndAhead(nodeOf(n.node));
   return ahead ? queuedSaid(what, `${ahead} on the machine`) : `${what}: ${runs}`;
@@ -105,7 +105,7 @@ function storageRow(h){
         h.prune ? `: <a href="#" data-stprune="${esc(h.prune)}">prune on the Containers page</a>` : ""}</div></div></div>`;
 }
 
-// What AerieOS could free on a filesystem (R123 step 4): its projects'
+// What AerieOS could free on a filesystem: its projects'
 // phones, its build caches and Docker's reclaimable, where they sit on it.
 function storageFreeable(n, fs){
   const on = path => fs.path === path || (path || "").startsWith(fs.path === "/" ? "/" : fs.path + "/");
@@ -116,8 +116,7 @@ function storageFreeable(n, fs){
   const dk = n.docker || {};
   const docker = dk.fs === fs.path ? (dk.kinds || []).reduce((a, k) => a + (k.reclaimable_mb || 0), 0) : 0;
   const home = n.homes?.fs === fs.path || on(n.homes?.path || "");
-  // Each named with the page that frees it: this page only measures (the
-  // operator, 23 Oct).
+  // Each named with the page that frees it: this page only measures.
   const parts = [[home ? phones : 0, "phones not running (the Emulator page)"],
                  [(home ? builds : 0) + cache, "build caches (Clear cache on the node's row on the Nodes page)"],
                  [docker, "Docker's reclaimable (the Containers page)"]].filter(([mb]) => mb > 0);
@@ -130,7 +129,7 @@ function andList(xs){
   return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 }
 
-// One picture per filesystem (R203): its meter, then what AerieOS holds
+// One picture per filesystem: its meter, then what AerieOS holds
 // on it, largest first, with the stores holding nothing folded into one
 // line. A flat list of nine stores under a separate meter stack said 37.8
 // TB used above rows adding up to 10 GB, and left the reader to join them.
@@ -144,7 +143,7 @@ function storageDisks(n){
     const ours = some.reduce((a, h) => a + (h.mb || 0), 0);
     const pct = fs.total_mb ? (fs.used_mb || 0) / fs.total_mb * 100 : 0;
     const also = fs.also?.length ? `, also at ${fs.also.join(", ")}` : "";
-    // Each filesystem a card of its own (R218 step 47, the operator 18 Oct):
+    // Each filesystem a card of its own:
     // its mount the heading, used of its size the status, then its meter,
     // what of it is AerieOS's and the rows of what that is.
     return docSection("storage", `fs:${fs.path}`, fs.path, `${sgb(fs.used_mb)} of ${sgb(fs.total_mb)}`,
@@ -158,7 +157,7 @@ function storageDisks(n){
       none.length ? `<div class="empty stnone">${esc(andList(none.map(h => h.name)))} hold${none.length === 1 ? "s" : ""} nothing yet.</div>` : ""}`,
       {cls: pct >= 92 ? "bad" : pct >= 80 ? "warn" : "", item: true});
   };
-  // The disks are the node's, as many as it has: big chips pick one (R122),
+  // The disks are the node's, as many as it has: big chips pick one,
   // where small pills listed them as if they were the page's sections.
   const off = held.filter(h => !fss.some(fs => fs.path === h.fs));
   const keys = [...fss.map(fs => fs.path), ...(off.length ? ["elsewhere"] : [])];
@@ -172,7 +171,7 @@ function storageDisks(n){
   return chips + out.join("");
 }
 
-// The controller's own machine's disks (R162 step 1), as its census lists
+// The controller's own machine's disks, as its census lists
 // them: each by name, model, size, serial, kind and what it holds, with
 // SMART's health, temperature and hours where the machine has smartctl;
 // the system disk marked. Read before anything is written to one; the
@@ -198,7 +197,7 @@ function storageMachineDisks(n){
   return docSection("storage", "disks", "Disks", disks.length ? `${disks.length}${failing ? `, ${failing} failing` : ""}` : "", body, {cls: failing ? "bad" : ""});
 }
 
-// A share's places on an array taken over (R163): where its new files
+// A share's places on an array taken over: where its new files
 // land, and what the mover does with them, from what to what; each a pool
 // in front of the data disks (the adopted ones, in their order) or the
 // array. A select's value for the mover is "FROM>TO", or "" for off.
@@ -225,11 +224,11 @@ function moveRead(share, land, mover){
   return {share, land, from: from || "", to: to || ""};
 }
 
-// The controller's own machine's shares (R162 step 1): each as AerieOS's
+// The controller's own machine's shares: each as AerieOS's
 // own two files say it (the path, SMB with its users or as a guest, NFS
 // with its clients), with Remove; and a form for a new one, every press a
 // system job the root agent runs, which writes the files whole and tells
-// Samba and NFS to read again. The SMB password an account sets is R164's.
+// Samba and NFS to read again. The SMB password an account sets is its Profile's.
 function storageShares(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
@@ -248,7 +247,7 @@ function storageShares(n){
     const names = [...(s.accounts || m.users || []).map(x => `${esc(x)}: read/write`), ...(s.readers || m.readers || []).map(x => `${esc(x)}: read-only`)];
     return `private: ${names.join(", ") || "nobody yet"}`;
   };
-  // Somebody named with no share password yet (R243): it is kept only for
+  // Somebody named with no share password yet: it is kept only for
   // people a share names, and made as they next sign in.
   const waiting = s => (s.waiting || []).length
     ? `<div class="sub warn">${s.waiting.map(esc).join(", ")}: it opens for ${s.waiting.length === 1 ? "them" : "each"} once they have signed in to AerieOS again, or set a share password on Profile</div>` : "";
@@ -259,14 +258,14 @@ function storageShares(n){
       ${s.smb?.on || s.nfs?.on ? "" : `<div class="sub">On this machine only: nothing serves it until you export it.</div>`}
       ${moveOf(s) ? `<div class="sub">${esc(moveSaid(moveOf(s)))}.</div>` : ""}
       </div>${admin && !why ? `<span class="acts"><button type="button" data-stshareedit="${esc(s.name)}">Edit</button><button type="button" class="danger" data-stshare="remove" data-name="${esc(s.name)}">Remove</button></span>` : ""}</div>`).join("");
-  // A share names the one pool it lives on, chosen when it is made (R162
-  // step 6, the operator, 27 Oct): the pools and the array are the places,
+  // A share names the one pool it lives on, chosen when it is made:
+  // the pools and the array are the places,
   // and the share's folder sits under the one picked, nothing moved behind
   // a person's back.
   // The main pool first: a fast one is for apps and VMs, not for shares.
   const places = [...(n.pools || []).filter(p => p.mount).sort((a, b) => (a.name === "fast") - (b.name === "fast")).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : [])];
-  // As a NAS's share works (the operator, 4 Nov): a folder first, internal until
+  // As a NAS's share works: a folder first, internal until
   // Export is on; then its security, and each person's access. A share has no
   // password of its own: each person signs in as they do here.
   const people = (n.accounts || []).map(a => `<div class="stwho"><span class="grow">${esc(a)}</span>
@@ -353,7 +352,7 @@ function wireStorageShares(root, n){
   }));
 }
 
-// The controller's own machine's ZFS pools (R162 step 1): each as zpool
+// The controller's own machine's ZFS pools: each as zpool
 // says it (size, used, health, the members by layout, the last scrub), with
 // Scrub, Export and Destroy on its row; and New pool, a form that names the
 // disks by model, size and serial before anything is written, every press
@@ -405,7 +404,7 @@ function storagePools(n){
           <div class="hint">Kept here, the pool opens at boot; not kept, it waits for the passphrase on this page after every boot. Write it down: nothing here recovers a pool without it${
             helpIcon("Kept here, the disks are unreadable pulled from this machine, but the machine as a whole opens them. Not kept, the pool and its shares wait after every boot until the passphrase is typed here, which also protects against the whole machine taken.")}</div></div>`]}],
     foot: [`<button type="button" class="primary" data-stpool="create">Make the pool</button>`]})}</div>`;
-  // Pools another machine made, found on its disks (R163 step 1): each
+  // Pools another machine made, found on its disks: each
   // imported as it is, never upgraded, its datasets under /mnt.
   const found = n.pools_importable || [];
   const importRows = found.map(p => `<div class="row stack2 stpoolfound" data-poolfound="${esc(p.name)}"><div class="grow">
@@ -458,21 +457,21 @@ function wireStoragePools(root, n){
     } else if (act === "export"){
       if (!await askYes(`Export the pool ${body.name}? Its datasets are unmounted and the disks let go, to import elsewhere or here again.`, {title: "Export the pool?", verb: "Export"})) return;
     } else if (act === "import" && b.dataset.elsewhere){
-      // Last used by another system (B938): the machine's own pools after
+      // Last used by another system: the machine's own pools after
       // its stick died, or disks still in use elsewhere, which this would
       // break; said so, and its name typed.
       if (!await askTyped(`Import ${body.name} anyway?\n\nIt was last used by another system and never exported. That is what this machine's own pools look like after its stick died and a new one was written: then this brings it back as it was. If these disks are in use by another machine that is still running, importing it here damages it.\n\nType the pool's name to import it.`,
                           body.name, {title: "Import anyway?", verb: "Import anyway", label: "The pool's name", refused: "that is not the pool's name: nothing was imported"})) return;
       body.force = true; body.confirm = body.name;
     }
-    // A pool exported cleanly is imported with no question (R265: a press asks only where its yes costs something): it
+    // A pool exported cleanly is imported with no question (a press asks only where its yes costs something): it
     // is taken as it is, never upgraded, and Export lets it go again.
     busyFor(b, act);
     await sayPost(null, "", "/api/v1/nodes", body, storageJobSaid(n, act, "the job runs on the machine; the page follows its next check-in"), () => refresh());
   }));
 }
 
-// Snapshots (R162 step 5): each pool's bb- snapshots as the census counts
+// Snapshots: each pool's bb- snapshots as the census counts
 // them, the pool's hourly, daily and weekly schedules (the Schedules
 // page's rows, made here as system jobs on the machine), Snapshot now, and
 // the newest ten with Roll back (the name typed again) and Delete.
@@ -544,7 +543,7 @@ function wireStorageSnapshots(root, n){
   }));
 }
 
-// The array (R162 step 2): disks of mixed sizes each their own filesystem,
+// The array: disks of mixed sizes each their own filesystem,
 // one tree over them by mergerfs, parity on one or two disks kept by
 // SnapRAID on a schedule (not in real time: what was written since the last
 // sync is unprotected until the next, said on the section). Each disk by
@@ -556,7 +555,7 @@ const ARRAY_POLICIES = [["mfs", "most free space: the emptiest disk"], ["epmfs",
                         ["lfs", "fill up: one disk fills before the next is used"], ["ff", "the first disk with room"]];
 const ARRAY_KINDS = [["sync", "Sync", "0 4 * * *", "Daily, at 4:00"], ["scrub", "Scrub", "0 5 * * 0", "Weekly, Sundays at 5:00"],
                      ["verify", "Parity check", "0 3 1 * *", "Monthly, the 1st at 3:00"], ["mover", "Mover", "40 3 * * *", "Daily, at 3:40"]];
-// The last full parity check (R163 step 15), in words.
+// The last full parity check, in words.
 function arrayVerifyWord(v){
   if (!v?.at) return "never";
   const r = !v.ok ? "did not finish" : !v.found ? "all good" : v.corrected
@@ -583,7 +582,7 @@ function storageArray(n){
   const pick = (id, held) => `<div class="lbox" id="${id}">${[...free, ...(held ? used : [])].map(d => `<label class="ndcap"><input type="checkbox" data-${id}="${esc(d.name)}"${used.includes(d) ? ' data-held="1"' : ""}> ${diskLine(d)}${used.includes(d) ? ` <span class="pill warn">holds ${esc((d.parts || []).find(p => p.holds && p.holds !== "nothing")?.holds || d.holds)}</span>` : ""}</label>`).join("") || `<div class="empty">No disk free for it.</div>`}</div>`;
   let body;
   if (has){
-    // An array taken over (R163 step 3) has the mover beside its schedules;
+    // An array taken over has the mover beside its schedules;
     // another array has no pool in front of it to move from.
     const kindsHere = ARRAY_KINDS.filter(k => k[0] !== "mover" || a.adopted);
     const kinds = kindsHere.map(([k, label]) => { const sch = scheds.find(x => x.array === k); return `<span class="pill${sch?.on ? " ok" : ""}">${label.toLowerCase()}: ${sch ? `${esc(sch.words || "")}${sch.on ? "" : ", off"}` : "not scheduled"}</span>`; }).join(" ");
@@ -679,7 +678,7 @@ function wireStorageArray(root, n){
   }));
 }
 
-// Other disks and shares (R162 step 4): a USB or eSATA disk here, or a
+// Other disks and shares: a USB or eSATA disk here, or a
 // remote SMB share or NFS export, mounted at /mnt/other/NAME as a backup
 // target or a source to copy in, never pooled. The record is the
 // controller's; the machine's agent mounts what it says within a minute,
@@ -750,7 +749,7 @@ function wireStorageOther(root, n){
   }));
 }
 
-// Backups (R162 step 5): a folder here copied to another place by rsync,
+// Backups: a folder here copied to another place by rsync,
 // each run a dated folder hard-linked to the one before, the oldest pruned
 // past what is kept; Run now, a daily or weekly schedule (the Schedules
 // page's row), the last run from the census, and a form for a new one.
@@ -777,7 +776,7 @@ function storageBackups(n){
         sch ? `<button type="button" data-stsnapsched="${esc(sch.id)}">Remove the schedule</button>` : "",
         `<button type="button" class="danger" data-stbackup="remove" data-id="${esc(r.id)}" title="forgotten here; the runs already copied stay where they are">Remove</button>`], true)}</span>` : ""}</div>`;
   }).join("");
-  // A pool of one disk has no redundancy (R162 step 6: an SSD pool holding
+  // A pool of one disk has no redundancy (an SSD pool holding
   // the hot data): where the array stands, one press makes its nightly
   // backup there, and a dead disk is restored from last night's.
   const lone = (n.pools || []).filter(p => p.mount && (p.vdevs || []).length === 1 && (p.vdevs[0].disks || []).length === 1 && p.vdevs[0].type !== "mirror"
@@ -838,14 +837,14 @@ function storageProjects(n, where){
   const rows = [...(n.projects || [])];
   if (n.other) rows.push({name: "other spaces", other: true, ...n.other});
   if (!rows.length) return `<div class="empty">no space's folders here yet</div>`;
-  // The ones holding nothing here are one line, not a row of "none" each
-  // (R203): four of five read none / 0 MB on a node that held one project.
+  // The ones holding nothing here are one line, not a row of "none" each:
+  // four of five read none / 0 MB on a node that held one project.
   const empty = rows.filter(r => !r.other && !r.total);
   const shown = rows.filter(r => r.other || r.total);
   const cols = where.filter(w => shown.some(r => r[w]));
-  // A table (R218 step 27, the tables rule): a head naming the columns at a
+  // A table (the tables rule): a head naming the columns at a
   // desk, and on a phone each cell its column's word beside its number,
-  // since a column of bare numbers under a name said nothing (B655). An
+  // since a column of bare numbers under a name said nothing. An
   // empty cell says so.
   const tcols = [{label: "Space"}, ...cols.map(w => ({label: w, num: true})), {label: "total", num: true}];
   const tail = empty.length ? `<div class="field stnone"><div class="sub">${esc(andList(empty.map(r => projLabel(r.name))))} hold${empty.length === 1 ? "s" : ""} nothing here</div></div>` : "";
@@ -855,10 +854,9 @@ function storageProjects(n, where){
       ...cols.map(w => r[w] ? sgb(r[w]) : `<span class="dim">none</span>`), `<b>${sgb(r.total)}</b>`])}</div>`).join(""), "sttbl") + tail;
 }
 
-// Each project's virtual phones on the node (R123 step 1), largest first,
+// Each project's virtual phones on the node, largest first,
 // whoever's they are among the projects this account sees: measured here,
-// removed on the Emulator page, the page that manages them (the operator,
-// 23 Oct).
+// removed on the Emulator page, the page that manages them.
 function storagePhones(n){
   const rows = [...(n.phones || [])].sort((a, b) => (b.mb || 0) - (a.mb || 0));
   const cols = [{label: "Phone"}, {label: "Space"}, {label: "Account"}, {label: "last started"},
@@ -873,7 +871,7 @@ function storagePhones(n){
 }
 
 // Measure now, the page's upkeep, on the head's action row under its facts,
-// as a node's own buttons are on the Nodes page (the operator, 29 Oct): the
+// as a node's own buttons are on the Nodes page: the
 // walk's numbers arrive with the node's census, which the page follows, so
 // it has no Refresh.
 // Given GHOST, the placeholder's: there and dead until the node is known.
@@ -884,12 +882,12 @@ function storageMeasureBtn(n){
     n.live ? "walk the disks now; the next report brings the numbers" : "the node is not dialing in"}">Measure now</button>`;
 }
 // What the tab says about one node: the state row, then its disks. Given
-// null, the placeholder (R218, the operator 18 Oct: drawn by the page's own
+// null, the placeholder (drawn by the page's own
 // code so it cannot drift): the same bands and By project, shimmering where
 // the node's numbers go.
 function storageBody(n, where){
-  // Where its stores are set, a fact of the head's (the operator, 25 Oct:
-  // no loose words at a page's top).
+  // Where its stores are set, a fact of the head's
+  // (no loose words at a page's top).
   // A fact's value is short, as a node's head's are, never a sentence.
   const byProject = (count, body) => docSection("storage", "projects", "By space", count,
     `<div class="field"><div class="hint">What each space's folders hold${n ? ` on ${esc(n.name)}` : ""}.${helpIcon("Its synced copy, build cache, artifacts, dev instance data, emulators and the accounts' build caches.")}</div></div>
@@ -898,15 +896,15 @@ function storageBody(n, where){
   const age = !n.measured ? "not measured yet"
     : n.age_s < 3600 ? `measured ${Math.round(n.age_s / 60)} min ago` : `measured ${Math.round(n.age_s / 3600)} h ago`;
   // A state is a pill (the voices rule); when it was measured is a fact.
-  // ...said once, on the line (R274), where it was a pill as well.
+  // ...said once, on the line, where it was a pill as well.
   const pill = "";
-  // The walk as a head's facts (R218 step 27; the operator, 25 Oct), and
-  // the memory AerieOS's work is kept to there (R110 step 4).
+  // The walk as a head's facts, and
+  // the memory AerieOS's work is kept to there.
   const fence = !("fence" in n) || !n.fence ? "" : `${humanBytes(n.fence[0] * 1048576)}, ${humanBytes(n.fence[1] * 1048576)} in use`;
   // Not fenced is a warning, said as one over the head, not as a fact.
   const unfenced = "fence" in n && !n.fence
     ? `<div class="field"><div class="notice warn">AerieOS's work on ${esc(n.name || "this node")} is not fenced from the system's memory: run its setup again.</div></div>` : "";
-  // When it was measured, and how often, on the line (R274); the memory
+  // When it was measured, and how often, on the line; the memory
   // AerieOS's work is held to and where stores are set at the page's foot.
   const head = pageHead({pills: pill, cls: "toolstate", line: [n.measured ? {text: age} : {text: age, tone: "warn"},
     {text: n.measured ? "walked every hour" : "walked every hour, the first an hour after start"}], actions: storageMeasureBtn(n)});
@@ -929,7 +927,7 @@ function storageBody(n, where){
   </div>`;
 }
 
-// The old system's disks (R163 step 9): the section This machine draws,
+// The old system's disks: the section This machine draws,
 // on the Storage page of the machine they are in (the controller's own),
 // with the same Check, Adopt, Release and shares, folded as Storage's are.
 function storageAdopt(n){
@@ -949,7 +947,7 @@ function renderStorageInto(i){
     loadStorage();
     return;
   }
-  // The Machines header picks from the node list (R177): a node this
+  // The Machines header picks from the node list: a node this
   // page knows that the list does not yet (one just enrolled) is read in.
   const known = new Set((nodesList || []).map(n => n.id));
   const missing = (storageList || []).filter(n => !known.has(n.node) && !storageAskedNodes.has(n.node));
@@ -961,7 +959,7 @@ function renderStorageInto(i){
   }
   const where = ["workspace", "cache", "artifacts", "appdata", "emulator", "builds"];
   const n = storagePick();
-  // The node is the group header's (R177) and Measure now the head's, so
+  // The node is the group header's and Measure now the head's, so
   // the page's own bar has nothing to carry.
   d.setBar("");
   patch(d.list, n ? storageBody(n, where)
@@ -978,7 +976,7 @@ function renderStorageInto(i){
 
 function wireStorageTab(root){
   // Its sections fold as every page's do: one open at a time on a phone,
-  // sliding, where they snapped and stood open together (B171).
+  // sliding, where they snapped and stood open together.
   wireSections(root);
   root.querySelectorAll("[data-stdisk]").forEach(c => c.onclick = () => chipMove(
     () => document.querySelector(".pane .doc.on .storagetab") || root, ".sect", () => {

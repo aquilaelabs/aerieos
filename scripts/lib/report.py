@@ -39,7 +39,7 @@ def flags(names):
 
 if sub == "add":
     words, got = flags(("area", "repro", "reproduces"))
-    # Steps given say how often they showed it (R124): a repro reads as a
+    # Steps given say how often they showed it: a repro reads as a
     # sure thing whether or not it is one.
     if got.get("repro") and not got.get("reproduces"):
         sys.exit("[builderbot] ERROR: say whether those steps reproduce it: --reproduces always, "

@@ -1,5 +1,5 @@
 """The root helper that starts sessions, and an account's terminal server,
-as root for real (R240 steps 3 and 4; the audit of 13 Nov).
+as root for real.
 
 bb-session keeps what the controller granted each account where only root
 writes, and holds an account's own user to it: an account that could write
@@ -126,7 +126,7 @@ class Worktree(unittest.TestCase):
         self.assertFalse(session.worktree_unfilled(wt))
 
     def test_a_git_file_naming_another_spaces_repository_makes_none(self):
-        # B890: a session of the space writes its tree, and a .git there
+        # A session of the space writes its tree, and a .git there
         # naming another space's repository had root make a worktree of it.
         other = self.w.folder("workspace/beta", WHO)
         r = world.as_account(WHO, ["git", "init", "-q", "-b", "main", "."], cwd=other,
@@ -146,7 +146,7 @@ class Worktree(unittest.TestCase):
 
 class ViewFolders(unittest.TestCase):
     """The folders a bind lands on, made by root in a home the account
-    writes (B887): through a link root made, which is the machine's own
+    writes: through a link root made, which is the machine's own
     (/home onto /var/home), and never through one the account left."""
 
     def setUp(self):

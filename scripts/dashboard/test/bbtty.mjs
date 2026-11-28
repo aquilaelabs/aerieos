@@ -17,12 +17,12 @@ import { dirname, join } from 'path';
 
 // bb-tty leaves git's GIT_CONFIG_n to whoever set them, and a Claude session
 // running this suite has set its own: they are not this suite's to inherit
-// (B151, as settings.mjs's B146).
+// (as in settings.mjs).
 for (const k of Object.keys(process.env)) if (/^GIT_CONFIG_(COUNT|KEY_|VALUE_)/.test(k)) delete process.env[k];
 
 const BBTTY = join(import.meta.dirname, '..', 'bb-tty');
-// This suite must not pick up the NODE'S OWN bb-session (R35). On a node where
-// the agent has installed it, `isolating()` is true, every launch below goes
+// This suite must not pick up the NODE'S OWN bb-session. On a node where
+// the agent has installed it, `isolating` is true, every launch below goes
 // through the real helper, and it rightly refuses this file's scratch paths:
 // they are not a project on the projects share. So the suite names a helper
 // that is not there, and the view section further down installs its own
@@ -150,7 +150,7 @@ const wrote = (file, run = LAUNCHER) =>
 // A launcher's --respawn run until its stub has written `argvFile`, then
 // ended with all it started (its process group). A fixed `timeout 5` cost
 // the whole five seconds every time, left the stub's sleep behind, and under
-// load ended Codex's launcher before it had run the stub at all (B819).
+// load ended Codex's launcher before it had run the stub at all.
 async function respawnRun(script, env, argvFile){
   rmSync(argvFile, { force: true });
   const ch = spawn('bash', [script, '--respawn'], { env, detached: true, stdio: 'ignore' });
@@ -192,24 +192,24 @@ ok(genv('GIT_AUTHOR_NAME') === 'GIT_AUTHOR_NAME=Pat Tester'
    `the session carries the account's commit identity as git's environment (${genv('GIT_AUTHOR_NAME') || 'unset'})`);
 // ...and beside it, the wall its own git meets at the network. There is no
 // credential on a node by design, and git's answer to that names neither the
-// reason nor the way out, so the session carries one that does (R69 step 4).
+// reason nor the way out, so the session carries one that does.
 ok(genv('GIT_CONFIG_KEY_0') === 'GIT_CONFIG_KEY_0=credential.helper'
    && /no git credential is on this machine/.test(genv('GIT_CONFIG_VALUE_0'))
    && /aerie git push/.test(genv('GIT_CONFIG_VALUE_0'))
    && genv('GIT_TERMINAL_PROMPT') === 'GIT_TERMINAL_PROMPT=0',
    `...and a credential helper that names aerie git rather than asking for a username (${
      (genv('GIT_CONFIG_VALUE_0') || 'unset').slice(0, 60)})`);
-// ...and git's own user.name and user.email say the same author (B5), so
+// ...and git's own user.name and user.email say the same author, so
 // `git config user.name` agrees with the commits whatever a home's
 // .gitconfig still holds.
-// ...after every tree taken as the session's own (R125 step 7: a tree
+// ...after every tree taken as the session's own (a tree
 // another user owns is otherwise refused as dubious).
 ok(genv('GIT_CONFIG_COUNT') === 'GIT_CONFIG_COUNT=4'
    && genv('GIT_CONFIG_KEY_1') === 'GIT_CONFIG_KEY_1=safe.directory' && genv('GIT_CONFIG_VALUE_1') === 'GIT_CONFIG_VALUE_1=*'
    && genv('GIT_CONFIG_KEY_2') === 'GIT_CONFIG_KEY_2=user.name' && genv('GIT_CONFIG_VALUE_2') === 'GIT_CONFIG_VALUE_2=Pat Tester'
    && genv('GIT_CONFIG_KEY_3') === 'GIT_CONFIG_KEY_3=user.email' && genv('GIT_CONFIG_VALUE_3') === 'GIT_CONFIG_VALUE_3=pat@example.invalid',
    `...and git's user.name and user.email are the same author, every tree its own (${genv('GIT_CONFIG_VALUE_2') || 'unset'})`);
-// ...and the toolchains its project's settings switch off (R77), which bb
+// ...and the toolchains its project's settings switch off, which bb
 // reads as not there and the view leaves out.
 ok(genv('BB_TOOLCHAINS_OFF') === 'BB_TOOLCHAINS_OFF=hexkit flutter',
    `the session carries the toolchains its space switches off (${genv('BB_TOOLCHAINS_OFF') || 'unset'})`);
@@ -246,7 +246,7 @@ await section("What bb does with it", async () => {
      'bb reaches for that file the moment the token it started with has expired');
   ok(ask({ BB_TOKEN: tokWritten }) === tokWritten,
      '...and leaves a live one alone');
-  // B497: `bb -p NAME` repoints BB_PROJECT at the project being read; the
+  // `bb -p NAME` repoints BB_PROJECT at the project being read; the
   // kept copy is still found by the project the token was minted for.
   ok(ask({ BB_TOKEN: dead, BB_PROJECT: 'beta' }) === tokWritten,
      '...and finds it under bb -p too, by the space the token names, not the one being read');
@@ -254,7 +254,7 @@ await section("What bb does with it", async () => {
   // nobody is typing in. A session that is talking slides its own forward on
   // every answer it gets; one idle past twelve hours has nothing to slide it,
   // and a dead token is never renewed, so the machine it runs on is handed a
-  // fresh one on its heartbeat and stores it here (R27). Both halves of where
+  // fresh one on its heartbeat and stores it here. Both halves of where
   // that goes already live in bb, which is why the agent hands it to bb
   // rather than writing the path itself.
   const keepHome = join(DIR, 'tokkeep');
@@ -315,7 +315,7 @@ ok(alive('claude-alpha') && /project\/alpha\/claude-run\.sh$/.test(paneCmd()),
 // because a terminal's URL can be asked for directly and a rule only the page honors
 // is a suggestion, the same reason `excluded` is checked in this script.
 const LOCKS = join(DIR, 'state', 'locked-projects.json');
-// An administrator's lock (R119), which holds everybody out, read from the
+// An administrator's lock, which holds everybody out, read from the
 // file: this suite's bb does not answer `aerie settings`, so the file decides.
 writeFileSync(LOCKS, JSON.stringify({ alpha: { by: 'u_0000aaaa', admin: true } }));
 const refusedAt = Date.now();
@@ -328,7 +328,7 @@ ok(/locked/.test(out) && !alive('claude-alpha'),
 // something is holding one: called from here, with stderr on a pipe, there is
 // nobody to show it to, and five tests in this suite were paying it. The
 // bound is under that pause, not a guess at how fast a loaded machine runs
-// bb-tty (B819: five seconds was missed with nothing wrong).
+// bb-tty (five seconds was missed with nothing wrong).
 ok(refusedIn < 9000,
    `...promptly, rather than pausing for a terminal nobody is holding open (${refusedIn}ms)`);
 ok(/card's menu/.test(out) && /locked by its owner/.test(out),
@@ -340,7 +340,7 @@ ok(/card's menu/.test(out) && /locked by its owner/.test(out),
 // block, empty means the controller did not answer, and a session that starts
 // anyway knows none of the house rules, the roadmap, the open bugs or the
 // machine it is on. It still STARTS, because a briefing nobody can fetch is not
-// a reason to leave somebody without a terminal (B160).
+// a reason to leave somebody without a terminal.
 rmSync(LOCKS, { force: true });
 out = connect(0, { FAKE_NO_PREAMBLE: '1' });
 await until(() => alive('claude-alpha'));
@@ -410,7 +410,7 @@ writeFileSync(join(DIR, 'state', 'claude-prefs.json'), JSON.stringify(
   { users: { [SEAT]: { alpha: { model: 'opus', effort: 'low' } } } }));
 // Named as Claude Code names a tree's folder, every character that is not a
 // letter or a digit a dash: the temp directory's dot made the slashes-only
-// name the respawn read a folder Claude never writes (B348).
+// name the respawn read a folder Claude never writes.
 const tdir = join(DIR, 'home', '.claude', 'projects',
                   join(DIR, 'ws', 'alpha').replace(/[^A-Za-z0-9]/g, '-'));
 mkdirSync(tdir, { recursive: true });
@@ -522,7 +522,7 @@ await section("a home and a shell of one's own", async () => {
       { encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 't',
         GIT_AUTHOR_EMAIL: 't@e', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@e' } });
     git(['init', '-q']); git(['add', '-A']); git(['commit', '-qm', 'first']);
-    await takeOn(proj);                  // dropped in by hand, so the owner takes it on (R135)
+    await takeOn(proj);                  // dropped in by hand, so the owner takes it on
 
     tmuxKill(`claude-${proj}`); tmuxKill(`${other}~claude-${proj}`);
     shell(`u:${ownerUid}:claude:${proj}:b:${boot}`);
@@ -546,7 +546,7 @@ await section("a home and a shell of one's own", async () => {
        `...on a branch of its own, so the work merges rather than collides (${
           (branch.match(/branch \S+/g) || []).join(", ")})`);
 
-    // ---- another coding agent beside Claude (R95 step 4) -------------------
+    // ---- another coding agent beside Claude -------------------
     // Codex CLI and Copilot CLI stood in for: a session of each starts from
     // its own argument, in a tree of its own beside the owner's Claude one,
     // handed the same briefing the way each reads instructions.
@@ -608,7 +608,7 @@ sleep 60
       ok(toml.includes(`[projects."${cwt}"]`) && /trust_level = "trusted"/.test(toml),
          '...and its tree answered as trusted, so its first run asks nothing a read-only console cannot answer');
       // A tab coming back to it puts the answer back if it went, and says
-      // the running session started without it, as Claude's does (R95 step 19).
+      // the running session started without it, as Claude's does.
       const cxToml = join(HOMEDIR, '.codex', 'config.toml');
       writeFileSync(cxToml, toml.replace(`[projects."${cwt}"]\ntrust_level = "trusted"\n`, ''));
       const cxNoted = shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
@@ -620,7 +620,7 @@ sleep 60
          '...and says nothing when it was there already');
       // On a Codex that can say which hooks it has (0.164.0), AerieOS's own
       // are trusted for the launch by the hash it reports, and the bypass
-      // flag and its warning are gone, as is the shared server's (B284).
+      // flag and its warning are gone, as is the shared server's.
       writeFileSync(join(bin, 'codex-164'), '');
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
@@ -636,14 +636,14 @@ sleep 60
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
       await until(() => alive(`codex-${proj}`));
-      // Its guards are its own hooks (R95 step 6): AerieOS's, for every
+      // Its guards are its own hooks: AerieOS's, for every
       // event a Claude session has them on, in the account's hooks file.
       const hk = existsSync(join(HOMEDIR, '.codex', 'hooks.json')) ? JSON.parse(readFileSync(join(HOMEDIR, '.codex', 'hooks.json'), 'utf8')) : {};
       const cmdOf = ev => (hk.hooks?.[ev] || []).flatMap(e => e.hooks || []).map(h => h.command).join(' ');
       ok(/bb-agent-hook codex pre$/.test(cmdOf('PreToolUse')) && /bb-agent-hook codex prompt$/.test(cmdOf('UserPromptSubmit'))
          && /bb-agent-hook codex stop$/.test(cmdOf('Stop')) && /bb-agent-hook codex asking$/.test(cmdOf('PermissionRequest')),
          `...its guards are Codex's own hooks, written into the account's hooks.json (${Object.keys(hk.hooks || {}).join(', ')})`);
-      // ...and what it need not ask about is its own rules file (R231).
+      // ...and what it need not ask about is its own rules file.
       const cxRules = existsSync(join(HOMEDIR, '.codex', 'rules', 'aerieos.rules')) ? readFileSync(join(HOMEDIR, '.codex', 'rules', 'aerieos.rules'), 'utf8') : '';
       ok(cxRules.includes('prefix_rule(pattern=["aerie", "version"], decision="allow")') && !/"run"|"build"/.test(cxRules),
          `...the aerie verbs the controller decides are allowed in Codex's rules file (${cxRules.split('\n').length} lines)`);
@@ -651,7 +651,7 @@ sleep 60
       ok(/export BB_AGENT=codex/.test(cxRun) && /export BB_AGENT_WHO=/.test(cxRun),
          '...and the launcher names the agent and the account its hooks act for');
       // The model and effort picked at Start ride the argument, each held
-      // to Codex's own list (R95 step 9).
+      // to Codex's own list.
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:m:gpt-5.5:e:high:b:${boot}`);
       await until(() => wrote(cxArgv, runOf('codex')));
@@ -660,13 +660,13 @@ sleep 60
       ok(alive(`codex-${proj}`) && mi >= 0 && cx2[mi + 1] === 'gpt-5.5' && cx2.includes('model_reasoning_effort="high"'),
          `a model and an effort picked at Start reach Codex as its own flags (${cx2.slice(0, 6).join(' ')})`);
       // A respawn onto a changed setting goes on with the conversation, as
-      // Claude's resumes its newest transcript (R95 step 19).
+      // Claude's resumes its newest transcript.
       const respawn = async ag => (await respawnRun(join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, `${ag}-run.sh`),
         { ...process.env, HOME: HOMEDIR, PATH: `${bin}:${process.env.PATH}` }, join(bin, `${ag}-argv`))).split('\0');
       const rcx = await respawn('codex');
       ok(rcx.includes('resume') && rcx[rcx.indexOf('resume') + 1] === '--last',
          `...and a respawn resumes Codex's newest conversation in its folder (${rcx.slice(-4).join(' ')})`);
-      // A Codex conversation resumes in Codex (R95 step 8): its kept log is
+      // A Codex conversation resumes in Codex: its kept log is
       // put back where Codex looks for it, and Codex is told to resume it.
       tmuxKill(`codex-${proj}`);
       {
@@ -687,8 +687,8 @@ sleep 60
       const odd = shell(`u:${ownerUid}:codex:${proj}:m:opus;rm:b:${boot}`);
       ok(/Not a model ChatGPT offers here/.test(odd) && !alive(`codex-${proj}`),
          '...and a model not on its list opens nothing');
-      // A second session of one agent on one project is a slot of its own
-      // (R143): its own name, launcher, tree and branch, the first untouched;
+      // A second session of one agent on one project is a slot of its own:
+      // its own name, launcher, tree and branch, the first untouched;
       // the owner's second Claude is a worktree too, the project directory
       // staying the first's.
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
@@ -720,7 +720,7 @@ sleep 60
       ok(/not signed in to Copilot/.test(cpRefused) && !alive(`copilot-${proj}`),
          'a Copilot session with no GitHub login remembered is refused the same way');
       mkdirSync(join(HOMEDIR, '.copilot'), { recursive: true });
-      // As Copilot CLI 1.0.103 writes it: two // lines over the JSON (B282).
+      // As Copilot CLI 1.0.103 writes it: two // lines over the JSON.
       const cpHead = '// User settings belong in settings.json.\n// This file is managed automatically.\n';
       writeFileSync(join(HOMEDIR, '.copilot', 'config.json'), cpHead + JSON.stringify({ lastLoggedInUser: { host: 'https://github.com', login: 'octo' } }));
       shell(`u:${ownerUid}:copilot:${proj}:b:${boot}`);
@@ -747,7 +747,7 @@ sleep 60
       ok((cpConf.trustedFolders || []).includes(join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-copilot`))
          && cpConf.lastLoggedInUser?.login === 'octo',
          '...its tree trusted in its config, and what was there kept, its // lines too');
-      // Grok Build (R95 step 21): its session token or an API key says it
+      // Grok Build: its session token or an API key says it
       // is signed in; its briefing is appended to its prompt, Claude's hooks
       // and its own updater are off, and its guards are its own hooks.
       {
@@ -789,8 +789,8 @@ sleep 60
         const away = shell(`u:${ownerUid}:grok:${proj}:r:${gsid}:b:${boot}`);
         ok(/not on this node/.test(away) && !alive(`grok-${proj}`), '...and a Grok conversation this node never ran opens nothing, saying so');
       }
-      // A pack's agent whose protocol is its manifest's own (R234 step 3;
-      // R233: Gemini, Google's Antigravity CLI, as the catalog's pack brings
+      // A pack's agent whose protocol is its manifest's own
+      // (Gemini, Google's Antigravity CLI, as the catalog's pack brings
       // it): its hooks go into the account's one hooks file under AerieOS's
       // own key, a person's kept; it has no option for the briefing, so its
       // launcher names the briefing's file and its start hook puts it into
@@ -876,7 +876,7 @@ sleep 60
         try { git(['worktree', 'remove', '--force', join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-${ag}`)]); } catch { /* not made */ }
       }
     }
-    // TWO ACCOUNTS ON ONE PROJECT KEEP THEIR OWN CACHE (B159). Every session
+    // TWO ACCOUNTS ON ONE PROJECT KEEP THEIR OWN CACHE. Every session
     // file lives under the account's id, because on a node the cache folder is
     // one folder for everybody: without that level the second session to start
     // wrote over the first's token, and a session would then be acting as
@@ -888,7 +888,7 @@ sleep 60
       // Decoded and compared by the account each names: the head of every
       // token for one project is the same (it is the project's name), so a
       // prefix said nothing, and two minted in one second without an account
-      // were the same token (B176).
+      // were the same token.
       const whose = t => { try { return Buffer.from(t.slice(4), 'base64url').toString().split('|')[2] || ''; } catch { return ''; } };
       ok(a && b && a !== b && whose(a) === ownerUid && whose(b) === other,
          `two accounts with a session on one space keep their own token, each naming its account (${
@@ -903,7 +903,7 @@ sleep 60
       join(HOMEDIR, '.cache', 'builderbot', 'u', other, 'project', proj, 'claude-scope.json'), 'utf8'));
     const deny = scope.permissions.deny.join(' ');
     // What the controller decides, Claude Code's own check does not judge
-    // again (R231): the aerie verbs held by the space's dials or a person's
+    // again: the aerie verbs held by the space's dials or a person's
     // answer are allowed in its settings, and nothing that runs a command of
     // the session's own is.
     const allow = scope.permissions.allow || [];
@@ -916,15 +916,15 @@ sleep 60
     ok(!deny.includes(`Edit(${wt}/**)`),
        '...and its own not denied, which a blanket rule on .worktrees would have done');
     // Edit covers every writing tool, and Claude Code warns at the top of the
-    // session for each Write() or NotebookEdit() rule it ignores (B285).
+    // session for each Write or NotebookEdit rule it ignores.
     ok(deny.includes('/rules.json)') && !/(Write|NotebookEdit)\(/.test(deny),
        '...and the rules file is denied by Edit alone, with no spelling Claude Code ignores and warns of');
     // ...and the memory of its own tree allowed, which Claude Code keeps
     // outside the tree: a session asked the person to approve reading a
-    // memory it was updating (6 Oct).
+    // memory it was updating.
     // The rest are the project's other repositories (BB_WORK_DIRS), which
     // this fixture has: they were never seen while the scope failed to be
-    // written for a project of several (B380).
+    // written for a project of several.
     const mem = scope.permissions.additionalDirectories || [];
     ok(mem.filter(d => /\/\.claude\/projects\//.test(d)).length === 1 && mem[0].endsWith(`/.claude/projects/${wt.replace(/[^A-Za-z0-9]/g, '-')}/memory`),
        `...and the memory of its own tree is a directory it may use without asking (${mem.join(', ')})`);
@@ -935,7 +935,7 @@ sleep 60
     ok(JSON.stringify(scope.hooks || {}).includes('bb-work-note'),
        '...and the settings carry the hook that records what the session touches');
     // No permission mode of AerieOS's: what a session may do without
-    // asking is set in Claude Code itself (the operator's call, 15 Sep), and
+    // asking is set in Claude Code itself, and
     // the deny list is the wall, so a sibling project, VERSION and the rules
     // file stay refused whatever mode the app is on.
     ok(scope.permissions.defaultMode === undefined,
@@ -1018,7 +1018,7 @@ sleep 60
     tmuxKill(`${other}~shell-9`);
   }
 
-  // ---- no history on disk (the operator, 27 Oct) -----------------------------
+  // ---- no history on disk -----------------------------
   // A person's shell and their agents run as one user, so a history file in
   // the home was the agents' to read: each shell keeps its own in memory,
   // and the files kept before are taken away.
@@ -1050,7 +1050,7 @@ sleep 60
   // in directly: every session gets a worktree.
   {
     const node = { BUILDERBOT_ROLE: 'node', BB_CI_LOG_DIR: '/x/ci-logs', BB_CONTROLLER: URL };
-    // A node's bb-tty asks the controller whose terminal it is (B166), so
+    // A node's bb-tty asks the controller whose terminal it is, so
     // what rides in on these URLs is real: tokens minted by the harness's own
     // server, for the owner and for two accounts made here and removed at the
     // end of the block, so no file after this one meets them: an administrator
@@ -1092,7 +1092,7 @@ print(uid)`);
        '...and gets a home under users/ rather than the box\'s own');
     tmuxKill(`${ownerUid}~shell-wtproj-10`);
 
-    // B166: what the URL claims is not who the terminal is for. A session on
+    // What the URL claims is not who the terminal is for. A session on
     // a node can start bb-tty itself with any words, so these are the URLs
     // it could type. The account, its name and ownership come from the controller's
     // answer to the token, and a URL the controller will not vouch for opens
@@ -1217,7 +1217,7 @@ print(uid)`);
     ok(/aerie settings --json/.test(launcher) && launcher.includes(`BB_TOKEN=${ownerTok}`),
        'the launcher asks aerie settings for the model when the prefs file is not here, and carries the token');
 
-    // ---- a session's view (R35) ----------------------------------------------
+    // ---- a session's view ----------------------------------------------
     // Where the node builds one, a project's session starts through sudo and
     // bb-session. Stand-ins for both record the call and run the command,
     // since the suite has no root: what is proved is what bb-tty asks for,
@@ -1234,7 +1234,7 @@ print(uid)`);
       const vproj = 'viewproj';
       mkdirSync(join(DIR, 'ws', vproj), { recursive: true });
       writeFileSync(join(DIR, 'ws', vproj, 'README.md'), 'x\n');   // an empty directory is not listed
-      await takeOn(vproj);               // dropped in by hand, so the owner takes it on (R135)
+      await takeOn(vproj);               // dropped in by hand, so the owner takes it on
       const vhome = join(HOMEDIR, 'users', ownerUid);
       const viewTok = tok(vproj);
       const runView = target => { try {
@@ -1272,7 +1272,7 @@ print(uid)`);
         // the listing, which has not met a directory made a moment ago,
         // and prefs.get reads the file fresh on every grant.
         const prefsFile = join(DIR, 'state', 'claude-prefs.json');
-        // What it reads and sees is its project's (R138): kept on the key
+        // What it reads and sees is its project's: kept on the key
         // of the project it is in, where the settings write it.
         const projKey = () => {
           try { return Object.entries(JSON.parse(readFileSync(join(DIR, 'state', 'project-repos.json'), 'utf8')).projects || {})
@@ -1299,7 +1299,7 @@ print(uid)`);
         tmuxKill(`${ownerUid}~claude-${vproj}`);
         setReads([]);
         // The places on the node it is shown (prefs.sees) ride the grant
-        // the same way, one --sees each (B378), to a helper that takes
+        // the same way, one --sees each, to a helper that takes
         // the word: one from before the setting is asked first and gets
         // none, since it would refuse the word and start no session.
         const setSees = sees => {
@@ -1432,13 +1432,13 @@ print(uid)`);
     tmuxKill(`${ownerUid}~shell-wtproj-11`);
 
     // The hooks a session is handed name its bundle through .bb/current, not
-    // the digest it started from (B120). The settings file is read once, when
+    // the digest it started from. The settings file is read once, when
     // claude starts, so a resolved path kept an open session on the hooks it
     // began with however many deliveries followed. Run from a real
     // <digest> directory with current pointing at it, the way a node runs
     // it: root's own copy of the bundle (a folder named bundle), which a
     // terminal starts from now and which was not known as one, so hooks
-    // named its digest again (19 Nov); the store's .bb is the same shape.
+    // named its digest again; the store's .bb is the same shape.
     {
       const bundles = join(DIR, 'store', 'bundle');
       const digest = join(bundles, '0123456789abcdef');
@@ -1483,11 +1483,11 @@ print(uid)`);
       tmuxKill(`${ownerUid}~claude-${proj}`);
       rmSync(join(DIR, 'store'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
-    // B157/B163: on a node an account keeps nothing in common with the base
+    // On a node an account keeps nothing in common with the base
     // home. A link made before this is taken down so the tool makes the
     // account's own, a launcher in the base home that reached its binary
     // through this account's .local is pointed at the base home's own copy
-    // first (B169), the crate cache is the account's, and Claude's updater
+    // first, the crate cache is the account's, and Claude's updater
     // is off. Staged the way bb-sandbox had it on 18 Sep.
     {
       const ah = join(HOMEDIR, 'users', otherUid);
@@ -1521,7 +1521,7 @@ print(uid)`);
          `...the crate cache is the account's, and never in the tmux server's shared environment (${env14('CARGO_HOME').replace(DIR, '…')})`);
       // Java takes its home from the passwd entry, the one session user's, so
       // Gradle, the Android tools and the Kotlin daemon are each pointed at the
-      // account's home by the variable they read (B182).
+      // account's home by the variable they read.
       const javaHomes = { GRADLE_USER_HOME: '.gradle', ANDROID_USER_HOME: '.android', XDG_DATA_HOME: '.local/share' };
       const wrong = Object.entries(javaHomes).filter(([k, d]) =>
         env14(k) !== `${k}=${join(ah, d)}` || genv14(k).includes(ah)).map(([k]) => k);
@@ -1543,7 +1543,7 @@ u._save(d)`);
 });
 
 
-// ---- a container's shell (R218 step 4) ----------------------------------------
+// ---- a container's shell ----------------------------------------
 // ctr:NAME:INSTANCE:CONTAINER runs docker exec in its own tmux session, named
 // by the container; on the controller the container is the argument's, which
 // the proxy checked (on a node it is tty-grant's answer, never the URL's). A

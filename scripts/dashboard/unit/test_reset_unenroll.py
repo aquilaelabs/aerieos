@@ -1,4 +1,4 @@
-"""Reset un-enrolls the nodes it is given first (the operator, 12 Oct): a
+"""Reset un-enrolls the nodes it is given first: a
 node AerieOS set up and can reach is uninstalled, any other is retired
 here, and a refusal (a node in use) comes back named rather than skipped."""
 import os

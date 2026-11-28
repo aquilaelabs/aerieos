@@ -1,5 +1,5 @@
 """What a node's heartbeat says about each account's coding agent sign-ins
-(channel._logins, B236): a login the node read is recorded, one it found no
+(channel._logins): a login the node read is recorded, one it found no
 file for is a sign-out, and one it could not read changes nothing."""
 import contextlib
 import io

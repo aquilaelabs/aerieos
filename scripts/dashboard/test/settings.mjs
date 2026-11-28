@@ -1,6 +1,6 @@
-// The Settings tab (roadmap R29, then the operator's cut): what is left after
+// The Settings tab (then the operator's cut): what is left after
 // asking which settings need to exist at all. Two switches, since the Claude
-// Code update settings went with the install itself (R47), plus the commit
+// Code update settings went with the install itself, plus the commit
 // identity, which became a project's own setting in its dialog. What is
 // exercised for real: the store through the endpoint, the tab's rows, the
 // identity landing in the repo's own config through /api/prefs and coming out
@@ -23,13 +23,13 @@ const post = (path, body) => pageCall(page, path, body);
 
 // ---- the tab ---------------------------------------------------------------
 await page.evaluate(() => openSettingsTab());
-// Controller settings is a page of settings (the operator, 16 Oct): a
+// Controller settings is a page of settings: a
 // section is picked from its list before its fields are used.
 await page.waitForSelector('.settingstab .snav [data-spick="idle"]', { timeout: 15000 }); await splitPick(page, 'idle');
-// The section on show, pressed again at a desk, is no change: no fade (B317).
+// The section on show, pressed again at a desk, is no change: no fade.
 await page.click('.settingstab .snav [data-spick="idle"]');
 ok(await page.evaluate(() => !document.querySelector('.fghost')), 'the section on show, pressed again, fades nothing');
-// One tree, two products (roadmap R54, step 6): the switch that offers the
+// One tree, two products: the switch that offers the
 // unvetted git hosts, hypervisors and OS families is a developer's (on the
 // Debug page, below), off by default, and the header carries the word while
 // it is on.
@@ -38,8 +38,8 @@ await post('/api/settings', { set: { offer_unvetted: true } });
 await page.waitForFunction(() => !document.querySelector('#devtag')?.hidden, null, { timeout: 30000 });
 ok(await page.$eval('#devtag', e => e.textContent.trim() === 'dev'),
    '...and says dev once it is on, so two dashboards are never confused');
-// ...and each dev feature it offers says so where it is offered (R102, the
-// operator, 22 Oct: a page hid two of them with it off and nothing said
+// ...and each dev feature it offers says so where it is offered
+// (a page hid two of them with it off and nothing said
 // why): the two dev apps' cards in the Library's For you and their
 // switches, never the Android app.
 await page.evaluate(() => { openLibrary(); loadLibrary(); });
@@ -94,11 +94,11 @@ print(json.dumps({"left": sorted(p.name for p in d.iterdir()), "moved": sorted(p
      `the reset moves everything into a dated directory beside it, leaves earlier resets and the root-only token store alone, and says what it kept (${JSON.stringify(r)})`);
 });
 const groups = await page.$$eval('.settingstab [data-group]', gs => gs.map(g => g.dataset.group));
-// No Update window here: the fixture is the container edition, which cannot apply a release to itself (B648).
+// No Update window here: the fixture is the container edition, which cannot apply a release to itself.
 ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog|Apps|Mail|Room on the nodes|Backup|Backup copies|Maintenance|Move|Reset',
    `the tab's groups are the ones that survived the question "does this need to exist": the logs, the idle rule, where what grows is kept (the operator, 10 Oct), how often each update check runs (R176), the vetted catalog's address and its mirror (R169), the apps offered (R272), the mail server the bell goes out through (R149), the room a node keeps (R110), the terminal tabs open in (R133), maintenance mode (the owner's), and the reset (${groups.join(', ')})`);
 await section("The room a node keeps", async () => {
-  // The room a node keeps (R110 steps 1 and 5): whole numbers held to their
+  // The room a node keeps: whole numbers held to their
   // range by the server, the browser's own min and max beside them.
   const room = await page.$eval('[data-group="Room on the nodes"]', g => [...g.querySelectorAll('input[type=number]')]
     .map(i => `${i.dataset.set}=${i.value}:${i.min}-${i.max}`).join(' '));
@@ -112,8 +112,8 @@ await section("The room a node keeps", async () => {
      `Room on the nodes is three numbers with their ranges, saved in range and refused out of it (${room}; ${JSON.stringify(bad)})`);
 });
 await section("The vetted catalog", async () => {
-  // The vetted catalog (R169 step 6, B444): its address, saved as an
-  // address where every text was held to a hostname (B445), and a mirror
+  // The vetted catalog: its address, saved as an
+  // address where every text was held to a hostname, and a mirror
   // imported from the page only when its index is the maintainers'.
   await splitPick(page, 'catalog');
   const G = '.settingstab [data-group="Vetted catalog"]';
@@ -159,7 +159,7 @@ await section("The vetted catalog", async () => {
   rmSync(`${DIR}/mirror-src`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   rmSync(arc, { force: true });
 });
-// Sections, and a page of settings (the operator, 16 Oct): a list of them
+// Sections, and a page of settings: a list of them
 // beside the one picked, each row saying what is in it, and Revert beside
 // each Apply putting the section's fields back to what is saved.
 await section("Sections, and a page of settings", async () => {
@@ -170,7 +170,7 @@ await section("Sections, and a page of settings", async () => {
   const was = await page.$eval('#idleMin', i => i.value);
   await splitPick(page, 'idle');
   // Apply and Revert sleep until a field differs from what is saved, and
-  // again when it is typed back (R218 step 32, as Profile's do).
+  // again when it is typed back (as Profile's do).
   const G = '.settingstab [data-group="Idle sessions"]';
   const awake = () => page.$eval(G, g => [g.querySelector('#idleApply').disabled, g.querySelector('[data-srevert]').disabled].join());
   const atRest = await awake();
@@ -190,7 +190,7 @@ await section("Sections, and a page of settings", async () => {
   await page.click('.settingstab [data-group="Idle sessions"] [data-srevert]');
   await page.waitForFunction(w => document.getElementById('idleMin')?.value === w, was, { timeout: 10000 });
   ok(true, 'Revert on a section puts its field back to what is saved');
-  // Reach from outside is the Network page's now (R165 step 4), with the
+  // Reach from outside is the Network page's now, with the
   // same builder: its setup steps are there.
   await page.evaluate(() => openNetworkTab());
   await page.waitForSelector('.networktab .snav .rrow', { timeout: 15000 });
@@ -199,7 +199,7 @@ await section("Sections, and a page of settings", async () => {
      'the Reach from outside section carries its own setup steps, with the controller\'s port in them, on the Network page');
 });
 
-// The home tunnel (R176): a hostname, two secrets never shown back, and the
+// The home tunnel: a hostname, two secrets never shown back, and the
 // controller running cloudflared itself (the harness's stub) from them, with
 // the group's line reading the process. The token is nowhere in the page.
 await section("The home tunnel", async () => {
@@ -262,11 +262,11 @@ await section("The home tunnel", async () => {
 ok(await page.$('.settingstab [data-set="claude_autoupdate"]') === null,
    'no switch updates Claude Code before a session starts');
 
-// ---- the Debug page (R147) -------------------------------------------------
+// ---- the Debug page -------------------------------------------------
 // Beside Controller settings on a controller started with DEBUG_MODE=1 (the
 // harness's), for an account with the debug grant: debug mode said as on,
 // Offer dev features, and every project's grants, which a project's settings
-// held before. Not advertised (the operator, 26 Oct): it has no tour.
+// held before. Not advertised: it has no tour.
 await post('/api/settings', { set: { offer_unvetted: false } });
 await page.evaluate(() => openDebugTab());
 await page.waitForSelector('.debugtab #dbgDev', { timeout: 15000 });
@@ -324,7 +324,7 @@ const prof2 = await post('/api/profile', { action: 'save', profile: { git_name: 
 ok(prof2.body.git.name === 'T. Person' && prof2.body.git.email === 'tp@users.noreply.invalid',
    '...and a git identity of its own outranks them');
 // The repository's own config alone: a session's environment carries its
-// identity as GIT_CONFIG_KEY_n, which git config would answer with (B146).
+// identity as GIT_CONFIG_KEY_n, which git config would answer with.
 const repoEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_CONFIG_(COUNT|KEY_|VALUE_)/.test(k)));
 const gitc = k => { try { return execFileSync('git', ['-C', `${DIR}/ws/alpha`, 'config', k], { encoding: 'utf8', env: repoEnv }).trim(); } catch { return ''; } };
 ok(gitc('user.name') === 'dashboard test' && gitc('user.email') === 'test@example.invalid',
@@ -352,7 +352,7 @@ await section("The projects this one reads", async () => {
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: [] }) })).json()));
 });
-await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
 await page.waitForSelector('#rnmodal:not([hidden])');
 // The dialog asks again (17 Sep), but for a different thing: the old field
 // was the PROJECT's identity and wrote user.name into the repository, which
@@ -377,8 +377,8 @@ const elsewhere = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie
 ok(elsewhere.git_name === 'T. Person',
    `...on that space only, with every other one still the Profile's (${elsewhere.git_name})`);
 
-// ---- global rules (R63), in each project's notebook --------------------------
-// There is no dialog for them (the operator, 2 Oct): they are listed under a
+// ---- global rules, in each project's notebook --------------------------
+// There is no dialog for them: they are listed under a
 // project's own rules on the Briefing, each with a switch for THIS project,
 // and an administrator adds and edits them there for every project. A rule
 // typed in one project's notebook comes back out of every project's preamble.
@@ -388,7 +388,7 @@ await section("global rules", async () => {
   const globals = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/global-rules', { headers: auth })).json()).rules || []);
   await page.evaluate(() => openSettingsTab());
   await page.waitForSelector('.settingstab .snav [data-spick="logs"]', { timeout: 15000 });
-  // Reset last, and no section that only linked to the Nodes page (R218 step 32).
+  // Reset last, and no section that only linked to the Nodes page.
   const order = await page.$$eval('.settingstab .snav [data-spick]', bs => bs.map(b => b.dataset.spick));
   ok(!order.includes('nodes') && order.at(-1) === 'reset', `Controller settings ends on Reset, with no Nodes section (${order.join(', ')})`);
   ok(!(await page.$('#setGlobalRules')) && !(await page.$('#grmodal')),
@@ -437,7 +437,7 @@ await section("global rules", async () => {
   await openFold(page, srow);
   await page.click(`${srow} .grEvery`);
   await page.waitForFunction(n => (document.querySelector(`.nb #rlGlobal`)?.textContent || '').includes('off everywhere'), first, { timeout: 15000 });
-  // Drawn off on the press (the operator, 22 Nov); stored once the server
+  // Drawn off on the press; stored once the server
   // has it, asked until it says so.
   await until(async () => (await globals()).find(r => r.name === first)?.disabled === true, 15000, 200);
   ok((await globals()).find(r => r.name === first)?.disabled === true
@@ -452,7 +452,7 @@ await section("global rules", async () => {
     body: JSON.stringify({ project: 'alpha', action: 'save', rules: (await (await fetch(URL.replace(/\/$/, '') + '/api/rules?project=alpha', { headers: auth })).json()).rules, globals_off: [] }) });
 });
 
-// ---- a browser's own time zone (the gear, R218 step 31) -------------------
+// ---- a browser's own time zone (the gear) -------------------
 // A cookie, not the account: a phone abroad and the desk at home each keep
 // their own. Every time the page shows goes through fmtTime, so picking a
 // zone moves them all, and nothing picked takes the cookie away again. It
@@ -487,7 +487,7 @@ await section("a browser's own time zone", async () => {
   await page.evaluate(() => { setUserTZ(''); toggleUiMenu(false); });
 });
 
-// ---- a person's own time zone (R294 step 8) --------------------------------
+// ---- a person's own time zone --------------------------------
 // On their Profile, kept with their account: their quiet windows on the bell
 // and the times every browser of theirs shows that picked none of its own;
 // the gear then offers it first, and this device's own beside it.
@@ -517,15 +517,15 @@ await section("a person's own time zone", async () => {
   await page.evaluate(async () => { setUserTZ(''); toggleUiMenu(false); await postJSON('/api/users', { action: 'prefs', prefs: { tz: '' } }); await refresh(); });
 });
 
-// ---- a project's settings live in its notebook (R119 step 3) ---------------
+// ---- a project's settings live in its notebook ---------------
 // The row's gear went, and the form is the notebook's Settings view: the
 // same form, moved there while the view is on screen, each section saving
 // itself, and back to the dialog when another view is picked.
 await section("a project's settings live in its notebook", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); });
   // The sidebar's row carries no gear; the Projects page's card offers
-  // Settings in its menu by design (R218 step 3), not as a button on its
-  // face, and on its back among the named icons (R138, the operator).
+  // Settings in its menu by design, not as a button on its
+  // face, and on its back among the named icons (the operator).
   ok(!(await page.$('#projects [data-rn]')) && !(await page.$('.doc .projtab .pcacts:not(.pcfoot) > [data-rn]')),
      'no space row carries a settings button any more');
   await page.evaluate(() => openProjectSettings('alpha'));
@@ -535,8 +535,8 @@ await section("a project's settings live in its notebook", async () => {
     bars: [...document.querySelectorAll('.nbsettings .rnbar')].filter(b => b.checkVisibility()).length }));
   ok(inView.name === 'alpha' && inView.modal && inView.close && inView.shown && inView.bars === 1,
      `the notebook's Settings view holds the form, the dialog shut, the section on show with its own Save and Revert (${JSON.stringify(inView)})`);
-  // The notebook taken down while it holds the form (B211, the operator,
-  // 22 Oct: Settings empty after leaving the project and coming back): the
+  // The notebook taken down while it holds the form
+  // (Settings empty after leaving the project and coming back): the
   // form is handed back first, so the next Settings view has it.
   await page.evaluate(() => getNotebook('alpha').destroy());
   const back = await page.evaluate(() => !!document.querySelector('#rnmodal > .box') && rnHost === null);
@@ -545,7 +545,7 @@ await section("a project's settings live in its notebook", async () => {
   const again = await page.evaluate(() => ({ name: $('rnName').value, shown: $('rnName').checkVisibility() }));
   ok(back && again.name === 'alpha' && again.shown,
      `a notebook taken down hands the form back, and Settings opened again holds it (${back} ${JSON.stringify(again)})`);
-  // The sections a list beside the one picked (the operator, 16 Oct: too
+  // The sections a list beside the one picked (too
   // many open at once to find a setting in): each row names what is in it,
   // a press shows that section alone, and People is on the list.
   // People joins the list when its read lands.
@@ -555,8 +555,8 @@ await section("a project's settings live in its notebook", async () => {
   ok(list.length >= 8 && list[0].k === 'project' && list[0].on && list.every(r => r.said) && list.some(r => r.k === 'people'),
      `...its sections a list beside the one picked, each saying what is in it, General first, People among them (${list.map(r => r.k).join(', ')})`);
   // Every section listed opens on something: Repository was listed and
-  // opened on an empty pane (B813), then on one line and a door to a dialog
-  // (the operator, 23 Nov); its credentials are drawn there now.
+  // opened on an empty pane, then on one line and a door to a dialog;
+  // its credentials are drawn there now.
   {
     const blank = [];
     for (const { k } of list){
@@ -587,7 +587,7 @@ await section("a project's settings live in its notebook", async () => {
     pick: document.querySelector('.nbsettings .snav .rrow.on')?.dataset.spick }));
   ok(still.people && still.pick === 'yours', `...and asked for again it keeps People and the section picked (${JSON.stringify(still)})`);
   // The picked row is a lift with the lit color as a bar at its left edge,
-  // never a wash of the lit color (the operator, 24 Nov: copper over navy
+  // never a wash of the lit color (copper over navy
   // read brown on the default scheme).
   const picked = await page.evaluate(() => {
     const r = document.querySelector('.nbsettings .snav .rrow.on');
@@ -602,8 +602,8 @@ await section("a project's settings live in its notebook", async () => {
     ok(/inset/.test(picked.bar) && /3px 0px 0px/.test(picked.bar) && picked.bar.includes(rgb(picked.lit).split(',')[0]) && !picked.bg.includes(rgb(picked.lit)),
        `...the picked row lifted with the lit color as a bar at its left, not washed in it (${JSON.stringify(picked)})`);
   } else skip('...the picked row lifted with the lit color as a bar at its left', 'the list is folded away at this width');
-  // The box borrowed from the dialog brings no dialog shadow into the view
-  // (B702): the scroll-hint class it wore in the dialog is dropped on the way
+  // The box borrowed from the dialog brings no dialog shadow into the view:
+  // the scroll-hint class it wore in the dialog is dropped on the way
   // in, and an inline box gets no shadow from that class however it arrives.
   const shade = await page.evaluate(() => {
     const dlg = document.querySelector('#rnmodal > .box') || document.querySelector('.nbsettings > .box');
@@ -617,7 +617,7 @@ await section("a project's settings live in its notebook", async () => {
   ok(!/scroll(up|down)/.test(shade.moved.cls) && shade.moved.shadow === 'none' && shade.forced === 'none',
      `...and wears no dialog shadow, with or without the dialog's scroll-hint class (${JSON.stringify(shade)})`);
   // A section's Save writes that section alone, and what is typed in another
-  // stays typed (the operator, 10 Oct: one Save for eleven sections).
+  // stays typed (one Save for eleven sections).
   await rnSect(page, 'build');
   await page.fill('#rnBuildCmd', 'make one');
   await rnSect(page, 'yours');
@@ -635,7 +635,7 @@ await section("a project's settings live in its notebook", async () => {
      `...Build and test's Save stores the build command and nothing of Yours on this space, whose change stays typed and unsaved (${JSON.stringify(after)})`);
   await rnSect(page, 'yours');
   await page.click('.rnbar[data-rnbar="yours"] [data-rnrevert]');
-  // Revert asks first, in the page's question modal (R121), answered a beat
+  // Revert asks first, in the page's question modal, answered a beat
   // after the press.
   await page.waitForFunction(was => $('rnGitName').value === was, nameWas, { timeout: 5000 }).catch(() => {});
   ok(await page.evaluate(was => $('rnGitName').value === was
@@ -643,7 +643,7 @@ await section("a project's settings live in its notebook", async () => {
        && $('rnBuildCmd').value === 'make one', nameWas),
      '...and its Revert puts Yours on this space back alone');
   // A section's Save is its own fields alone, and refuses one somebody else
-  // saved since these settings were opened (the operator, 17 Oct: a save in
+  // saved since these settings were opened (a save in
   // one section put back another section's change, and a session's change
   // not yet on screen was written over without a word).
   {
@@ -652,7 +652,7 @@ await section("a project's settings live in its notebook", async () => {
     await page.evaluate(() => { settingsOut(); openProjectSettings('alpha'); });
     await page.waitForSelector('.nbsettings .snav [data-spick="build"]', { timeout: 15000 });
     // A status read already out, answered before the save below and landing
-    // only after Save is pressed, as a loaded box has them (B100): the Save
+    // only after Save is pressed, as a loaded box has them: the Save
     // read "what is saved now" from it, and wrote over the other save
     // unseen. Held here, so the order is the one the gate met by chance.
     let release, read = false, caught = false;
@@ -690,7 +690,7 @@ await section("a project's settings live in its notebook", async () => {
   }
   // Also works on is drawn from what is saved until a draw has had nodes to
   // draw: one made before the node list arrived marked itself drawn, and the
-  // real one read its own empty boxes (B796, seen on dev, 16 Oct).
+  // real one read its own empty boxes (seen on dev).
   {
     const ns = await page.evaluate(async () => (await (await fetch('/api/v1/nodes')).json()).nodes);
     const first = ns.find(n => n.kind !== 'local');
@@ -717,7 +717,7 @@ await section("a project's settings live in its notebook", async () => {
      '...and picking another view puts the form back where the dialog keeps it');
 });
 
-// ---- a project's daily snapshots (R165) ------------------------------------------
+// ---- a project's daily snapshots ------------------------------------------
 // In the project's settings: how many days are kept, and a Snapshots fold
 // listing each day with Restore; a restore of one file puts it back, and the
 // line it leaves names the snapshot taken first, which undoes it.
@@ -725,7 +725,7 @@ await section("a project's daily snapshots", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); openProjectSettings('alpha'); });
   await page.waitForSelector('#rnSnapDays', { state: 'attached', timeout: 15000 });
   ok(await page.$eval('#rnSnapDays', i => i.value) === '14', 'a space keeps 14 days of snapshots unless set otherwise');
-  // Each number beside its unit, not over it (B51: "days" on a line under
+  // Each number beside its unit, not over it ("days" on a line under
   // its box), at a desk and on a phone.
   {
     await rnSect(page, 'rn:build');
@@ -739,7 +739,7 @@ await section("a project's daily snapshots", async () => {
       await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
         && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
       // Each count's label over it, naming what it counts (the forms rule,
-      // R273: the unit was a word beside the box, the label beside it too).
+      // The unit was a word beside the box, the label beside it too).
       apart.push(...(await page.$$eval('#rnCaptureDays, #rnSnapDays, #rnDevKeep', is => is.map(i => {
         const a = i.getBoundingClientRect(), l = document.querySelector(`label[for="${i.id}"]`), b = l?.getBoundingClientRect();
         return b && b.bottom <= a.top + 2 && Math.abs(b.left - a.left) <= 2 && /days|builds/i.test(l.textContent) ? ''
@@ -776,8 +776,7 @@ await section("a project's daily snapshots", async () => {
      'Restore file asks, then puts the file back as it was that day');
   const kept = (await page.evaluate(async () => (await (await fetch('/api/snapshots?project=alpha')).json()).days));
   ok(kept.some(d => /before-restore/.test(d.day)), '...having snapshotted the tree first, so the restore can be undone');
-  // A day pinned from its row is kept and says so; Unpin lets it go again
-  // (R105, the operator, 22 Oct).
+  // A day pinned from its row is kept and says so; Unpin lets it go again.
   {
     await page.evaluate(() => { openProjectSettings('alpha'); });
     await openFold(page, 'details.sect[data-sect="rn:snapshots"]');
@@ -785,7 +784,7 @@ await section("a project's daily snapshots", async () => {
     const day = await page.$eval('#rnSnapRows .snaprec:not([data-day*="before"])', r => r.dataset.day);
     if (!await page.$(`#rnSnapRows .snaprec.open[data-day="${day}"]`)) await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snapopen]`);
     await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
-    // The row says pinned on the press (the operator, 22 Nov), and the
+    // The row says pinned on the press, and the
     // server's list is read once it has answered.
     const pinned = page.waitForResponse(r => r.url().endsWith('/api/snapshots') && /"pin"/.test(r.request().postData() || ''), { timeout: 15000 });
     await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
@@ -823,7 +822,7 @@ await section("a project's daily snapshots", async () => {
   rmSync(`${DIR}/ws/alpha/snapped.txt`, { force: true });
 });
 
-// ---- where the controller keeps what grows (paths.py, the operator, 10 Oct) ----
+// ---- where the controller keeps what grows (paths.py) ----
 // Each kind on its own line of the Storage section with the path in use;
 // Apply moves what is there to the new path and switches once it is all
 // there; a path in the projects or one with something in it is refused in
@@ -863,7 +862,7 @@ await section("where the controller keeps what grows", async () => {
      '...and an empty path puts it back at its default, with what is there');
 });
 
-// ---- Profile's What you may do on a phone (B76) -------------------------------
+// ---- Profile's What you may do on a phone -------------------------------
 // One column of facts, every value starting at one line: each began where
 // its own label ended, two ragged columns.
 await section("Profile's What you may do on a phone", async () => {
@@ -887,7 +886,7 @@ await section("Profile's What you may do on a phone", async () => {
   await phone.close();
 });
 
-// ---- a split page's head on a phone (B370) ----------------------------------
+// ---- a split page's head on a phone ----------------------------------
 // The page's head is on top, as at a desk, not under the list of sections.
 await section("a split page's head on a phone", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
@@ -926,7 +925,7 @@ await section("a split page's head on a phone", async () => {
   await phone.close();
 });
 
-// ---- Connected services (R294 step 9) --------------------------------------
+// ---- Connected services --------------------------------------
 // Every credential the install holds for an outside service, on Controller
 // settings, with who added it; Open goes where it lives, and Forget, an
 // administrator's, takes it away at once.

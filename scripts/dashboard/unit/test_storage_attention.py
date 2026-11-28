@@ -1,4 +1,4 @@
-"""The controller's own machine's storage on the bell (R164 step 3): a
+"""The controller's own machine's storage on the bell: a
 disk SMART calls failing, a hot disk, a pool not online and an array slot
 not mounted, each a row keyed on what is wrong, from the census alone."""
 import os
@@ -33,7 +33,7 @@ class StorageRows(unittest.TestCase):
         self.assertTrue(all(r["kind"] == "disk" and r["node"] == "nas" for r in got))
 
     def test_an_array_adopted_writable_and_not_taken_and_a_stick_short_of_room(self):
-        # The operator, 8 Nov: writable disks with no parity behind them, and
+        # Writable disks with no parity behind them, and
         # the stick's own partition filling, each a row on the bell with
         # where to act; a read-only adoption and a roomy stick say nothing.
         rep = {"adopted": {"writable": True, "taken": False, "parity": ["sdd"], "mounts": [{"where": "/mnt/disk1", "mounted": True, "ro": False}]},

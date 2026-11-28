@@ -60,7 +60,7 @@ class Flags(unittest.TestCase):
 
 
 class OwnTree(unittest.TestCase):
-    """B743: on AerieOS's own tree a bug naming bb is this tracker's."""
+    """On AerieOS's own tree a bug naming bb is this tracker's."""
 
     def test_builderbot_source_is_its_own(self):
         bt = lift("builderbot_tree")

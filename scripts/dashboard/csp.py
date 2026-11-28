@@ -1,4 +1,4 @@
-"""The page's Content-Security-Policy (R158 step 4): the page's own scripts
+"""The page's Content-Security-Policy: the page's own scripts
 alone. A script written inline into one of the HTML files the server serves
 (the dashboard's head script and its wiring, the login card's) is allowed by
 its hash, computed from the file as it is served, so nothing inline that
@@ -83,7 +83,7 @@ def _load():
 
 # Reports are taken from anyone (the login page sends them too), so at most
 # this many a minute are written: a flood of them rewrote the file on every
-# post (R288). A real page's refusals come a few at a time.
+# post. A real page's refusals come a few at a time.
 PER_MINUTE = 30
 _recent = []
 

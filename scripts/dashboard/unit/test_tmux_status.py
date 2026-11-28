@@ -1,6 +1,6 @@
 """The status line every terminal wears (lib/tmux.conf): the session's own
 name, without the account prefix a session on a node carries, and the room
-to show it whole (B334: cut at tmux's ten characters it read u_8fb841d with
+to show it whole (cut at tmux's ten characters it read u_8fb841d with
 the window's 0 run into it)."""
 import os
 import shutil

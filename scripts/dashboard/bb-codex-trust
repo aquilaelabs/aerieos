@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AerieOS's own Codex hooks, trusted for one launch (B284).
+"""AerieOS's own Codex hooks, trusted for one launch.
 
 Codex CLI runs a hook a person has not reviewed only under
 --dangerously-bypass-hook-trust, which every ChatGPT session then opened on

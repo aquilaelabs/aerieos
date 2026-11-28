@@ -1,5 +1,5 @@
-"""An unlock that gives up less (R158 step 5) and a key of the person's own
-(R157): a token opened per use for the window picked and logged; a store
+"""An unlock that gives up less and a key of the person's own:
+a token opened per use for the window picked and logged; a store
 moved under a key the person holds opens only while unlocked, with a
 secret that is theirs; Lock lets go of everything, handouts included; the
 node's public halves are remembered while it is shut; the move puts a
@@ -68,8 +68,8 @@ class Unlocks(unittest.TestCase):
         self.assertEqual(unlocks.uses(UID)[0]["why"], "locked")
 
     def test_signed_out_everywhere_or_a_token_removed_shuts_what_was_opened(self):
-        # B545: a password change (signed out everywhere) left the window
-        # open; B546: a token removed stayed opened until it ended.
+        # A password change (signed out everywhere) left the window
+        # open; a token removed stayed opened until it ended.
         import users
         self.assertEqual(accountkeys.forge_line(UID, self.fid, why="push"), LINE)
         self.assertEqual(unlocks.status(UID)["open_tokens"], 1)

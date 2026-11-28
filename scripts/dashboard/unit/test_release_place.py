@@ -1,4 +1,4 @@
-"""Where a release may be cut from (R206; the operator, 14 Nov): a dev build
+"""Where a release may be cut from: a dev build
 on a commit that is on a branch a release is cut from (tools/release-branches:
 main, and a release's working branch), a stable release or a release
 candidate only on a commit that is on main. tools/release-place.sh is what

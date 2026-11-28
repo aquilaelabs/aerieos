@@ -1,5 +1,5 @@
 """A toolchain update or removal on a node is refused while anything runs
-from it, naming whose (the operator, 6 Oct): an update replaces files in
+from it, naming whose: an update replaces files in
 place, and a session's build or emulator running from them breaks under it."""
 import os
 import shutil
@@ -49,7 +49,7 @@ class InUse(unittest.TestCase):
         self.assertEqual(said[-1], "refused: jdk is in use, so it was left as it is: try again once that has finished")
 
     def test_an_install_of_what_is_there_is_an_update_by_the_verb_that_works(self):
-        """R193 (the operator, 11 Oct), and Swift on a node (12 Oct): an
+        """Swift on a node: an
         install of a toolchain that is there already is `update` where that
         verb knows the recipe, and a remove and the install where it does
         not or the recipe refuses an existing directory; one not installed,

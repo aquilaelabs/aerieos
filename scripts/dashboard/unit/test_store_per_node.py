@@ -1,4 +1,4 @@
-"""Each node keeps its own toolchains (R196, the operator, 12 Oct): the
+"""Each node keeps its own toolchains: the
 agent's directory under the toolchain store is its node id, and an agent
 with no id has none; the census says what sits at the top of the store."""
 import os
@@ -37,8 +37,8 @@ class OwnDirectory(unittest.TestCase):
 
 
     def test_an_empty_directory_is_no_toolchain(self):
-        """A delete that could not finish leaves an empty platform-tools
-        (the operator, 12 Oct): it is not listed, so no row reads installed."""
+        """A delete that could not finish leaves an empty platform-tools:
+        it is not listed, so no row reads installed."""
         st = self.stores
         state = {"stores": {"toolchains": self.store}}
         st.use_scope(self.store, "n_9381e721")

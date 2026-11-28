@@ -1,4 +1,4 @@
-"""Update checks on one clock, adjustable (R176, the operator, 28 Oct).
+"""Update checks on one clock, adjustable.
 
 Each check AerieOS makes by itself has a cadence under Controller
 settings, Update checks: the release (a newer AerieOS), the container
@@ -7,10 +7,10 @@ agents and the vetted index this controller offers), each daily, weekly
 (the default), monthly or off, with Check now beside it. A node's own
 version check (what its store holds against what is out) is that node's
 setting on its page, read by toolchains.node_checks_due. Each loop asks
-due() in place of the constant it had; an environment switch that turns a
+due in place of the constant it had; an environment switch that turns a
 check off (BB_IMAGE_AUTOCHECK=0 and the like) still does, for the suite.
 
-What a check last ran at is its own module's to say (last()); the release's
+What a check last ran at is its own module's to say (last); the release's
 and the catalog's, which kept theirs in memory, are stamped here in
 STATE/checks.json so a restart is not a reason to ask again.
 """
@@ -71,7 +71,7 @@ def guarded(lock, record, fetch, keep=None, flag=None):
             return dict(record())
         on["checking"] = True
     # Whatever the fetch raises is its answer's error, and the flag comes
-    # down however the record's keeping goes (B1026: a TypeError from a
+    # down however the record's keeping goes (a TypeError from a
     # null body left it up, and every later ask answered the stale record
     # until the controller restarted).
     try:

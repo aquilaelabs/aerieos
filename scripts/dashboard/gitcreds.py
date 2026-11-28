@@ -1,4 +1,4 @@
-"""A project's git token, as the controller keeps it (R135): one line, the
+"""A project's git token, as the controller keeps it: one line, the
 URL git's credential store would write (scheme, user, token, host), in
 /config/gitcreds/<project>, 0600, sealed under the install key where there
 is one, so a copy of /config pushes nowhere.
@@ -10,9 +10,9 @@ read_line. Sealing is the server's: seal, unseal and sealing are set by it
 from signing's, as for the signing keys and two-factor secrets.
 
 A token a person gives a project is kept in their own key store
-(accountkeys.py, sealed under their key; the operator, 27 Oct), and the
+(accountkeys.py, sealed under their key), and the
 project's file then says `account:UID:ID`, nothing secret, one line per
-person who gave one (R159: every git action is a person's, with their own
+person who gave one (every git action is a person's, with their own
 token). A person's own git work (their session's aerie git, their presses in
 the Git view, the release they cut, the wiki they sync) is handed their own
 token, while they hold a live sign-in anywhere (logins.live); signed out
@@ -30,10 +30,10 @@ import shlex
 import threading
 from pathlib import Path
 
-import unlocks            # the opened tokens and their handouts (R158 step 5)
+import unlocks            # the opened tokens and their handouts
 
 STATE = None
-# Whose work a git command is (R159): the server sets it for a person's
+# Whose work a git command is: the server sets it for a person's
 # request, so a call that names no account (version.release, the wiki's
 # push, the address check) is handed theirs.
 ACTING = contextvars.ContextVar("gitcreds_acting", default="")
@@ -42,7 +42,7 @@ unseal = None             # bytes -> bytes, or raises
 sealing = None            # () -> whether an install key is loaded now
 SEALED = "bbseal:"
 LINKED = "account:"
-# The space's own token as a connection (R294 step 9, connections.py): told
+# The space's own token as a connection (connections.py): told
 # when one is written or forgotten, and when git work is handed it. Set by
 # the server; None in a process with no ledger.
 on_added = None           # (project) -> None
@@ -71,7 +71,7 @@ def path(project):
 def open_text(text):
     """A file's content as its plain line: opened if sealed, "" when it
     cannot be (another install key, or none)."""
-    # The project's own line is the first that is not a giver's (R157: a
+    # The project's own line is the first that is not a giver's (a
     # token moved to the project sits beside the `account:` lines).
     lines = [ln for ln in (text or "").splitlines() if ln.strip() and not ln.startswith(LINKED)]
     text = lines[0].strip() if lines else ""
@@ -146,8 +146,8 @@ def read_line(project, uid=None, live_only=True, why="read"):
     their Profile (`why` says what for)."""
     uid = acting() if uid is None else uid
     g = givers(project)
-    # Each person's own token, with their own rights, never another's
-    # (the operator, 23 Nov): a person who gave none is handed none.
+    # Each person's own token, with their own rights, never another's:
+    # a person who gave none is handed none.
     if uid:
         if any(u == uid for u, _ in g) and (not live_only or _live(uid)):
             line = _accounts().forge_line(uid, given_by(project, uid), why=why, project=project, by=uid)
@@ -170,7 +170,7 @@ def read_line(project, uid=None, live_only=True, why="read"):
 
 def own_line(project):
     """Whether the project keeps a line of its own (from before accounts,
-    or moved to it when its giver took their key, R157)."""
+    or moved to it when its giver took their key)."""
     try:
         return bool(open_text(path(project).read_text()))
     except OSError:
@@ -180,7 +180,7 @@ def own_line(project):
 def keep_as_own(project, line):
     """`line` kept as the project's own, sealed, before its givers' lines:
     what a project's background work runs with when the person whose token
-    it was holds their own key (R157)."""
+    it was holds their own key."""
     if not line or "\n" in line:
         return False
     _settled(project)
@@ -205,7 +205,7 @@ def _locked(uid):
 
 
 def usable(project, uid):
-    """What git work by `uid` on this project would run with (R159):
+    """What git work by `uid` on this project would run with:
     {"by": uid or "", "mine": bool, "live": bool, "given": bool, "why": ""}.
     `why` says, in a sentence, what stops a push when nothing would run."""
     uid = uid or acting()
@@ -222,7 +222,7 @@ def usable(project, uid):
                 "why": "your token for this space is used only while you are signed in, and you are "
                        "signed out everywhere: aerie git waits for you to sign in to the dashboard"}
     # Nobody's work (no person) runs with any signed-in giver's; a person's
-    # with their own alone (the operator, 23 Nov).
+    # with their own alone.
     other = "" if uid else next((u for u, _ in g if _live(u) and not _locked(u)), "")
     if other:
         return {"by": other, "mine": False, "live": True, "given": False, "why": ""}
@@ -262,7 +262,7 @@ def _write_givers(project, rows, keep_own=True):
 
 # Each read of a project's givers and the write after it, as one: two
 # people giving a project a token at once each read the givers, and one
-# rewrite lost the other's line (B549). Re-entrant, so a writer may call
+# rewrite lost the other's line. Re-entrant, so a writer may call
 # another.
 _glock = threading.RLock()
 
@@ -384,14 +384,14 @@ def _settled(project):
 
 def helpers(project, uid=None, why="git"):
     """The credential helpers for git work on this project, in the order
-    git asks them (R159): a handout of the acting person's own token, when
+    git asks them: a handout of the acting person's own token, when
     they gave this project one and are signed in with their store open,
-    and never another person's (the operator, 23 Nov); for work that is
+    and never another person's; for work that is
     nobody's (uid "", watching CI) a handout of any signed-in giver's whose
     store is open; then the project's helper for a line kept as the
     project's own from before. A handout (unlocks.handout) is the opened
     line in a file of its own for the window, so the helper opens nothing
-    itself and each opening is a use on the person's Profile (R158 step 5)."""
+    itself and each opening is a use on the person's Profile."""
     uid = acting() if uid is None else uid
     out = []
     g = givers(project)
@@ -422,8 +422,8 @@ def git_c(project, uid=None, why="git"):
     """git's -c arguments that hand a command AerieOS's credential for this
     project, wherever it is kept (the account's own store, the project's),
     whatever the tree's own config names: every git that reaches a remote
-    for AerieOS goes through these or through helpers() written into a
-    config of its own (the operator, 27 Oct). [] where there is none."""
+    for AerieOS goes through these or through helpers written into a
+    config of its own. [] where there is none."""
     hs = helpers(project, uid, why)
     return ["-c", "credential.helper=", *[x for h in hs for x in ("-c", f"credential.helper={h}")]] if hs else []
 
@@ -458,7 +458,7 @@ def names_helper(value, project):
     helper is known by its name, not by the directory it was written from:
     a repository linked before the install moved to /opt/aerieos names it
     at /opt/builderbot, a link to the same file, and asked for the resolved
-    path it read as no credential at all, its pushes refused (B1144)."""
+    path it read as no credential at all, its pushes refused."""
     f = str(path(project))
     for line in value.splitlines():
         try:
@@ -479,7 +479,7 @@ def forget(project):
 
 def seal_all(again=False):
     """Every line kept open sealed, once the install has a key: at start.
-    `again`, after the install key changed (R154): every sealed one sealed
+    `again`, after the install key changed: every sealed one sealed
     once more, under today's key. Returns how many."""
     if not (seal and sealing and sealing()):
         return 0
@@ -494,7 +494,7 @@ def seal_all(again=False):
             continue
         # Through keep_as_own, which writes the line with the givers' lines
         # after it: write_line kept the one line and every person who had
-        # given the project a token was gone from it (B543).
+        # given the project a token was gone from it.
         if text and not text.startswith(SEALED):
             keep_as_own(f.name, text.splitlines()[0])
             n += 1

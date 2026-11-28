@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The AerieOS USB stick maker (R161 step 5): one tool for Windows, a Mac
+"""The AerieOS USB stick maker: one tool for Windows, a Mac
 and Linux, Python's own library and the system's ssh-keygen, that writes a
 release's stick image onto a USB stick and checks it.
 
@@ -55,8 +55,8 @@ ENV_SIZE = 4096
 # ...and its aerieos/firstboot.json, a prepared configuration: 64 KiB.
 BOOT_MARK = b"AERIE-FIRSTBOOT-1\n"
 BOOT_SIZE = 65536
-# ...and its aerieos/catalog-mirror.bin, a mirror of the vetted catalog
-# (R169 step 6): 64 MiB, the archive's length on the line after the marker.
+# ...and its aerieos/catalog-mirror.bin, a mirror of the vetted catalog:
+# 64 MiB, the archive's length on the line after the marker.
 MIRROR_MARK = b"BB-MIRROR-1\n"
 MIRROR_SIZE = 64 << 20
 
@@ -77,7 +77,7 @@ def disks():
     if sysname == "Linux":
         # The whole tree, not -d: a disk's own mount points are empty when
         # / is on one of its partitions, and the system disk read as any
-        # other (B474).
+        # other.
         out = subprocess.run(["lsblk", "-J", "-b", "-o", "NAME,SIZE,MODEL,RM,TRAN,TYPE,MOUNTPOINTS"], capture_output=True, text=True, check=False).stdout
 
         def mounts(d):
@@ -88,7 +88,7 @@ def disks():
                 continue
             mnts = mounts(d)
             # Its mount points ride with it: the confirmation names them, so
-            # a backup disk of the stick's make and size is told apart (B614).
+            # a backup disk of the stick's make and size is told apart.
             rows.append({"id": "/dev/" + d["name"], "size": int(d.get("size") or 0), "model": (d.get("model") or "").strip(),
                          "removable": bool(d.get("rm")) or d.get("tran") == "usb",
                          "system": any(m in ("/", "/boot", "/boot/efi", "/usr", "/var", "/home", "[SWAP]") for m in mnts),
@@ -104,7 +104,7 @@ def disks():
             except (ValueError, plistlib.InvalidFileException):
                 return {}
         whole = lambda dev: re.sub(r"s\d+$", "", str(dev or ""))    # noqa: E731 (disk2s1 -> disk2)
-        # Where each external disk's volumes are mounted (B614): a FAT or
+        # Where each external disk's volumes are mounted: a FAT or
         # exFAT volume on the disk itself, an APFS volume on the synthesized
         # disk its physical store points back from.
         mounted = {}
@@ -113,8 +113,8 @@ def disks():
             vols = [*(d.get("Partitions") or []), *(d.get("APFSVolumes") or [])]
             for s in stores:
                 mounted.setdefault(s, set()).update(str(v.get("MountPoint")) for v in vols if isinstance(v, dict) and v.get("MountPoint"))
-        # The disk this Mac runs from, by its root volume's physical stores
-        # (B617): a Mac booted from an external disk lists it as external.
+        # The disk this Mac runs from, by its root volume's physical stores:
+        # a Mac booted from an external disk lists it as external.
         root = plist("info", "/")
         system = {whole(s.get("DeviceIdentifier")) for s in root.get("APFSPhysicalStores") or [] if isinstance(s, dict)}
         system.add(whole(root.get("ParentWholeDisk")))
@@ -150,7 +150,7 @@ def disks():
 
 def named(d):
     """A disk as its person knows it: its model, its size and, on Windows,
-    its drive letters, elsewhere where its volumes are mounted (B614)."""
+    its drive letters, elsewhere where its volumes are mounted."""
     lt = " ".join(d.get("letters") or [])
     at = " ".join(d.get("mounts") or [])
     return f"{d.get('model') or 'unnamed'}, {d.get('size', 0) / GB:.1f} GB" + (f", {lt}" if lt else "") + (f", mounted at {at}" if at else "")
@@ -188,7 +188,7 @@ TAG = r"v\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?"
 def release_image(tag, channel="normal"):
     """The stick image of a release, fetched beside the tool with its sha256
     checked; the newest release when tag is 'latest', or on the dev channel
-    the newest pre-release a dev build's tag made (R179)."""
+    the newest pre-release a dev build's tag made."""
     if tag == "latest":
         req = urllib.request.Request(API, headers={"Accept": "application/json", "User-Agent": "aerieos-stick"})
         with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
@@ -245,7 +245,7 @@ SIGNER_IDENTITY = r"^https://github\.com/aquilaelabs/aerieos/\.github/workflows/
 
 def attested(path):
     """The image checked against its build attestation where gh is on this
-    machine (R191 step 2): the bundle from GitHub's public API, verified by
+    machine: the bundle from GitHub's public API, verified by
     gh with --bundle, which asks for no sign-in. Without gh it is said, and
     the sha256 is what held; one that does not verify is not written."""
     import shutil
@@ -291,7 +291,7 @@ def check_sha(path, sha_file):
     say(f"{os.path.basename(path)}: sha256 matches")
 
 
-# ---- the release's signature (R199) ------------------------------------------------
+# ---- the release's signature ------------------------------------------------
 # Who may sign a release, as config/release-signers holds them: written here
 # by tools/release-signers.py --write, never typed, and aerie lint keeps the
 # two the same. A release's SHA256SUMS signed by one of them is what says
@@ -718,7 +718,7 @@ def open_disk(dev):
         # After diskpart's clean Windows looks the stick over again for a
         # moment, and a handle from before that is not one to trust: the
         # first write met 'not ready' and the same handle then 'access
-        # denied' (2 Nov, B630). So the disk is opened once it reads, and
+        # denied'. So the disk is opened once it reads, and
         # the writer opens it again this way when a write meets either.
         k32.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
         k32.SetFilePointerEx.argtypes = [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD]
@@ -754,7 +754,7 @@ def open_disk(dev):
         return open(rdev, "r+b", buffering=0)
     # Every file system on it taken off first, and the write refused if one
     # will not go; then opened exclusively, which the kernel refuses while
-    # anything still holds the disk (B474).
+    # anything still holds the disk.
     out = subprocess.run(["lsblk", "-nro", "MOUNTPOINTS", dev], capture_output=True, text=True, check=False).stdout.split()
     for m in out:
         r = subprocess.run(["umount", m], capture_output=True, text=True, check=False)
@@ -783,7 +783,7 @@ def image_needs(image):
 
 
 def fits_why(image, size):
-    """Why a stick of `size` bytes cannot take `image`, or "" (B958): said
+    """Why a stick of `size` bytes cannot take `image`, or "": said
     before anything is erased, where a write onto a stick too small failed
     part way and read as a failing stick."""
     need = image_needs(image)
@@ -812,7 +812,7 @@ def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None
                 say(f"  {written / GB:.1f} GB written")
         dst.flush()
         # A stick that cannot flush did not take the image: said, never
-        # passed over (B474).
+        # passed over.
         if hasattr(dst, "sync"):
             dst.sync()
         else:
@@ -913,7 +913,7 @@ def cmd_write(a):
         die(f"no such image: {image}")
     else:
         # A file you have is checked as a fetched one is: its sha256 where it
-        # sits beside it, and its build attestation (R191 step 2).
+        # sits beside it, and its build attestation.
         if os.path.isfile(image + ".sha256"):
             check_sha(image, image + ".sha256")
         else:
@@ -923,7 +923,7 @@ def cmd_write(a):
     if not image.endswith(".xz"):
         die("the image is the release's aerieos-os-VERSION.stick.raw.xz (or .raw.xz)")
     # The disk asked about again after the download: one replugged meanwhile
-    # may be another disk under the same name (B474).
+    # may be another disk under the same name.
     again = pick(a.disk)
     if (again["size"], again["model"]) != (d["size"], d["model"]):
         die(f"{a.disk} is not the disk it was before the download ({again['model'] or 'unnamed'}, {again['size'] / GB:.1f} GB now): nothing written")
@@ -937,7 +937,7 @@ def cmd_write(a):
     try:
         write_image(image, d["id"], verify_after=not a.no_verify, sets=a.set or (), config=a.config, mirror=a.mirror)
     except OSError as e:
-        # The stick pulled or failing part way (B615): said with what to do.
+        # The stick pulled or failing part way: said with what to do.
         die(f"the write stopped ({e.strerror or e}): the stick was unplugged or is failing, or the image could not be read; "
             "plug it in and write it again from the start, since nothing on it is usable until then")
     say("Done. Boot the machine from the stick: it comes up as its own controller, and the dashboard's first page, at http://ITS-ADDRESS:7680 on the LAN, makes the owner or restores a saved configuration.")

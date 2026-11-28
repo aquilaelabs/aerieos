@@ -1,5 +1,5 @@
-"""The bell's rows sent elsewhere, per person and per kind (R149, the
-operator, 26 Oct: every NAS system has it).
+"""The bell's rows sent elsewhere, per person and per kind
+(every NAS system has it).
 
 Each person keeps destinations on their Profile (Where the bell reaches
 you): email over SMTP (the server set in Controller settings' Mail
@@ -184,7 +184,7 @@ def set_dest(uid, req):
 
 
 def set_on(uid, did, on):
-    """A destination switched on or off, its settings kept (R173): {dest}
+    """A destination switched on or off, its settings kept: {dest}
     or {error}."""
     with _lock:
         d = _load()
@@ -324,7 +324,7 @@ def _why(e):
 
 def _clock(now=None, tz=""):
     """The time as a person reads it: in their own zone where their Profile
-    names one (R294 step 8), else the controller's."""
+    names one, else the controller's."""
     if tz:
         try:
             from zoneinfo import ZoneInfo

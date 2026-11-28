@@ -45,8 +45,8 @@ class Unused(unittest.TestCase):
 
 
 class UnusedClasses(unittest.TestCase):
-    """aerie map unused over a page's stylesheet (B79): R60 swept the classes
-    nothing names and took .gl0 to .gl4, which nb-git.js builds as
+    """aerie map unused over a page's stylesheet: a sweep of the classes
+    nothing names once took .gl0 to .gl4, which nb-git.js builds as
     gl${lane % 5}, for dead. A template's head or tail names a family."""
 
     def setUp(self):

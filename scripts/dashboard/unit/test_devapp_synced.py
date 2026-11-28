@@ -1,7 +1,7 @@
-"""A dev instance on a node holding synced copies (R163 step 4): its own
+"""A dev instance on a node holding synced copies: its own
 /workspace is the projects root, so the path mapping takes it as such with
 no mount in its census; every agent node holds them unless taken off its
-copy (R164), and the controller's own node never does."""
+copy, and the controller's own node never does."""
 import os
 import sys
 import unittest

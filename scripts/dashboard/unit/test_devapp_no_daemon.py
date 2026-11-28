@@ -1,5 +1,5 @@
-"""Why there is no daemon to send docker work to, said for this install
-(B147): nodes enrolled with no Docker are told to install it, an install
+"""Why there is no daemon to send docker work to, said for this install:
+nodes enrolled with no Docker are told to install it, an install
 with none is told to enroll one, and one that holds enrolling off is not."""
 import os
 import sys

@@ -1,5 +1,5 @@
-"""What runs in a space's Kubernetes environment, and the presses on it
-(R281 step 5): the notebook's Kubernetes view.
+"""What runs in a space's Kubernetes environment, and the presses on it:
+the notebook's Kubernetes view.
 
 Every read and press goes through the environment's own deployer, a token
 kube.mint makes for its ServiceAccount, kept in memory for its life less a
@@ -231,7 +231,7 @@ def logs(space, env_name, pod, container="", tail=500):
     return {"text": text[-kubeclient.LOG_MAX:]}
 
 
-# ---- the bell's rows (R281 step 7) -------------------------------------------
+# ---- the bell's rows -------------------------------------------
 # Each environment a space has deployed to is looked at every WATCH_S:
 # a workload short of what it wants for longer than SETTLE_S (a rollout
 # takes a while), or a pod waiting on a reason that does not pass by itself,

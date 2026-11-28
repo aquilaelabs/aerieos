@@ -1,4 +1,4 @@
-"""The USB stick maker (R161 step 5, tools/aerieos-stick.py): the disks
+"""The USB stick maker (tools/aerieos-stick.py): the disks
 listed off the system's own tools, the system disk and a fixed disk never
 written, an image written whole from its xz and read back, a sha256 that
 does not match refused before anything is written."""
@@ -28,7 +28,7 @@ def load():
 
 
 # The system on a partition, as it always is: the disk's own mount points
-# are empty, and a USB disk the machine booted from is no stick (B474).
+# are empty, and a USB disk the machine booted from is no stick.
 LSBLK = '{"blockdevices": [{"name": "sda", "size": 512110190592, "model": "Samsung SSD", "rm": false, "tran": "sata", "type": "disk", "mountpoints": [null],' \
         ' "children": [{"name": "sda2", "type": "part", "mountpoints": ["/"]}]},' \
         '{"name": "sdb", "size": 32000000000, "model": "Ultra Fit", "rm": true, "tran": "usb", "type": "disk", "mountpoints": [null],' \
@@ -52,7 +52,7 @@ class Stick(unittest.TestCase):
         self.linux.start(); self.addCleanup(self.linux.stop)
 
     def test_a_stick_too_small_for_the_image_is_refused_before_it_is_erased(self):
-        # B958: an 8 GB stick took the write part way and read as failing.
+        # An 8 GB stick took the write part way and read as failing.
         import lzma
         head = bytearray(1 << 20)
         hdr = b"EFI PART" + bytes(24) + (22000000 - 1).to_bytes(8, "little")
@@ -77,13 +77,13 @@ class Stick(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.m.pick("/dev/sdz")
         self.assertEqual(self.m.pick("/dev/sdb")["model"], "Ultra Fit")
-        # B614: what is mounted on it is in its name, so the confirmation
+        # What is mounted on it is in its name, so the confirmation
         # tells a backup disk of the stick's make and size from the stick.
         self.assertEqual(self.m.named(self.m.pick("/dev/sdb")), "Ultra Fit, 32.0 GB, mounted at /media/u/BACKUP")
         self.assertEqual(rows[0]["mounts"], ["/"])
 
     def test_a_mac_lists_where_each_disk_is_mounted_and_marks_the_disk_it_runs_from(self):
-        # B614 and B617: an exFAT stick's volume is on the disk itself, an
+        # An exFAT stick's volume is on the disk itself, an
         # APFS volume on the synthesized disk whose physical store points
         # back; a Mac booted from an external disk lists it as external.
         import plistlib
@@ -116,7 +116,7 @@ class Stick(unittest.TestCase):
                 self.m.pick("/dev/disk5")
 
     def test_a_write_that_stops_is_said_with_what_to_do(self):
-        # B615: the stick pulled part way raised out of the tool as a traceback.
+        # The stick pulled part way raised out of the tool as a traceback.
         import argparse
         img = os.path.join(self.d, "aerieos-os-0.9.0.stick.raw.xz")
         with lzma.open(img, "wb") as f:
@@ -352,7 +352,7 @@ class Stick(unittest.TestCase):
         self.assertIn("the v0.8.2 release carries no stick image", str(e.exception))
 
     def test_an_image_is_checked_against_its_build_attestation_where_gh_is(self):
-        # R191 step 2: the bundle from GitHub's public API, gh verify --bundle.
+        # The bundle from GitHub's public API, gh verify --bundle.
         import io
         import json
         img = os.path.join(self.d, "aerieos-os-1.0.0.stick.raw.xz")
@@ -422,7 +422,7 @@ class Stick(unittest.TestCase):
         return raw, img, dev
 
     def test_set_writes_its_lines_into_the_sticks_env_file_even_across_two_chunks(self):
-        # R161 step 12: the 4 KiB on the stick, found by its marker and written
+        # The 4 KiB on the stick, found by its marker and written
         # in place, the file's size and everything around it as they were.
         for at in (1 << 20, (1 << 20) - 100):            # inside a chunk, and across the line
             raw, img, dev = self.stick_with_env(at)
@@ -438,7 +438,7 @@ class Stick(unittest.TestCase):
             self.assertEqual([x for x in env.splitlines() if "=" in x and not x.startswith("#")], ["TZ=Europe/Berlin", "BB_RELEASE_LINE=0.9", "BB_NET_DNS=1.1.1.1,9.9.9.9"])
 
     def test_config_writes_the_prepared_configuration_beside_the_env_file(self):
-        # R161 step 8: firstboot.json's 64 KiB behind its own marker, the two
+        # firstboot.json's 64 KiB behind its own marker, the two
         # files written in one pass, the rest of the image as it was.
         import json
         env = self.m.ENV_MARK + b": x\n"
@@ -470,7 +470,7 @@ class Stick(unittest.TestCase):
             self.m.boot_block(cfg)
 
     def test_mirror_writes_the_catalogs_mirror_into_its_slot(self):
-        # R169 step 6: catalog-mirror.bin's 64 MiB behind its marker, the
+        # catalog-mirror.bin's 64 MiB behind its marker, the
         # archive's length on the next line; held smaller here, the slot's
         # shape the same.
         import io

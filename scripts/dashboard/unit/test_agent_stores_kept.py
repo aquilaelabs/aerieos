@@ -1,4 +1,4 @@
-"""A node enrolling again keeps its stores where they are (B658): a role
+"""A node enrolling again keeps its stores where they are: a role
 the flags left at its default takes the path the node's record has."""
 import os
 import sys

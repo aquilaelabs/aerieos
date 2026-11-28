@@ -1,4 +1,4 @@
-"""The work notes are kept per account and coding agent (R95): one person's
+"""The work notes are kept per account and coding agent: one person's
 Claude and Codex sessions on a project are two sessions, each told when the
 other has the file it is about to edit, and each named with its agent."""
 import json

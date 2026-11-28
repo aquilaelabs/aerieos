@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A release's notes, written the one way a tag's run and the rehearsal both
-# write them (R190 step 2), on stdout. At the top, which download is for
-# what (docs/release-notes/downloads.md: the operator, 6 Nov, the files
+# write them, on stdout. At the top, which download is for
+# what (docs/release-notes/downloads.md: the files
 # alone did not say). Then the tree's own notes for this version where it
 # has them (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
 # else the changelog's: for a pre-release what is new since the release

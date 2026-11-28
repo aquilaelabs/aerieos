@@ -1,4 +1,4 @@
-"""Every git action is a person's, with their own token (R159): each person
+"""Every git action is a person's, with their own token: each person
 gives a project their own, the project keeps none, a token is used only while
 its person holds a live sign-in (logins.py), work that is nobody's takes any
 signed-in giver's, and the relay says what a signed-out person's push waits
@@ -54,7 +54,7 @@ class PerPerson(unittest.TestCase):
         self.assertFalse((self.d / "gitcreds" / "web").exists())
 
     def test_a_new_token_replaces_the_one_before_and_keeps_its_projects(self):
-        # One token per account on a host (the operator, 30 Oct): a new one
+        # One token per account on a host: a new one
         # replaces the entry, never files a second beside it.
         gitcreds.link_account("web", ADA, self.ada)
         new = "https://ada:ghp_adaNEWNEWNEWNEWNEW2@github.com"

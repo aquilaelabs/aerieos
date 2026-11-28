@@ -1,4 +1,4 @@
-"""A node's features (R91): bb-sandbox's feature command checks its verb and
+"""A node's features: bb-sandbox's feature command checks its verb and
 id before it touches the machine, the controller queues the install as a
 system job and refuses what could only fail with the reason the Features
 section shows, and the agent hands bb-sandbox nothing outside its table."""
@@ -91,14 +91,14 @@ class Controller(unittest.TestCase):
     def test_the_firewall_is_a_hosting_only_node_s(self):
         self.assertIn("hosting-only", nodes.node_feature("user:test", self.nid, "firewall", "install").get("error", ""))
         # ...whose machine runs no sessions: the switch alone left them, and
-        # the job failed on the machine (R97's walk).
+        # the job failed on the machine.
         nodes.node_update("user:test", self.nid, {"host_only": True})
         rep = dict(nodes.node(self.nid).get("reported") or {}, session={"up": True})
         nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), self.nid))
         self.assertIn("still runs sessions", nodes.node_feature("user:test", self.nid, "firewall", "install").get("error", ""))
 
     def test_the_card_to_a_vm_wants_a_card(self):
-        # R207 step 3: refused without a card in the census; a job with one.
+        # Refused without a card in the census; a job with one.
         self.assertIn("no NVIDIA card", nodes.node_feature("user:test", self.nid, "gpuvm", "install").get("error", ""))
         rep = dict(nodes.node(self.nid).get("reported") or {}, gpu_card="NVIDIA GeForce RTX 3070 Ti [10de:2482]")
         nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), self.nid))
@@ -110,7 +110,7 @@ class Controller(unittest.TestCase):
         self.assertIn("no such feature", nodes.node_feature("user:test", self.nid, "warpdrive", "install").get("error", ""))
 
     def test_a_controller_update_is_the_own_node_s_job_on_a_bare_metal_install(self):
-        # R90 step 5: refused on a container install and on any node but
+        # Refused on a container install and on any node but
         # the controller's own machine; there, a system job with the release
         # named only by its tag.
         from unittest import mock
@@ -146,7 +146,7 @@ class Agent(unittest.TestCase):
         self.assertEqual(a._apply_feature(Job(), {"id": "vmhost", "op": "purge"}), ("failed", 64))
         self.assertEqual(a._apply_feature(Job(), {"id": "vmhost", "op": "remove"}), ("succeeded", 0))
         self.assertEqual(ran, [["feature", "remove", "vmhost"]])
-        # The controller's own update (R90 step 5): only where the installer's
+        # The controller's own update: only where the installer's
         # own-node marker and the installer are, and a release by its tag.
         from unittest import mock
         self.assertEqual(a._apply_controller_update(Job(), {}), ("failed", 77))
@@ -158,7 +158,7 @@ class Agent(unittest.TestCase):
 
 
 class HelperFresh(unittest.TestCase):
-    """B163: a system job fetches the bundle before it compares bb-sandbox
+    """A system job fetches the bundle before it compares bb-sandbox
     with the bundle's copy, so a job pressed right after a controller update
     does not run the helper from before it."""
     def test_the_bundle_is_fetched_first(self):
@@ -180,7 +180,7 @@ class HelperFresh(unittest.TestCase):
 
 
 class IommuOnAerieOS(unittest.TestCase):
-    """B703: the IOMMU feature on an AerieOS machine writes its arguments
+    """The IOMMU feature on an AerieOS machine writes its arguments
     with the slot tool (GRUB's aerie_args), where it found no bootloader it
     knew and died."""
     def test_on_and_off_through_the_slot_tool(self):
@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
 
 class PowerEndsSessions(unittest.TestCase):
-    """B372: a reboot or a power-off ends every session on the machine first
+    """A reboot or a power-off ends every session on the machine first
     and says so to the controller before the machine goes, so none is left
     open on the record."""
     def test_sessions_end_before_the_machine_goes(self):
@@ -234,7 +234,7 @@ class PowerEndsSessions(unittest.TestCase):
         was = (cp.os.geteuid, cp.subprocess.Popen)
         cp.os.geteuid = lambda: 0
         # subprocess is the process's own module: another thread's Popen in
-        # the same moment is that thread's, not the power-off (B403).
+        # the same moment is that thread's, not the power-off.
         me, real = threading.get_ident(), was[1]
         cp.subprocess.Popen = lambda argv, **kw: (order.append(("power", argv[-2:])) if threading.get_ident() == me
                                                   else real(argv, **kw))

@@ -1,4 +1,4 @@
-// AerieOS's own terminal (R133): a dock tab drawn by xterm.js in the page
+// AerieOS's own terminal: a dock tab drawn by xterm.js in the page
 // itself, joined to /termws. One classic script beside index.html
 // (docs/nodes.md §13); terminal.html is the same terminal on a page of its
 // own, for a tab popped out and for the Android app.
@@ -27,7 +27,7 @@ function termOwn(t){
 // A log tab's argument (log:job:ID, log:controller): read-only, followed.
 function termLog(t){ return /^log:/.test(t?.arg || ""); }
 
-// A log opened in the dock, followed as it is written (R133 step 12).
+// A log opened in the dock, followed as it is written.
 function openLogTab(arg, label){
   openTab({kind: "term", arg, label});
 }
@@ -57,7 +57,7 @@ function termSlot(t){
     <div class="xend" hidden><span class="xwhy"></span><button type="button" class="xagain">Reconnect</button></div>${consoleBar(t)}</div>`;
 }
 
-// The hot bar (the operator, 12 Nov): the keys a terminal is most often
+// The hot bar: the keys a terminal is most often
 // reached for, a press each, so they are there without a keyboard that has
 // them. At a desk it floats over the terminal's bottom right corner,
 // slightly translucent; on a phone it is the band at the terminal's foot,
@@ -196,7 +196,7 @@ function termUrl(t, cols, rows){
   return `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/termws?${q}`;
 }
 
-// A terminal's colors by name (R133 step 10), the choices prefs.py's
+// A terminal's colors by name, the choices prefs.py's
 // TERM_SCHEMES names: Default the plain dark ground, Dashboard the page's
 // own scheme, and the tints a person gives a project to know it by. Literal
 // here as a terminal's palette is: these are what the program's own
@@ -213,7 +213,7 @@ const TERM_SCHEMES = {
 
 // What every scheme is laid over: xterm's own ground and the Tango ANSI
 // colors it ships, so a scheme names only what it changes and every color
-// has a value to show and to change (the operator, 25 Oct).
+// has a value to show and to change.
 const TERM_BASE = {background: "#2b2b2b", foreground: "#e6e6e6", cursor: "#e6e6e6", selectionBackground: "#5a5a5a",
   black: "#2e3436", red: "#cc0000", green: "#4e9a06", yellow: "#c4a000", blue: "#3465a4", magenta: "#75507b",
   cyan: "#06989a", white: "#d3d7cf", brightBlack: "#555753", brightRed: "#ef2929", brightGreen: "#8ae234",
@@ -237,8 +237,8 @@ function termPalette(scheme, mine){
   return {...TERM_BASE, ...preset, ...(mine || {})};
 }
 
-// A terminal drawn small in a palette, for a person to see before one opens
-// (the operator, 25 Oct): a prompt, a listing in the ANSI colors, every
+// A terminal drawn small in a palette, for a person to see before one opens:
+// a prompt, a listing in the ANSI colors, every
 // color as a block, a selection and the cursor in its shape.
 function termPreview(theme, look = {}){
   const c = k => esc(theme[k] || "");
@@ -260,7 +260,7 @@ function termPreview(theme, look = {}){
 
 
 // This person's look for this tab: their Profile's, for every space alike
-// (R223: a space's own colors went, its card's color telling spaces apart).
+// (a space's own colors went, its card's color telling spaces apart).
 function termLook(t){
   const look = state?.term_look || {};
   const scheme = look.scheme || "default";
@@ -316,7 +316,7 @@ function termMount(el, t, key){
   }, e => termEnded(rec, String(e.message || e)));
 }
 
-// A finger on the terminal (R133 step 11): a drag up and down scrolls it
+// A finger on the terminal: a drag up and down scrolls it
 // and a press held selects the word under it, with handles and Copy; a tap
 // is left to xterm.js, which focuses it for the keyboard.
 function termTouch(rec){
@@ -494,7 +494,7 @@ function termSelectEnd(rec){
 // What is typed, from the keyboard or the keys bar, for the program: a
 // pane this page scrolled back into tmux's copy mode leaves it first, where
 // an arrow moved tmux's cursor over the history and a letter did nothing,
-// and the program heard neither (B254). The leaving is tmux's own key for
+// and the program heard neither. The leaving is tmux's own key for
 // it (TERM_LEAVE, lib/tmux.conf), sent down the same socket ahead of what
 // is typed, so it lands first. Marked on the tab, so a pane the server
 // scrolled before the socket opened counts too: by its id, since the
@@ -526,7 +526,7 @@ function termConnect(rec){
   if (!rec.term) return;
   // A terminal on a node carries what opens the person's sealed sign-ins
   // there, which a store under a key of their own gives only while it is
-  // unlocked (R157 step 2): asked for first, once, and the terminal then
+  // unlocked: asked for first, once, and the terminal then
   // opens with it; declined, it opens as a terminal with no sign-in.
   if (state?.store?.own && state.store.locked && !rec.unlockAsked){
     rec.unlockAsked = true;
@@ -570,13 +570,13 @@ function termDrop(key){
   TERMS.delete(key);
   // Gone before anything is torn down: a message already on its way, or a
   // fit a resize asked for, reached the disposed terminal and xterm read a
-  // renderer it no longer had (B425: "reading 'dimensions'").
+  // renderer it no longer had ("reading 'dimensions'").
   rec.gone = true;
   wsShut(rec.ws);
   rec.ro?.disconnect();
   // Disposed two frames on, not now: xterm runs a frame it had already
   // asked for (a first draw still pending when a slow start's terminal is
-  // closed) after dispose() and reads a renderer that is gone (B802, the
+  // closed) after dispose and reads a renderer that is gone (the
   // same "reading 'dimensions'"). Frames run in the order they were asked
   // for, so the ones it has pending, and the one those ask for, come
   // first; nothing new reaches it meanwhile, since it is marked gone, its
@@ -590,7 +590,7 @@ function termDrop(key){
   setTimeout(drop, 1000);
 }
 
-// The keys bar's keys as a keyboard sends them (R133 step 5): a table, as
+// The keys bar's keys as a keyboard sends them: a table, as
 // everything the page can make happen is, never text from elsewhere.
 const TERM_KEYS = {escape: "\x1b", tab: "\t", backtab: "\x1b[Z", left: "\x1b[D", down: "\x1b[B", up: "\x1b[A", right: "\x1b[C",
   home: "\x1b[H", end: "\x1b[F", enter: "\r", bspace: "\x7f", pipe: "|", tilde: "~", slash: "/", backslash: "\\",
@@ -627,7 +627,7 @@ function termSweep(){
   }
 }
 
-// A terminal not on show draws nothing (R228 step 14): what its session
+// A terminal not on show draws nothing: what its session
 // writes meanwhile is kept, in order, and written when it is shown again;
 // hidden but still laid out, xterm drew every byte a busy session sent. Its
 // box is never hidden, so its size and its session's stay as they were.

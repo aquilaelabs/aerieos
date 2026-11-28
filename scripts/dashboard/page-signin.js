@@ -1,7 +1,7 @@
 // The Claude sign-in, which is one account's on one node: who this account
 // is signed in as there, the flow that signs that node in, the code a
 // person pastes back into it, and signing that node out. Drawn inside the
-// agent's row of the Installed page on that node (R95 step 15, R172), and reached
+// agent's row of the Installed page on that node, and reached
 // from a project's Claude button when its node has no sign-in yet.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
@@ -16,7 +16,7 @@
 // null. A report, from that node (claudegrant.py): the login itself is the
 // machine's, and no other node's counts for it.
 const claudeOn = nid => state?.claude_auth?.nodes?.[nid] || null;
-// ...and to any coding agent (R95 step 3): Claude's from the record above,
+// ...and to any coding agent: Claude's from the record above,
 // another agent's from the same record kept per agent.
 const agentOn = (id, nid) => id === "claude" ? claudeOn(nid) : state?.agent_auth?.[id]?.nodes?.[nid] || null;
 
@@ -144,7 +144,7 @@ function wireSignin(root){
 }
 
 // Open the Installed page on one node with the agent's row open on its
-// sign-in and in view (R172): where a Claude button sends its press when
+// sign-in and in view: where a Claude button sends its press when
 // that node has no sign-in of this account's yet.
 function openNodeClaude(nodeId, agent = "claude"){
   openInstalledOn(nodeId, agent);
@@ -188,7 +188,7 @@ async function signinCancel(btn){
 // lands a second after it is sent. The sign-in is a job on the node, so the
 // jobs revision moves with each line it writes, and the page reads the status
 // on it while one runs (page-boot.js); a timer of its own read the whole
-// status every 1.2 s, hidden or not (R283 step 4). Kept as the place a draw
+// status every 1.2 s, hidden or not. Kept as the place a draw
 // says a sign-in is on show.
 function watchSignin(){ return !!state?.signin?.running; }
 

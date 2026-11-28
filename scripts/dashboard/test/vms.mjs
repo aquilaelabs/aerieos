@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The VMs page (R91): a node with VM host installed, enrolled here by hand
+// The VMs page: a node with VM host installed, enrolled here by hand
 // with its census; New VM queues the node's vm job and the row says so; the
 // agent's result and its census make the row running with its address; Stop,
 // a snapshot and Remove each a vm job; a session's aerie vm is held to its
@@ -19,7 +19,7 @@ await ready(page);
 const base = URL.replace(/\/$/, '');
 const call = async (path, body, headers = H) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
-  // An agent poll with no work for it may answer nothing at all (B173).
+  // An agent poll with no work for it may answer nothing at all.
   const t = await r.text();
   return { status: r.status, ...(t ? JSON.parse(t) : {}) };
 };
@@ -59,7 +59,7 @@ await page.fill('#vmName', 'db');
 await page.selectOption('#vmProject', 'alpha');
 await page.selectOption('#vmOs', 'debian-13');
 // Make it with no key is refused, and the reason is where it can be read,
-// above the dialog's footer, not behind it (B304).
+// above the dialog's footer, not behind it.
 await page.click('#vmGo');
 await page.waitForFunction(() => !document.getElementById('vmWhyF').hidden, null, { timeout: 10000 });
 const seen = await page.evaluate(() => { const w = document.getElementById('vmWhy').getBoundingClientRect();
@@ -76,7 +76,7 @@ ok(job?.spec?.action === 'create' && job.spec.domain === 'bbvm-alpha-db' && job.
 await page.waitForFunction(() => /being made/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 15000 });
 ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alpha/.test(e.querySelector('.dmgroup').textContent)),
    '...and the row stands in its space\'s card, being made');
-// ...the space's, never the repository's (the operator, 24 Nov): alpha's
+// ...the space's, never the repository's: alpha's
 // space renamed (a session there holds it from a move) heads alpha's VMs
 // by the space's new name, and its own again when renamed back.
 await section("A VM stands under its repository's space, named as the space", async () => {
@@ -96,7 +96,7 @@ await section("A VM stands under its repository's space, named as the space", as
   await page.evaluate(() => refresh());
 });
 // What it cannot take while it is made is drawn dead, never left out, and
-// the row says why (the operator, 22 Nov).
+// the row says why.
 const making = await page.$eval('.vmtab [data-vm-key="alpha/db"]', e => ({
   start: e.querySelector('[data-vm="start"]')?.disabled, why: e.querySelector('.vmwait')?.textContent || '' }));
 ok(making.start === true && /wait until it is made/.test(making.why),
@@ -114,8 +114,8 @@ const row = await page.$eval('.vmtab [data-vm-key="alpha/db"]', e => ({ text: e.
 ok(/running/.test(row.text) && /ok/.test(row.pill) && /ssh builder@10\.232\.0\.12/.test(row.text) && /Debian 13/.test(row.text)
    && /kvmbox/.test(row.text) && row.stop && row.con && row.snap,
    `once made it runs: its pill, how to reach it, its OS and node, Stop, Console and its snapshot with Revert (${row.text.slice(0, 120)})`);
-// Domains the node's libvirt has that AerieOS did not make (R165 step
-// 1): an administrator reads them under Not AerieOS's, by name, state
+// Domains the node's libvirt has that AerieOS did not make:
+// an administrator reads them under Not AerieOS's, by name, state
 // and size, with Clone into a space alone to press, and the tiles count
 // AerieOS's own.
 await agent('hello', { census: { ...CENSUS, vms: [{ name: 'bbvm-alpha-db', state: 'running', ip: '10.232.0.12', vcpus: 2, mem_mb: 2048, snapshots: ['clean'] }],
@@ -126,7 +126,7 @@ await page.waitForSelector('.vmtab .vmothers', { timeout: 15000 });
 const foreign = await page.evaluate(() => ({
   rows: [...document.querySelectorAll('.vmtab .vmother')].map(r => r.textContent.replace(/\s+/g, ' ').trim()),
   buttons: document.querySelectorAll('.vmtab .vmothers button').length,
-  // Clone into a space (R163 step 12): live on the stopped one, dead with
+  // Clone into a space: live on the stopped one, dead with
   // why on the running one, and nothing else to press.
   clone: [...document.querySelectorAll('.vmtab .vmothers [data-vmclone]')].map(b => `${b.dataset.vmfrom}:${b.disabled ? 'dead' : 'live'}`),
   running: document.querySelector('.vmtab .pgline')?.textContent.replace(/\s+/g, ' ') || '',
@@ -140,7 +140,7 @@ await page.waitForFunction(() => !document.querySelector('.vmtab .vmothers'), nu
 ok(true, '...and the list goes with the next census that has none');
 
 // A Stop its system did not take (an installer with no ACPI daemon) is said
-// on the row after a while, pointing at Force stop (B308).
+// on the row after a while, pointing at Force stop.
 await page.evaluate(() => { vmStopAsked['alpha/db'] = Date.now() - 60000; readMoved('vms'); drawPanes(); });
 await page.waitForFunction(() => /asked to shut down/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
 const ignored = await page.evaluate(() => {
@@ -151,7 +151,7 @@ const ignored = await page.evaluate(() => {
 ok(/asked to shut down .* still running/.test(ignored) && /Force stop/.test(ignored),
    `a Stop the VM's system ignored is said on its row, with Force stop named (${(ignored.match(/asked to shut down[^.]*/) || [''])[0]})`);
 
-// The notebook's VMs view (R96): the project's own VMs, beside Docker in
+// The notebook's VMs view: the project's own VMs, beside Docker in
 // its Ship group, drawn from the page's rows, with New VM in its head.
 await page.evaluate(() => openNotebook('alpha', 'vms'));
 await page.waitForFunction(() => /1 running of 1/.test((document.querySelector('.nbview[data-view="vms"] #nvHint')?.textContent || '').replace(/\s+/g, ' ')), null, { timeout: 15000 });
@@ -163,7 +163,7 @@ const nv = await page.evaluate(() => {
 ok(nv.ship === 'artifacts,docker,vms,kubernetes,discord,signing' && nv.row && nv.newVm,
    `a space's notebook has VMs beside Docker in Ship, its own VM's row and New VM in its head (${JSON.stringify(nv)})`);
 // Its VMs may be on more than one node: one band of chips narrows the view
-// to a node, as the Docker view's does (the operator, 19 Nov), and on one
+// to a node, as the Docker view's does, and on one
 // node there is no band.
 const nvChips = await page.evaluate(() => {
   const nb = getNotebook('alpha').nb, v = document.querySelector('.nbview[data-view="vms"]');
@@ -187,7 +187,7 @@ ok(!nvChips.one.band && nvChips.two.band && nvChips.two.chips.length === 3 && /^
 await page.evaluate(() => openVmsTab());
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 10000 });
 
-// The head is Containers' (the operator, 26 Oct): the search, Cards and List
+// The head is Containers': the search, Cards and List
 // as their pictures at a desk, and New VM; List draws each VM as a line
 // that opens into its card, and Cards brings the card back.
 const head = await page.$eval('.vmtab .docbarrow', b => ({ search: !!b.querySelector('#vmSearch'), newVm: !!b.querySelector('#bVmNew'),
@@ -272,7 +272,7 @@ for (let i = 0; i < 4; i++){
 const left = (await call('/api/vms')).vms.map(v => v.key);
 ok(!left.includes('alpha/db'), `...and once it has run the record is gone (${left.join(', ')})`);
 // A console tab whose VM went while no page watched it is dropped once the
-// records are read (B172); a page opening with one reads them itself.
+// records are read; a page opening with one reads them itself.
 const reaped = await page.evaluate(async () => {
   tabs.push({id: 'vmc-gone', kind: 'term', arg: 'vm:alpha:db', label: 'console db'});
   vmsData = null; vmsAskedForConsoles = false;
@@ -281,12 +281,12 @@ const reaped = await page.evaluate(async () => {
   return !tabs.some(t => t.id === 'vmc-gone');
 });
 ok(reaped, 'a console tab whose VM is gone leaves the dock once the records are read');
-// A Console taken over: the owner's or an administrator's (the operator,
-// 21 Oct), said in the page's data as which projects it may happen on.
+// A Console taken over: the owner's or an administrator's,
+// said in the page's data as which projects it may happen on.
 const take = await call('/api/vms', { action: 'console-take', project: 'alpha', name: 'db' });
 ok(take.ok && (await call('/api/vms')).take?.alpha === true, `the owner may take a VM's Console over (${JSON.stringify(take)})`);
 
-// From an installer (R99): an ISO on the node is offered under From, and
+// From an installer: an ISO on the node is offered under From, and
 // picking it trades the key and the node box for the firmware.
 await agent('hello', { census: { ...CENSUS, vms: [], vm_isos: [{ name: 'ubuntu-26.04-live-server-amd64.iso', mb: 3100 }] },
                        version: shipped.version, digest: shipped.digest });
@@ -309,7 +309,7 @@ const inst = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs
 ok(inst?.spec?.installer?.iso === 'ubuntu-26.04-live-server-amd64.iso' && inst.spec.boot === 'uefi' && !inst.spec.image,
    `...and Make it queues a create from the ISO, UEFI, with no image (${JSON.stringify(inst?.spec?.installer)})`);
 
-// A VM's hardware beyond size (R100): the row says what it was given and
+// A VM's hardware beyond size: the row says what it was given and
 // carries the autostart switch; Hardware… on a stopped VM draws the host's
 // thread pairs and devices, and Save queues the node's hardware job.
 const took2 = await agent('work', { running: [], wait: 0 });

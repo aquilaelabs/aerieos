@@ -1,4 +1,4 @@
-"""cilogs.py (R115): a project's runs on GitHub's own runners and a failed
+"""cilogs.py: a project's runs on GitHub's own runners and a failed
 job's log, read with the controller's token against a stand-in for GitHub's
 API on a local port. The log answers with a redirect to another host, as
 GitHub's does, and the token must not follow it there."""
@@ -98,7 +98,7 @@ class CiLogs(unittest.TestCase):
         tail = build["log"].splitlines()
         self.assertEqual(len(tail), cilogs.TAIL_LINES)
         self.assertEqual(tail[-1], "##[error]Process completed with exit code 1.")
-        # The failing test was named far above the end (report #63, B525).
+        # The failing test was named far above the end (report #63).
         self.assertNotIn("tapsALetter", build["log"])
         self.assertEqual(build["earlier"], "dev.x.KeyTest > tapsALetter FAILED")
         self.assertNotIn("log", lint)                    # it passed: not fetched

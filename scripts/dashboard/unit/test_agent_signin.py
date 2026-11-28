@@ -1,4 +1,4 @@
-"""Signing in to the other coding agents on a node (R95 step 3): what the
+"""Signing in to the other coding agents on a node: what the
 node reads back about each account (login-list.py), the record the
 controller keeps per agent (claudegrant.py), and the device flows' links
 and codes as the job's log carries them (signin.py). Against files and logs
@@ -99,7 +99,7 @@ class Listed(unittest.TestCase):
         self.assertIn("error", self.listed()["agents"]["codex"])
 
     def test_copilot_s_managed_header_is_read_past_and_kept(self):
-        # 1.0.103 opens its config with comment lines (B280).
+        # 1.0.103 opens its config with comment lines.
         head = "// User settings belong in settings.json.\n// This file is managed automatically.\n"
         p = os.path.join(self.home, ".copilot", "config.json")
         os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -157,7 +157,7 @@ class Record(unittest.TestCase):
         self.assertEqual(claudegrant.on(self.home, "n1")["email"], "me@anthropic.invalid")
 
     def test_every_agent_s_accounts_are_named_for_people_and_profile(self):
-        # B296: People and Profile read each agent's, not Claude's alone.
+        # People and Profile read each agent's, not Claude's alone.
         self.assertEqual(claudegrant.emails_of(self.home), {})
         claudegrant.report(self.home, "n1", "me@openai.invalid", "plus", agent="codex")
         claudegrant.report(self.home, "n2", "octo", "", agent="copilot")

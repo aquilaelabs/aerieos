@@ -1,7 +1,7 @@
-"""The file explorer (R224): a machine's files, browsed, previewed,
+"""The file explorer: a machine's files, browsed, previewed,
 uploaded, downloaded, renamed and put in the trash, through its agent.
 
-Administrators only (the operator, 8 Nov), every change audited. What it
+Administrators only, every change audited. What it
 reaches is the machine's roots, read from its census: its pools, its
 array, its shares, the old system's merged view where disks were adopted,
 the disks and network shares it mounts, and the spaces folder a stick names; never the system's own folders, which
@@ -20,7 +20,7 @@ import time
 node_fn = None          # nodes.node
 host_fn = None          # nodes.route_host
 key_fn = None           # nodes.screen_key
-connect_fn = None       # the agent's relaytls.connect: TLS to the certificate the node reported (R243)
+connect_fn = None       # the agent's relaytls.connect: TLS to the certificate the node reported
 subject_fn = None       # ...and its subject: what is signed with a value of the request's own
 audit_fn = None         # db.audit(principal, what, detail, params)
 SCREEN_PORT = 7684
@@ -96,11 +96,11 @@ def _target(principal_ok, node_id, root):
         return {"error": f"{n.get('name') or node_id}'s agent does not serve files yet: update it from the Nodes page"}
     host, key = host_fn(node_id), key_fn(node_id)
     if host and not key:
-        # Its relay's key is learned from the node's own call (R288).
+        # Its relay's key is learned from the node's own call.
         return {"error": f"{n.get('name') or node_id} has not called in since the controller started: try again in a few seconds"}
     if not host:
         return {"error": f"{n.get('name') or node_id} cannot be reached from here"}
-    # How its relay is spoken to (R243): the certificate it reported, which
+    # How its relay is spoken to: the certificate it reported, which
     # is the only one taken, and whether it takes a request once.
     if (n.get("reported") or {}).get("root_off"):
         return {"error": off_said(n)}

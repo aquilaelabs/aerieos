@@ -1,4 +1,4 @@
-"""Versions derived, not typed (R254 steps 3 and 4): the releases a project's
+"""Versions derived, not typed: the releases a project's
 CHANGELOG dates, newest first with the end of each day, and a closed bug
 keeping when it was closed, which says the release that shipped the fix."""
 import json

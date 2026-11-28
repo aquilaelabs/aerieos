@@ -5,7 +5,7 @@ download, which is how a node gets the agent in the first place and how
 self-update fetches the next one. artifact and source are phase 6's, when
 there is a workspace to ship and an artifact store to land in.
 
-Out of server.py (R77): the server keeps the HTTP (the token from the
+Out of server.py: the server keeps the HTTP (the token from the
 Authorization header, a file streamed, a body read, the long-poll's empty
 answer) and calls one function here, which says what the verb means. Each
 answers (payload, status), a file as {path or body, ctype, headers}.
@@ -37,7 +37,7 @@ sessions_seen = None     # (node id, a heartbeat's session rows): server's, for 
 # Whether dev features are offered (settings' offer_unvetted), set by server.py.
 unvetted_ok = lambda: False  # noqa: E731
 
-# The sign jobs a key has been handed to (R106): once per job, so a node
+# The sign jobs a key has been handed to: once per job, so a node
 # that asks twice is refused the second time rather than given it again.
 _keys_given = set()
 
@@ -94,7 +94,7 @@ def _job_file(auth, q):
         return {"error": "not this node's running job"}, 403
     if j.get("type") == "sign-key":
         # A release's unsigned APK, handed to the sign-key job signing
-        # it (R106) from the controller's own fetch, never dist/.
+        # it from the controller's own fetch, never dist/.
         path = signing.handover_file((j.get("spec") or {}).get("handover"), j["id"])
         if path is None:
             return {"error": "this job was handed no file"}, 404
@@ -107,7 +107,7 @@ def _job_file(auth, q):
 
 @node_only
 def _iso(auth, q):
-    """An installer's ISO uploaded on the VMs page (R99), for the node whose
+    """An installer's ISO uploaded on the VMs page, for the node whose
     running vm job was queued to fetch it, and nobody else."""
     j = _running_job(auth["node"], q.get("job", [""])[0])
     up = str(q.get("upload", [""])[0])
@@ -117,7 +117,7 @@ def _iso(auth, q):
     if path is None:
         return {"error": "no such upload"}, 404
     # The Path itself, as every other file answer hands it: the server asks
-    # it for its size (B1035: a string here was a server error).
+    # it for its size (a string here was a server error).
     return _file(path)
 
 
@@ -146,16 +146,16 @@ def fetch(verb, auth, q, authed):
     # the operator's own login, for reading it in a browser.
     if auth.get("error") and not authed():
         return {"error": auth["error"]}, 401
-    # A Mac is a dev feature until one has been proven end to end (the
-    # operator, 12 Oct): its provisioner is served only with Offer dev
+    # A Mac is a dev feature until one has been proven end to end:
+    # its provisioner is served only with Offer dev
     # features on, which is also when the Enroll dialog names it.
     if what == "provisioner-macos" and not unvetted_ok():
         return {"error": "enrolling a Mac is a dev feature: turn on Offer dev features in Settings"}, 404
     if what in ("provisioner", "provisioner-macos"):
         # The provisioner too, from the copy this image carries: the
         # Enroll dialog's command names it, and a machine with an
-        # enroll token is what has to get it (B133), a Mac's as well
-        # as a Linux machine's (B150).
+        # enroll token is what has to get it, a Mac's as well
+        # as a Linux machine's.
         p = workspace.REPO / "nodes" / ("provision-macos.sh" if what == "provisioner-macos"
                                         else "provision-linux.sh")
         body = p.read_bytes() if p.is_file() else b""
@@ -178,7 +178,7 @@ def fetch(verb, auth, q, authed):
 def _running_job(node_id, jid, kind=""):
     """The job `jid` while it runs on this node (`node_id`), of the type
     `kind` where one is named, or None: the one test every hand-off to a
-    job asks before it gives the job anything (R283 step 3)."""
+    job asks before it gives the job anything."""
     j = nodes.job(jid, with_log=False)
     ok = j and j["node"] == node_id and j["state"] in nodes.JOB_ACTIVE and (not kind or j.get("type") == kind)
     return j if ok else None
@@ -210,7 +210,7 @@ def artifact(auth, q, stream, length):
         return {"error": "not this node's job"}, 403
     if j["state"] not in nodes.JOB_ACTIVE:
         return {"error": "the job has ended"}, 409
-    # A signed build says what signed it (R106 step 4): the route, the
+    # A signed build says what signed it: the route, the
     # certificate the node verified, and the schemes that verified. Only a
     # sign job's, and only in the shape it can have.
     extra = {}
@@ -236,7 +236,7 @@ def artifact(auth, q, stream, length):
 
 # ---- the node's own verbs, behind its token ---------------------------------------
 
-# ---- a node's projects as a synced copy (R162, wssync.py) -------------------------
+# ---- a node's projects as a synced copy (wssync.py) -------------------------
 
 @node_only
 def sync_file(auth, q):
@@ -268,7 +268,7 @@ moved_answer = lambda nid: {"answer": ""}  # noqa: E731
 
 @node_only
 def scan_put(auth, q, stream, length):
-    """One SARIF from a node's scan run (R145), raw in the body, kept as that
+    """One SARIF from a node's scan run, raw in the body, kept as that
     node's for the scanner named."""
     return scanners.take_report(auth["node"], q.get("scanner", [""])[0], stream, length, q.get("projects", [""])[0][:4000])
 
@@ -288,7 +288,7 @@ def oldapps_put(auth, q, stream, length):
     return adoptapps.take(stream, length)
 
 
-# ---- a synced node's Claude conversations (B613, claudesync.py) -----------------
+# ---- a synced node's Claude conversations (claudesync.py) -----------------
 
 @node_only
 def claude_file(auth, q):
@@ -305,7 +305,7 @@ def claude_put(auth, q, stream, length):
     return claudesync.put(auth["node"], q, stream, length)
 
 
-# ---- an image shipped between two nodes (R166, devactions.py) -------------------
+# ---- an image shipped between two nodes (devactions.py) -------------------
 
 @node_only
 def devimage_put(auth, q, stream, length):
@@ -388,7 +388,7 @@ def verb(name, auth, req, addr):
         return _sync(nid, req)
     if name == "claude":
         # What the controller has of the transcripts of the projects this
-        # node holds, for its mirror to compare (B613).
+        # node holds, for its mirror to compare.
         return claudesync.listing(nid), 200
     if name == "runner-token":
         # A registration or removal token for the node's runner, minted
@@ -397,7 +397,7 @@ def verb(name, auth, req, addr):
         kind = "remove" if field(req, "kind") == "remove" else "registration"
         slot = re.sub(r"[^a-z0-9.-]", "", field(req, "slot"))[:60]
         # Only to the job installing (or removing) that runner, while it
-        # runs (R288 step 7), so a stolen node token mints none.
+        # runs, so a stolen node token mints none.
         if not nodes.runner_job_on(nid, slot, kind):
             db.audit(auth["principal"], "runner-token", nid, {"kind": kind, "ok": False, "why": "no runner job"})
             return {"error": f"no job here is {'installing' if kind == 'registration' else 'installing or removing'} that runner now"}, 403
@@ -421,8 +421,8 @@ def verb(name, auth, req, addr):
             db.audit(auth["principal"], "signing-key", j["id"], said)
         return got, status
     if name == "signing-key":
-        # A project's signing key for the sign job running on this node
-        # (R106): only that job's own node, only while it runs, once. The
+        # A project's signing key for the sign job running on this node:
+        # only that job's own node, only while it runs, once. The
         # spec names the route and never carries a secret, so a session
         # reading the job sees which key and not the key.
         j = _running_job(nid, field(req, "job"), "sign")
@@ -439,7 +439,7 @@ def verb(name, auth, req, addr):
         package = field(req, "package")
         key = str(spec.get("key") or "") or signing.key_for(project, package, route)
         # A retired sideload key signs nothing alone: its builds go out with
-        # the key it was rotated to and the proof (R106 step 7).
+        # the key it was rotated to and the proof.
         if route == "sideload":
             key = signing.successor(project, key)
         got = signing.secret(project, route, key)
@@ -483,8 +483,8 @@ def verb(name, auth, req, addr):
                 print(f"[dashboard] auto sysdeps on {nid} skipped: {msg}", flush=True)
         return _answer(r)
     if name == "moved":
-        # A node knocking on a controller a move told it about (R90 step 12,
-        # move.py): the answer only a holder of the move key gives, and this
+        # A node knocking on a controller a move told it about
+        # (move.py): the answer only a holder of the move key gives, and this
         # controller's address and pin for it to take.
         return moved_answer(nid), 200
     if name == "beat":
@@ -492,7 +492,7 @@ def verb(name, auth, req, addr):
         nodes.beat(nid)
         return {"ok": True}, 200
     if name == "ftp-auth":
-        # One FTP login on this node's bb-ftpd (R151), relayed by its agent:
+        # One FTP login on this node's bb-ftpd, relayed by its agent:
         # the name and password checked as a sign-in checks them, and the
         # access this project gives that account. Never kept.
         return ftp.login(nid, field(req, "project"), req.get("user"), req.get("password"),
@@ -546,7 +546,7 @@ _unread = {}        # (node, uid, agent) -> why its login could not be read, log
 
 def _logins(nid, rows):
     """What a node's agent says each account on it is signed in to Claude
-    as (B104). Absent from most heartbeats, and then nothing happens.
+    as. Absent from most heartbeats, and then nothing happens.
 
     This is the report that does not come from a session's own token, and
     it is worth being clear about what that means: a node could name an
@@ -571,14 +571,14 @@ def _logins(nid, rows):
         if not home:
             continue
         _login(home, nid, "claude", r.get("email"), r.get("plan"))
-        # ...and the other coding agents' (R95 step 3), on an agent recent
+        # ...and the other coding agents', on an agent recent
         # enough to say: a row without the key says nothing about them.
         if isinstance(r.get("agents"), dict):
             for a in agents.rows():
                 if a.id == "claude" or not a.login_job:
                     continue
                 got = r["agents"].get(a.id) if isinstance(r["agents"].get(a.id), dict) else {}
-                # A login the node could not read is not a sign-out (B236):
+                # A login the node could not read is not a sign-out:
                 # the record stays, and why is said once in the log.
                 if got.get("error"):
                     why = str(got["error"])[:200]
@@ -601,6 +601,6 @@ def _login(home, nid, agent, email, plan):
         claudegrant.report(home, nid, email, str(plan or ""), agent=agent)
     elif on:
         # Said in the log: a sign-out read off a heartbeat is the one a
-        # person cannot see the cause of from the page (B236).
+        # person cannot see the cause of from the page.
         print(f"[dashboard] {nid} reports {agent} signed out for {home}", flush=True)
         claudegrant.report(home, nid, "", signed_in=False, agent=agent)

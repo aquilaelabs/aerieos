@@ -1,4 +1,4 @@
-"""Backups off the machine (R162 step 5): the controller's record held to
+"""Backups off the machine: the controller's record held to
 its shapes and summarized for Home and the bell, and the agent's job
 copying with rsync, each run hard-linked to the one before, the oldest
 pruned, a failed run leaving nothing, and a destination not mounted
@@ -115,7 +115,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual((rows[0]["name"], rows[0]["ok"], rows[0]["runs"]), ("media", True, 2))
 
     def test_a_destination_that_keeps_no_modes_takes_no_secrets(self):
-        # B861: exFAT, FAT or a share with one mode for every file shows
+        # exFAT, FAT or a share with one mode for every file shows
         # root's copy to whoever can reach it: the controller's state is
         # refused there, and anything else goes with that said.
         a = self.A()

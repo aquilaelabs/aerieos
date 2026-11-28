@@ -1,5 +1,4 @@
-"""A repository's build sent to one of its space's Kubernetes environments
-(R281 step 4).
+"""A repository's build sent to one of its space's Kubernetes environments.
 
 A deploy is one exec job on a node that holds the repository and runs
 Docker: the tree as committed at the branch, tag or commit picked
@@ -372,7 +371,7 @@ def draft(repo, name=""):
 
 
 def triggered(envs, when, refs, by_session, mode):
-    """What a push or a release starts (R281 step 6): [(env, ref, how)],
+    """What a push or a release starts: [(env, ref, how)],
     `how` "start" or "ask", for each of `envs` whose `when` it is: a push to
     one of `refs` ({branch: commit}) or a release (`refs` {tag: commit}),
     at that commit. A person's starts it; a session's follows the space's

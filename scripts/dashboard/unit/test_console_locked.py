@@ -1,5 +1,5 @@
 """A node locked to its own console refuses a console password set from its
-page (B1022), as every other system change is refused there: the job was
+page, as every other system change is refused there: the job was
 queued without asking the lock."""
 import json
 import os

@@ -1,4 +1,4 @@
-"""The provisioner's family files (R204): each declares the family, the
+"""The provisioner's family files: each declares the family, the
 os-release IDs it is for, the tools it needs and the four functions the
 core calls; and the core, sourcing the one beside it, takes a machine whose
 ID the file names and refuses another by name."""

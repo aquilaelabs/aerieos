@@ -1,4 +1,4 @@
-// A node's projects as a synced copy instead of a mounted share (R162): two
+// A node's projects as a synced copy instead of a mounted share: two
 // REAL agents, each enrolled and running against the harness server in sync
 // mode, holding one project in a directory of their own. A save on one
 // reaches the controller's copy and the other node over the agent API alone;
@@ -30,7 +30,7 @@ write(`${CTL}/.git/HEAD`, 'ref: refs/heads/main\n');
 write(`${CTL}/node_modules/x/index.js`, 'not synced\n');
 symlinkSync('src/b.py', `${CTL}/b-link`);
 // Enough files that a request a file would be minutes over a slow link: the
-// first copy is one download (R163).
+// first copy is one download.
 for (let i = 0; i < 1500; i++) write(`${CTL}/many/d${i % 30}/f${i}.txt`, `file ${i}\n`);
 const copyStart = Date.now();
 
@@ -50,7 +50,7 @@ for (const name of ['syncone', 'synctwo']){
   execFileSync('python3', [RUN, 'enroll', '--controller', URL, '--token', minted.token,
     '--user', process.env.USER || 'builder', '--store', `data=${home}/data`, '--store', `toolchains=${home}/tc`],
     { env, encoding: 'utf8', stdio: 'pipe' });
-  // A node enrolls holding its projects as a synced copy: the one way (R163).
+  // A node enrolls holding its projects as a synced copy: the one way.
   const conf = (await api('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config || {};
   ok(conf.workspace === 'sync', `${name} holds its spaces as a synced copy from enrollment (${JSON.stringify(conf.workspace)})`);
   nodes[name] = { id: minted.id, ws: `${home}/workspace/${P}`, log: `${home}/agent.log` };
@@ -99,7 +99,7 @@ try {
 
   // A relayed verb, run by a session's bb on the node: what was saved here a
   // moment ago is on the controller's copy before the verb runs there, and
-  // what the verb wrote there is on this copy when bb returns (R163 step 2).
+  // what the verb wrote there is on this copy when bb returns.
   {
     const relay = args => execFileSync('python3', [`${REPO}/scripts/lib/relay.py`,
       'Basic ' + Buffer.from('test:test').toString('base64'), ...args],
@@ -122,7 +122,7 @@ try {
        '...which bb reads from the state the agent keeps in the copy, a file that never syncs');
   }
 
-  // A project the synced one reads comes down too, read-only (R163 step 3).
+  // A project the synced one reads comes down too, read-only.
   {
     const R = 'syncread';
     const made2 = await api('/api/create', { name: R, mode: 'init' });

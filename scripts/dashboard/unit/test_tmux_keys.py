@@ -3,7 +3,7 @@ page-term.js TERM_LEAVE, TERM_LINE_UP, TERM_LINE_DOWN), through a real tmux
 client: a line of history up enters copy mode and a line down ends it at
 the bottom, a drag's lines arriving at once all counted (assume-paste-time);
 the leave key, ahead of what is typed, takes a pane out of copy mode so the
-first letter reaches the program (B254); and on a pane not in a mode none of
+first letter reaches the program; and on a pane not in a mode none of
 them is ever typed."""
 import os
 import pty

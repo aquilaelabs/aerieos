@@ -1,4 +1,4 @@
-"""B1: the briefing a session is handed (aerie preamble, scripts/lib/
+"""The briefing a session is handed (aerie preamble, scripts/lib/
 preamble-verbs.py) names each project as the dashboard shows it, with its
 directory beside it when the two differ, so a session and the person mean
 the same project by the same name."""
@@ -47,7 +47,7 @@ class PreambleLabels(unittest.TestCase):
             self.assertIn("Its id is P3, which never changes.", run("").stdout)
 
     def test_a_project_is_told_its_tool_packs(self):
-        # R77: the packs its settings switch on, by name, and a pack's own
+        # The packs its settings switch on, by name, and a pack's own
         # guidance as aerie help tool-NAME; a project that has not switched one
         # on is told nothing about it.
         with tempfile.TemporaryDirectory() as t:

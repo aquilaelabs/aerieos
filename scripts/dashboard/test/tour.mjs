@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The first-use tour (R94): the first time an account opens a page, its tour
+// The first-use tour: the first time an account opens a page, its tour
 // stands over it with the step's part ringed; Next and Back walk it, Done
 // ends it and the page is not toured again, on this browser or another;
 // Skip tour with its box ticked skips every page's; Show the tours again in
@@ -105,8 +105,8 @@ await until(async () => { const t = (await (await fetch(base + '/api/status', { 
   return !t?.off && !(t?.seen || []).length; }, 10000);
 const back = await (await fetch(base + '/api/status', { headers: H })).json();
 ok(!back.tour?.off && !(back.tour?.seen || []).length, `About's Show the tours again clears what was seen and the box (${JSON.stringify(back.tour)})`);
-// Close is all a person does: no reload and no redraw by hand (the
-// operator, 26 Oct: the tour waited for a refresh).
+// Close is all a person does: no reload and no redraw by hand
+// (the tour waited for a refresh).
 await page.click('#aboutClose');
 await page.waitForSelector('#tourCard:not([hidden])', { timeout: 15000 });
 ok(/Nodes are the machines/.test(await page.$eval('#tourCard .toursay', e => e.textContent)), '...and the page in front tours again');
@@ -135,7 +135,7 @@ const overSetup = await page.evaluate(async () => {
 ok(!overSetup, 'no tour starts while the setup page is up');
 
 // Nor over a page's placeholder: the draw after its data has landed asks
-// again (the operator, 21 Oct).
+// again.
 const overShimmer = await page.evaluate(async () => {
   const seen = state.tour;
   state.tour = { seen: [], off: false };
@@ -147,7 +147,7 @@ const overShimmer = await page.evaluate(async () => {
   const during = !$('tourCard')?.hidden;
   ph.remove(); tourSoon(tabOf(panes[0])?.kind);
   // Up to ten seconds for the tour to come, not a fixed second a loaded
-  // gate outran (B384).
+  // gate outran.
   for (let i = 0; i < 100 && $('tourCard')?.hidden !== false; i++) await new Promise(r => setTimeout(r, 100));
   const after = !$('tourCard')?.hidden;
   const shade = getComputedStyle($('tourRing')).boxShadow;
@@ -158,7 +158,7 @@ ok(!overShimmer.during && overShimmer.after, `no tour over a placeholder, and on
 ok(/9999px/.test(overShimmer.shade) && /0\.35/.test(overShimmer.shade), `...and the page is shaded around the part a step is about (${overShimmer.shade})`);
 
 // An empty page's step about its rows shows an example of one, inert, and
-// takes it away after (the operator, 21 Oct).
+// takes it away after.
 const sample = await page.evaluate(async () => {
   const { opened, saved } = tourTest;
   const seen = state.tour;
@@ -183,10 +183,10 @@ ok(sample.empty && sample.shown && sample.inert && sample.example && sample.row 
    `an empty VMs page's tour shows an example VM, inert and marked, gone after (${JSON.stringify(sample)})`);
 
 // The page redrawing itself under the step (its own poll, not the panes'
-// draw) puts the example back and the ring around it (B215, the operator,
-// 22 Oct: a ring around nothing after Reset tours); a placeholder the page
-// keeps hidden does not hold the tour back (B216: Containers had none); and
-// a poll answering with the old list after Reset does not undo it (B217).
+// draw) puts the example back and the ring around it
+// (a ring around nothing after Reset tours); a placeholder the page
+// keeps hidden does not hold the tour back (Containers had none); and
+// a poll answering with the old list after Reset does not undo it.
 const tours = await page.evaluate(async () => {
   const { till, opened, saved } = tourTest;
   const seen = state.tour;
@@ -231,8 +231,8 @@ ok(tours.docker, `...a placeholder the page keeps hidden does not hold the Conta
 ok(tours.kept, `...and a poll with the old list after Show the tours again does not undo it (${tours.kept})`);
 
 // With other pages kept in the pane before it (Home, Containers), the
-// example goes into the page on show, not the first kept (B223, the
-// operator, 22 Oct: a ring around an empty box on VMs after Home).
+// example goes into the page on show, not the first kept
+// (a ring around an empty box on VMs after Home).
 const after = await page.evaluate(async () => {
   const { opened, saved } = tourTest;
   const seen = state.tour;
@@ -286,8 +286,8 @@ const phoneSample = await phone.evaluate(async () => {
 ok(phoneSample.shown && phoneSample.row, `...and on a phone an empty VMs page's last step shows an example VM (${JSON.stringify(phoneSample)})`);
 await prefs({ tour_seen: [], tour_off: true });
 
-// Projects' tour turns a card over for the steps about its back (the
-// operator, 26 Oct): the first card on the page, turned back after; and on a
+// Projects' tour turns a card over for the steps about its back:
+// the first card on the page, turned back after; and on a
 // page with none, the example card, which turns over in place.
 const flips = await page.evaluate(async () => {
   const { till, opened, saved } = tourTest;
@@ -327,7 +327,7 @@ ok(flips.ex.front && flips.ex.ringed && flips.ex.turned && flips.ex.ringedBack &
    `...and with no space, an example card, its front then its back as it turns over (${JSON.stringify(flips.ex)})`);
 
 // Every page on the rail has a tour, and each step's part is on the page as
-// it is now (R142): a step whose part went with a redesign is left out by
+// it is now: a step whose part went with a redesign is left out by
 // tourStart, so a tour shrank without anybody seeing it. A step the
 // fixture's world cannot show is named here with why.
 const UNSHOWN = {
@@ -339,7 +339,7 @@ const UNSHOWN = {
 for (const p of [page, phone]){
   const where = p === phone ? 'on a phone' : 'at a desk';
   const kinds = await p.evaluate(() => [...RAIL.flatMap(g => g.tools.map(([k]) => [k, g.key])), ['notebook', '']]);
-  // The Debug page excepted: not an advertised feature (the operator, 26 Oct).
+  // The Debug page excepted: not an advertised feature.
   const untoured = await p.evaluate(ks => ks.map(([k]) => k).filter(k => !TOUR_STEPS[k] && k !== 'debug'), kinds);
   ok(!untoured.length, `every page on the rail has a tour ${where}${untoured.length ? `: none for ${untoured.join(', ')}` : ''}`);
   const lost = [];

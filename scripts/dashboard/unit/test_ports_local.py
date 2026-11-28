@@ -1,4 +1,4 @@
-"""Published ports bound to 127.0.0.1 by default on a hosting node (R190):
+"""Published ports bound to 127.0.0.1 by default on a hosting node:
 the daemon.json the agent writes, and the row's address for a port that is
 on the node alone."""
 import os
@@ -26,7 +26,7 @@ class DaemonJson(unittest.TestCase):
         self.assertIn('"labels"', kept)
         self.assertIn('"ip": "127.0.0.1"', kept)
         self.assertIsNone(f(kept, True), "already so: nothing to write, no docker restart")
-        # A node R190's first agent wrote, with `ip` alone, gets the other.
+        # A node an earlier agent wrote, with `ip` alone, gets the other.
         self.assertIn("host_binding_ipv4", f('{"ip": "127.0.0.1"}', True))
         off = f(kept, False)
         self.assertNotIn('"ip"', off)

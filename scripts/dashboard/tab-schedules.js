@@ -1,11 +1,11 @@
-// The Schedules page (R117): an administrator's own cron. Each schedule a row: its name, whether it is on, its
+// The Schedules page: an administrator's own cron. Each schedule a row: its name, whether it is on, its
 // timetable said in words, the node it runs on and as whom, its last run
 // (its state, when, and its log on the Jobs page) and its next; Run now,
 // Edit, Turn on or off, and Remove behind its More. New schedule in the
 // bar opens the same dialog a row's Edit does. The static analysis scan, once
 // built in: off until turned on, which asks for its node and its paths.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Data from
+// Chrome from docSurface; the hard rules are uniform.mjs's. Data from
 // /api/schedules, read when the page opens, after every press and on the
 // jobs revision, since a run is a job.
 
@@ -70,8 +70,8 @@ function schedRow(s, may){
 const SCHED_WHEN = [["0 * * * *", "Hourly"], ["0 4 * * *", "Daily, at 4:00"], ["0 4 * * 0", "Weekly, Sundays at 4:00"],
                     ["0 4 1 * *", "Monthly, on the 1st at 4:00"]];
 
-// The dialog a schedule is added or changed with (the a-dialog layout, the
-// operator, 26 Oct: as few fields as User Scripts): its name, when, where it
+// The dialog a schedule is added or changed with (the a-dialog layout,
+// as few fields as it can have): its name, when, where it
 // runs, and its script; the scan's paths in place of a script. A run is
 // stopped after a day, which is not asked.
 function schedForm(s){
@@ -79,7 +79,7 @@ function schedForm(s){
   const nodes = (schedData.nodes || []);
   const cron = schedDraft.cron ?? s?.cron ?? SCHED_WHEN[1][0];
   const custom = schedDraft.custom ?? !SCHED_WHEN.some(([c]) => c === cron);
-  // One form (R301) over the dialog's own foot; Runs as is a cell of its
+  // One form over the dialog's own foot; Runs as is a cell of its
   // own, drawn again when the node changes, and not drawn where there is
   // nothing to ask.
   const as = s?.system ? "" : schedAs(s);
@@ -101,8 +101,8 @@ function schedForm(s){
 
 // As whom it runs on a node AerieOS provisioned as a sandbox, the one
 // place root is AerieOS's to use (as aerie root run's): asked only there.
-// Anywhere else it is the jobs account, with nothing to ask (the operator,
-// 26 Oct), and a schedule saved as root elsewhere says why it will not run.
+// Anywhere else it is the jobs account, with nothing to ask,
+// and a schedule saved as root elsewhere says why it will not run.
 function schedAs(s){
   const nid = schedDraft.node ?? s?.node ?? "", n = (schedData.nodes || []).find(x => x.id === nid);
   const as = schedDraft.as ?? s?.as ?? "job";
@@ -206,9 +206,9 @@ function renderSchedulesInto(i){
   }
   const rows = schedData.schedules || [], may = !!schedData.may;
   const on = rows.filter(s => s.on), next = on.filter(s => s.next_at).sort((a, b) => a.next_at - b.next_at)[0];
-  // New schedule on the head (the operator, 29 Oct: not a row of its own).
+  // New schedule on the head (not a row of its own).
   d.setBar("");
-  // One line (R274): how many run, and which is next; the count of all is
+  // One line: how many run, and which is next; the count of all is
   // the section's.
   patch(d.list, pageHead({line: [{value: on.length, label: "turned on"},
                                  next ? {text: `next: ${next.name}, ${schedWhen(next.next_at)}`} : null],
@@ -216,7 +216,7 @@ function renderSchedulesInto(i){
     + docSection("schedules", "list", "Schedules", `${rows.length}`,
         rows.length ? `<div class="schedrows">${rows.map(s => schedRow(s, may)).join("")}</div>`
           // Nothing yet, said in words (the scan that used to stand here is
-          // the Scanners page's own since R145).
+          // the Scanners page's own).
           : `<div class="empty">No schedule yet. New schedule runs a command on a node at the times you set, as cron runs one; the static analysis scan has a schedule of its own on the Scanners page.</div>`));
   wireSchedules(d.el);
 }

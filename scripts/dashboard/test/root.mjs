@@ -1,4 +1,4 @@
-// One command as root on a node (roadmap R38): the phone's shape applied to
+// One command as root on a node: the phone's shape applied to
 // root. A session asks with a reason and the exact command; the request
 // waits on the administrators (on the Nodes tab and in the bell, nobody
 // else's), and Allow runs that one command on the node as a system job,
@@ -85,7 +85,7 @@ await page.waitForFunction(() => document.getElementById('bellPanel').hidden);
 
 // ---- Allow runs that one command on the node, and the session gets the output ------
 // The ask leaves the list the moment it is answered, not when the command
-// it allowed has finished running (B641): read in the same turn as the
+// it allowed has finished running: read in the same turn as the
 // press, before the request it sent could have come back.
 const immediate = await page.evaluate(() => {
   document.querySelector('.ndask [data-rallow]').click();
@@ -107,7 +107,7 @@ const sysjob = jobs.find(j => j.type === 'system' && j.node === sandbox.id);
 ok(sysjob && sysjob.state === 'succeeded',
    `the run is a system job on that node, finished (${sysjob?.state || 'no system job found'})`);
 
-// ---- the bell: Active over Earlier (R280) ----------------------------------------
+// ---- the bell: Active over Earlier ----------------------------------------
 // What waits on an answer is pinned at the top of Active in gold, every one
 // of them; answered or expired it moves to Earlier, plain, saying how it went.
 await section("the bell: Active over Earlier", async () => {
@@ -159,7 +159,7 @@ await section("a node locked to its console refuses the ask itself", async () =>
   await api('/api/v1/nodes', { action: 'unlock', id: sandbox.id });
 });
 // ---- ...and a node whose sessions may not ask for root at all ------------------
-// The switch in its Sessions section (the operator, 24 Sep): root asks alone,
+// The switch in its Sessions section: root asks alone,
 // where the lock above takes storage and network with them.
 await section("and a node whose sessions may not ask for root at all", async () => {
   const off = await api('/api/v1/nodes', { action: 'root-asks', id: sandbox.id, on: false });
@@ -277,20 +277,20 @@ await section("a machine log off the node, which is the same root job", async ()
     ok(/journalctl -u aerieos-agent -u builderbot-agent --no-pager -n 5;/.test(a) && /aerieos-agent\.log 2>\/dev\/null \| tail -n 5/.test(a),
        `...the agent's own log is its journal, or the file its service writes where there is none (${a.slice(0, 80)})`);
   }
-  // The terminals are the agent's own (R133), in its journal: there is no
+  // The terminals are the agent's own, in its journal: there is no
   // stream of their own to ask for.
   {
     const t = await readLog('terminal');
     ok(t.status >= 400 && !(await ranArgv(t)),
        `...and the terminals have no stream of their own, which runs nothing (${t.status} ${JSON.stringify(t.body).slice(0, 80)})`);
   }
-  // The node's nginx is a stream too (R182), read with docker logs where the
+  // The node's nginx is a stream too, read with docker logs where the
   // nginx tab put one; on a node without it the refusal names the tab, and
   // never runs a thing.
   r = await readLog('nginx');
   ok(/nginx is not deployed on sandbox: the nginx page puts it there/.test(r.body.error || ''),
      `the nginx stream on a node without nginx says where it comes from (${(r.body.error || 'ran').slice(0, 60)})`);
-  // The box itself (R183): the journal of this boot, the kernel ring, and
+  // The box itself: the journal of this boot, the kernel ring, and
   // the previous boot's last lines, each one journalctl call.
   ok(/^journalctl --system --no-pager -n 5$/.test(await ranArgv(await readLog('system'))),
      "the system stream is this boot's journal, every unit");

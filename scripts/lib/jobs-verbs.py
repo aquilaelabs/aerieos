@@ -4,7 +4,7 @@ the caller, which narrows it the way the Jobs page is narrowed: a session
 to its own project's jobs, an account to its projects', an administrator
 to all. It read the node store directly before, which on a machine that
 holds the controller's state showed a session every project's jobs by
-name (B317).
+name.
 
 Arguments: how many jobs to list, and a job's id for its log. The auth
 header is bbapi's own (BB_AUTH_HEADER, from api_py in aerie).
@@ -60,7 +60,7 @@ for j in rows:
             if j["type"] == "cache-clear" else
             # A line typed into a Claude session (the bell's Resume, a step or
             # a bug sent, Send to Claude): which session and what it said,
-            # since a failed one is otherwise a mystery (B775).
+            # since a failed one is otherwise a mystery.
             f'tell {s.get("session") or "?"}: "{" ".join(str(s.get("text") or "").split())[:60]}"'
             if j["type"] == "tell" else
             # A coding agent's install, sign-in and sign-out, by the program's

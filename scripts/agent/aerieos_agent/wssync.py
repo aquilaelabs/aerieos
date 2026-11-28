@@ -1,4 +1,4 @@
-"""A node's projects as a synced copy instead of a mounted share (R162).
+"""A node's projects as a synced copy instead of a mounted share.
 
 The controller's copy is the original (its wssync.py says how it judges);
 this keeps the node's copy under /workspace in step with it, over the
@@ -43,7 +43,7 @@ SKIP_DIRS = {"node_modules", ".gradle", "__pycache__", ".venv", "venv", ".next",
              ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 # ...and what is out by where it is: Claude Code's worktrees for its own
 # agents, each a checkout whose .git file the controller refuses, so syncing
-# them held the project behind and aerie git push with it (B68).
+# them held the project behind and aerie git push with it.
 SKIP_UNDER = (".claude/worktrees",)
 TMP = ".bbsync-"
 MAX_FILE = 512 * 1024 * 1024
@@ -52,7 +52,7 @@ TICK = 1.0
 # The fallback only: a project that moved on the controller is said in the
 # held work request and pulled at once. Every ten seconds per project was
 # 87 posts a minute at 0.44s each on a controller with two synced nodes,
-# most of its time (B643, 11 Oct), to learn nothing had changed.
+# most of its time, to learn nothing had changed.
 PULL_EVERY = 120.0
 CLAIM_EVERY = 600           # what root left in a tree is made its owner's at most this often
 ASK_EVERY = 30.0
@@ -79,17 +79,17 @@ def foreign_mount(path, mounts="/proc/self/mounts"):
                 bits = line.split()
                 if len(bits) > 2 and bits[1].replace("\\040", " ") == real:
                     # On AerieOS the image itself binds /workspace onto the
-                    # data partition or the system pool, so it lasts a boot
-                    # (B669): a local filesystem there is the machine's own.
+                    # data partition or the system pool, so it lasts a boot:
+                    # a local filesystem there is the machine's own.
                     if os.path.isfile(_IMAGE_TOOL) and bits[2] in ("ext4", "zfs", "xfs", "btrfs"):
                         return False
                     return bits[2] != "tmpfs"
     return True
 
 
-# A second account's worktree of a project (B615): a unit of its own,
+# A second account's worktree of a project: a unit of its own,
 # named for where it lives under the projects root, as the controller names it.
-# ...or one of its agents' other than Claude's (u_xxxxxxxx-codex, R95): the
+# ...or one of its agents' other than Claude's (u_xxxxxxxx-codex): the
 # account's all the same, so the uid is still the group a check reads.
 WT_UNIT = re.compile(r"\.worktrees/([A-Za-z0-9][A-Za-z0-9._-]*)/(u_[0-9a-f]{8})(?:-[a-z]+)?(?:-[2-9])?")
 
@@ -106,7 +106,7 @@ def skipped(rel):
 
 
 # Whether this system keeps POSIX modes. Windows does not (the companion app,
-# R270, runs this module there): a mode read back after a chmod is not the
+# runs this module there): a mode read back after a chmod is not the
 # one written, so every file fetched would read as changed and go up with
 # its execute bit gone. There a mode is unknown (0), recorded as such and
 # never sent, and the controller keeps the file's own.
@@ -299,7 +299,7 @@ class WorkspaceSync:
         self.mode = ""
         self.asked_at = 0.0
         self.thread = None
-        # Leaving the synced copy (R164): the controller holds new sessions
+        # Leaving the synced copy: the controller holds new sessions
         # and waits for this node to say nothing is left to send, then asks
         # for the copies to be removed, by a token it says again until the
         # answer names it.
@@ -354,8 +354,8 @@ class WorkspaceSync:
         owner = self.owner()
         for proj in own:
             d = os.path.join(self.root, ".worktrees", proj)
-            # One made as root before the sync made each folder its owner's
-            # (B356), put right: an account's own user makes its worktree there.
+            # One made as root before the sync made each folder its owner's,
+            # put right: an account's own user makes its worktree there.
             if owner:
                 for x in (os.path.dirname(d), d):
                     with contextlib.suppress(OSError):
@@ -387,7 +387,7 @@ class WorkspaceSync:
             if st_ != 200:
                 return
             self.asked_at = now
-            # sync, or off once the node is taken off its copy (R164). Off is
+            # sync, or off once the node is taken off its copy. Off is
             # also what any other word means: nothing is held then.
             mode = "sync" if str(r.get("mode") or "sync") == "sync" else "off"
             self.mode = mode
@@ -399,11 +399,11 @@ class WorkspaceSync:
             self.clean_ask = str(r.get("clean") or "")[:64]
             want = r.get("projects") if isinstance(r.get("projects"), dict) else {}
             # ...and the projects those read, read-only: a session sees them
-            # at /workspace/NAME and writes none of them (R163).
+            # at /workspace/NAME and writes none of them.
             reads = r.get("reads") if isinstance(r.get("reads"), dict) else {}
             ro = {n for n in reads if n not in want}
             # ...and the worktrees of the bound ones made here and not yet
-            # on the controller, which it does not list (B615).
+            # on the controller, which it does not list.
             own = [n for n in want if not WT_UNIT.fullmatch(n)]
             local = {n: 0 for n in self.local_worktrees(own) if n not in want}
             want = {**{n: reads[n] for n in ro}, **local, **want}
@@ -429,7 +429,7 @@ class WorkspaceSync:
             return
         if foreign_mount(self.root):
             # Something mounted where the copy goes (a share left in fstab
-            # from before R163): copying now could write onto somebody
+            # by an earlier setup): copying now could write onto somebody
             # else's files through it. Held and said, and started once it
             # is gone.
             for p in self.projects.values():
@@ -447,7 +447,7 @@ class WorkspaceSync:
                 p.walked_at = 0.0
             self.one(p)
 
-    # -- leaving the synced copy (R164) -------------------------------------------------
+    # -- leaving the synced copy -------------------------------------------------
     def drain(self):
         """While leaving, for the heartbeat: what is still to go up here,
         and whether every project has been walked whole since it began.
@@ -477,7 +477,7 @@ class WorkspaceSync:
         return os.path.join(data, "sync-cleaned.json")
 
     def clean(self, token):
-        """Remove this node's copies once it no longer holds them (R164): each
+        """Remove this node's copies once it no longer holds them: each
         project a record names, its record, and the conversations' folder.
         Only ever in mode off, and never through a mount: with the projects
         share at /workspace these would be the controller's own trees."""
@@ -517,7 +517,7 @@ class WorkspaceSync:
 
     def top(self, name):
         """Where a project's copy lives: under the root by its name on a
-        node; the companion app (R270) puts each in the folder its person
+        node; the companion app puts each in the folder its person
         picked."""
         return os.path.join(self.root, name)
 
@@ -589,7 +589,7 @@ class WorkspaceSync:
         """This project's state, in a file inside it a session's bb reads
         (lib/syncwait.py): the revision this copy has caught up to, what is
         still waiting to go up, and when the tick that measured it began, so
-        bb can wait for a tick that started after it was asked (R163). Sync
+        bb can wait for a tick that started after it was asked. Sync
         leaves the file alone: its name starts with TMP."""
         if not os.path.isdir(top):
             return
@@ -621,7 +621,7 @@ class WorkspaceSync:
             # Each folder made on the way the tree owner's, not the top's
             # alone: a worktree's unit made .worktrees/PROJECT as root, and an
             # account's own user, its tree mapped to it, could make no
-            # worktree beside it (B356). Root's to make, since the folder
+            # worktree beside it. Root's to make, since the folder
             # they go in may be root's, and so held to real folders all the
             # way down from the root: a link on the way is refused.
             with as_root():
@@ -716,7 +716,7 @@ class WorkspaceSync:
         p.files = {}
         if not here and rows:
             # Nothing here yet: the project in one download rather than a
-            # request a file (R163). Whatever it did not bring is fetched
+            # request a file. Whatever it did not bring is fetched
             # file by file below, as a tree that was here would be.
             try:
                 self.unpack(p, top)
@@ -910,14 +910,14 @@ class WorkspaceSync:
         ready = {k: v for k, v in moved.items() if k in p.moving and p.moving[k] == v}
         p.moving = {k: v for k, v in moved.items() if k not in ready}
         changed = False
-        # Removals go up together when there are several (B789): after a
+        # Removals go up together when there are several: after a
         # git gc packs the loose objects a tick holds thousands, and one
         # request each kept every relayed verb waiting for many minutes.
         gone = [(rel, e) for rel, e in sorted(ready.items()) if e is None and rel in p.files]
         if len(gone) > 1:
             try:
                 changed = self.put_gone(p, top, gone)
-            except Exception as ex:                  # noqa: BLE001 (as one path's failure, B806)
+            except Exception as ex:                  # noqa: BLE001 (as one path's failure)
                 p.error = f"removals: {type(ex).__name__}: {ex}"[:200]
                 for rel, e in gone:
                     p.moving[rel] = e
@@ -947,7 +947,7 @@ class WorkspaceSync:
                 # project's error, counted as pending, and the pass goes on
                 # to the paths after it. Raised out of here, it ended the
                 # pass with nothing counted, so every change sorted after it
-                # waited unsaid and the state said nothing pending (B806).
+                # waited unsaid and the state said nothing pending.
                 p.error = f"{rel}: {type(ex).__name__}: {ex}"[:200]
                 p.denied = p.denied or isinstance(ex, PermissionError)
                 log_once(f"sync-put-{p.name}-{rel}", f"sync: {p.name}: {p.error}")

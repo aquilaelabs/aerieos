@@ -1,4 +1,4 @@
-"""Declared downloads (R234, pack format 3; the operator, 13 Nov: what a
+"""Declared downloads (pack format 3: what a
 pack's install takes from somewhere else had no paper trail, and after the
 receipt, a way to stop what is not declared). A manifest lists each download
 with its address, its sha256 and the file it is kept as; the recipe a node

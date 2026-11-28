@@ -1,4 +1,4 @@
-"""The heartbeat's store readings land on the census rows (B434)."""
+"""The heartbeat's store readings land on the census rows."""
 import os
 import sys
 import unittest

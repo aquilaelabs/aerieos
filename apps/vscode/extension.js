@@ -1,5 +1,5 @@
 'use strict';
-// AerieOS for VS Code (R159): a project's files opened as a folder of
+// AerieOS for VS Code: a project's files opened as a folder of
 // their own, aerieos:/PROJECT/..., read and saved through the
 // controller's Files API, with no share mounted here; the changes a coding
 // agent's session makes appear in open editors as it saves them; and any
@@ -185,7 +185,7 @@ async function pickProject(context, why) {
     throw new Error('no space here is open to you in an editor. Its settings (File access) say who may, '
       + 'and whether opening it in an editor is on.');
   }
-  // An archived project is out of sight (R119): last, and said so. A lock
+  // An archived project is out of sight: last, and said so. A lock
   // that holds this account out says why, and leaves it read only.
   const shown = [...projects.filter(p => !p.archived), ...projects.filter(p => p.archived)];
   const pick = await vscode.window.showQuickPick(shown.map(p => ({
@@ -198,7 +198,7 @@ async function pickProject(context, why) {
   return pick && pick.project;
 }
 
-// The coding agents a session may run (R95), the live rows of the
+// The coding agents a session may run, the live rows of the
 // dashboard's table (scripts/dashboard/agents.py, held to it by
 // unit/test_agents.py): a session's terminal is `ID:PROJECT`, whichever it is.
 const AGENTS = [
@@ -287,7 +287,7 @@ async function cmdOpenProject(context) {
   }
 }
 
-// Any coding agent's session on a project (R128): the project, then which
+// Any coding agent's session on a project: the project, then which
 // agent, unless the caller named them (`aerieos.openSession` with a
 // project, and an agent's id after it).
 async function cmdOpenSession(context, project, agent) {

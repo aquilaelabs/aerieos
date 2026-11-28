@@ -1,4 +1,4 @@
-"""The code map reads data files (R167): a setting where compose, the env
+"""The code map reads data files: a setting where compose, the env
 file, the Unraid template and a JSON file define it, each at its line, a
 Markdown file's headings as sections, and where the code reads a setting
 as a call of it from `env`."""

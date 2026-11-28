@@ -97,7 +97,7 @@ async function opened(engine, o, urls, extra = {}){
   const bearer = /^bbs_/.test(auth);
   const [username, password] = !bearer && auth.includes(":") ? auth.split(/:(.*)/) : [null, null];
   const header = bearer ? "Bearer " + auth : username ? "Basic " + Buffer.from(auth).toString("base64") : "";
-  // Matched on the whole origin, the controller's own (B143): a port alone
+  // Matched on the whole origin, the controller's own: a port alone
   // let a dev instance, or anybody's page, on :7680 have this session's
   // token. A credential named with --auth goes to the URLs named with it.
   const trusted = new Set(trust === "named" ? [] : trust.split(",").filter(Boolean));
@@ -151,7 +151,7 @@ async function shot(o){
     }
     // The downscale, in the browser that took the shot. It used to be
     // imagemagick's convert, which is in the controller's image and on no
-    // node (B103). A browser resamples as well and is already here. On a
+    // node. A browser resamples as well and is already here. On a
     // blank page of its own, because a data: image is exactly what a
     // photographed page's own CSP may refuse.
     let scaler = null;
@@ -179,7 +179,7 @@ async function shot(o){
     const taken = new Set();
     for (const url of o.urls){
       // A page that never goes quiet is still a page, and is shot as it is;
-      // one that never answered is not (B535): a browser draws its own error
+      // one that never answered is not: a browser draws its own error
       // page, and a picture of that with exit 0 read as the site being up.
       let down = "";
       const res = await p.goto(url, { waitUntil: "networkidle" }).catch(e => {
@@ -193,8 +193,8 @@ async function shot(o){
       }
       if (res && res.status() >= 400) console.error(`${url}: answered ${res.status()}; shot as it is`);
       if (+o.wait) await p.waitForTimeout(+o.wait);
-      // --drive works the page first, as it does the emulator and a display
-      // (B847): its default export gets the page and the context.
+      // --drive works the page first, as it does the emulator and a display:
+      // its default export gets the page and the context.
       if (o.drive){
         const mod = await import(o.drive);
         await (mod.default || mod.drive)(p, { ctx, browser: b, url, engine });

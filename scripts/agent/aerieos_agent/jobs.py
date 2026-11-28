@@ -23,8 +23,8 @@ from .toolchains import sdk_env
 
 def pump(job, stream, keep_blank=True):
     """Read a child's output into a job's log on a thread of its own, and
-    return the thread. The one reader every job uses (the operator, 12 Oct:
-    four had diverged): lines split on newlines, a line a meter redrew in
+    return the thread. The one reader every job uses
+    (four had diverged): lines split on newlines, a line a meter redrew in
     place kept as the frame it ended on, and a meter that never prints a
     newline posted as its last frame once it passes 64 kB, rather than
     held in memory until the child exits."""
@@ -58,7 +58,7 @@ def pump(job, stream, keep_blank=True):
 
 
 # How long a job's output is still waited on once its process and everything
-# left in its group have ended (B983).
+# left in its group have ended.
 TAIL_S = 10
 
 
@@ -115,7 +115,7 @@ def watched(job, p, timeout, keep_blank=True, late="timed out after {n}s, killin
 
 
 def left_holding(job, p, since):
-    """Whether to stop waiting for a job's output (B983). The loops that run
+    """Whether to stop waiting for a job's output. The loops that run
     a job wait for its pipe to close, which a process that left the job's
     group (setsid) can hold for ever after the job's own process and the
     rest of its group have ended, or been killed at the timeout: the job
@@ -141,7 +141,7 @@ def _last_frame(line):
     """A line a progress meter redrew in place (frames joined by carriage
     returns) as the frame it ended on. Every frame used to go into the log:
     sdkmanager's unzip meter was most of a toolchain job's 60 kB, and the
-    lines worth reading were lost among them (the operator, 12 Oct)."""
+    lines worth reading were lost among them."""
     if "\r" not in line:
         return line
     end = "\n" if line.endswith("\n") else ""
@@ -150,7 +150,7 @@ def _last_frame(line):
 
 def spec_env(spec, by_root=False):
     """What a job's spec adds to its environment: its `env`, and its
-    `secret_env` (R281: a deploy's cluster token and registry password),
+    `secret_env` (a deploy's cluster token and registry password),
     which the controller keeps from every reader of the job and drops from
     its row when the job ends, and which nothing here says. A job run by the
     root agent takes neither PATH nor a loader variable from either."""
@@ -192,7 +192,7 @@ class Job(threading.Thread):
         self.canceled = False
         self.proc = None
         # True once the work has ended and only its end is left to post: the
-        # one state in which an update may leave the job behind (B520).
+        # one state in which an update may leave the job behind.
         self.reporting = False
         self.refused = 0         # the status of the last log post not taken
         self.outputs = []        # what the job left behind, for the result
@@ -219,7 +219,7 @@ class Job(threading.Thread):
             self.pending_step = str(name)[:60]
 
     # What a job may hold unsent while the controller is unreachable: past
-    # this the oldest goes, and one line says how much (B286: a chatty build
+    # this the oldest goes, and one line says how much (a chatty build
     # grew the agent without limit).
     PENDING_CAP = 8 * 1024 * 1024
 
@@ -265,7 +265,7 @@ class Job(threading.Thread):
                 batch, size = [], 0
                 # Measured as the body will be sent, and stopped BEFORE a
                 # chunk that would carry it past the batch: a post over the
-                # controller's cap was refused forever (B520).
+                # controller's cap was refused forever.
                 while self.pending:
                     more = len(json.dumps(self.pending[0]["chunk"]))
                     if batch and size + more > self.BATCH:
@@ -293,7 +293,7 @@ class Job(threading.Thread):
             # Refused for good (a job the controller no longer has, or not
             # this node's): the result loop posts only after a flush that
             # worked, so keeping these retried the job in this agent's count
-            # forever, and every self-update failed "busy" (B519). Dropped,
+            # forever, and every self-update failed "busy". Dropped,
             # and the result goes on to be refused in its turn.
             if st in (400, 401, 403, 404, 413):
                 with self.lock:
@@ -330,7 +330,7 @@ class Job(threading.Thread):
     RUNNERS = {
         "self-update": "self_update",
         "system": "system",
-        # The node's own scanners over its projects (R145, scan.py).
+        # The node's own scanners over its projects (scan.py).
         "scan": "scan",
         "vm": "vm",
         "image": "image",
@@ -356,7 +356,7 @@ class Job(threading.Thread):
         # Posted now: a job turns running at its first log post, and one
         # that works in this process (a disk measure, a cache clear) said
         # nothing more until its end, so its row read "assigned" all the
-        # while it ran (B250).
+        # while it ran.
         self.flush()
         try:
             kind = self.job.get("type")
@@ -364,7 +364,7 @@ class Job(threading.Thread):
             if runner:
                 state, code = getattr(self.agent, runner)(self, spec)
             elif kind == "compose":
-                # Port 80 let go while containers start (R202).
+                # Port 80 let go while containers start.
                 with http80.paused():
                     state, code = self.agent.compose(self, spec)
             elif kind == "toolchain":
@@ -380,11 +380,11 @@ class Job(threading.Thread):
                     # The census before the end: the controller says which
                     # names landed from what the store holds, and read from
                     # the census of before the job, a toolchain that had
-                    # just landed read as failed until the next hello (the
-                    # operator, 12 Oct: Build-Tools, installed, said failed).
+                    # just landed read as failed until the next hello
+                    # (Build-Tools, installed, said failed).
                     self.agent.hello()
             elif kind in ("claude-login", *AGENT_LOGINS):
-                # Claude's, or another coding agent's (R95 step 3): the same
+                # Claude's, or another coding agent's: the same
                 # pty and the same channel, `aerie login --flow` told which.
                 state, code = self.claude_login(spec, AGENT_LOGINS.get(kind, ""))
                 # Said on the next heartbeat rather than in five minutes:
@@ -394,7 +394,7 @@ class Job(threading.Thread):
                 state, code = self.claude_logout(spec, AGENT_LOGOUTS.get(kind, ""))
                 self.agent._logins_at = 0
             elif kind in ("agent-login", "agent-logout"):
-                # A pack's coding agent's (R233 step 6): one pair of jobs
+                # A pack's coding agent's: one pair of jobs
                 # for all of them, the spec naming which, and only one this
                 # node's bundle carries with a sign-in its pack describes.
                 # The same pty and channel; `aerie login` drives its screens
@@ -409,7 +409,7 @@ class Job(threading.Thread):
                     state, code = self.claude_logout(spec, which, pack=True)
                 self.agent._logins_at = 0
             elif kind in AGENT_INSTALLS:
-                # The other coding agents' installs (R95 step 2).
+                # The other coding agents' installs.
                 state, code = self.agent.agent_update(self, spec)
             else:
                 state, code = self.exec(spec)
@@ -433,7 +433,7 @@ class Job(threading.Thread):
         # A container came, went or moved: the session network's sets are
         # rebuilt from `docker ps` every ten seconds, and a session told by
         # its rebuild that the instance was up curled its port inside that
-        # window and was refused, the pair not yet in the set (B307). Read
+        # window and was refused, the pair not yet in the set. Read
         # again now, before the controller hears the job is done, so what
         # it reports up is reachable by the time anybody is told.
         if self.job.get("type") == "compose" \
@@ -450,7 +450,7 @@ class Job(threading.Thread):
         # answer waits here, with backoff, until it is taken.
         #
         # ...but not for ever while the controller is there and will not take
-        # it (the operator, 6 Oct: a stuck job should time out, the more so
+        # it (a stuck job should time out, the more so
         # when the controller says it is complete). A log the controller
         # answers and refuses no longer holds the end back: the end is posted
         # anyway, and a controller that has the job as complete takes it as
@@ -504,7 +504,7 @@ class Job(threading.Thread):
 
     def claude_login(self, spec, agent="", pack=False):
         """`claude auth login` on this machine, under a pty, as the SESSION
-        account (roadmap R47).
+        account.
 
         A job of its own and not an exec, for two reasons that both matter.
         It drops to the session account rather than the enrolled job one:
@@ -526,7 +526,7 @@ class Job(threading.Thread):
             self.say("refused: this node reports no session account, so there is "
                      "no home for a Claude login to land in\n")
             return "failed", 78
-        # As the account's own user where its home is that user's (R125),
+        # As the account's own user where its home is that user's,
         # from the root-owned bundle; as the session account otherwise.
         try:
             dropper = getattr(self.agent, "drop_for", None)
@@ -559,7 +559,7 @@ class Job(threading.Thread):
         env.setdefault("BUILDERBOT_ROLE", "node")
         env.setdefault("BB_NODE", str(self.agent.state.get("name") or ""))
         argv = ["bash", os.path.join(into, "scripts", "aerie"), "login", "--flow"] + (["--agent", agent] if agent else [])
-        # Where sign-ins are sealed (R126), the folder its opened copy lives
+        # Where sign-ins are sealed, the folder its opened copy lives
         # in is there before the login writes through the home's link to it;
         # the token pass then seals what the login wrote.
         ready = getattr(self.agent, "token_login_ready", None)
@@ -612,7 +612,7 @@ class Job(threading.Thread):
                     # approved the device, whether to keep its token in its
                     # config file, and waits on the answer: nothing typed it,
                     # and the sign-in hung after GitHub said the device was
-                    # connected (the operator, 23 Oct). Answered yes, and
+                    # connected. Answered yes, and
                     # said: the file is the account's own, 600, where Claude
                     # Code and Codex keep theirs on the same machine.
                     if agent == "copilot" and "plaintext config file? (y/N)" in tail:
@@ -651,7 +651,7 @@ class Job(threading.Thread):
         if not re.fullmatch(r"u_[0-9a-f]{8}", uid):
             self.say("refused: a sign-out names the account it is for\n")
             return "failed", 64
-        # As the account's own user where its home is that user's (R125),
+        # As the account's own user where its home is that user's,
         # from the root-owned bundle, as the sign-in is; the session account
         # otherwise.
         try:
@@ -686,7 +686,7 @@ class Job(threading.Thread):
             self.say(f"the sign-out did not run: {e}\n")
             return "failed", 70
         self.say((p.stdout or "") + (p.stderr or ""))
-        # ...and its seal, where sign-ins are sealed (R126): signed out is
+        # ...and its seal, where sign-ins are sealed: signed out is
         # nothing left here to open.
         forget = getattr(self.agent, "token_forget", None)
         if forget and p.returncode == 0:
@@ -812,7 +812,7 @@ class Job(threading.Thread):
         # Below the node's other work when the controller asks (a test run:
         # the emulator, a docker build and a session's own work keep the
         # CPU when they want it, and a run that only yields under contention
-        # is not slower on a quiet box; the operator, 27 Sep). The coreutils
+        # is not slower on a quiet box). The coreutils
         # nice in front of the command, not a fork hook: see preexec_fn
         # below on why this process must not run one.
         try:
@@ -821,7 +821,7 @@ class Job(threading.Thread):
             nice = 0
         if 0 < nice <= 19 and shutil.which("nice"):
             argv = ["nice", "-n", str(nice)] + argv
-        # ...and the kernel's to take before the sessions here (R271).
+        # ...and the kernel's to take before the sessions here.
         argv = oom_first(argv)
         try:
             p = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE,
@@ -853,8 +853,8 @@ class Job(threading.Thread):
         # TERM first, then up to `grace` seconds for it to finish what it does
         # on TERM (a toolchain install removes its partial download, which
         # for flutter over NFS took longer than the two seconds this gave:
-        # killed mid-delete, half of it stayed and read as installed, the
-        # operator, 12 Oct), then KILL whatever is left of the group.
+        # killed mid-delete, half of it stayed and read as installed),
+        # then KILL whatever is left of the group.
         try:
             os.killpg(p.pid, 15)
         except OSError:

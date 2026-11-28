@@ -1,5 +1,5 @@
-"""What a person says of their own conversations (R236, the operator, 12
-Nov): a label and a note kept beside them, and Kept, a second name for a
+"""What a person says of their own conversations:
+a label and a note kept beside them, and Kept, a second name for a
 conversation's file where its agent's own cleanup does not reach, so it is
 still listed, read and fetched for a resume once the original has gone."""
 import json

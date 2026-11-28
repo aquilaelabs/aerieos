@@ -1,4 +1,4 @@
-"""Every setting at one scope and on one page (R294 step 3, the design's
+"""Every setting at one scope and on one page (the design's
 placement rule): an install setting is declared as a field on one page's
 table or drawn by one page's own code, named here, and never on two; a
 space's settings and a repository's own are apart, the dials a repository

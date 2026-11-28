@@ -1,4 +1,4 @@
-"""A real phone lent to a project (R113): its owner lends the phone connected on
+"""A real phone lent to a project: its owner lends the phone connected on
 a node to one project on that node for a while, and that project's sessions
 see and drive the project's own app on it, the way they do the emulator, with
 no ask per command.
@@ -116,7 +116,7 @@ def view(nid):
     d = WORKSPACE / got["project"] / "dist" / "phone"
     shots = sorted(d.glob("shot-*.png"))
     # ...and the newest recording's reel, the frames that changed with their
-    # times, beside its video (the operator, 5 Oct).
+    # times, beside its video.
     sheets = sorted(d.glob("record-*-sheet.png"))
     video = sheets[-1].name.replace("-sheet.png", ".mp4") if sheets else ""
     return dict(got, left=int(got["until"] - time.time()) if got.get("until") else None,
@@ -190,8 +190,8 @@ def _ours_in_front(pkgs):
             f'case "$f $i" in {pats}) ;; *) echo "bb-not-yours: $f"; exit 3;; esac; ')
 
 
-# A recording started and left running on the phone while a session works it
-# (the operator, 5 Oct): one job is a recording and each touch another, and
+# A recording started and left running on the phone while a session works it:
+# one job is a recording and each touch another, and
 # a node runs one at a time, so a glide asked during `aerie phone record N` ran
 # after it ended and was never in it. start leaves screenrecord running on
 # the phone and answers at once; stop interrupts it (which closes the file
@@ -238,7 +238,7 @@ def _reeled(project, answer):
     """A recording that landed, with its reel beside it: the frames that
     changed, each stamped with its time, tiled into one picture
     (record-...-sheet.png), which is what the owner's tab shows and what a
-    session reads at a glance (the operator, 5 Oct). Best effort: a
+    session reads at a glance. Best effort: a
     recording is kept whether or not its sheet could be made."""
     res, st = answer
     if st != 200 or not res.get("path"):
@@ -365,7 +365,7 @@ def use(project, op, args):
                                     f"logcat -d -t {n} --pid=$p", project, timeout=90)
         return {"code": r["code"], "out": r["out"]}, 200
     if op in ("touch", "ui"):
-        # A touch its owner allowed on whatever is in front (--any-app, B485):
+        # A touch its owner allowed on whatever is in front (--any-app):
         # no lease-app guard on that one; every other is held to the lease.
         guard = "" if op == "touch" and (args or {}).get("anyapp") is True else _ours_in_front(pkgs)
         if op == "touch" and str((args or {}).get("kind")) == "glide":
@@ -400,7 +400,7 @@ _hand_mod = None            # hand.py once loaded (declared here: injected.mjs)
 
 
 def _hand():
-    """scripts/lib/hand.py, the finger's path a glide plays (R127), loaded
+    """scripts/lib/hand.py, the finger's path a glide plays, loaded
     by path the way artifacts.py loads capture.py: the one copy aerie emu
     touch uses too, so both glides move the same way."""
     global _hand_mod
@@ -430,7 +430,7 @@ adb -s "$1" push "$d/classes.dex" /data/local/tmp/bb-glide.dex >/dev/null && adb
 
 
 def _glide(project, nid, serial, guard, args):
-    """A glide as one held stroke (R126), or None when the node cannot build
+    """A glide as one held stroke, or None when the node cannot build
     the injector, for the caller's points instead; a bad argument is its
     refusal."""
     a = args if isinstance(args, dict) else {}
@@ -438,7 +438,7 @@ def _glide(project, nid, serial, guard, args):
     nums = [_num(v) for v in pts]
     if len(nums) < 4 or len(nums) % 2 or None in nums or len(nums) > 200:
         return {"error": "glide X Y X Y..., at least two points"}, 400
-    # The path between the points is a hand's (R127): the injector plays
+    # The path between the points is a hand's: the injector plays
     # one sample every hand.DT ms, which is what its first argument says.
     hand = _hand()
     hopts = a.get("hand") if isinstance(a.get("hand"), dict) else {}

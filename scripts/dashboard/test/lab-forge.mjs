@@ -1,4 +1,4 @@
-// The link path against a REAL forge (roadmap R54, step 3): the lab's Gitea,
+// The link path against a REAL forge: the lab's Gitea,
 // the `gitea` service of AerieOS's own dev stack under its compose file's
 // `lab` profile, brought up from the Docker tab like any project's stack. Everything the harness's
 // create.mjs cannot prove with stand-ins is proved here: the token check on
@@ -127,7 +127,7 @@ const made = [];   // owner/repo pairs to delete at the end
   const cfg = readFileSync(`${DIR}/ws/beta/.git/config`, 'utf8');
   ok(cfg.includes(`url = ${GITEA}/${repo}.git`) && /credential\]\s*\n\s*helper = \n\s*helper = !\S*git-credential-bb \S*\/gitcreds\/beta\s*\n/.test(cfg),
      'the remote is spelled as asked and the repository is scoped to its own token and nothing else');
-  // Release on the real forge (R124): a version, a changelog section and a
+  // Release on the real forge: a version, a changelog section and a
   // build of the commit, then the Artifacts tab's Release. The tag is pushed
   // and Gitea's release is made beside it with the section as its notes and
   // the build attached, all over the token the link stored.
@@ -153,14 +153,14 @@ const made = [];   // owner/repo pairs to delete at the end
      `...and the commit's build attached (${(on.body?.assets || []).map(a => `${a.name} ${a.size}`).join(', ') || 'none'})`);
   ok(fg.url === on.body?.html_url, `the release's address comes back to the page (${fg.url})`);
   // ...and the Artifacts view's version block links to it, though a Gitea
-  // on a LAN serves it over plain http (B505: only https was linked).
+  // on a LAN serves it over plain http (only https was linked).
   await page.evaluate(() => openNotebook('beta', 'artifacts'));
   const link = await page.waitForFunction(() => {
     const ln = [...document.querySelectorAll('.verln')].find(x => /^on (Gitea|Forgejo)/.test(x.textContent.trim()));
     return ln?.querySelector('a')?.href || '';
   }, null, { timeout: 15000 }).then(h => h.jsonValue()).catch(() => '');
   ok(link === fg.url, `the version block says on ${NAME} and links to the release (${link || 'no link'})`);
-  // ...then edited (R139): the notes replaced, a committed screenshot
+  // ...then edited: the notes replaced, a committed screenshot
   // attached and shown in them by (asset:NAME), and an edit again replaces
   // the file of that name rather than doubling it.
   const notes = '## 0.1.0\n\nThe lab release.\n\n![The screen](asset:shot.png)\n';
@@ -180,8 +180,8 @@ const made = [];   // owner/repo pairs to delete at the end
   ok(ed2.status === 200 && ed2.body.edited?.replaced?.includes('shot.png')
      && (after2.body?.assets || []).filter(a => a.name === 'shot.png').length === 1,
      `...and a second attach of the same name replaces it (${(after2.body?.assets || []).map(a => a.name).join(', ')})`);
-  // A file comes off only by its own removal, named as the forge lists it
-  // (the operator, 5 Oct); a name the release does not have is refused
+  // A file comes off only by its own removal, named as the forge lists it;
+  // a name the release does not have is refused
   // before anything is asked of it, and the build stays.
   const none = await api('/api/version', { project: 'beta', action: 'release-remove', remove: ['nope.png'] });
   const rm = await api('/api/version', { project: 'beta', action: 'release-remove', remove: ['shot.png'] });

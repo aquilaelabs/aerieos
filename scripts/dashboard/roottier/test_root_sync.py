@@ -1,5 +1,5 @@
 """A space's synced copy on a node, kept in step by a root agent for real
-(R240 step 1; the audit of 13 Nov, and the regression of the same day).
+(and the regression of the same day).
 
 The unit tier runs the controller's sync and the agent's end to end in one
 process (unit/test_wssync.py), as an ordinary account, where doing a tree's

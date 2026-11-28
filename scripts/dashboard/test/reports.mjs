@@ -1,10 +1,10 @@
 // Problems with AerieOS itself, reported by a session on any project
-// (reports.py, aerie report; the operator, 24 Sep). A session files one instead
+// (reports.py, aerie report). A session files one instead
 // of putting it in its own project's tracker, as a shipped rule tells it to;
 // the report waits on the controller and is read in the diagnostics behind
 // their gate, a log a person clears. Nothing goes back to the session that
 // made it: that loop worked only where AerieOS's own tracker sat beside
-// the sessions reporting to it (the operator, 8 Oct).
+// the sessions reporting to it.
 import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -122,7 +122,7 @@ await page.goto(URL);
 await ready(page);
 await page.evaluate(() => renameProject('alpha'));
 await page.waitForSelector('#rnmodal:not([hidden]) #rnGateReport', { timeout: 15000 });
-// A repository's door offers "as the project" first (R208 step 6); the auto set above is alpha's own.
+// A repository's door offers "as the project" first; the auto set above is alpha's own.
 ok(await page.$eval('#rnGateReport', e => e.value === 'auto' && [...e.options].map(o => o.value).join() === 'inherit,auto,deny'),
    "the space's settings carry it under Agents may, on auto, with nothing to ask");
 await page.selectOption('#rnGateReport', 'deny');
@@ -135,7 +135,7 @@ ok(true, '...and saving the dialog turns it off');
 await setReport('auto');
 
 // ---- cleared from Controller settings --------------------------------------------------
-// The operator, 24 Sep: a button there to clear them. Every one goes after a
+// A button there to clear them. Every one goes after a
 // confirm that says how many; the numbers carry on, and a session may not.
 const bySession = await call('/api/reports', { action: 'clear' }, ALPHA);
 ok(bySession.status === 403 && /a person's, from Controller settings/.test(bySession.error || '')
@@ -143,7 +143,7 @@ ok(bySession.status === 403 && /a person's, from Controller settings/.test(bySes
    `a session may not clear them (${bySession.error})`);
 await call('/api/reports', { action: 'add', text: 'one nobody has looked at yet' }, ALPHA);
 // Read until it answers a number: under an eight-worker load one count came
-// back without one (B722), and the check then compared against undefined.
+// back without one, and the check then compared against undefined.
 let before = {};
 for (let i = 0; i < 10 && typeof before.all !== 'number'; i++) before = await call('/api/reports', { action: 'count' });
 ok(typeof before.all === 'number' && before.all > 0, `the reports are counted before the press (${before.all})`);
@@ -152,12 +152,12 @@ await page.evaluate(() => openSettingsTab());
 await page.waitForSelector('.settingstab .snav [data-spick="reports"]', { timeout: 15000 }); await splitPick(page, 'reports');
 await page.waitForSelector('#setReportsClear', { timeout: 15000 });
 // Every report listed, each with its delete, so one is taken out before the
-// diagnostics are downloaded (the operator, 26 Oct).
+// diagnostics are downloaded.
 await page.waitForSelector(`.settingstab [data-report="${lastId}"] [data-repdel="${lastId}"]`, { timeout: 15000 });
 const onPage = await page.$$eval('.settingstab [data-report]', rs => rs.map(r => +r.dataset.report));
 ok(onPage.length === before.all && onPage.includes(lastId), `the section lists every report, each with its delete (${onPage.length} of ${before.all})`);
-// Its row goes on the press, before the server has answered (the operator,
-// 22 Nov: a press must never look as if nothing happened).
+// Its row goes on the press, before the server has answered
+// (a press must never look as if nothing happened).
 const deleted = page.waitForResponse(r => r.url().endsWith('/api/reports') && /"delete"/.test(r.request().postData() || ''), { timeout: 15000 });
 await page.click(`.settingstab [data-repdel="${lastId}"]`);
 ok(await page.evaluate(id => !document.querySelector(`.settingstab [data-report="${id}"]`), lastId),
@@ -181,7 +181,7 @@ await page.waitForFunction(async () => (await (await fetch('/api/reports', { met
 ok(page.dialogs.length === 1 && new RegExp(`Delete all ${before.all} reports`).test(page.dialogs[0])
    && !/open/.test(page.dialogs[0]),
    `Clear reports in Controller settings asks first, naming how many (${page.dialogs[0]})`);
-// The section opens on what it holds (R218 step 32): its count its status,
+// The section opens on what it holds: its count its status,
 // counted again after the Clear.
 await page.waitForFunction(() => document.querySelector('.settingstab details[data-sect="settings:reports"] > summary .sst')?.textContent === 'none',
   null, { timeout: 10000 }).catch(() => {});
@@ -196,7 +196,7 @@ await call('/api/reports', { action: 'clear' });
 await page.click('#setReportsClear');
 await page.waitForFunction(() => /no reports to clear/.test(document.getElementById('toast').textContent), null, { timeout: 10000 });
 ok(page.dialogs.length === 0, '...and with none kept, it says so rather than asking');
-// ---- a person's report, from a project's row (the operator, 2 Oct) -------------
+// ---- a person's report, from a project's row -------------
 // The bug on the row opens a dialog: a category, what happened, how to make
 // it happen; Send puts it in the diagnostics under that project, marked as
 // from the dashboard, whatever the project's Claude dial says.
@@ -226,8 +226,8 @@ await section("a person's report, from a project's row", async () => {
      `...and Send puts it in the diagnostics under alpha, with its category, marked as from the dashboard (${JSON.stringify(mine || diag).slice(0, 200)})`);
 });
 
-// A project's report can carry the reporter's latest conversation on it
-// (the operator, 2 Oct), ticked in the dialog, redacted, and carried by the
+// A project's report can carry the reporter's latest conversation on it,
+// ticked in the dialog, redacted, and carried by the
 // diagnostics and their download.
 await section("A project's report can carry the reporter's latest conversation on it", async () => {
   const dir = `${DIR}/home/.claude/projects/${`${DIR}/ws/alpha`.replace(/\//g, '-')}`;
@@ -266,8 +266,8 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
      `...ticked, it goes with the report: the diagnostics name its file and the download carries it beside them, the token taken out (${JSON.stringify(r?.conversation || null)})`);
 });
 
-// The header's bug is the same dialog about no project in particular (the
-// operator, 2 Oct): any account sends one, and the diagnostics say general.
+// The header's bug is the same dialog about no project in particular:
+// any account sends one, and the diagnostics say general.
 await section("The header's bug is the same dialog about no project in particular", async () => {
   await page.click('#bReport');
   await page.waitForSelector('#reportModal:not([hidden]) #reportCat', { timeout: 10000 });
@@ -284,7 +284,7 @@ await section("The header's bug is the same dialog about no project in particula
      `...and Send puts it in the diagnostics with no space, marked as from the dashboard (${JSON.stringify(gen || {}).slice(0, 160)})`);
 });
 
-// ...and only from a project the person works on (the operator, 2 Oct): an
+// ...and only from a project the person works on: an
 // administrator shown every project but not on this one cannot start a
 // session there, so has nothing of its to report.
 await section("and only from a project the person works on", async () => {

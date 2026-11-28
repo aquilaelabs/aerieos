@@ -31,27 +31,27 @@ import os
 # because a node has no /config for them to read; the verbs that need them
 # are relayed back to the controller (server._bb_relay).
 PARTS = ("scripts/aerie", "scripts/lib", "config/toolchains.json",
-         # The publishers' release keys a download is checked against (R137).
+         # The publishers' release keys a download is checked against.
          "config/release-keys",
          "nodes/provision-linux.sh", "nodes/families",
          # The root helper that builds a session's view, which the
-         # agent installs from here on a sandbox node (R35).
+         # agent installs from here on a sandbox node.
          "nodes/bb-session",
          # ...and the one that cuts the network for a declared pack's
-         # install steps where the job account cannot (R234).
+         # install steps where the job account cannot.
          "nodes/bb-netcut",
          "scripts/dashboard/bb-tty", "scripts/dashboard/bb-work-note",
          "scripts/dashboard/bb-prompt-relay", "scripts/dashboard/bb-check-relay",
          "scripts/dashboard/bb-rule-hook",
-         # ...and the other coding agents' one hook, which runs these
-         # (R95 step 6): their hooks files name it in this bundle.
+         # ...and the other coding agents' one hook, which runs these:
+         # their hooks files name it in this bundle.
          "scripts/dashboard/bb-agent-hook",
          # ...and the agents' table it reads the aerie verbs a session
          # is not asked about from (bb-agent-hook --allow, and an
          # agent approved by its hook): without it no session on a
          # node was handed them.
          "scripts/dashboard/agents.py",
-         # ...and what trusts Codex's for a launch (B284).
+         # ...and what trusts Codex's for a launch.
          "scripts/dashboard/bb-codex-trust",
          # The gate, which refuses every tool call while the
          # controller is not answering, so a node's sessions stop for
@@ -59,7 +59,7 @@ PARTS = ("scripts/aerie", "scripts/lib", "config/toolchains.json",
          "scripts/dashboard/bb-gate",
          # The record documents aerie design show NAME, aerie wiki and bb
          # roadmap --format print, which the verbs in scripts/lib
-         # import from beside the dashboard (B426: a node's bb
+         # import from beside the dashboard (a node's bb
          # had no records module).
          "scripts/dashboard/records.py",
          # ...and the agent package's __init__.py, whose AGENT_VERSION says

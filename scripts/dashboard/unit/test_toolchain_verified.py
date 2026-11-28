@@ -1,4 +1,4 @@
-"""How each toolchain was checked when it was installed (R137 step 5): the
+"""How each toolchain was checked when it was installed: the
 agent reads each one's .bb-verified into its census, and the controller
 keeps only the shapes it knows."""
 import os

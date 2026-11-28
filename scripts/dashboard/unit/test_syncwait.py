@@ -1,4 +1,4 @@
-"""A session's bb waits for its node's synced copy (R163): up before a
+"""A session's bb waits for its node's synced copy: up before a
 relayed verb acts on the controller's copy, down after it changed it."""
 import json
 import os
@@ -56,7 +56,7 @@ class Wait(unittest.TestCase):
         self.assertFalse(syncwait.up("alpha"))
 
     def test_up_goes_on_waiting_while_the_copy_is_moving(self):
-        # B1182: a minute's wait failed a push with thousands of changes
+        # A minute's wait failed a push with thousands of changes
         # still going up; each fall in what is left buys another UP_S.
         syncwait.UP_S, syncwait.MOVING_S = 1, 10
         self.addCleanup(setattr, syncwait, "MOVING_S", 600)

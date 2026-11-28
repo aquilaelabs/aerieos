@@ -1,4 +1,4 @@
-"""aerie devapp rebuild when the rebuilt container stops as it starts (B804):
+"""aerie devapp rebuild when the rebuilt container stops as it starts:
 a controller refusing its state exits at once, and the verb read it running
 in that moment and said 'is up' with exit 0. It looks again a few seconds
 on, and one that has stopped by then is said and fails."""

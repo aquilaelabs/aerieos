@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # aerie tests preflight: the suites and checks a change touches, run before a
 # push. Sourced by bb, which keeps the rest of the CLI; a file of its own
-# under the rule growth (25 Sep), the first verb moved out of bb whole.
+# under the rule growth, the first verb moved out of bb whole.
 #
-# Preflight (roadmap R75 step 3): the suites a change touches, picked by
+# Preflight: the suites a change touches, picked by
 # the code map from the files that changed, run before a push with the
 # checks the house rules name. Never picked by hand again: the one
 # suite skipped before a push this month was the one that would have
 # caught it. The files: the branch against its base, plus the working
 # tree; or --files given outright; --dry only prints the plan.
 
-# Each flake onto its bug as it happens (R250 step 2): the check it failed
+# Each flake onto its bug as it happens: the check it failed
 # and what it waited for, noted on the open bug whose title names the suite,
 # or filed when none does, so the next session finds the sighting where it
 # looks and not only in this gate's scroll.
@@ -53,7 +53,7 @@ cmd_tests_preflight() {
         git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git tree: aerie tests preflight --files F... names the files instead"
         local defaulted=""
         if [ -z "$base" ]; then
-            # What the branch has pushed (R228 step 20): a push adds what is
+            # What the branch has pushed: a push adds what is
             # past it, and measured from origin/main a long branch was every
             # file it ever touched and every suite on every gate. A branch
             # never pushed is measured from main. A whole gate still comes
@@ -67,8 +67,8 @@ cmd_tests_preflight() {
         while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done < <(
             { git diff --name-only "$mb" HEAD; git status --porcelain -z | tr '\0' '\n' | sed -E 's/^.{3}//'; } | sort -u)
         # The base is the branch's by default, which on a long branch is
-        # every file it ever touched and the whole suite every time
-        # (B225): said here, with the narrower measure beside it, so
+        # every file it ever touched and the whole suite every time:
+        # said here, with the narrower measure beside it, so
         # a session proving one change knows the flag exists.
         log "preflight: $(printf '%s' "${#files[@]}") file(s) changed since $base ($(git rev-parse --short "$mb"))$(
             [ -n "$defaulted" ] && [ "${#files[@]}" -gt 20 ] && printf '%s' "; --base HEAD measures the working tree alone, --base HEAD~1 the last commit with it")"
@@ -85,9 +85,9 @@ cmd_tests_preflight() {
     # every suite, which every suite runs on. A changed SUITE is itself
     # and nothing more: what it names is what it asks of the page and the
     # server, which it cannot change, and the map added every suite naming
-    # the same endpoint, 27 for one change to roles.mjs (B244). The rest
-    # is measured by the covered run when there is one (aerie map affected,
-    # the operator, 29 Sep): the functions the changed lines fall in and
+    # the same endpoint, 27 for one change to roles.mjs. The rest
+    # is measured by the covered run when there is one (aerie map affected):
+    # the functions the changed lines fall in and
     # the suites that reached them, so a change to one handler in
     # server.py is that handler's suites and not, as it was, all 49 for
     # 25 minutes; a changed function no covered run has seen falls back
@@ -98,7 +98,7 @@ cmd_tests_preflight() {
         case "$f" in
             scripts/dashboard/test/lib.mjs|scripts/dashboard/test/run.sh) all_dash=1; harness=1 ;;
             # Named outright (--files), there are no changed lines to place
-            # it by, and server.py whole is every suite (B472).
+            # it by, and server.py whole is every suite.
             scripts/dashboard/server.py) [ -z "$named" ] && [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && mapped+=("$f") || { all_dash=1; whole=1; } ;;
             scripts/dashboard/test/*.mjs) own+=("$(basename "$f" .mjs)") ;;
             # The unit tier runs every one of these first, whatever changed;
@@ -115,8 +115,7 @@ cmd_tests_preflight() {
         if [ "${#mapped[@]}" -gt 0 ]; then
             # Files named with --files are asked of the map whole: coverage
             # picks suites by the lines a change touched, and a file named
-            # outright may have none changed, which placed no suite at all
-            # (B471's run, page-bell.js).
+            # outright may have none changed, which placed no suite at all.
             if [ -z "$named" ] && [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ]; then
                 by=coverage
                 while IFS= read -r f; do
@@ -138,7 +137,7 @@ cmd_tests_preflight() {
     # (config/toolchains.json, which toolchains.mjs holds bb's tool case
     # against) or a bb library it drives (scripts/lib/sdk.sh) placed no
     # suite, and a change to either went out on a gate that never ran the
-    # one suite that checks it (B442: the audio recipe's B441).
+    # one suite that checks it.
     if [ "${suites[*]:-}" != ALL ]; then
         local named
         for f in "${files[@]}"; do
@@ -146,7 +145,7 @@ cmd_tests_preflight() {
             # unit test names as well is a suite's too where a suite names it:
             # skipping it for the unit tier's sake planned no suite for a change
             # to config/toolchains.json alone, which toolchains.mjs and
-            # plugins.mjs check, and the gate said clean (B1104).
+            # plugins.mjs check, and the gate said clean.
             case "$f" in scripts/dashboard/test/*|scripts/dashboard/unit/*|*.md|*.txt) continue ;; esac
             while IFS= read -r named; do
                 [ -n "$named" ] || continue
@@ -159,7 +158,7 @@ cmd_tests_preflight() {
         done
         # A state migration, or what runs them, is the upgrade suite's: it
         # starts every release's /config snapshot on this build, and a new
-        # migration's file is named by no suite (B1155).
+        # migration's file is named by no suite.
         for f in "${files[@]}"; do
             case "$f" in
                 scripts/dashboard/statemigrations/*|scripts/dashboard/stateversion.py|scripts/dashboard/statefile.py)
@@ -170,7 +169,7 @@ cmd_tests_preflight() {
     # Only what the harness has a file for: the map counts a python unit
     # file (test_x.py) as a test, rightly for other projects, and named
     # unit/test_token_keep.py for a change to bbapi.py, which the harness
-    # then failed as a suite it could not find (B420). The unit tier above
+    # then failed as a suite it could not find. The unit tier above
     # already runs every one of those.
     if [ "${suites[*]:-}" != ALL ] && [ "${#suites[@]}" -gt 0 ]; then
         local kept=() s
@@ -181,10 +180,10 @@ cmd_tests_preflight() {
     fi
     # The harness itself changed: every suite runs, and what the change
     # reaches by itself is kept beside that. A flake fails the gate in a
-    # suite the change touches (R7 step 3); where every suite runs only
+    # suite the change touches; where every suite runs only
     # because the library or the runner under them changed, a flake in one
-    # of the others is recorded and named and does not (the operator, 14
-    # Nov: four gates in a row each flaked on a different three or four of
+    # of the others is recorded and named and does not
+    # (four gates in a row each flaked on a different three or four of
     # fifty, and no harness change could be pushed until a whole run had
     # none).
     if [ -n "$harness" ]; then
@@ -213,7 +212,7 @@ cmd_tests_preflight() {
         esac
     done
     # The design check is uniform's three parts, a, b and c, run among the
-    # suites rather than after them (B987): as the rule's check it was part a
+    # suites rather than after them: as the rule's check it was part a
     # alone, leaving the contrast in each scheme, the phone pass and the
     # dialogs unchecked, and it ran by itself once the suites were done; the
     # stylesheets (page-*.css since 16 Nov) set it off at all only through
@@ -232,7 +231,7 @@ cmd_tests_preflight() {
     # drawn thing named each suite, and what fell back to a file.
     [ -z "$by" ] || cmd_map affected --base "$mb_ref" "${mapped[@]}" | sed 's/^/  /'
     # Code the map could place with no suite is a hole in the map, not a
-    # clean change (B280): named, and the verdict is not clean.
+    # clean change: named, and the verdict is not clean.
     # ...unless the unit tier runs it: a unit file that names the changed
     # file is one that loads or runs it (the provisioner's helper, a bb
     # library), and that tier runs first below. Said, so the plan shows what
@@ -251,7 +250,7 @@ cmd_tests_preflight() {
         done
     fi
     [ "${#unplaced[@]}" -eq 0 ] || printf '  WARN: no suite reaches %s: the map could not place it, so this is not a clean verdict; aerie map suites FILE says what it knows (B280)\n' "${unplaced[*]}"
-    # A patch line's own rules (R112 step 5): on a branch working toward
+    # A patch line's own rules: on a branch working toward
     # X.Y.Z with Z above 0, the house rules named patch say what a patch may
     # not change, and a file this branch changed under one fails the gate.
     local br pline=""
@@ -267,7 +266,7 @@ cmd_tests_preflight() {
     # verb before its checks: the harness is run as a child here.
     local rc=0 here="${BB_REPO:-$PWD}/scripts/dashboard/test/run.sh"
     # What ran before the run's log is opened, kept to be written into it in
-    # the shape aerie tests last reads (B989: a gate that failed only here
+    # the shape aerie tests last reads (a gate that failed only here
     # read back as every suite passed).
     local before_log=()
     if [ -n "$patch_line" ]; then
@@ -304,14 +303,14 @@ cmd_tests_preflight() {
     export BB_TEST_FRESH=1
     # Kept whole in the same log aerie tests run writes, so aerie tests log prints
     # this run when it was the last: a flake named only in the terminal's
-    # scroll was gone with the scroll (B328).
+    # scroll was gone with the scroll.
     local rl="${BB_REPO:-$PWD}/.bb-test-run.log"
     printf '[builderbot] preflight over %s, %s: %s\n' "$base" "$(date '+%d %b %H:%M')" "${suites[*]:-nothing}" > "$rl" 2>/dev/null || rl=/dev/null
     [ "${#before_log[@]}" -eq 0 ] || printf '%s\n' "${before_log[@]}" >> "$rl" 2>/dev/null || true
     # As conditions, so set -e and pipefail read a failed suite as rc=1
     # rather than ending this verb before its checks.
-    # The suites on the project's test node when its settings name one
-    # (R151): the plan is this tree's (git here), the run is there.
+    # The suites on the project's test node when its settings name one:
+    # the plan is this tree's (git here), the run is there.
     local tproj away=""
     tproj="$(project_here 2>/dev/null || true)"
     if [ -n "$tproj" ] && tests_go_away "$tproj"; then away=1; fi
@@ -326,14 +325,14 @@ cmd_tests_preflight() {
     elif [ "${#suites[@]}" -gt 0 ]; then
         # A run that holds the lock (the hand-back hook's own check) is
         # waited for, twenty minutes at most, rather than ending this gate
-        # having run nothing (B572).
+        # having run nothing.
         if [ -n "$away" ]; then
             if tests_away_run "$tproj" "${suites[@]}" 2>&1 | tee -a "$rl"; then :; else rc=1; fi
         elif BB_TEST_WAIT_LOCK="${BB_TEST_WAIT_LOCK:-1200}" bash "$here" "${suites[@]}" 2>&1 | tee -a "$rl"; then :; else rc=1; fi
     fi
     [ "${#unplaced[@]}" -eq 0 ] || rc=1
-    # A flake in a suite this gate ran fails it (R7 step 3; the operator, 14
-    # Nov). The harness calls a suite flaky when it failed in the run and
+    # A flake in a suite this gate ran fails it.
+    # The harness calls a suite flaky when it failed in the run and
     # passed run again, and exits 0; a gate runs the suites the change
     # touches, so one of them flaking is the change's to settle before a
     # push, where a release's tag still counts it as passed.
@@ -366,7 +365,7 @@ cmd_tests_preflight() {
     done
     # A run refused for another one holding the lock ran no suite at all,
     # which "something above failed" did not say: a gate cut for a new ask
-    # can leave a worker holding it for a minute (B471).
+    # can leave a worker holding it for a minute.
     if [ "$rc" != 0 ] && grep -q "another dashboard test run is going" "$rl" 2>/dev/null; then
         warn "preflight: no suite ran: $(grep -m1 -o 'another dashboard test run is going ([^)]*)' "$rl"). Wait for it to end, then run this again"
         return 1

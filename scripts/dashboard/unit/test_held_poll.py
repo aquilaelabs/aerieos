@@ -1,5 +1,5 @@
-"""A node's held poll waits on a lock of its own, not the store's (R228 step
-24): it scans for work outside the wake's lock, a wake that lands while it
+"""A node's held poll waits on a lock of its own, not the store's:
+it scans for work outside the wake's lock, a wake that lands while it
 scans is not missed, and a job is handed over only while it is still queued."""
 import os
 import sys

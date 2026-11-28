@@ -1,5 +1,5 @@
-"""A step a session marked done can be taken back by a session (the
-operator, 17 Oct): the mark goes, the log says so with why, and the step is
+"""A step a session marked done can be taken back by a session:
+the mark goes, the log says so with why, and the step is
 done again with no second thing to undo."""
 import json
 import os

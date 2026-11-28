@@ -1,5 +1,5 @@
 """Behind `aerie rules check` (cmd_rules in bb): each rule's check command, run
-HERE in this tree on whichever machine the session is on (roadmap R31).
+HERE in this tree on whichever machine the session is on.
 The rules themselves arrive in the file RULES_JSON_FILE names (or in
 RULES_JSON itself, for a short list), from `aerie rules --json`, which
 a node relays; this needs neither /config nor rules.py, only git, the
@@ -23,7 +23,7 @@ else:
 
 
 def patch_scope(files):
-    """A patch line's own rules (R112 step 5): a rule named patch, or
+    """A patch line's own rules: a rule named patch, or
     patch-SOMETHING, says in its paths what a patch release may not change
     (a migration, the API, a dependency's lock file), and aerie tests preflight
     on a branch whose line is X.Y.Z with Z above 0 fails on any of the files

@@ -15,15 +15,15 @@ import urllib.parse
 import bbapi
 
 
-# request() rather than call(), because the two failures want different
-# answers and call() cannot tell them apart: a refusal the server worded and a
+# request rather than call, because the two failures want different
+# answers and call cannot tell them apart: a refusal the server worded and a
 # refused connection both come back as {"error": sentence}. Reporting an
 # expired token as "the controller is down" is the mistake bb-gate already
 # made once, and the first version of this line made it again.
 # Short timeout: aerie status is run often, and a controller that is down should
 # cost a line rather than a 30-second wait.
-# One ask for both lines (R228 step 17): the controller's build, then, on a
-# line of its own, this node's agent (R131) with when it was built, or
+# One ask for both lines: the controller's build, then, on a
+# line of its own, this node's agent with when it was built, or
 # nothing after the newline when it cannot be had. aerie status ran this
 # twice, two pythons and two requests.
 NODE = os.environ.get("BB_NODE_ID", "")

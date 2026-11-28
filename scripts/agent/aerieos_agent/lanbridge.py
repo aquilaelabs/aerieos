@@ -1,4 +1,4 @@
-"""The host's wired LAN interface in a bridge on AerieOS (R219).
+"""The host's wired LAN interface in a bridge on AerieOS.
 
 A VM on macvtap cannot talk to its own host, so a VM made a node on the
 controller's own machine never reached its controller, and one a move
@@ -24,7 +24,7 @@ port is not an address the machine answers on.
 
 Docker's forwarding drops what it does not know, and frames bridged
 between a VM and the LAN pass through it once br_netfilter is loaded (Docker
-loads it), so keep_forward() holds one rule in DOCKER-USER for br0.
+loads it), so keep_forward holds one rule in DOCKER-USER for br0.
 """
 import contextlib
 import os
@@ -109,7 +109,7 @@ def plan(iface, page_text=None, mac="", stick_text=None):
     """{path: text or None} that puts `iface` in br0: the bridge, the card as
     its port, br0 on DHCP, and a Network page file for the card moved to br0
     (None removes a path). An address the stick sets for its wired cards
-    (`stick_text`) is br0's instead of DHCP (B944): the card, a port now,
+    (`stick_text`) is br0's instead of DHCP: the card, a port now,
     answers on no address, and a server set to one was lost to the network.
     Pure, for the tests."""
     fixed = static_of(stick_text)

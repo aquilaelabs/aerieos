@@ -1,5 +1,5 @@
 """A hosting-only node held to running the containers sent to it, however
-the work reaches it and whatever the box says about itself (R92)."""
+the work reaches it and whatever the box says about itself."""
 import os
 import sys
 import unittest

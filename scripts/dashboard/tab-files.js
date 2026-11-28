@@ -1,6 +1,6 @@
-// The Files page (R224, the operator, 8 Nov): a machine's files under
+// The Files page: a machine's files under
 // Machines, beside Nodes, Storage and Installed, one node picked in the
-// group's header. Laid out as a file explorer is (the operator, 12 Nov):
+// group's header. Laid out as a file explorer is:
 // the places it reaches down the left (the node's roots: its pools, its
 // array, its shares, the old system's disks it adopted, the spaces folder a
 // stick names; each by its name and its kind in words, Trash last), and
@@ -10,7 +10,7 @@
 // puts it in the place's trash. Upload takes files picked or dropped on
 // the page, streamed to the node. Administrators only.
 //
-// Chrome from docSurface(); the hard rules are uniform.mjs's. Loaded
+// Chrome from docSurface; the hard rules are uniform.mjs's. Loaded
 // before the page's own script, so everything here is a declaration.
 
 "use strict";
@@ -150,7 +150,7 @@ function flPlaces(roots){
 function renderFilesInto(i){
   const d = docSurface(i, "files");
   if (!d) return;
-  d.setBar("");    // the node is picked in the Machines group's header (R177)
+  d.setBar("");    // the node is picked in the Machines group's header
   if (fl === null){
     // As it waits, the page it will be: the places, the bar and the rows.
     drawHTML(d.list, skTpl(`<div class="fxpage"><div class="fxcols"><nav class="fxplaces"><div class="fxphead">Places</div>${
@@ -206,7 +206,7 @@ function renderFilesInto(i){
     : `<div class="fxempty">${flFilter ? "Nothing here matches the filter." : trash ? "Nothing has been deleted from this place." : "This folder is empty."}</div>`;
   const foot = fl.error ? "" : `<div class="fxfoot">${flTrashTop() ? "What was deleted from this place. Put back returns what is ticked to where it was. " : ""}${
     count}${fl.truncated ? `; the first ${(fl.entries || []).length} are shown, and this folder holds more` : ""}</div>`;
-  // Patched into what is there (R244): the filter being typed in, a row
+  // Patched into what is there: the filter being typed in, a row
   // ticked and a fold opened stay where they were through a re-read.
   patch(d.list, `<div class="fxpage" data-fxnode="${esc(flNode)}">${why}<div class="fxcols">${flPlaces(roots)}<div class="fxmain">${bar}${up}${body}${foot}</div></div></div>`);
   wireFiles(d.el);
@@ -232,7 +232,7 @@ function wireFiles(root){
   const f = root.querySelector("#flFilter");
   // The patch keeps the box, its focus and its caret where the person put
   // it; a word an input method is still composing is filtered on once it
-  // is chosen (R244 step 4).
+  // is chosen.
   if (f){
     onTyping(f, () => { flFilter = f.value; readMoved("files"); drawPanes(); });
   }
@@ -316,8 +316,8 @@ async function flUpload(list){
   if (!list.length || flUp) return;
   const node = flNode, root = flRoot, path = flPath;
   const there = new Set((fl?.entries || []).map(e => e.name));
-  // The names already in this folder are asked about once, together (R265:
-  // it was a question a file): a yes replaces them, Cancel leaves them as
+  // The names already in this folder are asked about once, together
+  // (it was a question a file): a yes replaces them, Cancel leaves them as
   // they are and sends the rest.
   const clash = [...list].filter(f => there.has(f.name)).map(f => f.name);
   const over = !clash.length ? false

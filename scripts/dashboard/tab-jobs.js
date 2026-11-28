@@ -17,7 +17,7 @@ let jobsNodes = {};              // id -> name, from the same answer
 let jobsErr = "";
 // The chip in force: "" for every job, else a state group's key (JOB_GROUPS).
 // A view, never a setting: kept for the page's life, nothing saved; Home's
-// "failed today" opens the page on "failed-today" by its address (B74, B113).
+// "failed today" opens the page on "failed-today" by its address.
 let jobsShow = "";
 const jobsOpen = new Set();      // ids whose log is unfolded
 const jobsLogs = {};             // id -> the log fetched for an unfolded row
@@ -32,7 +32,7 @@ function openJobsTab(){
 }
 
 // One job's row, its log open and brought into view: what a row on Home's
-// Last jobs opens (R218 step 5).
+// Last jobs opens.
 function openJob(id){
   jobsOpen.add(id);
   jobsFocus = jobsMarked = id;
@@ -50,18 +50,18 @@ function loadJobs(){
       // An unfolded log follows its job: refetched with the list, so a running
       // job's tail moves on the same revision that moves its row.
       await Promise.all([...jobsOpen].map(async id => {
-        // One that has ended and been read already writes no more (R228
-        // step 13): its row was read again on every read of the list.
+        // One that has ended and been read already writes no more:
+        // its row was read again on every read of the list.
         const row = jobsList.find(x => x.id === id);
         if (row && ["succeeded", "failed", "canceled"].includes(row.state) && jobsLogs[id] !== undefined
             && jobsLogsEnded.has(id)) return;
         if (row && ["succeeded", "failed", "canceled"].includes(row.state)) jobsLogsEnded.add(id);
-        // Its last 4,000 characters, which is all a row draws (R228 step 13).
+        // Its last 4,000 characters, which is all a row draws.
         const r = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}&tail=4000`);
         // A job answers with its own fields, `error` among them for one that
         // failed; a refused request has no id. Reading a failed job's error
         // as the request's kept its log out, so every failed job read "(this
-        // job wrote nothing)" (B658, the operator, 11 Oct).
+        // job wrote nothing)".
         if (r.id) jobsLogs[id] = r.log || "";
       }));
     },
@@ -87,12 +87,12 @@ function jobTitle(j){
   // is not what a person reads a job list for (the design pass, 4 Oct).
   if (s.title) return esc(s.title);
   // The kinds with no command of their own, each in the words of what it
-  // did: a storage walk read as a bare "exec" (B70).
+  // did: a storage walk read as a bare "exec".
   if (j.type === "storage") return "measure the disks";
   // Each coding agent's sign-in, sign-out and install by its own name, every
-  // agent's job named <id>-login, -logout and -update (B291).
+  // agent's job named <id>-login, -logout and -update.
   // A pack's agent's sign-in and sign-out are one pair of jobs for all of
-  // them (R233 step 6), the spec naming which.
+  // them, the spec naming which.
   const pk = (j.type === "agent-login" || j.type === "agent-logout") && AGENTS.find(a => a.id === s.agent);
   if (pk) return `sign ${esc(pk.name)} ${j.type === "agent-login" ? "in" : "out"}`;
   const ag = (j.type || "").match(/^([a-z]+)-(login|logout|update)$/);
@@ -110,7 +110,7 @@ function jobTitle(j){
   if (j.type === "phones-idle") return "the idle phones' quick-boot snapshots";
   if (j.type === "avd-remove") return `remove ${esc(projLabel(s.project || ""))}'s phone ${esc(s.name || "")}`;
   // Run on another node of the project's set because its primary was not
-  // up (R82 step 6): said on the row, since the row is where it is looked for.
+  // up: said on the row, since the row is where it is looked for.
   const stood = s.fell_over ? " (its primary was not up)" : "";
   const argv = (Array.isArray(s.argv) ? s.argv.join(" ") : "") + stood;
   // A job with a source is a build of that project's tree, and says so
@@ -120,7 +120,7 @@ function jobTitle(j){
 }
 
 // The session a tell job typed into, by its project rather than by its
-// tmux name (B112): "u_525cbd90~claude-hello" is the machine's spelling,
+// tmux name: "u_525cbd90~claude-hello" is the machine's spelling,
 // "Claude on hello" the person's. A shell is named for its project too.
 function jobSessionWords(name){
   if (!name) return "a session";
@@ -139,20 +139,20 @@ function jobWord(j){
 function jobStatePill(j){
   const cls = {succeeded: "ok", failed: "bad", running: "note",
                assigned: "note", canceled: "warn"}[j.state] || "";
-  // A running job is live, and glows (R218 step 7).
+  // A running job is live, and glows.
   const live = j.state === "running" || j.state === "assigned" ? " live" : "";
   return `<span class="pill ${cls}${live} jbstate">${esc(jobWord(j))}</span>`;
 }
 
 // Where and when: the node by name, and the timings that are known: a
 // queued job has only its wait so far, a finished one how long it took.
-// The table's cells (R218 step 8): when it last moved, and how long it ran
+// The table's cells: when it last moved, and how long it ran
 // with its exit code when that was not 0.
 function jobNode(j){
   return esc(jobsNodes[j.node] || (j.node ? j.node : "any node that fits"));
 }
 // A job not over says the clock time it has been waiting or running since
-// (the operator, 23 Oct: "started just now" was cut to "started just" in
+// ("started just now" was cut to "started just" in
 // the column, and said nothing a person could check), on a page that
 // redraws only when something moves; one that ended, how long ago.
 function jobSince(t){
@@ -171,7 +171,7 @@ function jobTook(j){
     && !String(j.error || "").includes(`exit ${j.exit_code}`) ? `exit ${esc(String(j.exit_code))}` : "";
   return [took, code].filter(Boolean).join(" · ");
 }
-// The list's groups by how a job stands, for its chips (B74): what is not
+// The list's groups by how a job stands, for its chips: what is not
 // over, what failed, what was canceled, what succeeded. They partition it.
 const JOB_GROUPS = [
   {key: "live", label: "Running or waiting", is: j => !["succeeded", "failed", "canceled"].includes(j.state)},
@@ -179,7 +179,7 @@ const JOB_GROUPS = [
   {key: "canceled", label: "Canceled", is: j => j.state === "canceled"},
   {key: "succeeded", label: "Succeeded", is: j => j.state === "succeeded"},
 ];
-// Home's "N failed today" opens the list on what it counted (B113): the
+// Home's "N failed today" opens the list on what it counted: the
 // failed jobs that ended since today began by the controller's day (Home's
 // answer says when; this browser's midnight until it has). Not one of the
 // groups that partition the list, so a chip of its own after them.
@@ -206,7 +206,7 @@ function jobsShowSet(v){
 // update" was cut to "automatic …"); the Kind column beside it says what
 // it updated.
 function jobBy(j){ return esc(principalWords(j.requested_by)); }
-// The Job column has the room (B112): a title wraps at a word only when
+// The Job column has the room: a title wraps at a word only when
 // its column holds the longest word, so it takes most of the shares; Node
 // and By keep a floor that holds a node's and an account's name whole, and
 // the buttons' column is one Cancel wide, not a blank band at the right.
@@ -223,7 +223,7 @@ function jobOutputs(j){
     ? `<a href="/api/artifact?project=${encodeURIComponent(j.project)}&path=${
         encodeURIComponent(o.path)}" download>${esc(o.path)}</a>`
     : o.kind === "workspace" ? `workspace kept at <code>${esc(o.path)}</code>`
-    // What the build took on its node (R110 step 7), its cache beside it.
+    // What the build took on its node, its cache beside it.
     : o.kind === "room" ? `took ${esc(humanBytes(o.workspace || 0))}${o.cache ? `, its cache ${esc(humanBytes(o.cache))}` : ""}` : "")
     .filter(Boolean);
   return said.length ? `<div class="sub jbouts">${said.join(" · ")}</div>` : "";
@@ -240,7 +240,7 @@ function renderJobsInto(i){
   const d = docSurface(i, "jobs");
   if (!d) return;
   if (jobsList === null){
-    // Its template (R218 step 16): the bar's filter and the table's head are
+    // Its template: the bar's filter and the table's head are
     // the page's own; the count and the rows are on their way.
     d.setBar("");
     drawHTML(d.list, skTpl(jobsSection(skTable(JOB_COLS, 6, "jbtbl"), "")));
@@ -252,12 +252,12 @@ function renderJobsInto(i){
     drawHTML(d.list, `<div class="hint bad">${esc(jobsErr)}</div>`);
     return;
   }
-  // Its count is its tiles' (the operator, 25 Oct: no loose words at a
+  // Its count is its tiles' (no loose words at a
   // page's top).
   d.setBar("");
   const shown = jobsShown(jobsList);
-  // Only the rows on show are built, a page at a time (pageLimit, R228 step
-  // 13), and as far as the row a link asked for (openJob).
+  // Only the rows on show are built, a page at a time (pageLimit),
+  // and as far as the row a link asked for (openJob).
   const focusAt = jobsFocus ? shown.findIndex(j => j.id === jobsFocus) : -1;
   const lim = Math.max(pageLimit(d.list, "jbList", shown.length), focusAt + 1);
   const rows = shown.slice(0, lim).map(j => {
@@ -271,11 +271,11 @@ function renderJobsInto(i){
             title="${j.state === "queued" ? "take it off the queue before it starts"
                      : "stop it where it is: the row moves when the runner reports that it did"}">Cancel</button>
         </div>`], "div", "jbopen",
-        // The row's line opens it to what the job wrote (rows-you-open,
-        // R218 step 25): pressed, or Enter and Space from the keyboard. Named
+        // The row's line opens it to what the job wrote (rows-you-open):
+        // pressed, or Enter and Space from the keyboard. Named
         // as the job and where it stands, then what the press does: a label
         // of the press alone was all a screen reader said of every row, the
-        // line under it being the button's (R286).
+        // line under it being the button's.
         `role="button" tabindex="0" aria-expanded="${open}" aria-label="${jobTitle(j)}, ${esc(jobWord(j))}: ${open ? "fold its log away" : "open its log"}"`)}
       ${j.error ? `<div class="sub jberr warn">${esc(j.error)}</div>` : ""}
       ${jobOutputs(j)}
@@ -292,7 +292,7 @@ function renderJobsInto(i){
           title="its whole log in a tab of the dock, following it as it is written">Follow in the dock</button></div>` : ""}
     </div>`;
   }).join("");
-  // Its status line in its head, as every page's (R274, the tiles rule):
+  // Its status line in its head, as every page's (the tiles rule):
   // what is news, the split of what runs from what waits and the failures
   // of today; the groups' counts are the chips' own, said once there.
   const count = f => jobsList.filter(f).length;
@@ -303,7 +303,7 @@ function renderJobsInto(i){
     {label: "waiting", value: waiting, omit: !waiting},
     {label: "failed today", value: failedToday, tone: "bad", omit: !failedToday},
   ]});
-  // Narrowed by how a job stands (B74): a chip per state group with jobs
+  // Narrowed by how a job stands: a chip per state group with jobs
   // in it, under the tiles; the one a link named stays on even when its
   // group is empty, so the list says so rather than showing everything.
   // Failed today is inside Failed, so All is the list's length, not a sum.
@@ -345,8 +345,8 @@ function wireJobsTab(root){
   root.querySelectorAll('.jblog[data-tail="1"]').forEach(t => { t.scrollTop = t.scrollHeight; });
   root.querySelectorAll(".jbrow").forEach(row => {
     const id = row.dataset.job;
-    // Opened and shut over its height, as every row that opens is (the
-    // operator, 24 Nov: the log appeared and went with a cut): open, it is
+    // Opened and shut over its height, as every row that opens is
+    // (the log appeared and went with a cut): open, it is
     // drawn at once with what is known and slides open, and slides on to
     // the log's own height when the log lands; shut, it slides closed over
     // its log before it is drawn without it.

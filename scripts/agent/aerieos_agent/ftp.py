@@ -12,7 +12,7 @@ from .toolchains import sdk_env
 
 
 class FtpServers:
-    """A project's file access over FTP (R151): one bb-ftpd per project the
+    """A project's file access over FTP: one bb-ftpd per project the
     controller's hello names, from the ftp toolchain, as the session
     account, rooted at the project's tree. bb-ftpd knows nobody's password:
     each login comes up its stdout as a JSON line, is asked of the
@@ -59,7 +59,7 @@ class FtpServers:
             rec["why"] = str(e)
             return rec
         # Never as root: with no session account to be, as_user gives
-        # nothing to drop to, and the server ran on the LAN as root (R247 step 5).
+        # nothing to drop to, and the server ran on the LAN as root.
         if not who and os.geteuid() == 0:
             rec["why"] = "this node has no session account to serve files as, so FTP is not started"
             return rec
@@ -89,7 +89,7 @@ class FtpServers:
             # A traceback's header lands first and its reason last, a moment
             # later: the process is given that moment to end before the
             # rest is read, or the section said "Traceback (most recent
-            # call last):" and nothing of why (B428).
+            # call last):" and nothing of why.
             with contextlib.suppress(subprocess.TimeoutExpired):
                 proc.wait(timeout=3)
             tail = (first + proc.stderr.read() if proc.poll() is not None else first).strip().splitlines()
@@ -99,7 +99,7 @@ class FtpServers:
                 proc.kill()
             # The port held by a bb-ftpd an agent before this one started (an
             # update execs in place, so it is still this process's child) and
-            # never stopped (B573): it refuses every login with nobody to
+            # never stopped: it refuses every login with nobody to
             # ask. It is ended and the start tried once more.
             if again and "in use" in rec["why"] and self._end_strays(port):
                 return self._start(name, port, root, again=False)

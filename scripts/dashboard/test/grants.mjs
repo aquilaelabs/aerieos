@@ -1,5 +1,5 @@
 // What a role grants, held at every door the audit of 24 Nov found open
-// (R277, the operator: "there's been a lot of changes and I'm worried it's
+// (the operator: "there's been a lot of changes and I'm worried it's
 // drifted"). Each account here holds one grant, and each knocks at a door a
 // grant somewhere else used to open: a role on one space reaching a node's
 // services, every container, another space's notebook or a space's router
@@ -88,7 +88,7 @@ await section("a shell on one space is no shell on every space", async () => {
   // Terminal Write on alpha is a shell in alpha's tree, on alpha's node; one
   // at /workspace, on no space, reaches every space's trees and asks it
   // Everywhere, so the dock draws no + for it. Alpha here has no node, and a
-  // shell on this controller is an administrator's (B1166): refused, saying
+  // shell on this controller is an administrator's: refused, saying
   // it opens on a node.
   const can = (await call('/api/status', undefined, sheller)).body.can || {};
   const bare = await call('/termws?arg=sh%3A1%3A', undefined, sheller);

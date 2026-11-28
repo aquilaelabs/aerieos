@@ -1,4 +1,4 @@
-"""What a pack is configured with per node (R172): each answer checked by
+"""What a pack is configured with per node: each answer checked by
 its field's kind, a secret sealed and shown only as set, the hello's rows
 with the secrets opened and the environment names a verb reads, a pack's
 answers dropped with it, and every seal refreshed after the key changed."""
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
 
 class PersonScope(unittest.TestCase):
-    """R172 step 5: a field a manifest scopes to a person is kept per account
+    """A field a manifest scopes to a person is kept per account
     per node, a secret sealed under the account's own key, handed to the
     node for that account alone, and left out while its key is locked."""
     FIELDS = [{"name": "region", "kind": "text", "label": "Region", "env": "HEX_REGION"},

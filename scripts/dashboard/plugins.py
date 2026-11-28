@@ -59,7 +59,7 @@ def _clean(rows):
 
 
 def _clean_mcp(m):
-    """{agent: [server names]} as a node said it (R95 step 15)."""
+    """{agent: [server names]} as a node said it."""
     if not isinstance(m, dict):
         return {}
     return {str(a)[:20]: sorted(str(x)[:80] for x in v)[:32]
@@ -68,7 +68,7 @@ def _clean_mcp(m):
 
 def report(node_id, rows):
     """What a node's `aerie login --list` said about each account's plugins,
-    and its coding agents' MCP servers beside them (R95 step 15). True when
+    and its coding agents' MCP servers beside them. True when
     anything was written."""
     if not isinstance(rows, list):
         return False

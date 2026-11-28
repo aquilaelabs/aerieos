@@ -71,7 +71,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'nbAnalysisView', 'nbArtifactsView', 'nbBugsView', 'nbDesignView', 'nbGitView', 'nbHistoryView', 'nbMemoryView', 'nbPendingView', 'chipsScrolled', 'chipsEdge', 'chipsEdges', 'chipsArrow', 'chipsDown', 'chipsMove', 'chipsUp', 'chipsClickGuard', 'dmHostOnly', 'nbPermsView', 'nbSessionsView', 'convRows', 'convForm', 'resumeConversation', 'rmLastSaid', 'rmLastModel', 'rmStartKeys', 'rmStartOn', 'nbRoadmapView', 'nbRulesView', 'nbSigningView', 'nbTestsView', 'nbWikiView', 'wikiMarkdown', 'wikiSlug', 'wikiToc', 'wikiNav', 'wikiUntitled', 'wikiContents', 'wikiScroll', 'wikiArticle', 'pullScroller', 'pullRefresh', 'wirePull', 'openReport', 'reportDrawForm', 'reportConvFor', 'sendReport', 'pDrawForge', 'pUrlHost', 'postJSON', 'unlinkProject',
   'nbRmLoad', 'nbRmCanSend', 'nbRmRowFacts', 'nbRmStepRow', 'nbRmBoxHolding', 'nbRmDraw', 'nbRmSendBoxEl', 'nbRmShutSendBoxes', 'nbRmDrawSendBox', 'nbRmPick', 'nbRmCancelSend', 'nbRmReallySend', 'nbRmPost', 'nbRmShowClash', 'nbRmSettleClash', 'nbRmDrawClash', 'nbRmOpenDrop', 'nbRmPickItem', 'nbRmOpenSplit', 'nbRmOpenReword', 'nbRmOpenStepInput', 'nbRmCloseStepInput', 'nbRmAdd', 'nbRmForm', 'nbRmRevertPending', 'nbRmStage', 'nbRmStageAdd', 'nbRmStageAddStep', 'nbRmStageEdit', 'nbRmStageInfo', 'nbRmStageTarget', 'nbRmStageRemove', 'nbRmStageShelve', 'nbRmMoveLocally', 'nbRmFlushPending', 'nbRmLoadFinished', 'nbRmDrawFinished', 'sayPost', 'poster',
   'pDrawForm', 'pFillNode', 'pDirOf', 'dmCalled', 'dmJobSettle', 'rnFillReads', 'rnLoadTools', 'rnFillTools', 'rnLockSettings', 'rnRowsList', 'rnHostIds', 'rnBars', 'rnDrawForms', 'rnWireBox', 'rnBarSay', 'rnRevertSect', 'rnSectChanges', 'rnEnc', 'rnDec', 'pJobAct', 'pJobPoll', 'pJobSeen', 'pJobWire', 'pNameShow', 'pOpen',
-  // A terminal in its own window (R8).
+  // A terminal in its own window.
   'popOut', 'reattachTab',
   'pShowKey', 'pSlide', 'paginate', 'pageReach', 'onPress', 'patch', 'patchKey', 'patchSame', 'patchFieldOf', 'patchAttrs', 'patchRecord', 'patchWas', 'patchControl', 'patchNode', 'patchKids', 'patchOwn', 'patchHeld', 'patchInto', 'pressBack', 'drawFresh', 'takeAway', 'giveBack', 'onTyping', 'fieldsBack', 'paintBar', 'paneStack',
   'phFetch', 'tcAct', 'tcPick', 'packState', 'packMachineState', 'packHeldState', 'packVersionPill', 'packJobErr', 'toolchainsSeen', 'toolchainsFor', 'packDeploy', 'agentUpdate',
@@ -97,8 +97,8 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   // guides are top-level consts, which are not window properties.
   'abShow', 'abGuideText', 'abLoadGuide', 'abLoadLog', 'abDrawCredits', 'abDrawLog', 'openAbout', 'closeAbout', 'welcomeOnce', 'updatedShow', 'updatedElsewhere', 'updatedHide',
   'proseline', 'proselines',
-  // R9: one way for a press to send and say, one for a read, one for a draw's
-  // arrival, and boot()'s parts.
+  // One way for a press to send and say, one for a read, one for a draw's
+  // arrival, and boot's parts.
   'answerOf', 'limitedFetch', 'boot', 'bootAway', 'bootContainerDialogs', 'bootCreating', 'bootDockDrag', 'bootDocs', 'bootDoctor',
   'bootFindings', 'bootFirstSession', 'bootKeys', 'bootLast', 'bootLogs', 'bootMarkup', 'bootMenuHeld',
   'bootMoreMenus', 'bootMotion', 'bootPickers', 'bootNewProject', 'bootNotebooks', 'bootNotices', 'bootPanes',
@@ -114,7 +114,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
     'reportsSection', 'clearReports',
   'renderDoc', 'renderDockerInto', 'renderGuarded', 'typingIn', 'typingBack', 'renderJobsInto', 'renderNodesInto', 'renderNotebookInto', 'renderSettingsInto',
   'renderProjectsInto', 'repoOfUrl',
-  // The Library (R170): its functions (a let or a const is no property of the window).
+  // The Library: its functions (a let or a const is no property of the window).
   'openLibrary', 'openLibraryOn', 'libPick', 'loadLibrary', 'railWarm', 'dockerWarm', 'libKnown', 'libFind', 'libQuery', 'libAddr', 'libFromAddr', 'libMore', 'libPagesFrom', 'libReload', 'libPills', 'makerLine', 'libState', 'libActs', 'libDetail', 'libRow',
   'libFilterBand', 'libViewNow', 'libNarrowed', 'libPackNote', 'libHostNote', 'libCards', 'rnLoadDiscord', 'rnDrawDiscord', 'nbDiscordLoad', 'nbDiscordDraw', 'nbDiscordAct', 'libShelves', 'libList', 'renderLibraryInto', 'wireLibrary', 'libWithToolchains', 'libAct', 'libLook', 'libDriverPick',
   'openNewContainerApp', 'tpAppCells', 'tpAppSeen', 'tpAppLook', 'tpOpenApp', 'tpWhatCell', 'openFilesTab', 'flPick', 'flQuery', 'loadFiles', 'flGo', 'flSize', 'flCrumbs', 'flRows', 'flLine', 'renderFilesInto', 'flFull', 'flPost', 'wireFiles', 'flAct', 'flUpload', 'flPreview', 'openInstalledTab', 'openInstalledOn', 'instPick', 'loadInstalled', 'instHere', 'instState', 'instActs', 'instConfigField', 'instConfigForm', 'instConfigRead', 'instServiceLines', 'instRow', 'renderInstalledInto', 'wireInstalled', 'instAct', 'instOpen',
@@ -127,11 +127,11 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'slideHidden', 'fadeIn', 'ghostOf', 'ghostOut', 'fadeThrough', 'moveKey', 'onScreen', 'chipMove', 'slideMark', 'swapBox', 'startClaude', 'sendSure', 'launchClaude',   'openBrief', 'closeBrief', 'briefDrawForm', 'briefGo', 'pArchivePicked',
   'tabLabel', 'tabLabels', 'tabTitle', 'untitle', 'untitleIn', 'helpToggle', 'helpShow', 'helpHide', 'cLock', 'dmUnrouted', 'nodeDoorConfig', 'nginxUndeployed', 'resumePicker', 'toggleBell', 'toggleUiMenu', 'unveil', 'watchSignin', 'wireConsole', 'wireLogSection', 'wireJobsTab', 'wireNodeConf', 'wireNodesTab', 
   'wireProjectRows',
-  // A press drawn on the click (the operator, 22 Nov): the spaces' marks and
+  // A press drawn on the click: the spaces' marks and
   // deletes, a session ended, a report, a profile row, a sent message.
   'projHeldLay', 'projMarkNow', 'trashList', 'sessEndNow', 'sessEndRead', 'sessShown', 'agentTab',
   'reportsGone', 'pfReachNow', 'pfGone', 'pfDeviceGone', 'pfTfNow', 'chatShown',
-  // ...and a press the server queues behind a running job says so (the operator, 22 Nov).
+  // ...and a press the server queues behind a running job says so.
   'sysJobAhead', 'sysSaid', 'setupAhead'
 ];
 
@@ -222,7 +222,7 @@ ok(scripts.length > 2 && known.size > 500 && stray.length === 0,
    `every name the page's ${scripts.length} scripts use is declared by one of them or is the browser's${
      stray.length ? `; declared nowhere: ${stray.join(', ')}` : ''}`);
 
-// One name, one script (B738). A `function` declared at the top level of two
+// One name, one script. A `function` declared at the top level of two
 // classic scripts is one global, and the later script's quietly replaces the
 // earlier's: page-dock.js's placeTab took page-tabstrip.js's drag helper's
 // name on 14 Oct, and only a suite's TypeError said so. (A `let` or `const`

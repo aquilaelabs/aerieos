@@ -1,7 +1,7 @@
 """The doctor's runner token line names the node and the repository its
 runner serves, and a failed one carries the way to the page a new token is
-given on, where it named a node id and a token slot with nothing to press
-(B71)."""
+given on, where it named a node id and a token slot with nothing to press.
+"""
 import os
 import sys
 import unittest

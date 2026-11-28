@@ -75,10 +75,10 @@ def configure(*, write_json, state, tell=None, tmux_name=None, workspace=None,
     globals().update(write_json=write_json, STATE=Path(state),
                      tell=tell, tmux_name=tmux_name, actor=actor,
                      # project -> its Unreleased lines, [{words, cat}], for a
-                     # row's Tie to a line (R255).
+                     # row's Tie to a line.
                      changelog_lines=changelog_lines,
                      # project -> [(version, end of its day)], newest first
-                     # (roadmap.releases): what a fix shipped in (R254).
+                     # (roadmap.releases): what a fix shipped in.
                      releases=releases, changelog_refs=changelog_refs,
                      # Where the projects are, for the version stamp below.
                      # bb passes it explicitly; the dashboard too; the
@@ -141,7 +141,7 @@ _tracker = tracker.Tracker(
     counts_revn=True)
 
 SEVERITIES = ("low", "medium", "high", "critical")
-# Whether it reproduces (R124), beside how: every time, now and then, the
+# Whether it reproduces, beside how: every time, now and then, the
 # once it was seen, or nobody has tried. A report from before the field has
 # none and reads as untried, which is what the tracker knew of it.
 REPRODUCES = ("always", "sometimes", "once", "untried")
@@ -204,7 +204,7 @@ def _clean(text, limit):
 # log: two people write this, and the tracker itself only shows the present
 # tense. Capped per project alongside the bugs it describes.
 MAX_HISTORY = 300
-# What the trim keeps whatever its age (R254 step 5): a report's filing and
+# What the trim keeps whatever its age: a report's filing and
 # its closing, so its history says when it came and how it went, as the
 # roadmap keeps a finished item's.
 KEEP_ACTS = ("filed", "fixed", "wontfix", "na")
@@ -328,16 +328,16 @@ def payload(project):
     with _lock:
         d = load()
         rows = list(d["projects"].get(project) or [])
-        # The revision of this answer, the number revisions() gives for the
+        # The revision of this answer, the number revisions gives for the
         # same state, so the panel records what it read and not the page's
-        # later token (B201).
+        # later token.
         rev = len((d.get("history") or {}).get(project) or []) + int((d.get("revn") or {}).get(project) or 0)
     rows.sort(key=lambda b: (b.get("status") != "open", -b.get("at", 0)))
     # The lines each bug is tied to in the notebook (link_changelog), found
     # in the changelog by their words, with the release that carried each.
     linked = {f"B{b['id']}": b["changelog"] for b in rows if isinstance(b.get("changelog"), list) and b["changelog"]}
     # ...and, for a fixed bug with none tied, the lines naming the commits
-    # that fixed it (R255), said as found by its commits.
+    # that fixed it, said as found by its commits.
     commits = {f"B{b['id']}": b["commits"] for b in rows
                if b.get("status") == "fixed" and isinstance(b.get("commits"), list) and b["commits"]}
     return {"project": project, "bugs": rows, "rev": rev,
@@ -370,14 +370,14 @@ def revisions():
     # was the token, and the history is capped at MAX_HISTORY: past 300
     # events it sat at 300 for good, the watch on it never fired again, and
     # an open Bugs tab showed a tracker frozen at whatever it held when it
-    # was opened (B197). The sum only ever grows, and a tracker written
+    # was opened. The sum only ever grows, and a tracker written
     # before the counter existed still answers with the length it always had.
     return {p: len(h.get(p) or []) + int(n.get(p) or 0) for p in set(h) | set(n)}
 
 
 def _too_long(title):
     """Why a title is refused for its length, or "". Refused rather than cut:
-    cutting it lost whatever followed, often the half that said why (B621)."""
+    cutting it lost whatever followed, often the half that said why."""
     n = len(" ".join(str(title or "").split()))
     if n > MAX_SHORT:
         return (f"a title is one line of at most {MAX_SHORT} characters (this one is {n}): "
@@ -396,8 +396,8 @@ def add(project, title, by="you", severity="medium", **fields):
     reproduces = str(fields.pop("reproduces", None) or "")
     if reproduces and reproduces not in REPRODUCES:
         return {"error": f"whether it reproduces is one of: {', '.join(REPRODUCES)}"}
-    # A session that says how to reproduce it says how often that worked
-    # (R124): the steps alone read as a sure thing whether or not they are.
+    # A session that says how to reproduce it says how often that worked:
+    # the steps alone read as a sure thing whether or not they are.
     # A report held before the field is replayed as it was asked.
     if by == "claude" and not reproduces and not pending.replaying() and _clean(fields.get("repro"), MAX_LONG):
         return {"error": "say whether those steps reproduce it: --reproduces always, sometimes, once "
@@ -546,7 +546,7 @@ def _edit(project, bug_id, change, by="you", rev=None):
     return out
 
 
-# The commits that fixed a bug (R255): several to a bug, and one commit may
+# The commits that fixed a bug: several to a bug, and one commit may
 # fix several bugs. Kept here, never in a commit's message, so a public
 # repository's history names no notebook number; the release check reads
 # them first (releasegaps.fix_commits).
@@ -764,7 +764,7 @@ def send(project, bug_id, sessions=(), note="", prefix="", want=""):
     # No /model or /effort ahead of it: a project's pair are launch flags now,
     # so the session this reaches is already running on them.
     # The caller's own session, not the project's bare one: see roadmap.send
-    # for why the bare name is the owner's conversation (B194).
+    # for why the bare name is the owner's conversation.
     session = running_session(prefix, project, set(sessions), want)
     tag = ids.label("bugs", bug_id)
     line = (f"Please look at bug {tag} in this space's tracker. "
@@ -802,7 +802,7 @@ def set_status(project, bug_id, status, note="", by="you", commits=None):
     # Taken once, outside the lock: git is slow and the lock is held by the
     # dashboard's poll too.
     closed_in = _stamp(project) if status != "open" else None
-    # The commits that fixed it (R255): the ones named, or the commit the
+    # The commits that fixed it: the ones named, or the commit the
     # project is on when the tree holds nothing uncommitted. A fix closed
     # before it is committed names none, and its row says to add it.
     fixes = []
@@ -841,7 +841,7 @@ def set_status(project, bug_id, status, note="", by="you", commits=None):
         else:
             bug["status_note"] = note_
             bug["status_by"] = "claude" if by == "claude" else "you"
-            # When, for the row's facts and what release shipped it (R254).
+            # When, for the row's facts and what release shipped it.
             bug["closed_at"] = int(time.time())
             if closed_in:
                 bug["fixed_in"] = closed_in[:80]
@@ -886,7 +886,7 @@ def open_bugs(project):
 
 
 def brief(project):
-    """The tracker's lines in a session's block (R202): how many are open by
+    """The tracker's lines in a session's block: how many are open by
     severity and the verbs, in place of the list; the bugs a prompt names
     arrive on that prompt (preamble.mentioned) and `aerie bug show` prints one
     in full. Empty when nothing is open."""
@@ -922,7 +922,7 @@ def verb(name, act, req, *, sessions, prefix):
     `prefix` the asking account's session prefix. (payload, status)."""
     parts = {k: field(req, k) for k in ("title", "area", "repro",
                                         "expected", "actual", "notes")}
-    # Whether it reproduces (R124), only when sent: a page from before the
+    # Whether it reproduces, only when sent: a page from before the
     # field edits a report without touching it.
     if field(req, "reproduces"):
         parts["reproduces"] = field(req, "reproduces")
@@ -938,7 +938,7 @@ def verb(name, act, req, *, sessions, prefix):
     elif act == "remove":
         r = remove(name, req.get("id"), why=field(req, "why"))
     elif act == "commits":
-        # Its Fixed in (R255): commits added by their hash, or taken off.
+        # Its Fixed in: commits added by their hash, or taken off.
         lst = lambda k: [str(x) for x in (req.get(k) or []) if isinstance(x, (str, int))][:COMMITS_MOST]  # noqa: E731
         r = fixed_by(name, req.get("id"), add=lst("add"), drop=lst("drop"))
     elif act == "tie":

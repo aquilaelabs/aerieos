@@ -1,4 +1,4 @@
-"""Migration 0041 (R205): a pack kept from a folder of a repository, recorded
+"""Migration 0041: a pack kept from a folder of a repository, recorded
 before 11 Nov without `kept_at`, is given its repository's head, which is
 what toolpacks.py read in its place until 27 Nov; a node then fetches it at
 the same commit. One that says it already, or is not kept from a folder, is

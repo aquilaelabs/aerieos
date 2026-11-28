@@ -1,4 +1,4 @@
-// The notebook's Wiki view (R112): the project's wiki, its pages as rows
+// The notebook's Wiki view: the project's wiki, its pages as rows
 // you open to read, Edit on a row to rewrite it, New page at the top, and
 // the status line's Export, Pull and Push. Writes through, like Bugs: a Save on
 // a page is that page written, with no notebook foot behind it. The pages
@@ -31,7 +31,7 @@ function wikiMarkdown(src, titles){
       if (/^https?:\/\//i.test(url)) return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text || url}</a>`;
       const pageName = url.replace(/\.md$/i, "").replace(/^\.\//, "");
       // A link whose words are its own file name ([how-it-works.md](...))
-      // reads as the page's title where the caller knows it (B110): a file
+      // reads as the page's title where the caller knows it: a file
       // name is the source's spelling, not what a reader looks for.
       const doc = pageName.replace(/#.*$/, ""), file = url.replace(/^\.\//, "").replace(/#.*$/, "");
       const words = titles?.[doc] && (!text || text === file || text === url) ? esc(titles[doc]) : text || pageName;
@@ -80,7 +80,7 @@ function wikiMarkdown(src, titles){
       const head = cells(l), rows = [];
       for (i += 2; i < lines.length && /\|/.test(lines[i]) && lines[i].trim(); i++) rows.push(cells(lines[i]));
       // A head with nothing in it (| | |, a table of label and value) is no
-      // head: drawn, it was a blank first row (B78).
+      // head: drawn, it was a blank first row.
       out.push(`<table>${head.some(c => c.trim()) ? `<thead><tr>${head.map(c => `<th>${inline(c)}</th>`).join("")}</tr></thead>` : ""}<tbody>${
         rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
     } else if (!l.trim()){
@@ -115,7 +115,7 @@ function wikiToc(src){
 }
 
 // ---- the reader, Help's and a project's Wiki view's ----------------------
-// One reader for both (the operator, 19 Oct: so the two cannot drift): the
+// One reader for both (so the two cannot drift): the
 // list beside the article with its picker on a phone, the article's head,
 // its contents box and its page. The Wiki view adds its Read and Edit tabs
 // and its footer; Help adds its search.
@@ -146,8 +146,8 @@ function wikiContents(text){
 // scrolls: the reader's own id (wk-...), or a forge's as a doc's links write
 // it, which drops what the reader's ids turn into dashes. The pane is what
 // scrolls, so the pane is scrolled: scrollIntoView moved the PAGE instead,
-// the heading went up under the header and the article sat where it was
-// (the operator, 4 Oct). False when there is no such heading.
+// the heading went up under the header and the article sat where it was.
+// False when there is no such heading.
 function wikiScroll(root, anchor){
   const doc = root?.querySelector(".wkpage");
   if (!doc || !anchor) return false;
@@ -172,7 +172,7 @@ function wikiArticle({name, title, meta, over = "", body}){
 }
 
 function nbWikiView({$, nb, project}){
-  // Read like an encyclopedia (the operator, 2 Oct): one article at a time,
+  // Read like an encyclopedia: one article at a time,
   // its title over a rule, a contents box for a page with sections, and
   // the pages listed beside it (the wiki's own _Sidebar when it has one),
   // a picker above it on a phone. Read and Edit are tabs over the article.
@@ -227,7 +227,7 @@ function nbWikiView({$, nb, project}){
     if (!p){ notify(`no page called ${name} yet: New page makes it`); return; }
     if (wikiDirty() && !await askYes("Leave the page you are editing? What you typed is not saved.")) return;
     wikiClear();
-    // A history entry (R256 step 3): the address names the page, and Back
+    // A history entry: the address names the page, and Back
     // returns to the one before.
     navPush(() => { nb.wkCur = p.name; shellSync(); });
     if (!nb.wkPages[p.name]) readPage(p.name); else drawWiki();
@@ -245,7 +245,7 @@ function nbWikiView({$, nb, project}){
     const d = nb.wkData || {};
     const n = articles().length;
     const rem = d.remote;
-    // The glance (R109): its pages, none while it has none, whose empty
+    // The glance: its pages, none while it has none, whose empty
     // state is said where the article would be; its status line, on the
     // control row's slot, where it goes, or why it could not be read.
     // An empty wiki is its empty state, not a fault: the line says its
@@ -257,7 +257,7 @@ function nbWikiView({$, nb, project}){
     $("wkNew").setAttribute("aria-expanded", String(!!nb.wkAdding));
     $("wkExport").disabled = !pages().length;
     $("wkPull").hidden = $("wkPush").hidden = !rem?.label;
-    // A role that reads the project and does not write it (B101): Pull and
+    // A role that reads the project and does not write it: Pull and
     // Push dead, and that is the reason said under them.
     const ro = projWriteWhy(project);
     $("wkPull").disabled = !!ro;
@@ -285,7 +285,7 @@ function nbWikiView({$, nb, project}){
     if (!meta) return `<article class="wkarticle"><div class="hint">No pages yet. Start with Home, the page a wiki opens on; a session adds pages with aerie wiki save${
       nb.wkData?.gate === "deny" ? ", though this space's Agents may: Write the wiki is deny" : ""}.</div></article>`;
     const pg = nb.wkPages[meta.name];
-    // A reader (B101) gets no Edit, Rename or Remove on a page: New page,
+    // A reader gets no Edit, Rename or Remove on a page: New page,
     // dead above, says why.
     const ro = projWriteWhy(project);
     const editing = !ro && nb.wkEdit && nb.wkEdit.name === meta.name;
@@ -339,8 +339,8 @@ function nbWikiView({$, nb, project}){
         ? (d.history || []).map(h => `<div class="wklogrow"><span class="mono">${esc(h.commit)}</span> ${esc(h.what)} <span class="dim">· ${esc(h.by)} · ${esc(ago(h.at))}</span></div>`).join("")
         : `<span class="dim">nothing yet</span>`}</div>`;
     // The add band is the first band under the head, above where the wiki
-    // goes (B457); the rest is the body.
-    // Patched (R244): a page's name and Markdown being typed, here or in a
+    // goes; the rest is the body.
+    // Patched: a page's name and Markdown being typed, here or in a
     // page's editor, stay as they are when the wiki is read again.
     patch($("wkAddBox"), add);
     patch(box, log + `<div class="field wkreader">${articles().length ? nav() : ""}${article()}</div>`);
@@ -376,8 +376,8 @@ function nbWikiView({$, nb, project}){
     const ta = box.querySelector("#wkText");
     if (ta) ta.oninput = () => { nb.wkEdit.text = ta.value; };
     on("wkCancel", () => { nb.wkEdit = null; drawWiki(); });
-    // Save reads the page as typed on the press, its editor put away (the
-    // operator, 22 Nov); a refusal (somebody saved over it first) brings the
+    // Save reads the page as typed on the press, its editor put away;
+    // a refusal (somebody saved over it first) brings the
     // editor back holding the typing, and says why.
     on("wkSave", () => {
       const text = nb.wkEdit.text, was = nb.wkPages[name];
@@ -481,7 +481,7 @@ function nbWikiView({$, nb, project}){
   };
   $("wkPush").onclick = async ev => {
     // A page being edited is not in the push and stays as typed: said, not
-    // asked (R265: a press asks only where its yes costs something).
+    // asked (a press asks only where its yes costs something).
     if (wikiDirty()) notify("pushing what is saved: the page being edited is not in it, and its edits stay here");
     busy(ev.target, "Pushing");
     let j = await postJSON("/api/wiki", {project, action: "push"});

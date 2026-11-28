@@ -1,5 +1,5 @@
-"""Migration 0037 (R295): a repository record from before it named the dials
-it sets apart (3 Nov) is given the list, made as prefs.py's reader made it
+"""Migration 0037: a repository record from before it named the dials
+it sets apart is given the list, made as prefs.py's reader made it
 from the values stored, which on 26 Nov read as FROZEN."""
 import copy
 import importlib

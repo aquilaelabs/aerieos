@@ -1,11 +1,11 @@
-"""R200: a session is held to its house rules by more than reading them.
+"""A session is held to its house rules by more than reading them.
 
 The shell reader (scripts/lib/cmdmatch.py) that decides what a Bash call
 runs; a rule that refuses, and the briefing's never-do lines, through
 bb-rule-hook guard; a project rule that replaces a global one; the named
 rules a prompt fires remembered for the conversation and said again by
 bb-rule-hook recall after a summary; and the hook endpoint a node's
-session asks (hooks.py), which now carries the rules (B686).
+session asks (hooks.py), which now carries the rules.
 """
 import json
 import os
@@ -64,7 +64,7 @@ class MapFirst(unittest.TestCase):
                           ("function startClaude", ["startClaude"]), ("claudeLiveOn\\(", ["claudeLiveOn"]),
                           ("class Foo|def bar_baz", ["Foo", "bar_baz"]),
                           ("TODO", []), ("apt install", []), ("resumePick", []),
-                          # A definition word inside English is text (R289).
+                          # A definition word inside English is text.
                           ("does not let run", []), ("the type field", []), ("a class name", []),
                           ("export function toastWhy", ["toastWhy"]), ("  async def worker", ["worker"])]:
             self.assertEqual(rulehook.symbols(pat), want, pat)
@@ -93,13 +93,13 @@ class Store(unittest.TestCase):
         return r.stdout
 
     def test_pgrep_f_is_the_same_hazard_wherever_the_shell_puts_it(self):
-        """B736: pgrep -f from a tool call matches the call's own shell, in a
+        """Pgrep -f from a tool call matches the call's own shell, in a
         kill, in a wait loop behind the shell's own words, and run alone;
         aerie proc is the way, and pgrep by name is let be."""
         import rules
         pats = next(r for r in rules.ALWAYS if r["name"] == "pkill-by-pid")["refuse"]
         for line in ("pgrep -f ff/grant.js", "kill $(pgrep -f x.js)", "until ! pgrep -f x; do sleep 2; done",
-                     # B170: `);` run together after a substitution hid it.
+                     # `);` run together after a substitution hid it.
                      "for i in $(seq 1 9); do pgrep -f x >/dev/null || break; done",
                      "while pgrep -f x >/dev/null; do sleep 1; done", "pgrep -af x", "pkill -9 -f x"):
             self.assertIsNotNone(cmdmatch.first_match(line, pats), line)
@@ -109,7 +109,7 @@ class Store(unittest.TestCase):
         self.assertIn("aerie proc", next(r for r in rules.ALWAYS if r["name"] == "pkill-by-pid")["text"])
 
     def test_a_session_reaches_a_remote_through_bb_git_alone(self):
-        """The operator, 27 Oct: git's own push, fetch, pull, ls-remote and
+        """Git's own push, fetch, pull, ls-remote and
         remote update are refused however written, a token in the URL or
         not, so the controller's credential, git policy and scan cannot be
         gone round; local git and aerie git are let be."""
@@ -135,7 +135,7 @@ class Store(unittest.TestCase):
                                    stdin={"tool_name": "Bash", "tool_input": {"command": "ls -la"}}), "")
 
     def test_a_recording_is_met_with_the_reel(self):
-        """The operator, 17 Oct: a phone's screen recording was taken apart
+        """A phone's screen recording was taken apart
         with ffmpeg by hand though aerie capture reel reads one. A video in the
         person's message, or ffmpeg reached for on one, has the reel said
         beside it; anything else has nothing."""
@@ -171,11 +171,11 @@ class Store(unittest.TestCase):
             self.assertIsNone(rules.refusing("alpha", line, background=True), line)
         for line in ("aerie tests unit", "aerie tests log", "./run.sh", "bash run.sh", "aerie dashboard trace 30",
                      "aerie tests preflight --dry", "aerie tests preflight --files a.py --dry 2>&1 | tail",
-                     "sed -n 1,5p scripts/dashboard/test/run.sh",         # reading the runner is not running it (B700)
+                     "sed -n 1,5p scripts/dashboard/test/run.sh",         # reading the runner is not running it
                      "grep -n slow scripts/dashboard/test/run.sh | head",
-                     # A verb's usage runs nothing (B278).
+                     # A verb's usage runs nothing.
                      "aerie dashboard test --help", "aerie tests probe -h", "aerie build --help 2>&1 | head"):
-            self.assertIsNone(rules.refusing("alpha", line), line)     # --dry is the plan alone (B698)
+            self.assertIsNone(rules.refusing("alpha", line), line)     # --dry is the plan alone
 
     def test_a_wait_on_a_runs_log_is_refused_only_in_the_foreground(self):
         for line in ("timeout 590 bash -c 'until grep -q \"exited\" /tmp/t/tasks/b1.output; do sleep 10; done'",
@@ -184,7 +184,7 @@ class Store(unittest.TestCase):
             self.assertEqual(g and g[0]["name"], "notified-not-waited", line)
             self.assertIsNone(rules.refusing("alpha", line, background=True), line)
         for line in ("grep -n FAIL gate.log", "grep -c passed run.log", "tail -8 /tmp/t/tasks/b1.output",
-                     # A search for the word is a search (B699).
+                     # A search for the word is a search.
                      "grep -n '\\[exited\\]' -r scripts/dashboard/*.js", "grep -n exited scripts/dashboard/rules.py"):
             self.assertIsNone(rules.refusing("alpha", line), line)
         for line in ("while ! grep -q exited f.output; do sleep 5; done", "for i in 1 2 3; do grep -q exited f && break; sleep 5; done"):
@@ -207,7 +207,7 @@ class Store(unittest.TestCase):
         self.assertIn("Run aerie tidy after a task.", rules.block("alpha"))
         self.assertNotIn("emulator running for a day", rules.block("alpha"))
         self.assertNotIn("emulator running for a day", rules.said(rules.by_names("alpha", ["tidy"])))
-        # An edit stores a new why, and one that says nothing about it keeps the old (B694).
+        # An edit stores a new why, and one that says nothing about it keeps the old.
         r = rules.edit("alpha", "tidy", text="Run aerie tidy when a task is done.", by="you",
                        why="The emulator ran for a day.")
         self.assertEqual(r["rule"]["why"], "The emulator ran for a day.")
@@ -269,7 +269,7 @@ class Store(unittest.TestCase):
         class Overlap:
             others_touching = staticmethod(lambda *a: [])
             note = staticmethod(lambda *a: None)
-            # The notes' key per account and agent (R95), the real one.
+            # The notes' key per account and agent, the real one.
             key = staticmethod(real_overlap.key)
 
         class Users:

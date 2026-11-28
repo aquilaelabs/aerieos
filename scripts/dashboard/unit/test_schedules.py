@@ -1,4 +1,4 @@
-"""Scheduled scripts (R117): the timetable in words and its next minute, a
+"""Scheduled scripts: the timetable in words and its next minute, a
 schedule held to its shapes, and the timer: one run at a time, a run the
 controller was down for run once and said, the bell's rows."""
 import json
@@ -58,7 +58,7 @@ class Store(unittest.TestCase):
         self.assertTrue(schedules.remove(s["id"])["ok"])
 
     def test_a_system_schedule_is_one_of_the_tables_jobs_and_says_what_it_does(self):
-        # The Storage page's snapshot schedules (R162 step 5): no script,
+        # The Storage page's snapshot schedules: no script,
         # root on the node, the config held to the table's shape.
         self.assertIn("one of the table's jobs", schedules.save({"name": "x", "cron": "0 * * * *", "node": "n1", "system": {"apply": "reboot"}}, "u")["error"])
         self.assertIn("keep is missing", schedules.save({"name": "x", "cron": "0 * * * *", "node": "n1",

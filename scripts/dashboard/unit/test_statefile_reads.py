@@ -1,4 +1,4 @@
-"""A state file is read once while it stays the same file (R228 step 1):
+"""A state file is read once while it stays the same file:
 statefile.read_text and read_json keep its text by what the file is on disk,
 a request looks at it once, and nothing a caller does to its copy reaches
 another's."""

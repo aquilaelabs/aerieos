@@ -1,5 +1,5 @@
 """Behind `aerie login --flow` and `--out` for every coding agent that says
-how it signs in: its sign-in run for the page (R233 step 6, R234 step 6).
+how it signs in: its sign-in run for the page.
 
 One driver for all of them, the shipped agents and the ones a tool pack
 brings: each describes its sign-in as data (its row in the agents' table,

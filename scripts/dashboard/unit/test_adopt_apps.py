@@ -1,11 +1,11 @@
-"""The containers and VMs another system ran, taken again here (R163 steps
-10 and 11): each container's settings as the agent reads them from the old
+"""The containers and VMs another system ran, taken again here:
+each container's settings as the agent reads them from the old
 Docker folder (adopt.container_spec: only what its image does not say), the
 compose file each becomes (adoptapps.compose_of, and compose_for for a
 stick plan's template: its network of fixed addresses, restarting with the
 machine where it started with it, its paths said where the adopted disks do
-not hold them or may not write them), the zip of them to import (the
-operator, 10 Nov), and the agent's rewrite of a VM for this machine."""
+not hold them or may not write them), the zip of them to import,
+and the agent's rewrite of a VM for this machine."""
 import json
 import os
 import sys
@@ -194,7 +194,7 @@ class Read(unittest.TestCase):
 
 
 class Links(unittest.TestCase):
-    """B846: the old system's image or folder is its own, and an absolute
+    """The old system's image or folder is its own, and an absolute
     link in it names this machine's files; nothing is read or copied through
     one."""
 
@@ -261,7 +261,7 @@ WIN = (f"<domain type='kvm'><name>Windows 11</name><uuid>{U}</uuid><os><loader>/
 
 
 class Settings(unittest.TestCase):
-    """R163 step 16: what an adopted VM keeps that this machine can honor."""
+    """What an adopted VM keeps that this machine can honor."""
     def test_its_tpm_state_is_found_wherever_the_old_system_kept_it(self):
         root = tempfile.mkdtemp()
         os.makedirs(f"{root}/qemu")

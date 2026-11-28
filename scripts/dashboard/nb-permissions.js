@@ -1,9 +1,9 @@
 // The notebook's Permissions view: everything a session may do on this
-// project, in one place (the operator, 22 Oct: the dials were split between
+// project, in one place (the dials were split between
 // the Settings view's Agents may and the Git view's push policy). Beside
 // Overview and Settings in the Overview group.
 // One classic script beside index.html, the shape tab-*.js has (docs/nodes.md
-// §13): same page, same global scope, one file per notebook view (R60).
+// §13): same page, same global scope, one file per notebook view.
 //
 // A factory rather than a script that runs: makeNotebook calls it per
 // notebook with the notebook's element lookup, its state object and its
@@ -36,11 +36,11 @@ function nbPermsView({$, nb, project, root}){
     rnBars();
   }
 
-  // What a session may do with the remote (roadmap R36), moved here from
+  // What a session may do with the remote, moved here from
   // the Git view: staged until Apply, enforced on the relay; a local commit
   // or merge cannot be forbidden, and the bar says so. The third is whether
   // a push with lines that look sensitive waits on the bell for a person
-  // (R219) or goes without the hold.
+  // or goes without the hold.
   let draft = {};
   const GITPOL_DEFAULT = {push: "allow", main: "deny", scan: "hold"};   // prefs.GITPOL_DEFAULT
   function drawPush(){
@@ -48,14 +48,14 @@ function nbPermsView({$, nb, project, root}){
     if (!host) return;
     const p = (state?.projects || []).find(x => x.name === project);
     const locked = !!p?.locked_me || !!projWriteWhy(project);
-    // Each part the space's default until this repository sets it apart
-    // (R294 step 4): "as the space (word)" first, as every dial here is.
+    // Each part the space's default until this repository sets it apart:
+    // "as the space (word)" first, as every dial here is.
     const saved = {}, pol = {...(p?.prefs?.gitpol || {})};
     for (const k of Object.keys(GITPOL_DEFAULT)) saved[k] = rnDialVal(p, `gitpol.${k}`, GITPOL_DEFAULT[k]);
     const pick = k => k in draft ? draft[k] : saved[k];
     const opts = (k, modes) => optionList(rnDialChoices(p, `gitpol.${k}`, modes.map(m => [m, m]), GITPOL_DEFAULT[k]), pick(k));
     const dirty = Object.keys(draft).length > 0;
-    // One form (R301), as Agents may beside it is: its three dials, Apply at
+    // One form, as Agents may beside it is: its three dials, Apply at
     // the foot.
     const body = `<div class="row stack2 gpolicy"><div class="grow">${formBox({fields: [
         formField("permPush", "Push its branches", `<select id="permPush" data-gitpol="push"${locked ? " disabled" : ""}>${opts("push", ["allow", "deny"])}</select>`),
@@ -65,7 +65,7 @@ function nbPermsView({$, nb, project, root}){
         state: `<span class="state">${locked ? "this space is locked: its owner changes these" : `its own branches, one at a time ${helpIcon("Applies to pushes only. Tags, deletions and remote-only branches stay yours; commits and merges here are always allowed.")}`}</span>`,
         foot: [`<button type="button" class="permGitApply"${dirty && !locked ? "" : " disabled"}>Apply</button>`]})}</div></div>`;
     const html = docSection("permissions", "push", "Pushing", `${pol.push || "allow"} · ${pol.main || "deny"}${pol.scan === "off" ? " · unheld" : ""}`, body);
-    // Patched (R244): a pick not yet applied stays, and a read that brings
+    // Patched: a pick not yet applied stays, and a read that brings
     // nothing new writes nothing.
     if (!patch(host, html)) return;
     wireSections(host);
@@ -90,7 +90,7 @@ function nbPermsView({$, nb, project, root}){
     };
   }
 
-  // On the git host (R188): each ability with what the project's token
+  // On the git host: each ability with what the project's token
   // says (its kept measure) and the project's own Allow or Deny over it,
   // staged until Apply as Pushing is. The token sets what is possible; a
   // Deny here takes an ability away whatever the token allows.
@@ -134,7 +134,7 @@ function nbPermsView({$, nb, project, root}){
         ? `the token may not: it needs ${esc(r.needs)}` : "not measured";
       const how = r.verbs.length ? `aerie forge ${r.verbs.join(", ")}` : r.how;
       // One another setting governs has no switch here, only where it is
-      // set (B559): its deny was told to sessions and enforced nowhere.
+      // set: its deny was told to sessions and enforced nowhere.
       return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how && !r.fixed ? ` · ${esc(how)}` : ""}</div></div>
         ${r.fixed ? `<span class="state">${esc(r.fixed)}</span>`
           : `<label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}" data-own="${esc(own)}"${locked ? " disabled" : ""}>${optionList(rnDialChoices(p, `forgepol.${r.id}`, [["allow", "allow"], ["deny", "deny"]], r.set), set)}</select></label>`}</div>`;
@@ -167,14 +167,14 @@ function nbPermsView({$, nb, project, root}){
     };
   }
 
-  // The glance (R109): how many of the dials a session meets on its own,
+  // The glance: how many of the dials a session meets on its own,
   // asked first, or not at all, read off the section's own pickers, and the
   // push policy as its line.
   function drawGlance(){
     const v = view(), hint = v?.querySelector(".nbglance");
     if (!hint) return;
     const n = {auto: 0, ask: 0, deny: 0};
-    // A dial on "as the project" counts as what it inherits (R208 step 6).
+    // A dial on "as the project" counts as what it inherits.
     v.querySelectorAll('details[data-sect="rn:claude"] select').forEach(s => {
       const w = s.value === "inherit" ? (s.dataset.inherit || "").replace(/ me$/, "") : s.value;
       if (w in n) n[w]++;

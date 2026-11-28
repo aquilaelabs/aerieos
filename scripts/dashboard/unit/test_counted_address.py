@@ -1,5 +1,5 @@
-"""The wrong-password hold counts the client, not the door (R243; the audit
-of 13 Nov): keyed on the socket's own address it held everybody behind the
+"""The wrong-password hold counts the client, not the door:
+keyed on the socket's own address it held everybody behind the
 tunnel or a reverse proxy together, since they are one address there, after
 a hundred wrong passwords from anyone. Behind a proxy this install trusts,
 the address that proxy passes on is the one counted; from anybody else the

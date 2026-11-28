@@ -1,5 +1,5 @@
 """A runner registered to a public repository takes a stranger's pull
-request (B761): its row says so, from what its host was last asked, never
+request: its row says so, from what its host was last asked, never
 on the page's own read."""
 import io
 import json

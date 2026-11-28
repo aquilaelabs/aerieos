@@ -1,4 +1,4 @@
-"""The install key, made by the install and changed from the page (R154).
+"""The install key, made by the install and changed from the page.
 
 With INSTALL_KEY not set, the boot makes a key in a folder only the
 controller's account reads (lib/boot.sh install_key_made): the secrets
@@ -12,7 +12,7 @@ This module reads and writes that folder (BB_INSTALL_KEY_DIR):
                 one a person said they saved; nothing in it opens anything
 
 A change seals everything kept under the install key again under the new
-one at once (the passes handed to configure()); the previous goes when no
+one at once (the passes handed to configure); the previous goes when no
 node holds a sign-in sealed under it any more. A key set in the environment
 is the environment's: shown, never changed here.
 """
@@ -182,7 +182,7 @@ def change(new=""):
         # The key before is kept until the next start has run every pass
         # again with both keys (settle): dropped here, anything a pass
         # skipped (a keystore it could not write a moment ago) was left
-        # under a key that was gone for good (B550).
+        # under a key that was gone for good.
     return {"ok": True, "fingerprint": fingerprint(key), "resealed": moved,
             **({"note": f"{left} of the stores could not be sealed again now; the key before is kept, "
                         "and they are sealed again at the next start"} if left else {})}, 200
@@ -190,14 +190,14 @@ def change(new=""):
 
 def landed(key, state_dir=None):
     """The install key a move carried, in place of the one this install made
-    for itself (B599), with that one kept as the one before, and loaded now:
+    for itself, with that one kept as the one before, and loaded now:
     what the moved state sealed opens under it. A key set in the environment
     is the environment's, and a move does not change it."""
     key = bytes(key).strip()
     if len(key) < 16:
         return "the carried install key is too short to be one: not taken"
     if not os.environ.get("BB_INSTALL_KEY_DIR"):
-        # Said, not swallowed (B623): the landing reported ok and the
+        # Said, not swallowed: the landing reported ok and the
         # moved state's sealed settings and sign-ins answered Locked.
         return ("this install's key is set in its environment (INSTALL_KEY), so the carried key was not taken: "
                 "set INSTALL_KEY to the old install's, or its sealed settings and sign-ins stay locked")

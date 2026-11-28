@@ -1,5 +1,5 @@
-"""A terminal's open keeps the newest copy of an account's sealed sign-in
-(B1043). Every open used to write the opened copy from the seal and put the
+"""A terminal's open keeps the newest copy of an account's sealed sign-in.
+Every open used to write the opened copy from the seal and put the
 link in the home's file's place, so a refresh the pass had not sealed yet
 (a plain file renamed over the link, or the opened copy written in place)
 was thrown away for the seal's older copy; a refresh spends the token

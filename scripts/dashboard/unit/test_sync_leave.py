@@ -1,4 +1,4 @@
-"""Leaving a synced copy (R164): the agent's half. While the controller says
+"""Leaving a synced copy: the agent's half. While the controller says
 leaving it keeps sending and says what is left after a whole walk; told the
 node is off with a clean-up token, it removes the copies, their records and
 the conversations' folder once, answers by the token, and never removes

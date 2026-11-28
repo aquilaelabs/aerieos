@@ -1,8 +1,8 @@
-"""The app kept current by its controller (R270 step 9): a person's device,
+"""The app kept current by its controller: a person's device,
 not a machine of the controller's, so nothing pushes to it; the app asks.
 
 At start and once a day it asks its controller's door what the controller
-holds of it (the apps verb, R272), and when that is newer than itself it
+holds of it (the apps verb), and when that is newer than itself it
 fetches the file it runs as (the .exe, or the .pyz), checks it against the
 controller's sha256 and, where this copy is signed, that the new one is
 signed too, and leaves it beside itself. The next start swaps it in
@@ -23,7 +23,7 @@ NEEDS_DOOR = 1          # the oldest controller door this app works with
 
 def headers():
     """What this app says on every call: the door it speaks and which app
-    and release it is, so a controller can refuse it by name (R79 step 8)."""
+    and release it is, so a controller can refuse it by name."""
     return {"X-BB-Door": str(DOOR), "X-BB-App": f"companion/{version()}"}
 
 
@@ -54,7 +54,7 @@ def version():
 def _parts(v):
     """Where a version stands: X.Y.Z, then a dev build (-dev.N) before the
     release it leads to and by its number, so one dev build is newer than
-    the last (B1171: -dev.N was ignored, and a dev companion never moved)."""
+    the last (-dev.N was ignored, and a dev companion never moved)."""
     m = re.match(r"v?(\d+)\.(\d+)\.(\d+)(?:-[a-z][a-z0-9]*\.(\d+))?", str(v or ""))
     if not m:
         return (0, 0, 0, 0, 0)
@@ -141,7 +141,7 @@ def proven(proof, name, sha):
     """Why the file `name` with `sha` is not one the release's signed list
     names under a key this copy carries, or "" when it is: the list's
     signature checked here with Windows' own ssh-keygen (OpenSSH Client),
-    never on the controller's word (B1168)."""
+    never on the controller's word."""
     keys = signers()
     if not keys:
         return "this copy carries no release signer to check the update with"
@@ -204,7 +204,7 @@ def check(ctl):
         os.remove(dest)
         return {"said": "the update did not match the controller's sha256: not kept"}
     # ...and its sha256 one the release's signed list gives it, the list's
-    # signature checked here with the keys this copy carries (B1168).
+    # signature checked here with the keys this copy carries.
     if why := proven(r.get("proof"), f["file"], _sha256(dest)):
         os.remove(dest)
         return {"said": f"{why}: the update is not kept"}

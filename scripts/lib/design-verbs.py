@@ -10,7 +10,7 @@ and `file --from FILE` the same from a record given (what `json` prints,
 edited) rather than the saved one, so a branch writes it from its own design;
 `json` prints the record (language, pages, and the presets they are drawn
 from: every kind, template, scheme and choice by key); `schema` prints the
-record's shape with every limit (B342); `save FILE` (or `-`
+record's shape with every limit; `save FILE` (or `-`
 for stdin) writes a record of that shape back, whole, which is how a
 session asked to put a design language into the notebook does it. A page
 without an id is new; one with its id replaces that page; one left out is
@@ -36,7 +36,7 @@ import dash  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard"))
 import records  # noqa: E402
 
-# `--format json|yaml|markdown` on list or show (R167): the record `json`
+# `--format json|yaml|markdown` on list or show: the record `json`
 # prints, in that form; a design is one record of its pages and themes.
 fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
@@ -49,7 +49,7 @@ argv = [a for a in argv if a != "--file"]
 
 
 if verb == "save" and (len(argv) < 2 or argv[1] in ("-h", "--help")):
-    # Help, not a file called -h (B342): the shape and every limit.
+    # Help, not a file called -h: the shape and every limit.
     r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=schema")
     print("aerie design save FILE (or - for stdin): a JSON file of this shape, saved whole")
     print()
@@ -67,7 +67,7 @@ def read_record(src):
 
 
 if verb == "file" and len(argv) > 1:
-    # From a record given rather than the saved one (B227): a branch writes
+    # From a record given rather than the saved one: a branch writes
     # the file from its own design, not from what other branches saved.
     if argv[1] != "--from" or len(argv) != 3:
         die("usage: aerie design file [--from FILE]")

@@ -1,4 +1,4 @@
-// Sign-in hardened (R158 step 8): a browser's sign-in is bound to the
+// Sign-in hardened: a browser's sign-in is bound to the
 // browser it was made in, so its cookie presented from another browser is
 // refused; Profile lists the browsers signed in as you, each with Sign out,
 // which ends that one's cookie; and the Audit page under Controller reads
@@ -53,7 +53,7 @@ await page.waitForFunction(() => { const rows = [...document.querySelectorAll('.
 ok(true, 'picked to one person, every row is theirs');
 
 // A notebook's presence beat changes nothing a person reads the audit for,
-// and it came every fifteen seconds an open notebook (R228 step 7): it is
+// and it came every fifteen seconds an open notebook: it is
 // not a row, while a write beside it still is.
 const audited = await page.evaluate(async () => {
   for (let i = 0; i < 3; i++) await postJSON('/api/presence', { project: 'alpha', client: 'audit-probe', where: 'roadmap' });

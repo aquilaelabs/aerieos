@@ -1,4 +1,4 @@
-"""The root startup hooks an administrator approves (B1166): each
+"""The root startup hooks an administrator approves: each
 STATE/startup.d/*.root.sh, what it says, and whether the start will run it,
 read and changed through the root-only helper scripts/root-hook, which keeps
 the approvals where only root writes. Controller settings' Startup hooks

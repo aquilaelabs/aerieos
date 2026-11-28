@@ -1,4 +1,4 @@
-// aerie capture (R95). reel: the frames of a recording that changed, stamped and tiled,
+// aerie capture. reel: the frames of a recording that changed, stamped and tiled,
 // with a JSON of when. Driven on a synthetic video ffmpeg draws with two
 // hard changes, so the answer is known: three frames, at 0, 2.0 and 3.5s.
 // ffmpeg is a toolchain recipe rather than a given, so a node without it
@@ -19,7 +19,7 @@ const freePort = () => new Promise(res => {
 
 const S = `${DIR}/reel`;
 mkdirSync(S, { recursive: true });
-// dist/ and the scratch apart (R96): the sheet and frames.json land under
+// dist/ and the scratch apart: the sheet and frames.json land under
 // dist/reel/NAME, the recording and the frames under the scratch, and the
 // record names who asked.
 const env = { ...process.env, BB_CAPTURE_OUT: `${S}/dist/reel`, BB_CAPTURE_SCRATCH: `${S}/scratch`, BB_ACCOUNT_NAME: 'tester' };
@@ -45,8 +45,8 @@ if (ff.status !== 0){
   const coarse = reel('--video', `${S}/letters.mp4`, '--name', 'letters');
   const fine = reel('--video', `${S}/letters.mp4`, '--name', 'letters2', '--threshold', '0.0002');
   const kept = n => (JSON.parse(readFileSync(`${S}/dist/reel/${n}/frames.json`, 'utf8')).frames || []).map(f => f.t);
-  // A patch changed from the last frame kept is a change (R261, the operator,
-  // 17 Oct): a letter is a few patches, so the default sees each one, where a
+  // A patch changed from the last frame kept is a change:
+  // a letter is a few patches, so the default sees each one, where a
   // whole-frame score of 0.02 saw neither.
   ok(coarse.status === 0 && kept('letters').length === 3 && Math.abs(kept('letters')[1] - 1.5) < 0.2 && Math.abs(kept('letters')[2] - 2.5) < 0.2,
      `a letter-sized change is a frame at its time by default (${JSON.stringify(kept('letters'))})`);
@@ -80,7 +80,7 @@ if (ff.status !== 0){
        (slow.stderr.match(/about [^;]*/) || ['nothing'])[0].slice(0, 90)})`);
   cap('prune', `${S}/dist`, 'flash', 'flash10', 'slow');
   // A slow scroll: a block moving two pixels a frame, which no frame scores
-  // against the one before but which adds up (the operator's phone, 17 Oct),
+  // against the one before but which adds up,
   // thinned to where it starts and settles and frames between; a long reel
   // pages twelve frames a sheet; --dry counts and draws nothing, listing
   // the run; --from and --to see one stretch at the recording's own times.
@@ -129,7 +129,7 @@ if (ff.status !== 0){
   mkdirSync(`${S}/dist/emu`, { recursive: true });
   writeFileSync(`${S}/dist/emu/shot-old.png`, Buffer.from([1, 2, 3]));
   writeFileSync(`${S}/dist/emu/.shot-old.png.json`, JSON.stringify({ by: 'claude', at: Math.floor(Date.now() / 1000) - 10 * 86400 }));
-  // A page's shot is a capture too (B6): aerie capture shot URL with no file
+  // A page's shot is a capture too: aerie capture shot URL with no file
   // writes it under dist/shot and marks it with the URL it was taken from.
   mkdirSync(`${S}/dist/shot`, { recursive: true });
   writeFileSync(`${S}/dist/shot/shot-page.png`, Buffer.from([1, 2, 3]));
@@ -156,8 +156,8 @@ if (ff.status !== 0){
   ok(byName.status === 0 && !existsSync(`${S}/dist/reel/cut`) && /no captures/.test(cap('ls', `${S}/dist`).stderr),
      'prune NAME lets a capture go now whatever its age');
 }
-// --emu PKG launches the package only when it is not already on the screen
-// (B387): a launch restarts its launcher activity, and the keyboard, dialog
+// --emu PKG launches the package only when it is not already on the screen:
+// a launch restarts its launcher activity, and the keyboard, dialog
 // or deep screen a session had just driven into place was gone from the
 // shot. adb is stood in for by a script that answers get-state, the window
 // dump from a file, and screencap with one fixed picture, and logs a launch.
@@ -192,7 +192,7 @@ exit 0
      `...and one that is not on the screen is launched first (${away.launched})`);
 });
 
-// A timed touch (R101): touch.py finds the panel and the screen through adb
+// A timed touch: touch.py finds the panel and the screen through adb
 // and sends the whole gesture as one shell of sendevent lines with sleeps,
 // in the panel's own range, turned with the screen. The same stand-in adb,
 // answering getevent -p, wm size and dumpsys input from files, and logging
@@ -217,7 +217,7 @@ exit 0
     const r = spawnSync('python3', [`${REPO}/scripts/lib/touch.py`, ...a],
                         { encoding: 'utf8', env: { ...env, BB_CAPTURE_ADB: `${A}/adb` } });
     // The gesture is the last shell it is handed; a glide's first is the
-    // measure of what one move costs (B502), which this adb cannot time.
+    // measure of what one move costs, which this adb cannot time.
     return { r, sent: readFileSync(`${A}/log`, 'utf8').trim().split('\n').at(-1).split(';') };
   };
   writeFileSync(`${A}/rotation.txt`, '  SurfaceOrientation: 0\n');
@@ -230,7 +230,7 @@ exit 0
   const hold = touch('hold', '100', '100', '--ms', '700');
   ok(hold.r.status === 0 && hold.sent.includes('sleep 0.7') && hold.sent.indexOf('sleep 0.7') < hold.sent.indexOf('sendevent /dev/input/event2 3 57 -1'),
      'a hold keeps the finger down for its time before lifting');
-  // The path is a hand's (R127): a sample every 10 ms. A ruler hand is the
+  // The path is a hand's: a sample every 10 ms. A ruler hand is the
   // straight even stroke, 500 px at 2000 px/s, 25 samples.
   const glide = touch('glide', '100', '1000', '600', '1000', '--hand', 'ruler', '--pre', '150', '--hold', '300');
   const moves = glide.sent.filter(l => l === 'sleep 0.01').length;
@@ -324,7 +324,7 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
 await section("aerie capture shot at rest", async () => {
   const { spawn } = await import('node:child_process');
   const web = `${S}/web`; mkdirSync(web, { recursive: true });
-  // Two pages (B392). The settled shots take the one whose heading lands
+  // Two pages. The settled shots take the one whose heading lands
   // at 700 ms, inside the second a settle waits. The --now shot takes one
   // whose heading lands at 20 s: shooting the 700 ms page with --now had to
   // beat its timer, and a headless shot on a box at a load near ten did not.
@@ -348,14 +348,14 @@ await section("aerie capture shot at rest", async () => {
      && !bytes(`${S}/now.png`).equals(bytes(`${S}/one.png`)) && bytes(`${S}/one.png`).equals(bytes(`${S}/two.png`)),
      `aerie capture shot --settle pictures a page after its late element lands, and --now pictures it before (${
         [now, one, two].map(r => r.status).join('/')}; ${(one.stderr || '').trim().slice(0, 60)})`);
-  // B535: the server is gone now. A page that does not answer is no
+  // The server is gone now. A page that does not answer is no
   // picture and a failure, where it was Chromium's error page and exit 0.
   const gone = shot('', `${S}/gone.png`, '--now');
   ok(gone.status === 3 && !existsSync(`${S}/gone.png`) && /did not answer/.test(gone.stderr || ''),
      `...and a page that does not answer is no picture and exit 3, saying so (${gone.status}; ${(gone.stderr || '').trim().slice(0, 80)})`);
 });
-// A page in any browser installed here, as any device Playwright knows
-// (R263): neither is a list of aerie's own, so the checks ask what is there
+// A page in any browser installed here, as any device Playwright knows:
+// neither is a list of aerie's own, so the checks ask what is there
 // and hold the verbs to it. A machine with Chromium alone passes as one
 // with three does.
 await section("a page in every browser installed, as any device", async () => {
@@ -400,7 +400,7 @@ await section("a page in every browser installed, as any device", async () => {
   ok(!many || (many.status !== 0 && here.every(n => (many.stderr || '').includes(n))), `...one browser a recording, said with their names when all is asked (${many ? many.status : 'one browser here'})`);
   srv.kill();
 });
-// B143: this session's own token goes to the controller's origin alone. A
+// This session's own token goes to the controller's origin alone. A
 // page on another host (here the same loopback under another port, as a dev
 // instance on bb-sandbox:7680 was beside the controller's :7680) is shot
 // and recorded without it; the controller itself is shot with it.
@@ -439,7 +439,7 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
       { encoding: 'utf8', env: as('http://127.0.0.2:7680'), cwd: S });
     reelHeard = heard();
   }
-  // The controller's own dashboard is a person's page (R227 step 4): a
+  // The controller's own dashboard is a person's page: a
   // session's token is sent to no page, and a shot or a reel of the
   // controller's own address says so and asks nothing of it.
   let homeReel = { status: 2, stderr: 'skipped' }, homeReelHeard = '';

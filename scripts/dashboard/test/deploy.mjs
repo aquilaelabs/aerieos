@@ -1,4 +1,4 @@
-// A space's Deploy section (R281 step 3): with a cluster kept, the space's
+// A space's Deploy section: with a cluster kept, the space's
 // settings list its Kubernetes environments as records; Add environment's
 // Save makes the namespace ready on the cluster (the namespace labeled with
 // the space's id and this install's mark, a deployer with a Role and a
@@ -173,7 +173,7 @@ await section("the Kubernetes view: what runs, Scale, Restart and a pod's log, t
   const ended = await page.evaluate(() => [...TERMS.values()].find(r => r.t.arg === 'log:pod:alpha:qa:web-1')?.ended || '');
   ok(said && !ended, `its log is read through the deployer and followed (${ended})`);
   await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:pod:alpha:qa:web-1').id));
-  // A shell in the running pod (R281): a dock tab, the controller the
+  // A shell in the running pod: a dock tab, the controller the
   // cluster's client as its deployer, keys in and the pod's answer back.
   await page.click(`${sect} [data-kbshell="qa:web-1"]`);
   const opened = await until(() => page.evaluate(() => [...TERMS.values()].some(r => r.t.arg === 'pod:alpha:qa:web-1' && r.ws?.readyState === 1)), 15000, 200);

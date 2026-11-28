@@ -1,5 +1,5 @@
-"""The controller's secrets carried across a move on a machine of its own
-(B728): the folder is root's there, so the root helper packs it on the old
+"""The controller's secrets carried across a move on a machine of its own:
+the folder is root's there, so the root helper packs it on the old
 home and places it on the new, where every *.env line is held to a secret's
 name and a value with no shell in it, since the controller's start reads
 those files as root. Run here as the test's own account against folders of
@@ -165,7 +165,7 @@ class Moved(unittest.TestCase):
     def test_with_no_helper_to_run_nothing_is_asked_of_root(self):
         os.environ.pop("BB_SECRETS_CARRY")
         # Pinned here, not left to what a module run earlier in the same
-        # process set (B808): bare_metal() true and a helper file in place
+        # process set: bare_metal true and a helper file in place
         # would have this ask sudo.
         was = move.bare_metal
         self.addCleanup(setattr, move, "bare_metal", was)

@@ -1,5 +1,5 @@
 """Another account's Claude session on Claude Code's permission prompt reads
-asking to whoever may see the project, not waiting (B104), and the maps the
+asking to whoever may see the project, not waiting, and the maps the
 status read and /api/live carry are every account's sessions on the
 projects the viewer sees and on no other."""
 import os

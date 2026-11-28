@@ -1,4 +1,4 @@
-"""The Library's one list (R170 step 1): the toolchains and packs a node's
+"""The Library's one list: the toolchains and packs a node's
 store reads, the coding agents, the apps, the catalog's offers not yet added
 and the companions, each a row of one shape with its kind, its tier, where
 it stands on the node and the one verb it takes."""
@@ -36,7 +36,7 @@ COMP = {"apps": [{"name": "android", "title": "AerieOS for Android", "does": "th
 class RunningJob(unittest.TestCase):
     """A job running before its agent says which name it is on: the first
     is the one it works on and the rest wait, so a card pressed reads as
-    pressed (the operator, 17 Nov: Node.js kept its Software update while
+    pressed (Node.js kept its Software update while
     the Jobs page said it ran)."""
     def test_its_names_are_running_and_queued_before_the_agent_says(self):
         tc = dict(TC, job={"running": True, "action": "install", "current": "", "queue": ["node", "jdk"]})
@@ -62,7 +62,7 @@ class Rows(unittest.TestCase):
         self.by = {(r["kind"], r["name"]): r for r in self.rows}
 
     def test_a_card_names_who_the_tool_is_by_and_never_on_a_sideloaded_packs_own_word(self):
-        """The operator, 12 Nov: the tier says who stands behind the pack,
+        """The tier says who stands behind the pack,
         the maker who the tool itself is by."""
         tc = {"nonode": False, "items": [
             {"name": "jdk", "label": "JDK 21", "about": "Java", "maker": "Eclipse Adoptium"},
@@ -137,7 +137,7 @@ class Rows(unittest.TestCase):
         self.assertEqual((v["verb"], v["absent"], v["download"]), ("", "0.9.0", None))
 
     def test_a_service_is_a_row_with_its_configuration_as_the_page_sees_it(self):
-        # R172: the model router as a card, its values from its own status.
+        # The model router as a card, its values from its own status.
         fields = [{"name": "anthropic", "kind": "secret", "label": "Anthropic"}, {"name": "custom", "kind": "list", "label": "Other", "fields": [{"name": "name", "kind": "text"}, {"name": "base", "kind": "text"}, {"name": "key", "kind": "secret"}]},
                   {"name": "ollama", "kind": "switch", "label": "Ollama"}, {"name": "projects", "kind": "projects", "label": "Spaces"}]
         status = {"deployed": True, "url": "http://10.0.0.5:4000", "providers": {"anthropic": True, "openai": False},
@@ -171,7 +171,7 @@ class Rows(unittest.TestCase):
                             "platforms": ["linux/*"]}]}
         by = {r["name"]: r for r in library.rows(tc, [], [], index, None)}
         # The toolchain's own verdict stands, said as every other card's is
-        # now a card for another system can be shown (R256).
+        # now a card for another system can be shown.
         self.assertEqual(by["xcode"]["wrong_platform"], "not for this node (linux/amd64): needs darwin/arm64", "the toolchain's own verdict stands")
         self.assertIn("not for this node (linux/amd64)", by["armonly"]["wrong_platform"])
         self.assertEqual((by["anylinux"]["wrong_platform"], by["jdk"]["wrong_platform"]), ("", ""))
@@ -180,7 +180,7 @@ class Rows(unittest.TestCase):
                          "a node that has not said its platform is not judged")
 
 class NoShippedApps(unittest.TestCase):
-    """No app is shipped (R238): the Apps are what the catalog's index
+    """No app is shipped: the Apps are what the catalog's index
     lists and what is kept here, and nothing where there is neither."""
     INDEX = {"packs": [{"name": "whoami", "kind": "app", "url": "https://example.com/catalog", "commit": "c" * 40, "sha256": "d" * 64,
                         "path": "packs/apps/whoami", "tier": "aerie", "about": "A tiny web server.", "maker": "Traefik Labs"}]}

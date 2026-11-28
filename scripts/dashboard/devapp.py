@@ -88,7 +88,7 @@ WORKSPACE = None
 STATE = None
 FILE = None
 OWNERS = None
-LANS = None             # docker-lan.json: {node: [container keys]} let onto the LAN (R178)
+LANS = None             # docker-lan.json: {node: [container keys]} let onto the LAN
 node_for = None
 node_addr = None
 ENVDIR = None
@@ -96,10 +96,10 @@ write_json = None
 field = None                     # server.py's one-string-field reader, for act()
 # Why a container of a project on a node cannot be given that node's NVIDIA
 # card, or "": server.py's, which knows the node's switch, the project's
-# setting and what the node's Installed page holds (R102).
+# setting and what the node's Installed page holds.
 gpu_why = None
-room_why = None         # set by server.py: (node id) -> why a build there would run out of disk, or "" (R110)
-container_mem_gb = None  # set by server.py: (node id) -> the memory limit in GB a container with none gets there, 0 for none (R110, R294 step 7)
+room_why = None         # set by server.py: (node id) -> why a build there would run out of disk, or ""
+container_mem_gb = None  # set by server.py: (node id) -> the memory limit in GB a container with none gets there, 0 for none
 
 # docker, or the harness's stub in the source tree alone (seams.py).
 DOCKER = seams.get("BB_DOCKER_BIN", "docker")
@@ -114,7 +114,7 @@ RUN_DENIED = ("running this space's containers is the operator's: rebuilding, "
               "one are handed over in the space's settings, Agents may: Run its container")
 
 MAIN = "main"
-# The owner of a container AerieOS deploys itself (R180): the nginx tab's
+# The owner of a container AerieOS deploys itself: the nginx tab's
 # container is the one today. Set by the deployment that writes it and by
 # nothing else, not a person's picker and not a session, and given every
 # bridge and every published port on its node by the containers' network
@@ -127,7 +127,7 @@ def _slug(s):
 
 # Where a dev instance's data lives when the node addressed reports no
 # appdata store. It is a STORE, reported per node with its path and its
-# headroom and edited on the node's own Storage section (R17 step 2), because
+# headroom and edited on the node's own Storage section, because
 # where a node keeps a container's databases is a fact about that node; this
 # is the answer for a node that has not said, and BB_DEV_DATA_DIR is how the
 # test harness points it at a scratch directory.
@@ -139,7 +139,7 @@ DEVDATA = os.environ.get("BB_DEV_DATA_DIR", "/devdata")
 log_dir = None
 project_node = None   # the project's own node, from prefs (docs/nodes.md §13)
 node_reported = None  # a node's reported facts by id (nodes.node), for BB_DOCKER_GID
-project_nodes = None  # ...and the set it works on, primary first (R82)
+project_nodes = None  # ...and the set it works on, primary first
 all_project_nodes = None  # () -> {project: [node ids]}, every project's set
 reads_of = None           # project -> [projects it reads] (prefs.reads), set by the server
 hosts_of = None           # project -> [node ids it hosts its containers on] (prefs hosts), set by the server
@@ -195,8 +195,8 @@ def _instance_node(project, instance):
     own node (one setting for everything a project does on a node), else
     nothing.
 
-    Nothing, not a default: there is no primary docker manager (the
-    operator, 25 Sep). An instance whose record names no node and whose
+    Nothing, not a default: there is no primary docker manager.
+    An instance whose record names no node and whose
     project has none has no daemon, and everything that reaches for one
     says so rather than landing on whichever node was enrolled last.
     """
@@ -224,12 +224,12 @@ def project_daemon(project):
 
 def container_nodes(project):
     """Every node this project's containers may be on, its own first: the
-    nodes it works on (R82), the ones it hosts its containers on (R166), and
+    nodes it works on, the ones it hosts its containers on, and
     the node each of its instances was put on, which aerie devapp new --node
     makes one of neither. The one answer a session's container list, its
     container verbs and an instance's address all read: asking the
     project's own node alone left an instance on a hosting node unlisted
-    and unreachable to the session that made it (B338)."""
+    and unreachable to the session that made it."""
     out = []
 
     def add(n):
@@ -499,7 +499,7 @@ def _published(ports, local=False):
     """The published TCP ports of an instance, from either shape the two
     listings use: "7475->7474/tcp" or "127.0.0.1:7475->7474/tcp" strings,
     or {published, proto} dicts. With `local`, the ones bound to the
-    loopback alone (R190), which no address of the node's reaches."""
+    loopback alone, which no address of the node's reaches."""
     out, loop = [], []
     for p in ports or []:
         if isinstance(p, dict):
@@ -554,7 +554,7 @@ def route_view(project, instance, ports, prefer=None):
                                 and (n.get("reported") or {}).get("sandbox"))
     if mode == "lan":
         host = queue.route_host(nid) if queue is not None and nid else ""
-        # A port bound to the loopback alone (R190) has no address of the
+        # A port bound to the loopback alone has no address of the
         # node's to be reached at: the node's nginx is what answers for it.
         if port in _published(ports, local=True) and port not in _published([p for p in ports or [] if not (
                 isinstance(p, str) and p.split("->", 1)[0].rpartition(":")[0].startswith("127."))]):
@@ -585,7 +585,7 @@ def route_view(project, instance, ports, prefer=None):
 def job_why(j):
     """How a compose job ended, in words: a failed one whose reason is only
     its exit code says what its log says instead, as the Jobs page shows it
-    (B96: a Rebuild whose image could not be pulled read 'exit 1' on its
+    (a Rebuild whose image could not be pulled read 'exit 1' on its
     row, and why was only in the Jobs page's output)."""
     err = str(j.get("error") or "")
     if j.get("state") != "failed" or not re.fullmatch(r"\s*(exit \d+)?\s*", err):
@@ -686,7 +686,7 @@ def _learn_host_key(addr):
     REFUSES an unknown host rather than asking, so a node the controller has
     never ssh'd to fails with "Host key verification failed" and every Docker
     control on the tab grays out. The documented cure was a person running
-    ssh-keyscan on the controller, which R47 took away with sessions: there
+    ssh-keyscan on the controller, which went with its sessions: there
     is no session here to run it in any more.
 
     So it is done here, on the failure, and only on the first meeting. The
@@ -762,7 +762,7 @@ def source():
     # address "the sandbox VM" and then refusing it as not one, in the same
     # sentence, is how a status line stops being read. An agent node's
     # daemon is reached through its agent and nothing dials the address on
-    # its record, so that one is named by the node (B264).
+    # its record, so that one is named by the node.
     n = _agent_here()
     kind = (n["name"] if n
             else "the sandbox VM" if addr.startswith("ssh://")
@@ -772,7 +772,7 @@ def source():
             # The status poll carries ONE daemon's verdict (the default
             # node's) and the manager may be looking at another, so a page
             # that cannot match the two applies the default node's absence to
-            # every node there is. B109, which was fixed on the client by
+            # every node there is. That was fixed on the client by
             # comparing this id and then shipped with nothing setting it, so
             # the comparison quietly fell back to "yes, that is us" and the
             # bug came back whole.
@@ -784,7 +784,7 @@ def _agent_here():
     """The node these docker calls are addressed at, when it is an AGENT node
     whose agent is dialing in, else None.
 
-    THE WHOLE OF B111 IS THIS DISTINCTION. On an agent node nothing about
+    THIS DISTINCTION IS THE WHOLE OF IT. On an agent node nothing about
     compose goes over ssh: _submit sends the entire plan to the agent and the
     agent runs it against that machine's own local docker socket. So the
     controller's ssh is the wrong question to judge the page by, and asking it
@@ -840,7 +840,7 @@ def _forget_reads(node_id):
 def on_own_machine(project, instance=MAIN):
     """Whether this instance lives on the controller's own machine, where
     docker is root over the controller and a session's build waits for a
-    person (B743)."""
+    person."""
     if queue is None:
         return False
     nid = _instance_node(project, instance)
@@ -855,7 +855,7 @@ def _agent_exec(n, argv, timeout):
     node is not answered from what it said before."""
     _docker_log("$ " + " ".join(argv) + f"   (on {n['name']})")
     # 25s for a start or a stop; a prune is given the time it asks for
-    # (B249: a build cache's prune was killed at 25s, partway through).
+    # (a build cache's prune was killed at 25s, partway through).
     cap = 600 if argv[1:] in [list(p) for p in PRUNES.values()] else 25
     r = queue.run_wait("dashboard", n["id"], argv, timeout=min(int(timeout), cap),
                        forget=True, docker=True)
@@ -872,7 +872,7 @@ def _agent_read(n, argv, timeout):
     memo = getattr(_scope, "reads", None)
     if memo is not None and key in memo:
         return dict(memo[key])
-    # Asked every time, busy or not (the operator, 11 Oct: the tab read
+    # Asked every time, busy or not (the tab read
     # "down, as last seen" whenever anything ran on the node, which on a
     # shared node is most of the time, and through every change made from
     # it, since the change is itself a job). A short exec goes on the light
@@ -918,8 +918,8 @@ def _agent_instance_containers(n, project, instance, running_only):
 
 
 def _no_daemon_why():
-    """Why there is no daemon to send docker work to, said for this install
-    (B147): nodes enrolled that run no Docker want Docker, not another node,
+    """Why there is no daemon to send docker work to, said for this install:
+    nodes enrolled that run no Docker want Docker, not another node,
     and an install that holds enrolling off is not told to enroll."""
     rows = [n for n in (queue.node_list() if queue else [])
             if n.get("kind") != "local" and n.get("state") not in ("retired", "pending")]
@@ -987,7 +987,7 @@ def _available_agent(n):
                        "docker group"} | source()
     # The controller's own machine is never stamped a sandbox (it is not a box
     # to be wrecked) and its containers are the root agent's, so a person's
-    # press reaches its daemon (B743).
+    # press reaches its daemon.
     if not rep.get("sandbox") and not (n.get("config") or {}).get("own"):
         return {"on": False,
                 "why": f"{n['name']} is not an AerieOS sandbox: it does "
@@ -1166,7 +1166,7 @@ def forget_available():
 _IMAGE_REF = re.compile(r"[a-z0-9][a-z0-9._/:-]{0,250}")
 _BARE_OK = {"version", "ps", "info"}
 # Acting on a container by name: the three verbs a person reaches for on a
-# list, and the log they open it to read (R68 steps 1 and 2). Held apart from
+# list, and the log they open it to read. Held apart from
 # compose because these address a CONTAINER rather than a project, which is
 # the whole point: a container this dashboard did not create has no compose
 # project here to name.
@@ -1183,7 +1183,7 @@ LOG_LINES = 400
 def _mount_ok(root):
     """Whether a devdata `docker run` may bind this path as /d.
 
-    Two shapes, and the second is why this is a function (B192). A SHARE ROOT
+    Two shapes, and the second is why this is a function. A SHARE ROOT
     (/auxiliary for /auxiliary/plex-library), which is what a compose naming a
     path on the VM needs: the mount is the share and the names under it are
     made by the run. And THIS NODE'S APPDATA STORE, whatever depth the node
@@ -1253,21 +1253,21 @@ def _guard(argv):
         return "a `docker run` this module did not build"
     # Start, stop, restart and the log, each by SHAPE: the verb and names
     # that look like names, one or an instance's several (container_ctl
-    # acts on every container the name means; B770). Nothing else can ride
+    # acts on every container the name means). Nothing else can ride
     # along, because each word is held to a name rather than scanned for
     # something bad.
     if verb in _CTL_OK:
         if argv[2:] and all(_CTR_NAME.match(a) for a in argv[2:]):
             return ""
         return f"a `docker {verb}` this module did not build"
-    # Start on boot (R122): the restart policies read for a list, and one set
+    # Start on boot: the restart policies read for a list, and one set
     # on named containers, each in the one shape this module builds. Refused
-    # by this guard until B476, so the switch never read or set anything.
+    # by this guard, the switch never read or set anything.
     if verb == "inspect":
         if argv[2:4] == ["--format", BOOT_FORMAT] and argv[4:] and all(_CTR_NAME.match(a) for a in argv[4:]):
             return ""
         # ...and an image's pulled digests, for the registry check
-        # (imagecheck.py, R195): one image reference, in its one shape.
+        # (imagecheck.py): one image reference, in its one shape.
         if argv[2:6] == ["--type", "image", "--format", "{{json .RepoDigests}}"] and len(argv) == 7 \
                 and _IMAGE_REF.fullmatch(argv[6]):
             return ""
@@ -1277,7 +1277,7 @@ def _guard(argv):
                 and all(_CTR_NAME.match(a) for a in argv[4:])):
             return ""
         return "a `docker update` this module did not build"
-    # The reads the Docker tab's 2.0 surfaces make (R216), each in the one
+    # The reads the Docker tab's 2.0 surfaces make, each in the one
     # shape this module builds: what every container uses now, the images
     # and the volumes on the daemon and what they weigh.
     if verb == "stats":
@@ -1290,7 +1290,7 @@ def _guard(argv):
         return "a `docker images` this module did not build"
     # ...and the prunes the view offers, each exactly as PRUNES spells it and
     # nothing named: the four were added to PRUNES while this knew two, so
-    # Prune unused images and Prune build cache were refused as a bug (B245).
+    # Prune unused images and Prune build cache were refused as a bug.
     if argv[1:] in [list(p) for p in PRUNES.values()]:
         return ""
     if verb == "image":
@@ -1385,9 +1385,9 @@ def _run(argv, timeout=60, env_extra=None, sink=None, hold=None):
     # the compose actions already do (roadmap #18): the controller holds no
     # ssh into a node its agent dials out of, so `docker ps` over
     # DOCKER_HOST=ssh:// was the one call left dialing it and the one that
-    # failed on every fresh deploy (B134). Streamed calls are builds and
+    # failed on every fresh deploy. Streamed calls are builds and
     # never reach here on an agent node; _submit ships those whole.
-    # ...and the 2.0 reads the same way (R216): what the containers use,
+    # ...and the 2.0 reads the same way: what the containers use,
     # the images, the volumes and what they weigh.
     if sink is None and hold is None and argv[:1] == [DOCKER] \
             and len(argv) > 1 and (argv[1] in _BARE_OK | {"inspect", "stats", "images"}
@@ -1398,9 +1398,9 @@ def _run(argv, timeout=60, env_extra=None, sink=None, hold=None):
     # ...and the verbs addressed at one container by name (its log, start,
     # stop, restart) run there the same way, as one exec and never from a
     # kept answer: they fell through to DOCKER_HOST=ssh:// below, which on
-    # an agent node is the path R85 names and no controller holds a key
+    # an agent node is a path no controller holds a key
     # for, so a session's aerie devapp log on the dev pair met "Host key
-    # verification failed" from the VM (B312).
+    # verification failed" from the VM.
     if sink is None and hold is None and argv[:1] == [DOCKER] \
             and len(argv) > 1 and (argv[1] in _CTL_OK | {"logs", "update"}
                                    or argv[1:] in [list(p) for p in PRUNES.values()]):
@@ -1513,7 +1513,7 @@ COMPOSE_LABEL = "com.docker.compose.project"
 SERVICE_LABEL = "com.docker.compose.service"
 
 
-# What each container is using now (R216): one `docker stats` per ask,
+# What each container is using now: one `docker stats` per ask,
 # memoised a few seconds per daemon, so a page that redraws often does not
 # sample the daemon on every redraw. Read beside the list, never inside it:
 # stats takes a second or two to sample and the list must not wait on it.
@@ -1578,7 +1578,7 @@ def stats():
 
 
 def images_view():
-    """The daemon's images and volumes (R216): each image with its size and
+    """The daemon's images and volumes: each image with its size and
     age and whether a container here uses it, each volume with its driver,
     and what the daemon says the lot weighs and what a prune would give
     back. One listing each, memoised like stats."""
@@ -1649,7 +1649,7 @@ def images_view():
     return out
 
 
-# What each prune removes (R110 step 3 adds the last two, which are where a
+# What each prune removes (the last two are where a
 # busy node's disk goes: images nothing has used for two weeks, and the
 # build cache older than a week). Nothing a container uses is ever touched.
 PRUNES = {"images": ["image", "prune", "-f"],
@@ -1706,7 +1706,7 @@ def containers():
     at a time, and nobody's project until its row names one.
     """
     # One listing serves the checks one press makes in the same breath, inside
-    # one_listing() alone (the operator, 26 Oct: Start on boot read the
+    # one_listing alone (Start on boot read the
     # daemon twice, the project's check and the targets, before it acted, each
     # a trip to the node), dropped by any write (_run). Nowhere else: a job
     # reads the daemon again to see what its own step did.
@@ -1723,8 +1723,8 @@ def containers():
     if r["code"] != 0:
         # From the TAIL, through the same reader availability uses. Cut from
         # the front, as this was, docker's connect error reads "command [ssh
-        # -l bb -o Connect…" and stops, which is the half the operator knew
-        # (B106). It mattered less when a failed listing only grayed rows
+        # -l bb -o Connect…" and stops, which is the half the operator knew.
+        # It mattered less when a failed listing only grayed rows
         # nobody could act on; now that the controls stay live and this line
         # is the whole account of what is not known, it is the message.
         return {"error": _why_not(r["out"]), "containers": []}
@@ -1755,7 +1755,7 @@ def containers():
             "status": c.get("Status", ""),
             "ports": _ports(c.get("Ports", "")),
             # ...and the ports published on every address, for a node whose
-            # ports are meant to stay on it (R190).
+            # ports are meant to stay on it.
             "open": sorted(set(_published(_ports(c.get("Ports", ""))))
                            - set(_published(_ports(c.get("Ports", "")), local=True))),
             "project": proj,
@@ -1767,7 +1767,7 @@ def containers():
     return {"error": "", "containers": out, "stale": bool(r.get("stale"))}
 
 
-# Start on boot (R122, the operator 4 Oct): a container's restart policy,
+# Start on boot: a container's restart policy,
 # read in one docker inspect for the whole list. unless-stopped or always is
 # on: the daemon starts it when the node (or docker) starts, unless somebody
 # stopped it. For an instance of AerieOS's own the choice is kept on its
@@ -1778,7 +1778,7 @@ BOOT_FORMAT = "{{.Id}} {{.HostConfig.RestartPolicy.Name}}"
 # Each container's policy by its id, so a listing inspects only containers it
 # has not seen. On a node the listing is an agent job, and a second job for
 # the inspect on every listing doubled what the Docker tab waits on: devapp.mjs
-# timed out around Up in every gate that ran it beside another suite (B470).
+# timed out around Up in every gate that ran it beside another suite.
 # A rebuild makes new ids, read once; Start on boot writes what it set here.
 _policies = {}
 _asked_at = {}          # id -> when an inspect last went unanswered for it
@@ -1804,7 +1804,7 @@ def _boot_read(out):
         # Read off the listing's path: the listing draws what is known, and
         # the next one (seconds later) has the rest. On a node the inspect is
         # a job of its own, and a listing that waited on it was what kept
-        # the Docker tab's waits running out (B470, B476). An id the daemon
+        # the Docker tab's waits running out. An id the daemon
         # did not describe is remembered as unknown for a while, then asked
         # again.
         for i in new:
@@ -1891,7 +1891,7 @@ def _ports(raw):
             continue
         host, _, rest = bit.partition("->")
         bind, _, port = host.rpartition(":")
-        # Bound to the loopback, it says so (R190): that is the port only the
+        # Bound to the loopback, it says so: that is the port only the
         # node's own nginx reaches, and the row has to tell it from one
         # published on every address.
         entry = f"127.0.0.1:{port}->{rest}" if bind.startswith("127.") else f"{port}->{rest}"
@@ -1917,23 +1917,23 @@ def _app_name(name):
 def project_has_compose(project):
     """Whether the project's own checkout carries a compose file.
 
-    Stats only, and deliberately: compose_file() consults the instance record
+    Stats only, and deliberately: compose_file consults the instance record
     first, which means reading the store, and this is asked for every project
     on every status poll. The question here is not "which file would an
     instance build from" but "is there anything to build at all", which is
     what decides whether the settings dialog offers to run the tests in a
-    container (R68 step 6).
+    container.
     """
     return any((WORKSPACE / project / n).is_file() for n in COMPOSE_NAMES)
 
 
-# Every compose file a project has, not only the one at its root (the
-# operator, 10 Oct): a repo with a site in site/ and an api in api/, or a
+# Every compose file a project has, not only the one at its root:
+# a repo with a site in site/ and an api in api/, or a
 # docker-compose.prod.yml beside the main one. An override file is left out:
 # compose merges it onto the file beside it, and alone it is half a file.
 # compose.yml, docker-compose.yml, a variant after (compose.prod.yml) or a
 # name before (admin.compose.yml: one file per service, as Turing Lens
-# keeps them under deploy/containers/, 11 Oct).
+# keeps them under deploy/containers/).
 OVERRIDE_RE = re.compile(r"[A-Za-z0-9_.-]+\.override\.ya?ml")
 COMPOSE_RE = re.compile(r"(?:(?P<pre>[A-Za-z0-9_-]+)\.)?(docker-)?compose(?P<var>\.[A-Za-z0-9_-]+)?\.ya?ml")
 COMPOSE_SKIP = {".git", "node_modules", ".gradle", "__pycache__", ".venv", "venv",
@@ -1966,7 +1966,7 @@ def compose_files(project):
 
 def override_files(project):
     """Every compose file in the project's tree an instance may lay over its
-    own (the operator, 17 Oct): the sendable ones and the ones named
+    own: the sendable ones and the ones named
     `*.override.*`, which are never sent on their own."""
     return _compose_walk(project, overrides=True)
 
@@ -2021,7 +2021,7 @@ def example_file(project, instance=MAIN):
     the root's, a folder's own for one in a folder. Not the root's for a
     folder's: compose reads a file's .env from its own folder, and the
     root's example asked a one-service site in a folder for every key of
-    the project's own app (found sending R167's test container, 10 Oct)."""
+    the project's own app."""
     return WORKSPACE / project / compose_sub(project, instance) / ".env.example"
 
 
@@ -2031,7 +2031,7 @@ _REMOTE_CTX = re.compile(r"^(?:git@|git://|ssh://|https?://\S+?\.git(?:#\S*)?$|(
 
 
 def remote_contexts(compose_text):
-    """The git URLs a compose file builds from (B595), read off its `build:`
+    """The git URLs a compose file builds from, read off its `build:`
     and `context:` lines: a build from one is the files committed at that
     ref, so an untracked or ignored file changed in a working tree is never
     in it, and the rebuild's log says so before it builds."""
@@ -2068,7 +2068,7 @@ def compose_file(project, instance=MAIN):
     return p if inside and p.is_file() and not p.is_symlink() else None
 
 
-# ---- an instance's override (the operator, 17 Oct) ---------------------------
+# ---- an instance's override ---------------------------
 # A second compose file from the project's tree, laid over the instance's own
 # with compose's own -f after -f: its ports, env, volumes or an extra service
 # for that one container, versioned with the tree and built from its branch
@@ -2104,7 +2104,7 @@ def override_ok(project, rel, instance=MAIN):
     return ""
 
 
-# A container given the machine's GPU (R207 step 4): a setting of the
+# A container given the machine's GPU: a setting of the
 # instance, "nvidia" or "amd", laid over its compose as a small file AerieOS
 # writes beside the instance's env copies, naming every service of the
 # compose: NVIDIA through the container toolkit (a device reservation of
@@ -2186,7 +2186,7 @@ def pname(project, instance=MAIN):
     return _pname(project, instance)
 
 
-# A project's container named by hand (the operator, 11 Oct: a project's
+# A project's container named by hand (a project's
 # container is named whatever its owner wants, not after the project): the
 # record's `name`, read through a table kept per store write, since _pname
 # is on the poll path and is asked in loops over every instance.
@@ -2373,7 +2373,7 @@ def _compose(project, instance, *args, gpu=True):
                         copy.write_text(new, encoding="utf-8")
                     ov = copy
         argv += ["-f", str(ov)]
-    # ...and the GPU it was given (R207 step 4), last, over both.
+    # ...and the GPU it was given, last, over both.
     gf = gpu_file(project, instance) if gpu else None
     if gf is not None:
         argv += ["-f", str(gf)]
@@ -2428,11 +2428,11 @@ def _pairs():
 
 
 def _synced_here(path):
-    """Whether the node being addressed holds its projects as a synced copy
-    (R162), which every agent node does unless taken off it (R164), and
+    """Whether the node being addressed holds its projects as a synced copy,
+    which every agent node does unless taken off it, and
     `path` is the projects root: its own /workspace holds the same trees at
-    the same paths, so a compose's binds mean on it what they mean here
-    (R163 step 4). A dev instance lives on its project's own nodes, which
+    the same paths, so a compose's binds mean on it what they mean here.
+    A dev instance lives on its project's own nodes, which
     always hold it."""
     nid = getattr(_node_ctx, "node", None) or _default_node()
     n = queue.node(nid) if (queue is not None and nid) else None
@@ -2496,16 +2496,16 @@ def host_map():
             # ...which makes it the one shape nothing above can catch, and it
             # is the shipped default. So the daemon is asked: an identity is
             # only TRUE of a daemon on another machine, which is what
-            # sandbox_daemon() answers. Asked THROUGH that rather than by
+            # sandbox_daemon answers. Asked THROUGH that rather than by
             # reading the address here, because it is as often written with
             # the scheme left off as with it, and reading it directly reported
             # the shipped default as misconfigured.
             #
             # An agent node is the other machine that really does have this
-            # path: it holds its synced copy of the projects at /workspace
-            # (R163), so the identity is correct there for the same reason it
+            # path: it holds its synced copy of the projects at /workspace,
+            # so the identity is correct there for the same reason it
             # is correct on the sandbox VM, and saying otherwise put a warning
-            # on every start once a second node was enrolled (B193). For any
+            # on every start once a second node was enrolled. For any
             # other path its own census is the evidence, rather than the
             # address or an assumption about what a node must look like: it
             # lists what is mounted where on that machine.
@@ -2706,7 +2706,7 @@ def _daemon_mounts(path):
 
     The census lists what is mounted where on that machine, so this is the
     one question in here that is answered with evidence from the other end
-    rather than inferred from an address (B193). False for a node that has
+    rather than inferred from an address. False for a node that has
     not reported, which fails the way the check always did: it says so.
     """
     if _synced_here(path):
@@ -2763,7 +2763,7 @@ def _build_env(project, instance=MAIN):
         # whole job is that it cannot carry `+`: the same build then read
         # 0.5.0-dev.1633+59d8912 on production and 0.5.0-dev.1633-59d8912 on
         # the dev instance, and the rule that makes this string the first
-        # thing anybody compares turned one build into two (B158).
+        # thing anybody compares turned one build into two.
         forms = (version.render(project) or {}).get("forms") or {}
         f = forms.get("semver")
         if f:
@@ -2779,10 +2779,10 @@ def _build_env(project, instance=MAIN):
 
 def _node_env(project, instance=MAIN):
     """What a compose is handed about the node its instance runs on: the
-    docker group's id there (R86, BB_DOCKER_GID), for a compose that runs a
+    docker group's id there (BB_DOCKER_GID), for a compose that runs a
     service as a member of it to reach the daemon's socket. Every compose
     call has it, `config` too: a file that requires it (${BB_DOCKER_GID:?})
-    could not be read at all without it (B448)."""
+    could not be read at all without it."""
     out = {}
     with contextlib.suppress(Exception):
         nid = _instance_node(project, instance) if instance else ""
@@ -2889,7 +2889,7 @@ def missing_env(project, instance=MAIN):
     """Keys the repo's example declares that the dev env does not set,
     except the ones the compose file answers for itself (${PUID:-99}): the
     example lists those so they CAN be set, and asking for nine of them
-    before a first Up was the operator's report (15 Sep). A key the file
+    before a first Up was the operator's report. A key the file
     never names stays required: the example says it matters, and this side
     cannot tell what reads it.""" 
     try:
@@ -3013,7 +3013,7 @@ def _overview_here(picked):
             if picked and _instance_node(project, inst) != picked:
                 continue
             # A container written here that compose is still reading, which
-            # may yet be refused (B239).
+            # may yet be refused.
             if time.time() - float((store[project][inst] or {}).get("pending") or 0) < PENDING_S:
                 continue
             pn = _pname(project, inst)
@@ -3023,13 +3023,13 @@ def _overview_here(picked):
             # Whose sessions can reach it: the project it belongs to works
             # on a node, and this row is drawn under the daemon of another
             # (the project moved after this was built, pin_to_current_node)
-            # means out of reach, said on the row (R79, the operator 25 Sep).
+            # means out of reach, said on the row.
             whose = owner_of(project, inst, rec)
             own = nodes_of(whose) if whose else []
             # Where it belongs too: one of the nodes the project hosts its
-            # containers on, or a node it was shipped to on purpose (R166).
+            # containers on, or a node it was shipped to on purpose.
             # Its sessions reach it there by its published ports, so neither
-            # is out of place (the operator, 12 Oct: a hosting node's row
+            # is out of place (a hosting node's row
             # said so in red).
             hosted = picked in (hosts_of(whose) if whose and hosts_of else []) or bool(rec.get("ship"))
             out.append({
@@ -3038,7 +3038,7 @@ def _overview_here(picked):
                 # The project it belongs to, or "" for none: whose sessions
                 # may see it and work on it, and the group it is drawn in.
                 "owner": owner_of(project, inst, rec),
-                # Let onto the network around its node (R178).
+                # Let onto the network around its node.
                 "lan": pn in lan_here,
                 # Its project was deleted (moved to the trash): drawn as
                 # "X (deleted)" until X is restored or it is moved (8 Oct).
@@ -3048,10 +3048,10 @@ def _overview_here(picked):
                 "exists": bool(mine),
                 "containers": len(mine),
                 # Start on boot, as the daemon says for this instance's own
-                # containers (R122). The listing's top-level containers are
+                # containers. The listing's top-level containers are
                 # the ones that belong to no instance, so the row's switch
                 # read a list that never held its containers and always said
-                # off (found walking the dev instance, 5 Oct).
+                # off (found walking the dev instance).
                 "boot": any(c.get("boot") for c in mine),
                 # Ports from the containers themselves rather than from the
                 # compose file: what is published is what the daemon says it
@@ -3079,10 +3079,10 @@ def _overview_here(picked):
                 "compose_path": str(rec.get("compose") or ""),
                 # ...and the one laid over it, when it has one.
                 "override": str(rec.get("override") or ""),
-                # ...and the GPU it was given (R207 step 4).
+                # ...and the GPU it was given.
                 "gpu": str(rec.get("gpu") or ""),
                 "source": "file" if filed else "project",
-                # ...and, for one made from an app, the app's name (R238), so
+                # ...and, for one made from an app, the app's name, so
                 # its row's press opens that app's panel as Configure.
                 "app": _app_name(project) if filed else "",
                 # A file read and one git call. risks/problems stay out:
@@ -3104,7 +3104,7 @@ def _overview_here(picked):
                 "ref": pin,
                 # Each container of the instance, so the row can list them:
                 # an instance is one thing to Up and Down and three things
-                # to look at (the operator, 15 Sep).
+                # to look at.
                 "services": [{"service": c.get("service", ""), "name": c.get("name", ""),
                               "state": c.get("state", ""), "status": c.get("status", ""),
                               "ports": c.get("ports", []), "image": c.get("image", "")}
@@ -3127,7 +3127,7 @@ def _overview_here(picked):
     # answer, and the revision the job moves brings the next ask.
     return {"error": cs["error"], "blind": blind, "stale": bool(cs.get("stale")),
             "node": picked,
-            # TWO QUESTIONS, kept apart, which is the whole of B111. "Can we
+            # TWO QUESTIONS, kept apart. "Can we
             # ACT" is availability: on an agent node compose runs on the
             # agent, against that machine's own socket, so a controller that
             # cannot ssh there changes nothing about whether Up works. "Can we
@@ -3207,7 +3207,7 @@ def node_name(nid):
 
 
 def nodes_of(whose):
-    """The node set a project works on, primary first (R82), or []. None
+    """The node set a project works on, primary first, or []. None
     when nothing here can say: a module loaded without the controller's
     wiring (a probe, a test driving it in process) has no projects' settings
     to read, and the rule that needs them does not apply."""
@@ -3223,9 +3223,9 @@ def nodes_of(whose):
 def on_project_node(whose, node="", ship=False):
     """(why, node): the node a container for project `whose` goes to, or the
     reason it cannot go anywhere. One rule, said in one place: a container
-    lives on one of its project's nodes (R79 makes any other unreachable
+    lives on one of its project's nodes (any other is unreachable
     from the project's sessions), so `node` may only be one of those, and
-    nothing means the primary. The exception is `ship` (R166): a container
+    nothing means the primary. The exception is `ship`: a container
     sent on purpose to a node the project is not on, whose image is built on
     one of the project's own nodes and shipped there, so the project's
     source never reaches it; the project still needs a node to build on."""
@@ -3249,7 +3249,7 @@ def instance_key(project, name):
     project, so asking for that name by hand is asking for that container,
     not a second one beside it; before this, the name a person naturally
     typed into "New container from X" was refused as a clash with X's own
-    container, which nobody had built yet (the operator, 25 Sep)."""
+    container, which nobody had built yet."""
     slug = _slug(name) or ""
     return MAIN if slug and slug == _slug(project) else slug
 
@@ -3279,7 +3279,7 @@ def new_refusal(project, key):
         # Where AerieOS looks, said: a session that wrote its compose
         # somewhere else read "no compose file" as not having one at all,
         # and went to aerie container new, which builds from an empty
-        # directory (B329).
+        # directory.
         return (f"{project} has no compose file at its root to make an instance of: "
                 f"{', '.join(COMPOSE_NAMES)} is where it is looked for")
     return _taken(project, key, _load())
@@ -3307,13 +3307,13 @@ def create_instance(project, name, node="", owner=None, ship=False, compose=""):
         return {"error": why}
     # A container lives on the node of the project it belongs to and nowhere
     # else: a session reaches only its own project's containers on its own
-    # node (R79), so one anywhere else is out of reach of the work it is for
-    # (the operator, 25 Sep). The project's node is where it goes; a node
+    # node, so one anywhere else is out of reach of the work it is for.
+    # The project's node is where it goes; a node
     # named that differs is refused, and a project with no node has to be
     # given one first. A container for no project may go where it is asked.
     whose = project if owner is None else owner
     picked = str(node or "")
-    # Sent to a node the project is not on (R166): shipped, never built there.
+    # Sent to a node the project is not on: shipped, never built there.
     ship = bool(ship and picked and whose and picked not in (nodes_of(whose) or []))
     if whose:
         why, node = on_project_node(whose, node, ship=ship)
@@ -3381,7 +3381,7 @@ def owner_of(project, instance=MAIN, rec=None):
 
     Which project's sessions may see it and work on it, which group the
     Containers page draws it in and which notebook lists it: one setting for the
-    three (the operator, 24 Sep). Stored as `for` and read by presence. No
+    three. Stored as `for` and read by presence. No
     `for` is the default: the project it was built from, or none for a
     container written here, which has no project behind it. An empty `for`
     is none, set on purpose.
@@ -3392,7 +3392,7 @@ def owner_of(project, instance=MAIN, rec=None):
     return "" if rec.get("source") == "file" else project
 
 
-# registry.label, set by the server (R154): the name a deleted project was
+# registry.label, set by the server: the name a deleted project was
 # shown under, which the registry keeps after its directory is gone.
 label_of = None
 
@@ -3406,13 +3406,13 @@ def owner_label(owner):
 def owner_gone(owner):
     """True when a container's project is no project any more: deleted to
     the trash, its records kept under its name, so a restore gives every one
-    of them back (the operator, 8 Oct)."""
+    of them back."""
     return bool(owner) and owner != SYSTEM and not (WORKSPACE / owner).is_dir()
 
 
 def move_instance(project, instance, to):
-    """Move a project's own instance to project `to` (the operator, 8 Oct:
-    MediaReducer-Dev's dev container to MediaReducer before the old project
+    """Move a project's own instance to project `to`
+    (MediaReducer-Dev's dev container to MediaReducer before the old project
     goes). Recorded under `to` as the instance whose compose name is the one
     it already has, so its containers, env file and data directory stay
     exactly where they are; from then on it builds from `to`'s tree and is
@@ -3464,8 +3464,8 @@ def move_instance(project, instance, to):
 def unassign(owner):
     """Every instance and written container that belongs to `owner`, a
     project or a repository going away (to the trash, or deleted), given to
-    no project rather than left naming one that is gone (the operator, 26
-    Oct): they keep running, and an administrator gives them to another.
+    no project rather than left naming one that is gone:
+    they keep running, and an administrator gives them to another.
     The names of those it changed."""
     owner = str(owner or "")
     if not owner:
@@ -3525,7 +3525,7 @@ def set_owner(project, instance, owner):
     when the answer is the default."""
     owner = str(owner or "").strip()[:100]
     # Only to a project on the node it is on: given to one that works
-    # elsewhere it would be out of reach of that project's sessions (R79).
+    # elsewhere it would be out of reach of that project's sessions.
     if owner and owner != project:
         here = _instance_node(project, instance)
         own = nodes_of(owner)
@@ -3547,7 +3547,7 @@ def set_owner(project, instance, owner):
 
 def session_net_own(node_id):
     """What each project owns on `node_id`, for its agent to keep each session
-    to its own project's network (R79): the compose projects of the instances
+    to its own project's network: the compose projects of the instances
     bound there, under the project each belongs to, and the containers the
     operator gave a project there, by name. {project: {"compose", "names"}}.
     The project a container belongs to is the Containers page's: the same answer
@@ -3562,7 +3562,7 @@ def session_net_own(node_id):
     for name, owner in (_owners().get(node_id) or {}).items():
         out.setdefault(owner, blank())["names"].add(name)
     # ...and what each project that can have a session HERE holds on its
-    # other nodes (R82): the published ports of its containers there, from
+    # other nodes: the published ports of its containers there, from
     # what those nodes report, and the whole address of a node that is not a
     # sandbox (a Mac, Windows, a guest), which has no containers to narrow
     # to. The project's set is the operator's; a node outside it is never
@@ -3586,7 +3586,7 @@ def session_net_own(node_id):
             return
         rep = n.get("reported") or {}
         # A hosting-only node is a public box: what it says of itself does
-        # not open it whole, only its containers' ports (R92).
+        # not open it whole, only its containers' ports.
         # ...nor does the controller's own machine.
         if not rep.get("sandbox") and not (n.get("config") or {}).get("host_only") and not (n.get("config") or {}).get("own"):
             o["hosts"].add(addr)
@@ -3597,7 +3597,7 @@ def session_net_own(node_id):
                 o["peers"].add((addr, int(port)))
 
     # ...and every node holding a container the project owns, its own or
-    # one sent elsewhere on purpose (R166), so a session on the project's
+    # one sent elsewhere on purpose, so a session on the project's
     # node reaches a container shipped to another.
     held = {}
     for p, insts in _load().items():
@@ -3612,8 +3612,8 @@ def session_net_own(node_id):
         for other in list(nids) + sorted(held.get(project, set()) - set(nids)):
             if other and other != node_id:
                 reach(o, project, other)
-        # ...and what its settings name besides (Also reaches, the operator,
-        # 7 Oct): a whole machine, or one port on it.
+        # ...and what its settings name besides (Also reaches):
+        # a whole machine, or one port on it.
         for e in (reaches_of(project, node_id) if reaches_of else []) or []:
             addr, _, port = str(e).partition(":")
             if port:
@@ -3640,7 +3640,7 @@ def session_net_own(node_id):
 
 
 def container_net_own(node_id):
-    """What each compose project on `node_id` may reach of the others (R178):
+    """What each compose project on `node_id` may reach of the others:
     {compose project: {owner, to: [compose projects]}}, the owner's own and
     those of the projects it reads (prefs.reads). The agent turns it into
     bridge pairs; a compose project not named here reaches its own and no
@@ -3661,7 +3661,7 @@ def container_net_own(node_id):
         to = set(comps)
         for r in (reads_of(owner) if reads_of and owner != SYSTEM else []) or []:
             to |= owned.get(r, set())
-        # AerieOS's own (R180) reaches every compose project here by
+        # AerieOS's own reaches every compose project here by
         # `all`, which covers a container nobody here knows of.
         for c in comps:
             out[c] = ({"owner": owner, "to": sorted(to)} | ({"all": True} if owner == SYSTEM else {})
@@ -3676,7 +3676,7 @@ def row_named(name):
     `name`, by the name the Containers page lists it under or by the
     instance's own (aerie devapp new NAME), or None. An instance renamed on
     the page answers to both, which aerie devapp --container and --instance
-    each knew only one of (B338)."""
+    each knew only one of."""
     store = _load()
     for proj, insts in store.items():
         for inst in insts:
@@ -3704,7 +3704,7 @@ def _owners():
 
 def lans(node_id):
     """The containers on `node_id` an administrator let onto the network
-    around the node (R178): their keys, the compose project for one of
+    around the node: their keys, the compose project for one of
     AerieOS's instances and the container's name for any other, the same
     keys container_net_own names them by. Off for every one not listed."""
     try:
@@ -3781,20 +3781,20 @@ def only_instance(project):
 
 
 # The name a project is shown under, which a rename changes and its folder
-# does not (R154): set by server.py to registry.label.
+# does not: set by server.py to registry.label.
 label_of = lambda p: p   # noqa: E731
 
 
 def send_name(project, compose=""):
     """The name a new container of a project gets when nobody typed one:
     named for what the project is called now (a renamed Clanker-Detector
-    offers turing-lens, not its folder's name: the operator, 10 Oct), with
+    offers turing-lens, not its folder's name: the operator), with
     the folder or the variant of the compose file it is made from after it
     (turing-lens-site, turing-lens-prod), so two files are not offered one
     name. The project's own container while that is free, then -2, -3 and on,
     the first no container here holds. Send to Docker opens on it and `aerie
     devapp new` takes it, so sending again makes another container beside
-    the first rather than a refusal (the operator, 26 Sep)."""
+    the first rather than a refusal."""
     base = _slug(label_of(project)) or _slug(project) or "container"
     rel = str(compose or "")
     sub = posixpath.dirname(rel)
@@ -3840,9 +3840,9 @@ def edit_rec(project, instance, create=False):
     With `create` a record that is not there is made, as _rec makes it.
     Without, the block is handed None for an instance the store does not
     have and nothing is written: a result that lands after Remove forgot the
-    instance must not make its row again (B633). Only whether it is there is
+    instance must not make its row again. Only whether it is there is
     asked: a record new made with nothing set is empty, and reading that as
-    gone left a first build unstamped (B646).
+    gone left a first build unstamped.
 
     The lock is not reentrant, so the block calls nothing that takes it."""
     with _lock:
@@ -3875,7 +3875,7 @@ def _load():
     except OSError:
         return {}
     except ValueError as e:
-        # Kept before the next save writes the empty store over it (B1082).
+        # Kept before the next save writes the empty store over it.
         statefile.keep_unreadable(FILE, str(e)[:160])
         return {}
     if not isinstance(d, dict):
@@ -4375,10 +4375,10 @@ _EVERY_ADDR = re.compile(r"""^\s*-\s*['"]?(?:\$\{(?P<var>[A-Za-z_][A-Za-z0-9_]*)
 
 
 def every_address(project, instance=MAIN):
-    """Where the compose file behind an instance publishes on every address
-    (R217): {"vars": [names], "literal": bool}, or None when it names no
+    """Where the compose file behind an instance publishes on every address:
+    {"vars": [names], "literal": bool}, or None when it names no
     address, which leaves the daemon's default (127.0.0.1 on a node whose
-    ports stay on it, R190) to decide. Read as text, since a variable's
+    ports stay on it) to decide. Read as text, since a variable's
     default is its spelling and the resolved config has only the value."""
     f = compose_file(project, instance)
     if f is None:
@@ -4443,7 +4443,7 @@ def wiring(cfg):
     somebody else's JSON is how a reader quietly stops reading.
 
     Each line carries its service: a stack's ports in one list could not be
-    told apart, which container answers on which (B252).
+    told apart, which container answers on which.
     """
     if cfg is None:
         return {"ports": [], "mounts": []}
@@ -4517,7 +4517,7 @@ def gpu_asks(cfg):
 
 def room_gate(project, instance=MAIN):
     """The reason a build on this instance's node would run out of disk, or
-    "" (R110): Docker's images and build cache under the node's floor fail
+    "": Docker's images and build cache under the node's floor fail
     a build partway, with a disk-full error that names neither (set by
     server.py through room_why)."""
     if room_why is None:
@@ -4529,7 +4529,7 @@ def gpu_gate(project, instance=MAIN, cfg=None):
     """The reason a compose that reserves the GPU cannot start on this
     instance's node, or "": Docker's own answer there is "could not select
     device driver nvidia", after the build, which names neither the toolkit
-    nor the setting that said no (R102)."""
+    nor the setting that said no."""
     if gpu_why is None:
         return ""
     asks = gpu_asks(cfg if cfg is not None else _config(project, instance))
@@ -4570,7 +4570,7 @@ def _risk_gate(project, instance=MAIN, ack=""):
 def unacked_risks(project, instance=MAIN):
     """What this compose asks for beyond its own directory that no person
     has acknowledged yet, or []: what a session's build on auto waits for a
-    person over (the operator, 10 Nov: auto runs at once unless the file
+    person over (auto runs at once unless the file
     reaches the host)."""
     rs = risks(project, _config(project, instance))
     if not rs or _read_rec(project, instance).get("risks_ack") == risk_digest(rs):
@@ -4594,7 +4594,7 @@ def ack_risks(project, instance=MAIN):
     return ""
 
 
-# ---- what a build ships beside the app (the operator, 17 Oct) -------------
+# ---- what a build ships beside the app -------------
 # A project's dev container is the one built from its tree; a service that
 # runs a published image beside it (a database, a git host, a seed) rides in
 # its stack, is rebuilt and pinned to its branch with it, and ships when it
@@ -4727,7 +4727,7 @@ def _container_text(name):
 # What git said about a project, kept until the repository moves. The
 # manager's listing asks HEAD, the branches and the pinned refs of every
 # project it lists on every draw, and a draw is one per revision while a job
-# runs; each ask is a subprocess reading a tree on the share (B205). A commit,
+# runs; each ask is a subprocess reading a tree on the share. A commit,
 # a checkout or a fetch changes one of .git's few top-level files, so their
 # mtimes are the key: the same key, the same answer, and no git run. `status`
 # is not here, because a working tree can move without .git moving.
@@ -4762,7 +4762,7 @@ def _head(project, instance=None):
     ref = (str(_read_rec(project, instance).get("ref") or "").strip()
            if instance else "")
     if not (WORKSPACE / project).is_dir():
-        return ""                      # no tree to ask (B634, as _dirty)
+        return ""                      # no tree to ask (as _dirty)
 
     def run():
         r = _run(["git", "-C", str(WORKSPACE / project), "rev-parse", "--short=7",
@@ -4774,10 +4774,10 @@ def _head(project, instance=None):
 def _dirty(project):
     # Without taking the index lock: this is polled for the row, and git
     # status refreshing the index would hold it just as a session in the
-    # same tree runs git and meets index.lock: File exists (B155).
+    # same tree runs git and meets index.lock: File exists.
     # No tree, no question: a record under a written container's name that
     # lost its source mark (one a late job wrote back after a Remove) sent
-    # git to a directory that is not there on every poll (B634).
+    # git to a directory that is not there on every poll.
     if not (WORKSPACE / project).is_dir():
         return False
     r = _run(["git", "-C", str(WORKSPACE / project), "status", "--porcelain"],

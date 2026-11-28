@@ -1,4 +1,4 @@
-"""The forge's release beside the tag (R123, the operator 4 Oct): when Release
+"""The forge's release beside the tag: when Release
 has pushed a version's tag and the project is on GitHub, Gitea or GitLab
 with a token that can write there, the forge's release for that tag, titled
 with the version, its notes the changelog's section for it, its builds
@@ -7,7 +7,7 @@ attached.
 On GitHub it is read and written with the project's own token, else the
 shared PAT (the same one cilogs.py reads runs with), and only
 api.github.com and uploads.github.com are asked. On Gitea (Forgejo and
-Codeberg answer the same API) and on GitLab (R124) it is the project's own
+Codeberg answer the same API) and on GitLab it is the project's own
 token alone, the one its link stored, asked of the API root forges.py
 derives from the remote's host and scheme and nothing else: a Gitea on a
 LAN is plain http on a port, and that is the address its token was stored
@@ -15,12 +15,12 @@ for. GitLab keeps no files on a release, so a build goes into the
 project's generic package registry under the version and the release
 links to it there.
 
-A release that exists already is changed only by edit() (R139, the
-operator 5 Oct): its notes replaced, files attached to it (one of the same
+A release that exists already is changed only by edit:
+its notes replaced, files attached to it (one of the same
 name replaced), never the release deleted or its tag moved, and only with
-files from the project's dist/ or its committed tree, which edit_plan()
+files from the project's dist/ or its committed tree, which edit_plan
 checks before anybody is asked. A file comes off a release only by
-remove(), its own ask and never part of an edit (the operator, 5 Oct).
+remove, its own ask and never part of an edit.
 
 A release that exists already for the tag is left as it is and pointed at:
 a second press makes nothing twice. What was made, or why nothing was, is
@@ -106,7 +106,7 @@ def notes(where, version, tag="", repo=""):
     Markdown, or "" when the file has none: its categories as headings and
     its entries as a list. A version cut without a bump has its changes
     still under Unreleased, and those are what it releases (v0.5.0 went out
-    with no notes, B116)."""
+    with no notes)."""
     own = Path(where) / "docs" / "release-notes" / f"{version}.md"
     try:
         return (own.read_text().replace("@TAG@", tag or f"v{version}")
@@ -124,7 +124,7 @@ def notes(where, version, tag="", repo=""):
     return _listed(pending) if pending else ""
 
 
-# ---- what each of a release's files is for (R255) -----------------------------
+# ---- what each of a release's files is for -----------------------------
 # Over the notes of every release AerieOS makes or publishes, unless the
 # repository's Releases settings switch it off: a row for each file the
 # release holds with what it is for, from the repository's list, the
@@ -218,7 +218,7 @@ def _listed(sec):
 
 
 def _shown(project):
-    """The name the project is shown under, not its folder (B116: a release
+    """The name the project is shown under, not its folder (a release
     read "builderbot-2 0.5.0")."""
     import roles
     return roles.shown(project)
@@ -236,7 +236,7 @@ def assets(project, sha, version=""):
     if not sha or not d.is_dir():
         return []
     # An unsigned APK installs nowhere and is the controller's to sign
-    # (releasesign.py, R106): never one of a release's files.
+    # (releasesign.py): never one of a release's files.
     ships = [f for f in d.iterdir() if f.is_file() and "-dirty" not in f.name and "-unsigned" not in f.name
              and SHIPS.search(f.name)]
     files = [f for f in ships if sha in f.name]
@@ -292,7 +292,7 @@ _BY_TAG = re.compile(re.escape(API) + r"/repos/([^/?#]+/[^/?#]+)/releases/tags/(
 def _draft_by_tag(repo, tag, token, pages=3):
     """The release (a draft among them) whose tag is `tag`, from the listed
     releases, newest first, or None. A draft GitHub moved to a name of its
-    own (untagged-ID: a PATCH that left out tag_name, B696) is found by its
+    own (untagged-ID: a PATCH that left out tag_name) is found by its
     title, the tag, and every PATCH here sends the tag back with it."""
     for page in range(1, pages + 1):
         rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=50&page={page}", token) or []
@@ -325,7 +325,7 @@ def _send(opener, req, name, kind, upload, reasons, gone=None):
     its own reason, the first of the `reasons` keys its answer carries."""
     try:
         # Ten minutes for an upload, thirty seconds for anything else: a
-        # host that stopped answering held a page's lookup that long (B566).
+        # host that stopped answering held a page's lookup that long.
         with opener(req, timeout=600 if upload else 30) as r:
             raw = r.read(2_000_000)
             return json.loads(raw) if raw.strip() else {}
@@ -346,7 +346,7 @@ def _send(opener, req, name, kind, upload, reasons, gone=None):
 
 
 # The container packages of a repository's owner, an organization's or the
-# signed-in account's: what a withdrawn release's build pushed (B1159).
+# signed-in account's: what a withdrawn release's build pushed.
 _PACKAGES = re.compile(re.escape(API) + r"/(?:(?:orgs|users)/[A-Za-z0-9-]+|user)/packages(?:[/?].*)?")
 # Tags an image keeps beside its release's version and is still that
 # release's alone: the commit's, as docker/metadata-action writes it.
@@ -355,7 +355,7 @@ _OWN_IMAGE_TAG = re.compile(r"sha-[0-9a-f]{7,40}")
 
 def _gh_images_drop(repo, token, tag):
     """The container images the build of `tag` pushed, deleted with its
-    release (B1159): the version of each container package GitHub links to
+    release: the version of each container package GitHub links to
     `repo` whose tags are the release's version (the tag, or the tag without
     its v) and nothing but commit tags beside it. One that also carries a
     tag people follow (dev, latest, main) is left, said. {images: [the
@@ -404,7 +404,7 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
 
     def gone():
         # A draft release is never found by its tag (GitHub's rule), and
-        # every release starts a draft (the operator, 1 Nov): looked for
+        # every release starts a draft: looked for
         # among the listed ones, which a token that may see drafts lists.
         m = _BY_TAG.fullmatch(url)
         return _draft_by_tag(m.group(1), urllib.parse.unquote(m.group(2)), token) if m else None
@@ -417,8 +417,8 @@ def publish(project, tag, version, sha, comp="", pre=False):
     {url, made, assets, skipped, forge} or {error, forge}. A project whose CI
     makes its releases says so with .release-files: its release is CI's draft,
     which a person publishes, so nothing is published here ahead of it.
-    `pre` marks it a pre-release (R218), never the latest: its notes are its
-    own changelog section, which notes() finds by its version."""
+    `pre` marks it a pre-release, never the latest: its notes are its
+    own changelog section, which notes finds by its version."""
     if not comp and (WORKSPACE / project / ".release-files").is_file():
         return {"url": "", "made": False, "assets": [], "skipped": [], "forge": "CI",
                 "note": "CI makes this release as a draft: read it and publish it from the Artifacts view's Drafts"}
@@ -476,7 +476,7 @@ def _github(repo, token, project, tag, version, sha, where, title, pre=False):
     return {"url": rel.get("html_url") or "", "made": True, "assets": up, "skipped": skipped}
 
 
-# ---- Gitea and GitLab (R124) ---------------------------------------------------
+# ---- Gitea and GitLab ---------------------------------------------------
 
 def _remote(project):
     """{scheme, host, path} of the project's forge: the push record its link
@@ -595,7 +595,7 @@ class _GitHub(_Driver):
 
     def swept(self, project, tag):
         # The image the tag's build pushed, which deleting the release left
-        # pullable by its version (B1159).
+        # pullable by its version.
         return _gh_images_drop(self.repo, self.token, tag)
 
     def paths(self, tag):
@@ -682,7 +682,7 @@ class _GitLab(_Driver):
 
     def delete_asset(self, project, tag, name, got):
         self.f.ask("DELETE", f"/projects/{self.pid}/releases/{urllib.parse.quote(tag, safe='')}/assets/links/{got[0]}")
-        # ...and the file the link served (B561): the link gone, the
+        # ...and the file the link served: the link gone, the
         # package registry still handed the build out.
         _gl_pkg_drop(self.f, self.pid, project, tag, name)
 
@@ -696,7 +696,7 @@ class _GitLab(_Driver):
 
     def swept(self, project, tag):
         # GitLab keeps a release's builds in its package registry, which
-        # deleting the release leaves serving them (B561).
+        # deleting the release leaves serving them.
         return {"packages": _gl_pkg_drop(self.f, self.pid, project, tag)}
 
 
@@ -825,7 +825,7 @@ def _multipart(field, name, data):
     return head + data + f"\r\n--{boundary}--\r\n".encode(), f"multipart/form-data; boundary={boundary}"
 
 
-# ---- editing a published release (R139) ----------------------------------------
+# ---- editing a published release ----------------------------------------
 
 NOTES_MAX = 100_000
 ATTACH_MAX = 20
@@ -905,7 +905,7 @@ def edit_plan(project, tag, notes=None, attach=()):
                 return {"error": f"{rel} is not committed: a release carries a build in dist/ or a file "
                                  "the space's history has, so what it shows can be found again"}
             # ...as the history has it: a tracked file changed since was
-            # attached as it is now, which no commit holds (B564).
+            # attached as it is now, which no commit holds.
             same = _tree_git(project, "diff", "--quiet", "HEAD", "--", rel)
             if same is None or same.returncode:
                 return {"error": f"{rel} has changes not committed: commit them first, so what the release "
@@ -981,7 +981,7 @@ def _github_edit(project, repo, token, tag, notes, files):
         p = WORKSPACE / project / x["path"]
         try:
             # The new file first, under a name of its own, and only then the
-            # old one gone and the new one named for it (B560): deleted
+            # old one gone and the new one named for it: deleted
             # first, a failed upload left the release without the file.
             old = have.get(x["name"])
             got = _req("POST", f"{UPLOADS}/repos/{repo}/releases/{int(rel['id'])}/assets"
@@ -996,7 +996,7 @@ def _github_edit(project, repo, token, tag, notes, files):
         except (Refused, OSError, KeyError, TypeError, ValueError) as e:
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
-        # Its draft said back with the notes, or a draft is published (B590).
+        # Its draft said back with the notes, or a draft is published.
         _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls), "draft": rel.get("draft") is True,
                                                           "tag_name": tag})
     return _said(rel.get("html_url") or "", notes, urls, attached, replaced, skipped)
@@ -1013,7 +1013,7 @@ def _gitea_edit(f, at, project, tag, notes, files):
     attached, replaced, skipped = [], [], []
     for x in files:
         try:
-            # As on GitHub (B560): the new file in, then the old one out.
+            # As on GitHub: the new file in, then the old one out.
             old = have.get(x["name"])
             up = _TMP + x["name"] if old else x["name"]
             data, ctype = _multipart("attachment", up, (WORKSPACE / project / x["path"]).read_bytes())
@@ -1045,7 +1045,7 @@ def _gitlab_edit(f, at, project, tag, notes, files):
     for x in files:
         path = f"/projects/{pid}/packages/generic/{pkg}/{ver}/{urllib.parse.quote(x['name'])}"
         try:
-            # The package first (B560): a failed upload leaves the link and
+            # The package first: a failed upload leaves the link and
             # what it serves as they were. A link already at this address
             # serves the new file now and stays.
             f.ask("PUT", path, data=(WORKSPACE / project / x["path"]).read_bytes(), ctype="application/octet-stream")
@@ -1082,8 +1082,8 @@ def edit_said(r):
 
 # ---- taking a file off a published release ---------------------------------------
 # Its own ask, never part of an edit: a removal is the one change here that
-# takes something away from the people downloading, so it is asked as itself
-# (the operator, 5 Oct). The release is read first, so the ask names files
+# takes something away from the people downloading, so it is asked as itself.
+# The release is read first, so the ask names files
 # that are really there, with their sizes.
 
 def _files_on(kind, name, ctx, tag):
@@ -1175,14 +1175,14 @@ def _gl_pkg_drop(f, pid, project, tag, name=None):
 
 
 # ---- withdrawing a release, its tag with it --------------------------------
-# A release taken back takes its tag too (R190 step 3): the forge keeps a
+# A release taken back takes its tag too: the forge keeps a
 # tag while its release exists, a session may not push a deletion, and the
 # 0.9.0 dev release left three to be deleted by hand, one of them a tag with
-# no release (the operator, 30 Oct). Always a person's answer, whatever the
+# no release. Always a person's answer, whatever the
 # dial: it is the one change here nothing undoes.
 
 
-# ---- drafts (the operator, 1 Nov) --------------------------------------------
+# ---- drafts --------------------------------------------
 # Every release CI makes starts a draft, seen by the repository's own people
 # alone, so its notes are read before anybody else sees it. GitHub's alone:
 # Gitea and GitLab releases made here are published as they are made.
@@ -1206,7 +1206,7 @@ def drafts(project):
         if not (isinstance(r, dict) and r.get("draft")):
             continue
         # One GitHub moved to a name of its own (untagged-ID: its tag field
-        # lost on the git host's form, B636) is listed under the tag it is
+        # lost on the git host's form) is listed under the tag it is
         # titled for, which is the one it is published under from here.
         tag = str(r.get("tag_name") or "")
         if tag.startswith("untagged-") and TAG.fullmatch(str(r.get("name") or "")):
@@ -1241,13 +1241,13 @@ def is_pre(tag):
 
 def holds(repo, token, tag, notes):
     """What keeps a draft from being published, each a sentence saying what
-    puts it right (R206 step 3); [] when nothing does. The files it must
+    puts it right; [] when nothing does. The files it must
     carry are the caller's to check (releasefiles), which reads the list.
 
     The tag: a release published while its tag is not on the git host is
     given one by GitHub, on the newest commit of the default branch, which
-    is no commit the release was built from (B636 was the form's own tag
-    field, emptied). The notes: CI's placeholder says nothing."""
+    is no commit the release was built from (as when the form's own tag
+    field is emptied). The notes: CI's placeholder says nothing."""
     out = []
     try:
         ref = _req("GET", f"{API}/repos/{repo}/git/ref/tags/{urllib.parse.quote(tag, safe='')}", token)

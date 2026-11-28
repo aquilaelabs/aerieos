@@ -1,4 +1,4 @@
-"""The official packs (R169 step 1): every shipped toolchain and every
+"""The official packs: every shipped toolchain and every
 agent as a pack in bbtool.json's format, validated as such (a shipped
 recipe or an agent's adapter standing in for steps and verbs, a shipped
 name allowed), an agent that cannot take the guards refused, and the
@@ -17,7 +17,7 @@ import toolpacks  # noqa: E402
 
 class Official(unittest.TestCase):
     def test_a_config_block_is_checked_and_a_service_is_official_only(self):
-        # R172: what a pack asks for per node, drawn by the Library as Configure.
+        # What a pack asks for per node, drawn by the Library as Configure.
         good = {"name": "hexkit", "label": "Hexkit", "platforms": ["linux/amd64"], "terms": [], "layout": {"bin": [], "env": {}},
                 "verbs": {"dump": {"about": "dump", "usage": "FILE", "run": ["{dir}/bin/hexkit", "{args}"]}},
                 "config": [{"name": "api_key", "label": "API key", "kind": "secret", "env": "HEXKIT_KEY", "required": True},
@@ -119,7 +119,7 @@ class Official(unittest.TestCase):
         self.assertEqual(clean["agent"]["command"], "claude")
         clean, errors = toolpacks.validate({**m, "agent": {**a, "guards": "none"}}, official=True)
         self.assertTrue(any("cannot take AerieOS's guards" in e for e in errors))
-        # Another pack's agent block is a pack agent's adapter (R169 step 8),
+        # Another pack's agent block is a pack agent's adapter,
         # which never takes a shipped agent's name or its table's fields.
         clean, errors = toolpacks.validate({**m, "tier": "url"})
         self.assertTrue(any("a coding agent AerieOS ships" in e for e in errors), errors)

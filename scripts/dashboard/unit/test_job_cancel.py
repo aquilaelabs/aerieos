@@ -1,4 +1,4 @@
-"""Who may cancel a job (server.py's _job_cancel_why, R277): an
+"""Who may cancel a job (server.py's _job_cancel_why): an
 administrator any; a session its own space's; a person one on a node they
 hold Jobs Write on, or one of a space they hold Spaces Write on; and a job
 this account does not read is answered as one it does not have. Held here

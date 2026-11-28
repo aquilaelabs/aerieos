@@ -1,4 +1,4 @@
-"""Each text setting is held to its own shape (B445): a hostname, an
+"""Each text setting is held to its own shape: a hostname, an
 address, a port, a word, an email, or one line as typed; until then every
 text was held to a hostname's, so Connection's Served over, its email, the
 mail server's port, security, sign-in name and From and the catalog's

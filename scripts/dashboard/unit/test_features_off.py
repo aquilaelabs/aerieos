@@ -1,4 +1,4 @@
-"""Features switched off for a whole install from its environment (R81):
+"""Features switched off for a whole install from its environment:
 which request is which feature's, the sentence it is refused with, and a
 name that is not a feature switching nothing off."""
 import importlib

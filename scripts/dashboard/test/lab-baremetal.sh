@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The shell lab-baremetal.mjs runs as root in its VM (R90 step 9), kept here
+# The shell lab-baremetal.mjs runs as root in its VM, kept here
 # rather than in the suite's own text: what a session on the controller's own
 # node must never reach, tried, and the same tries from inside a session's
 # view. The suite sends this file and a line naming the function to run.
@@ -76,7 +76,7 @@ inside() {
 }
 
 # start_update REF: the repository's REF unpacked beside the install and the
-# installed release's --update run from it (R90 step 5), in the background;
+# installed release's --update run from it, in the background;
 # /root/update.rc says how it ended.
 start_update() {
     set -e

@@ -66,7 +66,7 @@ def configure(*, state, write_json, project_prefs=None, nodes_of=None):
 
 
 # nodes_of(u): the nodes of the projects an account is on, which is what a
-# node grant's scope "mine" means (R137 step 3). Set by the server from prefs.
+# node grant's scope "mine" means. Set by the server from prefs.
 nodes_of = None
 
 
@@ -116,8 +116,8 @@ def mint_uid():
 
 
 def load():
-    # Read once while the file is the same file (statefile.read_json, R228
-    # step 1): a status read asked for it seventy times. Its own copy each.
+    # Read once while the file is the same file (statefile.read_json):
+    # a status read asked for it seventy times. Its own copy each.
     d = statefile.read_json(_file())
     if not isinstance(d, dict) or not isinstance(d.get("users"), dict):
         return {"users": {}}
@@ -125,7 +125,7 @@ def load():
 
 
 def unreadable():
-    """Why the accounts file is there and cannot be read, or "" (B763).
+    """Why the accounts file is there and cannot be read, or "".
 
     `load` answers no accounts for a file that is missing, which is a fresh
     install, and for one that is cut short or not JSON, which is not: read
@@ -152,7 +152,7 @@ def fresh():
 
 
 def _save(d):
-    # Never over an accounts file that cannot be read (B763): what is in it
+    # Never over an accounts file that cannot be read: what is in it
     # is somebody's accounts, and this would be the empty view of them.
     why = unreadable()
     if why:
@@ -181,7 +181,7 @@ def all_users():
         out.append({"name": name, "uid": u.get("uid", ""),
                     "role": u.get("role", "user"),
                     "projects": list(u.get("projects") or []),
-                    # The roles it carries (R137): its role, and any of your own.
+                    # The roles it carries: its role, and any of your own.
                     "roles": roles.roles_of(u),
                     "created": u.get("created", 0), "seen": u.get("seen", 0),
                     # The Profile fields, for the Users tab's edit dialog:
@@ -200,11 +200,11 @@ def uid_of(u):
     (ALL), which are nobody: a background sweep has no tab strip, and every
     per-account store treats "" as "do not store".
 
-    A session answers "" too (R227 step 4): it is a caller of its own kind
+    A session answers "" too: it is a caller of its own kind
     and carries no account's id, so whatever keeps something by this id keeps
-    nothing for a session unless its handler asked whose() by name. It
+    nothing for a session unless its handler asked whose by name. It
     answered its person's id until then, and each handler that was a
-    person's alone had to remember to refuse a session as well (B764).
+    person's alone had to remember to refuse a session as well.
     """
     if (u or {}).get("session"):
         return ""
@@ -403,7 +403,7 @@ def owner_name():
 
 # A hash nobody's password matches, checked for a name that has no account,
 # so a wrong name costs what a wrong password does and the time taken does
-# not say which names are accounts (B721).
+# not say which names are accounts.
 _NOBODY = "pbkdf2_sha256$600000$" + "00" * 16 + "$" + "00" * 32
 
 
@@ -424,7 +424,7 @@ def authenticate(name, password, where=""):
     return u
 
 
-# Wrong passwords counted (B721): sign-in page, Basic, an app's sign-in,
+# Wrong passwords counted: sign-in page, Basic, an app's sign-in,
 # a node's file door. An address is held, an account only slowed, so
 # nobody can lock its owner out by guessing at it.
 PW_WINDOW = 900
@@ -452,7 +452,7 @@ def counted_address(sock, forwarded="", trusted=()):
     that proxy says it passes on, the last one in X-Forwarded-For that is
     not itself a trusted proxy. Counted by the socket alone, everybody
     behind the tunnel or a reverse proxy was one address, and a hundred
-    wrong passwords from anyone there held every one of them (R243).
+    wrong passwords from anyone there held every one of them.
     `trusted` is addresses and networks as text; what does not read as one
     is ignored, and a header from anybody else is ignored whole."""
     import ipaddress
@@ -577,7 +577,7 @@ def stamp(u):
 # from "nobody is signed in" and must not be.
 ALL = {"role": "owner", "projects": ["*"], "name": "\u0000server",
        "uid": "\u0000server"}
-# repos.key_of, handed over by the server (R138): the project a name stands
+# repos.key_of, handed over by the server: the project a name stands
 # for, a repository's being its project's. An account's project list and its
 # project roles are kept by project, so every name is asked through it.
 # Unset, every name is its own.
@@ -640,10 +640,10 @@ def may_work(u, name):
     # there to be seen and never changed.
     if u.get("session"):
         return name == u["session"] or key_of(name) == key_of(u["session"])
-    # "*" lists every project (sees_all) and takes none on (R135): the
+    # "*" lists every project (sees_all) and takes none on: the
     # owner works on what they added to their own list, like everybody,
     # as a safeguard against working on the wrong one by accident.
-    # A repository is worked on by whoever is on its project (R138).
+    # A repository is worked on by whoever is on its project.
     return key_of(name) in _keys(u)
 
 
@@ -687,21 +687,21 @@ def is_admin(u):
 
 def may_node(u, action, node_id=""):
     """Whether this account may do `action` on the node `node_id`, for the
-    capabilities scoped over nodes (R137 step 3: toolchains-write, jobs,
-    node, terminal). "" when it may, else the reason, like may()."""
+    capabilities scoped over nodes (toolchains-write, jobs,
+    node, terminal). "" when it may, else the reason, like may."""
     if u is ALL:
         return ""
     if not u:
         return "not signed in"
     # No node named, for a node's area, is every node (the controller's own
     # where a verb takes none): a role held on named nodes alone is on none
-    # of them (R277, the audit of 24 Nov: it was answered as "anywhere", so a
+    # of them (it was answered as "anywhere", so a
     # role on one node installed on the controller), as may_instance says.
     if not node_id and roles.CAP_AREA.get(action, ("", ""))[0] in roles.NODE_AREAS:
         return may_instance(u, action, "")
     if roles.granted(u, action, node=str(node_id or "") or None, nodes_of=nodes_of):
         return ""
-    # A node area's answer is the node's (R152): asking again with no node
+    # A node area's answer is the node's: asking again with no node
     # would answer "anywhere" for a role held on other nodes.
     area = roles.CAP_AREA.get(action, ("", ""))[0]
     if area in roles.NODE_AREAS and node_id:
@@ -711,7 +711,7 @@ def may_node(u, action, node_id=""):
 
 def may_instance(u, action, instance="", name=""):
     """Whether this account may do `action` on one instance of its area (a
-    node, a runner's NODE_ID/SLOT: roles.INSTANCE_AREAS, R260), "" when it
+    node, a runner's NODE_ID/SLOT: roles.INSTANCE_AREAS), "" when it
     may, else the reason. No `instance` is a new one, which a role holding
     the area on named instances alone does not reach: it is on none of them
     yet. `name` is how the refusal names the instance."""
@@ -781,7 +781,7 @@ def may(u, action, project=None):
                 f"{project}'s code and notebook, and a session on {project} is what changes them")
     if project is not None and not may_work(u, project):
         # Read-only, and so read: an administrator sees every space, and one
-        # not taken on still reads its notebook and code (R274's seatbelt
+        # not taken on still reads its notebook and code (the seatbelt
         # stops changes, not reading).
         if action in READ_ACTIONS and is_admin(u):
             return ""
@@ -796,7 +796,7 @@ def may(u, action, project=None):
     if action == "rules" and (u or {}).get("session"):
         return ("a session cannot change the rules it is being held to: they "
                 "are the operator's, written on the space's Overview in the notebook")
-    # ...nor hand out the project's files to people outside AerieOS (R151).
+    # ...nor hand out the project's files to people outside AerieOS.
     if action == "ftp" and (u or {}).get("session"):
         return "who may reach a space's files over FTP is a person's to set, not a session's"
     # ...and may not approve what it has waiting (roadmap #27): a session
@@ -805,20 +805,20 @@ def may(u, action, project=None):
         return ("what a session has waiting is the operator's to approve or "
                 "deny, on the notebook; a session cannot answer for itself")
     # ...nor reach what was the administrator's before the areas said who
-    # may (R255 step 3): the controller, its settings and logs, the nodes,
+    # may: the controller, its settings and logs, the nodes,
     # every container, a project's settings, sessions and snapshots, and
     # its signing keys. A role reaches them for a person; a session's token
     # carries its account's uid, and is still a session.
     if action in PERSON_ONLY and (u or {}).get("session"):
         return f"{PERSON_ONLY[action]} is a person's, not a session's"
-    # The grants (R137): what the account's roles allow, on this project
+    # The grants: what the account's roles allow, on this project
     # where one is named. The built-in roles reproduce the answers from
     # before roles existed; a role of your own says exactly what it grants.
     if roles.granted(u, action, project, may_work):
         return ""
     if action in USER_DENIES:
-        # What the action is and why it is guarded, with what it needs named
-        # (R255 step 2): the area and level a role gives, not "an
+        # What the action is and why it is guarded, with what it needs named:
+        # the area and level a role gives, not "an
         # administrator's", since a role of anybody's may grant it.
         what, why = {
             "rename": ("renaming a space", ""),
@@ -831,7 +831,7 @@ def may(u, action, project=None):
                      "node's own account, so it reaches everything on that machine"),
             "node": ("choosing which node a space builds on",
                      "a node is shared, so changing it reaches every space on it"),
-            # The CI runner tab (R137 step 3, the operator's R136 line):
+            # The CI runner tab:
             # its status stays on the Tools card for everybody.
             "runner": ("the CI runner's settings", "its status is on the Tools card"),
             # A project this account made would not be in the list it was
@@ -859,13 +859,13 @@ def may(u, action, project=None):
     if action == "admin":
         return f"that {_needs(action, None)}"
     # Everything else, for a person, is what their roles give and nothing
-    # more (R152, the operator, 7 Oct: no role, no permission); it used to
+    # more (no role, no permission); it used to
     # be allowed to anybody on the project's list. A session keeps its own
     # project's work: its token carries no roles, and the project's Claude
     # may settings are what hold it.
     if not (u or {}).get("session"):
         return _roles_why(action, project)
-    # A session's own short list (R227 step 4): what one may ask for at all,
+    # A session's own short list: what one may ask for at all,
     # each then held to the account behind it. It used to be everything the
     # lines above did not name, so an action added tomorrow was a session's
     # until somebody remembered it was not.
@@ -875,7 +875,7 @@ def may(u, action, project=None):
 
 
 def _needs(action, project=None):
-    """What an action needs, as a refusal says it (R255 step 2): "needs
+    """What an action needs, as a refusal says it: "needs
     Projects Write on alpha, which your roles do not give: an administrator
     gives it on the Users page"."""
     area, need = roles.CAP_AREA.get(action, ("projects", "write"))
@@ -894,8 +894,8 @@ def _roles_why(action, project=None, whose="your"):
 
 
 def _session_account_why(u, action, project):
-    """A session does no more than the account behind it (R152, the
-    operator, 7 Oct): what its own rules allow, and what that account's roles
+    """A session does no more than the account behind it:
+    what its own rules allow, and what that account's roles
     give on the project, whichever is less. "" when the account may."""
     acct = account_of(u)
     if not acct or acct is u or not acct.get("name"):
@@ -1026,13 +1026,13 @@ def session_principal(tok):
     want = hmac.new(_session_key(), signed.encode(), hashlib.sha256).hexdigest()[:32]
     if not hmac.compare_digest(sig, want):
         return None
-    # A token minted for an account that is gone is no token (R277, the audit
-    # of 24 Nov: a removed account's session went on working, and renewing,
+    # A token minted for an account that is gone is no token
+    # (a removed account's session went on working, and renewing,
     # held to nothing but its space's dials). One minted for nobody is the
     # controller's own (aerie users token on it, the harness), and stays so.
     if uid and not any(isinstance(rec, dict) and rec.get("uid") == uid for rec in load()["users"].values()):
         return None
-    # A caller of its own kind (R227 step 4): no role's rights and no
+    # A caller of its own kind: no role's rights and no
     # account's id. `seat` names the person it works for, which the routes a
     # session's table names ask for by name (seat_of, whose).
     return {"name": f"session:{project}", "kind": "session", "role": "session",
@@ -1063,7 +1063,7 @@ def claim(name, password):
             return {"error": "this container already has an account"}
         d["users"][name] = {"uid": mint_uid(), "role": "owner",
                             # Sees every project by role; takes each on
-                            # like everybody (R135).
+                            # like everybody.
                             "projects": [],
                             "password": hash_password(password),
                             "created": int(time.time()), "seen": 0,
@@ -1087,7 +1087,7 @@ def add(name, password, role="user", projects=None):
             return {"error": f"{name} already has an account"}
         d["users"][name] = {"uid": mint_uid(), "role": role,
                             # No role, so no permission, until one is given on
-                            # the Roles tab (R152; admin is its own).
+                            # the Roles tab (admin is its own).
                             "roles": [],
                             "projects": list(projects or []),
                             "password": hash_password(password),
@@ -1095,7 +1095,7 @@ def add(name, password, role="user", projects=None):
                             "prefs": {}}
         _smb_follow(d["users"][name], password)
         _save(d)
-    # Its own key made now, as every account's is at the start (R154).
+    # Its own key made now, as every account's is at the start.
     import accountkeys
     if accountkeys.STATE is not None:
         accountkeys.key_of((d["users"].get(name) or {}).get("uid") or "")
@@ -1103,7 +1103,7 @@ def add(name, password, role="user", projects=None):
 
 
 def adopt(owner, people):
-    """A prepared configuration's accounts (R161 step 8, firstboot.py), on a
+    """A prepared configuration's accounts (firstboot.py), on a
     store with nobody in it: the owner from a name and a password hash in
     this file's own scheme (a stick maker hashed what was typed), and each
     person by name and role with no password, which the owner sets on the
@@ -1132,7 +1132,7 @@ def adopt(owner, people):
 
 def adopt_people(people):
     """A prepared configuration's people made once the first-run page has
-    made the owner, where the stick came with no owner's password (B946):
+    made the owner, where the stick came with no owner's password:
     each by name and role with no password, and their SMB password's NT
     hash where one came with them. {ok, made, skipped} or {error}."""
     made, skipped = [], []
@@ -1177,20 +1177,20 @@ def accounts_in_use():
     """The accounts a person has made or used: any with a password or that
     has signed in. One a stick's first boot made from the old system's share
     users (adopt: no password, never seen) is not, so a controller carrying
-    only those is still a fresh one a move may land on (B715)."""
+    only those is still a fresh one a move may land on."""
     return sum(1 for u in load()["users"].values()
                if isinstance(u, dict) and (u.get("password") or int(u.get("seen") or 0) > 0))
 
 
-# ---- SMB passwords (R164 step 1) ----
+# ---- SMB passwords ----
 # A share on the controller's own machine is reached as the account's own
 # Unix user there (bbu- and the id's hex, accounts.py), by the account's name
-# and password: a share lists people, and has no password of its own (the
-# operator, 4 Nov). Samba wants the NT hash (MD4 of the password in
+# and password: a share lists people, and has no password of its own.
+# Samba wants the NT hash (MD4 of the password in
 # UTF-16LE), which is what is kept here and handed to the own machine's
 # agent in its hello; the password itself is never stored. The hash opens
 # the shares as the password does and is far weaker than the password's own
-# hash, so it is kept for as few accounts as need it (the operator, 13 Nov):
+# hash, so it is kept for as few accounts as need it:
 # on a machine that serves shares, for an account a share names, made from
 # the password as that account next signs in or changes it, and taken away
 # when no share names it any more; it was made for every account at every
@@ -1405,7 +1405,7 @@ def set_password(name, password):
         uid = d["users"][name].get("uid") or ""
         _save(d)
     # Every browser's cookie stops verifying with the stamp; the sign-ins
-    # they named go too (R159), so the tokens they kept in use are not.
+    # they named go too, so the tokens they kept in use are not.
     _signed_out_everywhere(uid)
     return {"ok": True, "name": name}
 
@@ -1417,7 +1417,7 @@ def _signed_out_everywhere(uid):
             logins.drop_all(uid)
     except ImportError:
         pass
-    # ...and the key store shut with them (B545): a window picked for eight
+    # ...and the key store shut with them: a window picked for eight
     # hours went on handing out the person's tokens after a password change
     # meant to stop exactly that.
     try:
@@ -1450,8 +1450,8 @@ def set_role(name, role):
 
 
 def set_roles(name, want):
-    """The roles of your own an account carries, beside its built-in role
-    (R137): names the roles store knows; the built-in one stays what
+    """The roles of your own an account carries, beside its built-in role:
+    names the roles store knows; the built-in one stays what
     set_role made it, so is_admin keeps meaning what it meant."""
     known = roles.all_roles()
     want = [str(r) for r in (want if isinstance(want, list) else []) if str(r) in known and str(r) not in roles.BUILTIN]
@@ -1471,14 +1471,14 @@ def set_projects(name, projects):
         u = d["users"].get(name)
         if not u:
             return {"error": f"no account called {name}"}
-        # By project (R138): a repository named stands for its project.
+        # By project: a repository named stands for its project.
         u["projects"] = list(dict.fromkeys(p if p == "*" else key_of(str(p)[:120]) for p in (projects or [])))[:200]
         _save(d)
     return {"ok": True, "name": name, "projects": u["projects"]}
 
 
 def give_owner_role(project, new_uid, old_uid=""):
-    """PROJECT_owner moves with the project (R152): off the account that
+    """PROJECT_owner moves with the project: off the account that
     owned it, onto the one that does, on that project alone."""
     project = key_of(project)
     name = roles.ensure_owner_role(project)
@@ -1503,7 +1503,7 @@ def give_owner_role(project, new_uid, old_uid=""):
 
 def give_project_role(project, uid, role):
     """Add one role on one project to an account, which puts it on the
-    project (R155): an invitation accepted."""
+    project: an invitation accepted."""
     with _lock:
         d = load()
         for u in d["users"].values():
@@ -1522,8 +1522,8 @@ def give_project_role(project, uid, role):
 def take_on(name, project):
     """Put one project on this account's own list, the way the Users page
     does; nothing to do for an account that has it or has every project.
-    What the create paths call for whoever made the project (the operator,
-    24 Sep): an administrator's new project was otherwise one they had not
+    What the create paths call for whoever made the project:
+    an administrator's new project was otherwise one they had not
     taken on, read-only to them until they added it by hand."""
     with _lock:
         d = load()
@@ -1567,7 +1567,7 @@ def remove(name):
     # Its invitations go, and what it owned falls back to AerieOS's owner.
     import membership
     membership.forget_account(u.get("uid") or "")
-    # ...and its key store (R154): its own key, what it linked, and the
+    # ...and its key store: its own key, what it linked, and the
     # projects linked to it, each then saying so.
     import accountkeys
     import gitcreds
@@ -1595,11 +1595,11 @@ def own_prefs(name, want):
     theme = str(want.get("theme") or "")
     if re.fullmatch(r"[a-z]{2,12}", theme):
         keep["theme"] = theme
-    # Dark, light or the device's own (R216): the scheme's other half, kept
+    # Dark, light or the device's own: the scheme's other half, kept
     # beside it for the same reason.
     if want.get("mode") in ("dark", "light", "system"):
         keep["mode"] = want["mode"]
-    # Less motion, or what the device asks for (the operator, 19 Oct): a
+    # Less motion, or what the device asks for: a
     # person's own, kept beside the scheme for the same reason.
     if want.get("motion") in ("reduce", "system"):
         keep["motion"] = want["motion"]
@@ -1609,14 +1609,14 @@ def own_prefs(name, want):
         keep["welcome_seen"] = want["welcome_seen"]
     if isinstance(want.get("image_seen"), str) and re.fullmatch(r"[0-9a-f]{0,40}", want["image_seen"]):
         keep["image_seen"] = want["image_seen"]
-    # The tour (R94): which pages this account has toured, by their kind,
+    # The tour: which pages this account has toured, by their kind,
     # and whether it skips the tour on every page; both cleared by Show the
     # tours again.
     if isinstance(want.get("tour_seen"), list):
         keep["tour_seen"] = sorted({str(k) for k in want["tour_seen"][:64] if re.fullmatch(r"[a-z][a-z0-9-]{0,30}", str(k))})
     if isinstance(want.get("tour_off"), bool):
         keep["tour_off"] = want["tour_off"]
-    # A person's time zone (R294 step 8): their quiet windows and their
+    # A person's time zone: their quiet windows and their
     # dates. "" is none, the controller's clock; anything else a zone this
     # machine knows, said when it is not.
     if "tz" in want:
@@ -1625,7 +1625,7 @@ def own_prefs(name, want):
             return {"error": f"not a time zone this machine knows: {tz[:64]}"}, 400
         keep["tz"] = tz
     # A terminal's look, this person's in every tab of AerieOS's own
-    # terminal (R133 step 10): its text size, cursor and colors. Named and
+    # terminal: its text size, cursor and colors. Named and
     # bounded, as everything here is.
     if isinstance(want.get("term"), dict):
         import prefs as project_prefs
@@ -1638,8 +1638,8 @@ def own_prefs(name, want):
             look["blink"] = t["blink"]
         if t.get("scheme") in project_prefs.TERM_SCHEMES:
             look["scheme"] = t["scheme"]
-        # ...and each scheme's colors as this person changed them (the
-        # operator, 25 Oct): by scheme, each a terminal color's name and a
+        # ...and each scheme's colors as this person changed them:
+        # by scheme, each a terminal color's name and a
         # #rrggbb, so a project given that scheme wears them too, and Reset
         # is taking one scheme's away.
         if isinstance(t.get("colors"), dict):
@@ -1696,8 +1696,8 @@ def _members_refused(name, want, may_change):
 def _verb_refused(act, req, me):
     """Why `me` may not do `act` to the account `req` names, or "": the
     owner's account is the owner's alone, and an administrator's account
-    and the admin role an administrator's (R152 (a), B66), held here as
-    assign holds them (R277, the audit of 24 Nov: Accounts Write alone set a
+    and the admin role an administrator's, held here as
+    assign holds them (Accounts Write alone set a
     role to admin, its own among them, and an administrator reset the
     owner's password)."""
     if me is None or me is ALL:
@@ -1731,7 +1731,7 @@ def verb(act, req, seen, may_change=None, me=None):
                 return {"error": why}
         r = add(name, pw, role=field(req, "role") or "user",
                 projects=req.get("projects") or [])
-        # A name and an email with it (R134), the Profile's own two fields
+        # A name and an email with it, the Profile's own two fields
         # and nothing of the git identity, which is theirs to set.
         pr = req.get("profile") if isinstance(req.get("profile"), dict) else {}
         pr = {k: pr[k] for k in ("full_name", "email") if pr.get(k)}
@@ -1771,11 +1771,11 @@ def verb(act, req, seen, may_change=None, me=None):
 
 
 def what_may(name):
-    """What an account may do, said once (R255 step 5): its roles by the
+    """What an account may do, said once: its roles by the
     names a person reads (and where each holds), and the areas they add up
     to with the best level held anywhere, in the Roles page's order."""
     rec = get(name) or {}
-    # The projects that are projects now (B75): a grant on one in the bin or
+    # The projects that are projects now: a grant on one in the bin or
     # purged is kept, for a restore to bring back, and is not said, nor
     # counted toward what the account may do.
     import registry
@@ -1803,25 +1803,25 @@ def tab_view(me, projects, logins_of):
         r["what_may"] = what_may(r.get("name"))
     return {"users": rows, "owner": owner_name(),
             "me": (me or {}).get("name", ""), "roles": list(ROLES),
-            # The roles of your own, for the edit dialog's picker (R137).
+            # The roles of your own, for the edit dialog's picker.
             "role_names": [n for n in roles.all_roles() if n not in roles.BUILTIN],
-            # How each role is named to a person (R255 step 1).
+            # How each role is named to a person.
             "role_labels": {n: roles.label(n) for n in roles.all_roles()},
             "projects": projects}
 
 
-# ---- R152: an account's roles and projects, from the Roles tab -------------
+# ---- an account's roles and projects, from the Roles tab -------------------
 
 def assignable(me):
     """What `me` may change on the Roles page's top section: every project
     and Global roles for an administrator; for a project's owner who is
-    not one, the projects they own, with roles on the user's projects only
-    (R152 (c)). {"admin": bool, "projects": [names]}."""
+    not one, the projects they own, with roles on the user's projects only.
+    {"admin": bool, "projects": [names]}."""
     import membership
     if not me or me.get("session"):
         return {"admin": False, "projects": []}
     # Accounts and roles Write through a role of one's own is the
-    # administrator's top section too (B66); assign keeps the built-in admin
+    # administrator's top section too; assign keeps the built-in admin
     # itself an administrator's.
     if is_admin(me) or not may(me, "admin"):
         return {"admin": True, "projects": None}
@@ -1835,9 +1835,9 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
     """Set an account's Everywhere roles and the roles it holds on each
     project, as far as `me` may (assignable): what is outside that is kept
     as it was, never refused silently. The projects it is on follow the
-    roles (R155). `may_join(project)` says why the account may not join a
+    roles. `may_join(project)` says why the account may not join a
     space it is not on yet (membership's invite-only rule), as the Users
-    page's edit asks it (R277, the audit of 24 Nov: a role given here put
+    page's edit asks it (a role given here put
     an account on an invite-only space). (payload, status)."""
     can = assignable(me)
     if not can["admin"] and not can["projects"]:
@@ -1858,10 +1858,10 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
         u = d["users"].get(str(name or ""))
         if not u:
             return {"error": f"no account called {name}"}, 400
-        # The owner's account is nobody's but the owner's to change (R152 (a)).
+        # The owner's account is nobody's but the owner's to change.
         if u.get("role") == "owner" and (me or {}).get("role") != "owner":
             return {"error": "the owner's roles and spaces are the owner's alone"}, 403
-        # ...and the built-in admin an administrator's, given or taken (B66).
+        # ...and the built-in admin an administrator's, given or taken.
         if not is_admin(me) and (u.get("role") == "admin"
                                  or "admin" in [str(r) for r in global_roles or []]):
             return {"error": "the admin role and an administrator's account are an administrator's to change"}, 403
@@ -1869,7 +1869,7 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
             if not can["admin"]:
                 return {"error": "Everywhere roles are an administrator's to give"}, 403
             want = [str(r) for r in global_roles if str(r) in known and str(r) != "owner"]
-            # Everywhere roles only: a role on a project is given on it (R155).
+            # Everywhere roles only: a role on a project is given on it.
             onp = [r for r in want if r not in roles.BUILTIN and known[r].get("scope") != "global"]
             if onp:
                 return {"error": f"{', '.join(onp)} {'is a role' if len(onp) == 1 else 'are roles'} "
@@ -1892,7 +1892,7 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
                     if not role:
                         continue
                     # A role on a project is given on it; an Everywhere
-                    # one is the account's, above (R155).
+                    # one is the account's, above.
                     if role.get("scope") != "projects":
                         return {"error": f"{r} holds everywhere: give it under Everywhere roles"}, 400
                     got.append(str(r))
@@ -1901,7 +1901,7 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
                 else:
                     pr.pop(p, None)
             u["project_roles"] = pr
-            # On a project is holding a role there (R155): the list follows
+            # On a project is holding a role there: the list follows
             # the roles, kept as it was where the account has every project.
             if "*" not in (u.get("projects") or []):
                 u["projects"] = sorted(p for p, rs in pr.items() if rs)
@@ -1912,7 +1912,7 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
 
 def rekey(old, new):
     """Every account's list and roles that name `old` (a repository, before
-    it was put in a project) name its project `new` instead (R138): what
+    it was put in a project) name its project `new` instead: what
     migration 0010 does, for a repository placed since (repos.place)."""
     with _lock:
         d = load()
@@ -1934,7 +1934,7 @@ def rekey(old, new):
 
 def forget_project(project):
     """A project that is gone for good off every account: its list and the
-    roles held on it (membership.forget_project, B95)."""
+    roles held on it (membership.forget_project)."""
     project = str(project or "")
     with _lock:
         d = load()
@@ -1955,7 +1955,7 @@ def forget_project(project):
 
 def forget_role(name):
     """A removed role taken off every account that held it, everywhere and
-    on each project (B20): left on them, a role made later under the same
+    on each project: left on them, a role made later under the same
     name would hand them its access without anybody giving it. How many
     accounts held it."""
     n = 0

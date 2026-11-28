@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The Storage tab (R169): what every node's disks hold, by project. The
+// The Storage tab: what every node's disks hold, by project. The
 // harness's fixture node is enrolled by hand with a walk in its census; the
 // tab lists it with its filesystems as meters, its stores, and its projects
 // largest first; Measure now queues the agent's storage job.
@@ -23,7 +23,7 @@ const WALK = { at: Math.floor(Date.now() / 1000) - 600, took_s: 4,
   workspace: { path: '/workspace', fs: '/' }, homes: { path: '/home/bb', mb: 2500, fs: '/' },
   docker: { kinds: [{ kind: 'Images', count: 3, mb: 1500, reclaimable_mb: 400 }, { kind: 'Build Cache', count: 9, mb: 700, reclaimable_mb: 650 }],
             root: '/var/lib/docker', fs: '/' }, slow: [],
-  // Each project's phones (R123): one idle, one running.
+  // Each project's phones: one idle, one running.
   phones: [{ project: 'alpha', uid: '', name: 'builderbot-36', mb: 4096, running: false },
            { project: 'alpha', uid: '', name: 'builderbot-35', mb: 2048, running: true }] };
 const en = await (await fetch(base + '/api/v1/agent/enroll', { method: 'POST',
@@ -38,7 +38,7 @@ await page.waitForSelector('.storagetab [data-stnode]', { timeout: 15000 });
 const row = await page.evaluate(() => (storageList || []).find(n => n.name === 'diskbox'));
 ok(row && row.measured && row.projects.map(p => p.name).join() === 'alpha,beta' && row.projects[0].total === 6400 && !row.other,
    `the tab lists the node with its spaces largest first, every one named for an administrator (${JSON.stringify(row?.projects)})`);
-// One node at a time, picked in the bar like Toolchains (the operator, 11 Oct).
+// One node at a time, picked in the bar like Toolchains.
 await page.waitForFunction(() => [...document.querySelectorAll('.pane .bar select#ndPick option')].some(o => o.textContent === 'diskbox'), null, { timeout: 15000 });
 ok(await page.$eval('.pane .bar label.pick select#ndPick', s => [...s.options].some(o => o.textContent === 'diskbox')),
    'the bar picks the node, as Toolchains does');
@@ -46,17 +46,17 @@ await page.selectOption('.pane .bar #ndPick', minted.id);
 const sect = `.storagetab [data-stnode="${minted.id}"]`;
 await page.waitForSelector(sect, { timeout: 10000 });
 const drawn = await page.$eval(sect, s => ({ status: s.querySelector('.toolstate .pgline')?.textContent.trim() || '',
-  // Each filesystem a card titled by its mount (R218 step 47), its meter "used".
+  // Each filesystem a card titled by its mount, its meter "used".
   meters: [...s.querySelectorAll('details[data-sect^="storage:fs:"] > summary .t')].map(l => l.textContent),
   used: [...s.querySelectorAll('.ndmeter .lbl')].every(l => l.textContent === 'used'),
   vals: [...s.querySelectorAll('.ndmeter .val')].map(v => v.textContent),
   stores: /cache store/.test(s.textContent) && /Docker/.test(s.textContent) && /reclaimable/.test(s.textContent),
   proj: [...s.querySelectorAll('.stproj:not(.sthead) .name')].map(n => n.textContent.trim()),
   // Measure now on the head's action row under its facts, as a node's
-  // buttons are on the Nodes page (the operator, 29 Oct), and no Refresh
-  // (17 Oct): the walk lands with the census the page follows.
+  // buttons are on the Nodes page, and no Refresh:
+  // the walk lands with the census the page follows.
   measure: !!document.querySelector('.storagetab .pghead .actbar [data-stmeasure]') && !document.querySelector('.storagetab .docbarrow [data-stmeasure]') && !document.querySelector('#stReload'),
-  // Each meter's block: what AerieOS holds on that disk, largest first (R203).
+  // Each meter's block: what AerieOS holds on that disk, largest first.
   disks: [...s.querySelectorAll('.stdisk')].map(d => { const rows = []; let e = d.nextElementSibling;
     while (e && e.classList.contains('row')){ rows.push(e.querySelector('.name, .sub').textContent.trim().split(' ·')[0]); e = e.nextElementSibling; }
     return `${d.closest('details').querySelector('summary .t').textContent}: ${rows.join(', ')}`; }) }));
@@ -81,8 +81,8 @@ const back = await page.waitForFunction(id => {
 ok(back, 'Measure now reads Measure now again once its press is answered, not Asking');
 if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
 
-// The page measures, and each thing is freed on the page that manages it
-// (the operator, 23 Oct): its phones are listed here with a link to the
+// The page measures, and each thing is freed on the page that manages it:
+// its phones are listed here with a link to the
 // Emulator page, where each has its Remove, refused while one runs; no
 // prune and no clear is pressed here.
 await section("The page measures, and each thing is freed on the page that manages it", async () => {
@@ -111,7 +111,7 @@ await section("The page measures, and each thing is freed on the page that manag
   const refused = await api('/api/emulator', { action: 'phone-remove', node: minted.id, project: 'alpha', uid: '', name: 'builderbot-35' });
   ok(/running/.test(refused.error || ''), `a running phone is refused by the server too (${refused.error})`);
 });
-// The array's parity check (R163 step 15): offered where the machine's
+// The array's parity check: offered where the machine's
 // agent has it, its progress on the running pill, its result a fact.
 await section("The array's parity check", async () => {
   const got = await page.evaluate(async () => {
@@ -141,7 +141,7 @@ await section("The array's parity check", async () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     // The question put away, its leaving over.
     for (let i = 0; i < 100 && document.querySelector('.modal.askdlg:not([hidden])'); i++) await new Promise(r => setTimeout(r, 50));
-    // A pool another machine made, found on the disks (R163 step 1).
+    // A pool another machine made, found on the disks.
     // Laid over again until it draws: the page's poll reads the list again.
     for (let i = 0; i < 20 && !(out.found || []).length; i++){
       const m = (storageList || []).find(x => x.name === 'diskbox');
@@ -158,7 +158,7 @@ await section("The array's parity check", async () => {
   ok(got.asks.includes('Check') && got.asks.includes('Check and correct'), `Check parity asks: Check, or Check and correct (${JSON.stringify(got.asks)})`);
   ok(JSON.stringify(got.found) === '["tank:true"]', `a pool another machine made is listed with Import (${JSON.stringify(got.found)})`);
 });
-// Each share's places on an array taken over (R163): where its new files
+// Each share's places on an array taken over: where its new files
 // land and the mover's from and to, said on its row, filled by its Edit,
 // and sent beside the share on Save.
 await section("Each share's places on an array taken over", async () => {

@@ -31,7 +31,7 @@ class Parse(unittest.TestCase):
         self.assertEqual(testreg.parse("PASS  orphan\nnoise\n")[0], [])
 
     def test_the_load_a_run_ended_under(self):
-        # R108: the harness's own line, the busiest when there are several
+        # The harness's own line, the busiest when there are several
         # (a whole run's workers each print one), timestamped or not.
         log = ("[dashboard-test] load: 1.10 0.90 on 4 cores\n"
                "1790000000.5 [dashboard-test] load: 6.00 5.20 on 4 cores\n")
@@ -76,7 +76,7 @@ class Suspect(unittest.TestCase):
 
 class Described(unittest.TestCase):
     """A test whose name says what it protects counts as described; a terse
-    one wants a note (the operator, 17 Nov)."""
+    one wants a note."""
     def test_a_sentence_is_its_own_description(self):
         for n in ("a press on the page around it puts it away", "...and Escape or its own Done puts it away",
                   "test_a_release_whose_apk_never_came_is_said", "testTheCardOpensOnAPress"):

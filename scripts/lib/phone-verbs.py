@@ -70,10 +70,10 @@ def run():
     sys.exit(o.get("code") or 0)
 
 
-# ---- a phone lent to this project (R113, R120) -------------------------------
+# ---- a phone lent to this project -------------------------------
 # The owner lent the phone to this project, and the controller allows only the
 # project's own app on it (phonelease.py). Every command but reading the lease
-# asks the phone's owner and runs on their Allow (R120): whether a session
+# asks the phone's owner and runs on their Allow: whether a session
 # drives somebody's phone is theirs to say each time. BB_PHONE_WHY, from --why,
 # is the sentence they read.
 
@@ -152,7 +152,7 @@ def lent():
         use("ui")
     elif op == "touch":
         # --any-app: the one touch on whatever is in front, not only a lease
-        # app (B485: another project's keyboard on a lent phone had no way to
+        # app (another project's keyboard on a lent phone had no way to
         # be glided on); its owner's ask says so, and their Allow for this
         # session does not cover it.
         anyapp = "--any-app" in rest
@@ -168,7 +168,7 @@ def lent():
             if ms:
                 a["ms"] = ms
         elif kind == "glide":
-            # The path is a hand's (R127): its flags ride along, checked here
+            # The path is a hand's: its flags ride along, checked here
             # and again on the controller.
             try:
                 pts, hopts = hand.parse(rest[1:])

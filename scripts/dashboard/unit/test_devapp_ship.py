@@ -1,4 +1,4 @@
-"""A dev instance sent to a node its project is not on (R166): made only on
+"""A dev instance sent to a node its project is not on: made only on
 purpose, its image built on the project's own node and shipped, the two
 jobs' plans, the image passed only to the jobs that ship and load it, binds
 into the project's tree refused, and the project's sessions reaching it."""
@@ -80,13 +80,13 @@ class Ship(unittest.TestCase):
     def test_a_written_container_builds_on_its_owners_node(self):
         # The written container's owner is alpha, whose node is n1: the
         # shipped build runs there, against its data directory, not against
-        # a tree the container does not have (B716).
+        # a tree the container does not have.
         write_json(devapp.FILE, {"web": {"main": {"source": "file", "for": "alpha", "node": "n2", "ship": True}}})
         devapp.containers_dir("web").mkdir(parents=True, exist_ok=True)
         (devapp.containers_dir("web") / "docker-compose.yml").write_text("services:\n  app:\n    build: .\n")
         r = devactions._ship_submit("web", "main", "n2")
         # Its prepare thread is waited for here: left running, it released
-        # j_1 into the next test's queue, which never held it (B438).
+        # j_1 into the next test's queue, which never held it.
         for t in threading.enumerate():
             if t.name == f"prepare-{r.get('job')}":
                 t.join(10)
@@ -147,8 +147,8 @@ class Ship(unittest.TestCase):
         self.assertEqual(p.read_bytes(), body)
         self.assertTrue(str(p).startswith(str(paths.of("images"))))
         # Handed over and not yet marked running: the fetch is the run half's
-        # first step and can reach here before the agent's first log post
-        # (B648), so an assigned job is served too.
+        # first step and can reach here before the agent's first log post,
+        # so an assigned job is served too.
         self.q.jobs["j_2"]["state"] = "assigned"
         self.assertIsNone(devactions.image_path("n2", {"job": ["j_2"]})[1], "an assigned job fetches it")
         self.q.jobs["j_2"]["state"] = "succeeded"
@@ -170,7 +170,7 @@ class Ship(unittest.TestCase):
 
     def test_a_hosting_only_node_is_never_opened_whole(self):
         # It says it is no sandbox, which would open its whole address: a
-        # public box's word about itself is not taken (R92).
+        # public box's word about itself is not taken.
         n2 = self.q.nodes["n2"]
         n2["reported"]["sandbox"], n2["config"]["host_only"] = False, True
         self.make()

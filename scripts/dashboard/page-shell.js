@@ -1,4 +1,4 @@
-// The shell (R218 step 2): a rail of groups down the left edge, each one a
+// The shell: a rail of groups down the left edge, each one a
 // page with an address, the page on show in the pane; the tool tabs that
 // filled the strip are these pages now, and the strip keeps the documents
 // (terminals, notebooks, the profile is a page under Settings). On a phone
@@ -29,23 +29,23 @@ const RAIL_ICONS = {
 };
 
 // The eleven groups, in the rail's order (the design's rail rule); Help, the
-// docs, last (R258).
+// docs, last.
 const RAIL_GROUPS = [
   {key: "home", label: "Home", icon: "home"},
   {key: "projects", label: "Spaces", icon: "projects"},
   {key: "build", label: "Build", icon: "toolchains"},
   {key: "containers", label: "Containers", icon: "docker"},
-  // The controller, a group of its own (the operator, 22 Oct): how this
+  // The controller, a group of its own: how this
   // AerieOS behaves, with room for the pages a bare-metal install and
-  // the USB edition add beside Settings (R90, R56). After Containers, so a
+  // the USB edition add beside Settings. After Containers, so a
   // phone's bar keeps its four.
   {key: "controller", label: "Controller", icon: "controller"},
   {key: "machines", label: "Machines", icon: "nodes"},
   {key: "sessions", label: "Sessions", icon: "sessions"},
   {key: "jobs", label: "Jobs", icon: "jobs"},
   {key: "people", label: "People", icon: "people"},
-  // Each person's own (Profile): named You (the operator, 25 Nov, R294 step
-  // 15), so Controller > Settings is the one thing called Settings and a
+  // Each person's own (Profile): named You,
+  // so Controller > Settings is the one thing called Settings and a
   // press meaning the install's settings does not land on one's profile.
   {key: "settings", label: "You", icon: "you"},
   {key: "help", label: "Help", icon: "help"},
@@ -60,11 +60,11 @@ const RAIL_GROUPS = [
 //                  a page with a key of its own in its address (an installed
 //                  thing, a Library entry) has none, the address opening it
 //   may            whether the areas this account's grants read draw it
-//                  (state.areas, "" for no Read; R152 step 3); without one
+//                  (state.areas, "" for no Read); without one
 //                  everybody is drawn it. Asked only once the areas are
 //                  known, unless the record says early
 //   node, setNode  the last part of its address, read and set: the node it
-//                  is on (R256 step 3). A page that keeps what it read for
+//                  is on. A page that keeps what it read for
 //                  one node forgets it when the node changes, or the other
 //                  node's list showed under this one until the read
 //   keep           the key this browser keeps that node under
@@ -72,7 +72,7 @@ const RAIL_GROUPS = [
 //   load           what the page on show reads again after a pick; a page
 //                  without one redraws from what setNode left it
 //   moved          the read whose revision a pick moves (readMoved)
-//   back           it is opened by a press, off its group's sub-nav (R181),
+//   back           it is opened by a press, off its group's sub-nav,
 //                  and this is the page Back goes to when it was opened by
 //                  its address alone
 //   own: false     not built for the controller's own machine, whose docker
@@ -84,7 +84,7 @@ const PAGE_KINDS = {
   projects: {group: "projects", label: "Spaces", open: () => openProjectsTab()},
   findings: {group: "projects", label: "Analysis", open: () => openFindingsTab()},
 
-  // The Library (R170): the toolchains and the coding agents as one, so
+  // The Library: the toolchains and the coding agents as one, so
   // either area draws it; what each row offers is the server's to gate.
   // Every door to the Toolchains, Agents and Apps pages it replaced lands
   // here, and their addresses open the group.
@@ -108,7 +108,7 @@ const PAGE_KINDS = {
       const ns = typeof ph !== "undefined" && ph?.nodes;
       return Array.isArray(ns) && ns.length && !ns.some(x => x.id === nid) ? "no adb on this node: install Android platform tools from the Library" : "";
     }},
-  // A Library entry's own page (R183), the Library's areas.
+  // A Library entry's own page, the Library's areas.
   entry: {group: "build", label: "Library", may: a => PAGE_KINDS.library.may(a), back: "library"},
 
   // The Containers page's node is its tab's own argument too, kept with
@@ -122,41 +122,41 @@ const PAGE_KINDS = {
     }},
   vms: {group: "containers", label: "VMs", open: () => openVmsTab()},
 
-  // This machine (R90 step 8): a bare-metal install's own, drawn only
+  // This machine: a bare-metal install's own, drawn only
   // where the install has one; the container edition shows Settings first.
   machine: {group: "controller", label: "This controller", open: () => openMachineTab(), may: a => !!a.controller && !!state?.own_node},
   settings: {group: "controller", label: "Settings", open: () => openSettingsTab(), may: a => !!a.controller},
   network: {group: "controller", label: "Network", open: () => openNetworkTab(), may: a => !!a.controller},
   keys: {group: "controller", label: "Keys", open: () => openKeysTab(), may: a => !!a.controller},
   audit: {group: "controller", label: "Audit", open: () => openAuditTab(), may: a => !!a.controller},
-  // The Debug page (R147) only where DEBUG_MODE=1 started the controller,
+  // The Debug page only where DEBUG_MODE=1 started the controller,
   // and for an account with the debug grant, whatever its areas say.
   debug: {group: "controller", label: "Debug", open: () => openDebugTab(), early: true,
     may: () => !!state?.settings?.debug_available && state?.can?.debug !== false},
 
   nodes: {group: "machines", label: "Nodes", open: () => openNodesTab(), may: a => !!a.nodes,
     node: () => nodesPick, setNode: v => { nodesPick = v; }, moved: "nodes"},
-  // The Kubernetes clusters a space may deploy to (R281 step 2), beside
+  // The Kubernetes clusters a space may deploy to, beside
   // the nodes: infrastructure the install keeps, an area of its own.
   clusters: {group: "machines", label: "Clusters", open: () => openClustersTab(), may: a => !!a.clusters},
-  // Storage has an area of its own (R169).
+  // Storage has an area of its own.
   storage: {group: "machines", label: "Storage", open: () => openStorageTab(), may: a => !!a.storage,
     node: () => storageNode, setNode: v => { storageNode = v; }, keep: "bb.stnode", moved: "storage"},
-  // What is installed on a node (R172): the same areas as the Library.
+  // What is installed on a node: the same areas as the Library.
   installed: {group: "machines", label: "Installed", open: () => openInstalledTab(),
     may: a => !!a.install || !!a.configure || !!a.nodes,
     node: () => instNode, setNode: v => { if (v !== instNode){ instNode = v; inst = null; } },
     keep: "bb.instnode", load: () => loadInstalled(), moved: "installed"},
-  // An installed thing's own page (R181 step 2), Installed's areas.
+  // An installed thing's own page, Installed's areas.
   thing: {group: "machines", label: "Installed", may: a => PAGE_KINDS.installed.may(a), back: "installed"},
-  // nginx and the Scanners are services a node has installed (R264, the
-  // operator, 19 Nov): their pages are opened from their rows on Installed,
+  // nginx and the Scanners are services a node has installed:
+  // their pages are opened from their rows on Installed,
   // and from Configure on their containers, kept off the sub-nav. Their
   // addresses from when they were the Containers group's still open
   // (openRoute: a page that moved group keeps its old address), and an
-  // address with no opener lands on its group's first page (B410), so each
-  // has one. Theirs is the Nodes page's area (R171).
-  // ...or Configure's, a node's services' settings being that area's (R277).
+  // address with no opener lands on its group's first page, so each
+  // has one. Theirs is the Nodes page's area.
+  // ...or Configure's, a node's services' settings being that area's.
   nginx: {group: "machines", label: "nginx", open: () => openNginxTab(), may: a => !!a.nodes || !!a.configure,
     node: () => nginxNode, setNode: v => { nginxNode = v; }, keep: "bb.ngnode", moved: "nginx",
     back: "installed", own: false,
@@ -166,22 +166,22 @@ const PAGE_KINDS = {
     }},
   scanners: {group: "machines", label: "Scanners", open: () => openScannersTab(), may: a => !!a.nodes || !!a.configure,
     back: "installed", own: false},
-  // CI runner is offered by grant too (R137 step 3). Its page is drawn from
+  // CI runner is offered by grant too. Its page is drawn from
   // the nodes' read.
-  // A node's service, as nginx and the Scanners are, so under Machines (R294
-  // step 15), after Installed so the group still opens on Nodes; its
+  // A node's service, as nginx and the Scanners are, so under Machines,
+  // after Installed so the group still opens on Nodes; its
   // #/build/runner address still opens it (openRoute). Unlike theirs its
   // list is the node's own row (services.runners), not an Installed row, so
   // it keeps its place on the sub-nav.
   runner: {group: "machines", label: "CI runner", open: () => openRunnerTab(),
-    // ...drawn for CI runner Read, which reads the runners it may (R277).
+    // ...drawn for CI runner Read, which reads the runners it may.
     may: a => state?.can?.["runner-read"] !== false && a.runner !== "",
     node: () => runnerNode, setNode: v => { runnerNode = v; }, moved: "nodes",
     off: n => {
       const has = (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
       return has ? "" : "no CI runner on this node yet: Add runner is on its page";
     }},
-  // A machine's files (R224): an administrator's alone.
+  // A machine's files: an administrator's alone.
   files: {group: "machines", label: "Files", open: () => openFilesTab(), may: () => !!state?.admin,
     node: () => flNode, setNode: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },
     keep: "bb.filenode", load: () => loadFiles()},
@@ -189,11 +189,10 @@ const PAGE_KINDS = {
   sessions: {group: "sessions", label: "Sessions", open: () => openSessionsTab()},
 
   // The Jobs page has no node; the last part of its address is the chip it
-  // is narrowed to (#/jobs/failed-today, which Home's "failed today" opens,
-  // B74).
+  // is narrowed to (#/jobs/failed-today, which Home's "failed today" opens).
   jobs: {group: "jobs", label: "Jobs", open: () => openJobsTab(), may: a => !!a.jobs,
     node: () => jobsShow, setNode: v => jobsShowSet(v)},
-  // An administrator's own cron (R117), its own area.
+  // An administrator's own cron, its own area.
   schedules: {group: "jobs", label: "Schedules", open: () => openSchedulesTab(), may: a => !!a.schedules},
 
   users: {group: "people", label: "Users", open: () => openUsersTab(), may: a => !!a.accounts},
@@ -213,13 +212,13 @@ const RAIL = RAIL_GROUPS.map(g => ({...g, tools: Object.entries(PAGE_KINDS).filt
 // Where Back on a page a press opened goes when it was opened by its address
 // alone: the page its press is on, which need not be its group's first.
 const PRESSED_HOME = kindFacts("back");
-// The pages a press opens rather than a tab (R181): off their group's
+// The pages a press opens rather than a tab: off their group's
 // sub-nav, each wearing a small top header with Back to the page it was
 // opened from.
 const PRESSED = new Set(Object.keys(PRESSED_HOME));
 // What opens each page (railGo, openRoute).
 const OPENERS = kindFacts("open");
-// A node page's picked node, read and set by the address (R256 step 3): the
+// A node page's picked node, read and set by the address: the
 // node is the address's last part, so a reload, a link and Back land on it.
 const NODE_PICKED = kindFacts("node"), NODE_SET = kindFacts("setNode");
 // What a page keeps in this browser about its node, written on a pick.
@@ -227,12 +226,12 @@ const GROUP_KEEP = kindFacts("keep");
 // What the page on show reads again after a pick; the rest redraw from
 // what NODE_SET left them.
 const GROUP_LOAD = kindFacts("load");
-// The controller's own machine is a node like any (the operator, 9 Nov), on
+// The controller's own machine is a node like any, on
 // every page about a node but those not built for it.
 const NOT_ON_OWN = new Set(Object.keys(PAGE_KINDS).filter(kind => PAGE_KINDS[kind].own === false));
 
 // The five on a phone's bar: the rail's first four, so a phone and a desk
-// keep one order (the operator, 19 Oct), and More for the rest in it.
+// keep one order, and More for the rest in it.
 const RAIL_PHONE = RAIL.slice(0, 4).map(g => g.key);
 
 // A tool kind is a page: it leaves the strip and lives on the rail.
@@ -273,7 +272,7 @@ function railOn(){
     if (g && (g.tools || []).some(([k]) => k === kind)) return railWant;
     railWant = "";
   }
-  // The pages the Library replaced (R170) are off the rail but keep their
+  // The pages the Library replaced are off the rail but keep their
   // addresses under Build until step 5 retires them.
   return groupOf(kind)?.key || (kind === "notebook" ? "projects" : "");
 }
@@ -300,10 +299,10 @@ function railGo(key, tool){
 }
 
 // A history entry the page made itself, and shellSync told so: it leaves an
-// address alone that differs from the one it last saw (a hand-typed one,
-// B303), and an entry pushed here without saying so read as one, so the
+// address alone that differs from the one it last saw (a hand-typed one),
+// and an entry pushed here without saying so read as one, so the
 // next page opened left the old page's address under it and Back went
-// there (B313).
+// there.
 function shellPush(to, from = location.hash){
   shellCame(from, to);
   // While a dialog's entry is being given back the push waits for it to
@@ -316,7 +315,7 @@ function shellPush(to, from = location.hash){
 }
 
 // A move inside a page (a notebook view, a wiki page) is a history entry,
-// so Back returns to where it was (R256 step 3): the draw replaces the
+// so Back returns to where it was: the draw replaces the
 // address as it always does, and the one before is put back and the new
 // one pushed after it.
 function navPush(fn){
@@ -335,10 +334,10 @@ const routeIn = hash => String(hash || "").replace(/^#\/spaces(?=\/|$)/, "#/proj
 function routeOf(t){
   if (!t) return "";
   if (t.kind === "notebook"){
-    // ...and the view it is on (R218 step 3): Overview is the Briefing
+    // ...and the view it is on: Overview is the Briefing
     // view's name on the page, so the address says overview.
     const n = notebooks.get(t.arg), v = n?.where?.() || "";
-    // ...and a branch's comparison, its own page (R269 step 2).
+    // ...and a branch's comparison, its own page.
     const page = v === "wiki" ? n?.wikiPage?.() || "" : v === "git" && n?.gitPage?.() ? "compare/" + encodeURIComponent(n.gitPage())
       : v === "design" ? n?.designPage?.() || "" : "";
     return "#/spaces/" + encodeURIComponent(t.arg) + (v ? "/" + (v === "briefing" ? "overview" : v) : "")
@@ -347,7 +346,7 @@ function routeOf(t){
   if (!isToolKind(t.kind)) return "";
   // The Notifications page is on no group: the bell's See all opens it.
   if (t.kind === "notices") return "#/notifications";
-  // Help names the doc on show (R258), so a link to one lands on it.
+  // Help names the doc on show, so a link to one lands on it.
   if (t.kind === "help") return "#/help" + (helpCur && helpCur !== helpIndex?.home ? "/" + encodeURIComponent(helpCur) : "");
   const g = groupOf(t.kind);
   if (!g) return "";
@@ -356,14 +355,14 @@ function routeOf(t){
   if (t.kind === "home") return "#/home";
   // An installed thing's page names its node and itself under Installed's.
   if (t.kind === "thing") return `#/machines/installed/${encodeURIComponent(instNode || "")}/${encodeURIComponent(thingKey)}`;
-  // ...and a Library entry's page its node and itself under the Library's (R183).
+  // ...and a Library entry's page its node and itself under the Library's.
   if (t.kind === "entry") return `#/build/library/${encodeURIComponent(libNode || "")}/${encodeURIComponent(entryKey)}`;
   const node = NODE_PICKED[t.kind]?.() || "";
-  // A page named as its group is (Jobs, beside Schedules since R117) keeps
+  // A page named as its group is (Jobs, beside Schedules) keeps
   // the group's own address, #/jobs/failed as Home links it, never
   // #/jobs/jobs; the reader takes a segment that is no page's for its node.
   const at = ADDR_OF[g.key] || g.key;
-  // ...and the Library's narrowing (R256), so Back, a reload and a link land
+  // ...and the Library's narrowing, so Back, a reload and a link land
   // on the same list.
   return ((g.tools || []).length > 1 && t.kind !== g.key ? `#/${at}/${t.kind}` : `#/${at}`) + (node ? "/" + encodeURIComponent(node) : "")
     + (t.kind === "library" ? libAddr() : "");
@@ -372,7 +371,7 @@ function routeOf(t){
 // Open what an address names; nothing happens for one that names nothing.
 function openRoute(hash){
   hash = routeIn(hash);
-  // What follows a ? is a page's own narrowing (the Library's, R256).
+  // What follows a ? is a page's own narrowing (the Library's).
   const qat = String(hash || "").indexOf("?");
   const query = qat >= 0 ? hash.slice(qat + 1) : "";
   if (qat >= 0) hash = hash.slice(0, qat);
@@ -418,9 +417,9 @@ function openRoute(hash){
   // #/home/settings, bookmarks from before Controller settings had a group
   // of its own, open it there.
   if (a && !(g.tools || []).some(([k]) => k === a) && groupOf(a)) g = groupOf(a);
-  // An installed thing's page (R181 step 2): #/machines/installed/NODE/KIND:NAME.
+  // An installed thing's page: #/machines/installed/NODE/KIND:NAME.
   if (g.key === "machines" && a === "installed" && b && c){ railWant = g.key; openThing(decodeURIComponent(b), decodeURIComponent(c)); return true; }
-  // A Library entry's page (R183): #/build/library/NODE/KIND:NAME.
+  // A Library entry's page: #/build/library/NODE/KIND:NAME.
   if (g.key === "build" && a === "library" && b && c){ railWant = g.key; openEntry(decodeURIComponent(b), decodeURIComponent(c)); return true; }
   const multi = (g.tools || []).length > 1;
   // A group of one tool names its node second (#/group/NODE), as routeOf
@@ -432,7 +431,7 @@ function openRoute(hash){
   if (!OPENERS[kind] && PRESSED_HOME[kind]) kind = railTool(g, PRESSED_HOME[kind]);
   if (!kind) return false;
   railWant = g.key;
-  // The node the address names, set before the page draws (R256 step 3).
+  // The node the address names, set before the page draws.
   const node = multi && named ? b : a;
   if (node && NODE_SET[kind]) NODE_SET[kind](decodeURIComponent(node));
   if (kind === "library"){
@@ -449,11 +448,11 @@ function openRoute(hash){
 // The address it last left, or null before the first: one that has changed
 // since, and is not the page on show, is a navigation whose hashchange has
 // not run yet, and is left for it. Replacing it took the address back to the
-// page being left, which the handler then opened (B303).
+// page being left, which the handler then opened.
 let shellSeen = null;
 // Signing in after a deliberate Sign out opens on Home, never on the page
-// the browser last showed, which on a shared browser was another person's
-// (the operator, 22 Nov). Sign out leaves the note (signOutGo); the boot
+// the browser last showed, which on a shared browser was another person's.
+// Sign out leaves the note (signOutGo); the boot
 // after it takes it once. A sign-in the page was sent to (its session ran
 // out) leaves none and comes back to the page as a reload does.
 const SIGNED_OUT_KEY = "bb.signedout";
@@ -497,7 +496,7 @@ function shellSync(){
   // put away does not give back the page's address (backRelease).
   if (to && to !== location.hash) history.replaceState(null, "", to);
   // A document in front has no address: the page's goes, so a reload lands
-  // on the document this browser had in front (R131), not on the last page.
+  // on the document this browser had in front, not on the last page.
   else if (!to && location.hash) history.replaceState(null, "", location.pathname + location.search);
 }
 // Once, on the first draw that had state: an address the page was opened on
@@ -525,11 +524,11 @@ function drawRail(){
   const item = g => `<button type="button" class="ritem${g.key === on ? " on" : ""}" data-rail="${esc(g.key)}" aria-label="${esc(g.label)}"${
       g.key === on ? ' aria-current="page"' : ""}>${RAIL_ICONS[g.icon] || TOOL_ICONS[g.icon] || ""}<span class="rlbl">${esc(g.label)}</span></button>`;
   const html = groups.map(item).join("");
-  // Through patch(), which remembers what it wrote: compared against
+  // Through patch, which remembers what it wrote: compared against
   // innerHTML, which the browser writes back its own way (an SVG's
   // attributes, an entity), it never matched, and the rail was rebuilt on
-  // every draw with the pointer on it (R218 step 10); patched, a group
-  // pressed keeps its button and the keyboard's focus on it (R244).
+  // every draw with the pointer on it; patched, a group
+  // pressed keeps its button and the keyboard's focus on it.
   if (patch(rail, html, true)){
     rail.querySelectorAll("[data-rail]").forEach(b => {
       b.onclick = () => railGo(b.dataset.rail);
@@ -570,7 +569,7 @@ function railMoreShow(on){
 }
 
 // The pane's bar for a page: the group's tools as a sub-nav, one button
-// in the accent when the page stands alone (the operator, 16 Oct: a bare
+// in the accent when the page stands alone (a bare
 // name beside the other pages' segments read as a different kind of page);
 // a page has no close, the rail is how you leave it (a split pane keeps its
 // own close).
@@ -583,15 +582,15 @@ function shellBar(t, i){
   const grouped = !!g && GROUP_HEADS[g.key];
   const nid = grouped ? groupNode(g, t.kind) : "";
   const nav = `<span class="subnav pseg hscroll" role="tablist" aria-label="${esc(g ? g.label : tabLabel(t))}">${tools.map(([k, label]) => {
-    // A sub-tab whose feature the picked node lacks is drawn unavailable
-    // (R178): muted, the reason on it, still a press, and the page says
+    // A sub-tab whose feature the picked node lacks is drawn unavailable:
+    // muted, the reason on it, still a press, and the page says
     // the same and offers the one thing that makes it available.
     const off = grouped && nid ? toolOff(k, nid) : "";
     return `<button type="button" role="tab" aria-selected="${k === t.kind}" class="${k === t.kind ? "on" : ""}${off ? " off" : ""}"${g ? ` data-subnav="${esc(k)}"` : ""}${off ? ` title="${esc(off)}"` : ""}>${esc(label)}${off ? `<span class="navnote">not here</span>` : ""}</button>`;
   }).join("")}</span>`;
-  // A group that wears one header over its sub-nav (R177, R178): the node
+  // A group that wears one header over its sub-nav: the node
   // picked once for every page of the group, the group's actions on the
-  // sub-nav's line at its right (the operator, 28 Oct).
+  // sub-nav's line at its right.
   // A page of the group about no one node (Clusters) wears the group's name
   // where the picker stands, as a space's header wears the space's.
   // The group's actions wait on the node list, which the picker's header
@@ -601,7 +600,7 @@ function shellBar(t, i){
     : `<span class="phead mchead"><span class="pname">${esc(g.label)}</span><span class="sp"></span></span>`;
   return grouped ? head + `<span class="subrow">${nav}<span class="sp"></span>${GROUP_HEADS[g.key].actions ? GROUP_HEADS[g.key].actions() : ""}</span>` : nav;
 }
-// Where Back on a page a press opened goes (R181): the address it was
+// Where Back on a page a press opened goes: the address it was
 // opened from, kept as it opens, with what that page is called; none when it
 // was opened by its own address (a reload, a link from outside), and Back
 // then opens its group's first page.
@@ -670,8 +669,8 @@ function wireShellBar(bar){
   wireGroupHeader(bar);
 }
 
-// ---- a group's header (R177, R178) --------------------------------------------------
-// The operator, 28 Oct: a header like a project's for the Machines group,
+// ---- a group's header --------------------------------------------------
+// A header like a project's for the Machines group,
 // the node pulldown there instead of on each of the three sub-tabs; then
 // the same for Build and Containers. One band in the project header's
 // shape: the node picker where the name is, the node's facts beside it in
@@ -691,7 +690,7 @@ const GROUP_HEADS = {
 function machinesLive(kind = ""){
   const all = (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && NOT_ON_OWN.has(kind)));
   // A reader the Nodes listing gives no node (no Nodes Read) is offered the
-  // nodes the page itself read (Configure Read on a node's services, R277),
+  // nodes the page itself read (Configure Read on a node's services),
   // where the header said "No node yet" over a page showing one.
   return all.length || nodesList === null ? all : pageNodes(kind);
 }
@@ -734,7 +733,7 @@ function keptNode(kind, {have = liveAgents(), idOf = n => n.id, cur = PAGE_KINDS
 // A page opened on a node somebody named (the bell's rows, a node's page, a
 // space's Sign in on NODE): the node set and kept, the page opened with its
 // address pushed as a press pushes it, and read for that node. A node the
-// list does not hold yet is read for first (B754's lesson).
+// list does not hold yet is read for first.
 function openKindOn(kind, id){
   const k = PAGE_KINDS[kind];
   if (id) k.setNode(id);
@@ -747,7 +746,7 @@ function openKindOn(kind, id){
   if (to && to !== was) shellPush(to);
   k.load();
 }
-// One node per group (the operator, 29 Oct: the header's pick is the node
+// One node per group (the header's pick is the node
 // every sub-tab of the group shows). A page whose own node differs from the
 // group's is moved to it when it is drawn, read again for it; a page an
 // opener sent to a node of its own (a node's row, a Library entry) takes
@@ -833,10 +832,10 @@ function openNodePage(nid){
 // feature off (the reason is on the Nodes page) and until the node list lands.
 // At a desk the two buttons; on a phone, where they cut the tabs short behind
 // the strip's arrow, one + whose menu holds them, so the tabs are whole and
-// the row keeps its one height (the operator, 22 Nov; the group-header rule).
+// the row keeps its one height (the group-header rule).
 function machinesActions(){
   // Not drawn for an account whose roles do not give a new node (Nodes Write
-  // on every node, R277): what a role does not give is not advertised.
+  // on every node): what a role does not give is not advertised.
   if (state?.can?.["nodes-new"] === false) return "";
   const dead = nodesList === null || featureOff("enroll") ? " disabled" : "";
   const fold = actMore([`<button type="button" data-ndvm${dead}>New VM</button>`, `<button type="button" data-ndenroll${dead}>Enroll node</button>`],
@@ -848,7 +847,7 @@ function wireGroupHeader(bar){
   const go = bar.querySelector("[data-ndgo]");
   if (go) go.onclick = () => openNodePage(go.dataset.ndgo);
   const pick = bar.querySelector("#ndPick");
-  // A pick is a history entry (B31), so Back returns to the node before.
+  // A pick is a history entry, so Back returns to the node before.
   if (pick) pick.onchange = () => navPush(() => groupPick(groupOf(tabOf(panes[0])?.kind || "nodes") || groupOf("nodes"), pick.value));
   const vms = bar.querySelectorAll("#ndVm, [data-ndvm]"), ens = bar.querySelectorAll("#ndEnroll, [data-ndenroll]");
   if (vms.length || ens.length){
@@ -869,12 +868,12 @@ function drawMaintBand(){
   // Written only when it changes: a poll that brings nothing new writes nothing.
   if (b && b.hidden !== off) b.hidden = off;
   // Its link opens Controller settings at Maintenance, where it is switched
-  // off (the operator, 26 Oct).
+  // off.
   const go = b?.querySelector("[data-maintgo]");
   if (go && !go.onclick) go.onclick = e => { e.preventDefault(); SPLIT.settings = {pick: "maint", open: true}; openSettingsTab(); };
 }
 
-// ---- a held start's band (R56 step 9) ------------------------------------------
+// ---- a held start's band ------------------------------------------
 // Drawn under the header on a bare-metal install while its start is held:
 // the server sends it hidden on every page, and the poll shows it with why.
 function drawHeldBand(){
@@ -887,12 +886,12 @@ function drawHeldBand(){
   const said = (h.why || []).length ? `Held because ${h.why.join("; ")}.` : "";
   if (why && why.textContent !== said) why.textContent = said;
   const go = b.querySelector("[data-heldgo]");
-  // While the first-run page stands, no page shows behind it (B662): the
+  // While the first-run page stands, no page shows behind it: the
   // walk holds Start.
   if (go && !go.onclick) go.onclick = e => { e.preventDefault(); setupNeeded() ? setupWalkPick("move") : openMachineTab(); };
 }
 
-// ---- a moved controller's band (R90 step 12) ---------------------------------
+// ---- a moved controller's band ---------------------------------
 function drawMovedBand(){
   const b = document.getElementById("movedband");
   if (!b) return;
@@ -934,7 +933,7 @@ function drawJump(){
   jumpRows = jumpItems(inp.value);
   jumpAt = 0;
   // Something typed that matches nothing says so, rather than the list
-  // staying shut as if the field had not heard (B72).
+  // staying shut as if the field had not heard.
   const none = !jumpRows.length && !!inp.value.trim();
   list.hidden = !jumpRows.length && !none;
   patch(list, none ? `<div class="jnone" role="option" aria-disabled="true">nothing matches “${esc(inp.value.trim())}”</div>`
@@ -945,7 +944,7 @@ function drawJump(){
   else inp.removeAttribute("aria-activedescendant");
 }
 // ArrowDown and ArrowUp move the mark through the rows, round at the ends,
-// so the second hit is a key away and not only the mouse's (B72).
+// so the second hit is a key away and not only the mouse's.
 function jumpMove(by){
   const list = $("jumpList");
   if (!jumpRows.length || !list) return;
@@ -971,7 +970,7 @@ function wireJump(){
   const inp = $("jump"), list = $("jumpList");
   if (!inp || !list) return;
   // Its hint is the whole where it fits, else a shorter one, else two words
-  // (the operator, 18 Oct: cut off mid-word), as every field's is (phFit,
+  // (cut off mid-word), as every field's is (phFit,
   // its data-ph-short); the aria-label keeps the whole of it either way.
   onTyping(inp, drawJump);
   inp.onfocus = () => { (nodesList === null ? nodesKnown() : Promise.resolve()).then(dmJumpLoad).then(drawJump); drawJump(); };
@@ -983,7 +982,7 @@ function wireJump(){
   document.addEventListener("click", e => { if (!e.target.closest(".jump")) list.hidden = true; });
 }
 
-// ---- the project page's header (R218 step 3) -----------------------------
+// ---- the project page's header -----------------------------
 
 // A project is a page: its pane's bar is the header the design names (the
 // a-notebook/project-page rule): the name large, the branch and the node in
@@ -996,13 +995,13 @@ function wireJump(){
 // first, then whose else is here, then none. The dot is the one every
 // session surface wears.
 function projectState(p){
-  // A space's one session runs on its first repository (R136), so every
+  // A space's one session runs on its first repository, so every
   // repository's header says that one's state, as its agent button does:
   // the second repository of a space read "no session" beside a lit Manage
-  // agent (the operator's screen, 19 Nov).
+  // agent.
   const name = state?.repos?.[p.project]?.members?.[0] || p.name, sess = myLiveSession(name), mine = !!sess;
-  // One entry per person per agent per slot (B344: a person's Claude and
-  // Codex folded into one, one session's state masking the other's; R143:
+  // One entry per person per agent per slot (a person's Claude and
+  // Codex folded into one, one session's state masking the other's;
   // and two of one agent's), from where each session is: its account, its
   // agent, its slot and its state, a session on two nodes once.
   const rows = (state?.claude_where || {})[tmuxName(name)] || (state?.claude_where || {})[name] || [];
@@ -1013,10 +1012,10 @@ function projectState(p){
   }
   const one = (st, word, cls, agent, slot = 1) => `<span class="pstate${cls}">${st ? `<span class="st ${st}"></span>` : ""}${esc(word)}${
     agent ? `<span class="pagent"> · ${esc(agentSlotName(agentById(agent) || {name: agent}, slot))}</span>` : ""}</span>`;
-  // Yours first, then everybody else's, each with its own dot (the
-  // operator, 16 Oct). On its permission prompt it is asking, in amber, as
-  // the dock and Sessions say it (B98); another account's reads asking too
-  // (B104), not "asking you": only that person's terminal answers it.
+  // Yours first, then everybody else's, each with its own dot.
+  // On its permission prompt it is asking, in amber, as
+  // the dock and Sessions say it; another account's reads asking too,
+  // not "asking you": only that person's terminal answers it.
   const all = [...seen.values()];
   const me = all.filter(e => e.who === state?.me).map(e => e.asking ? one("asking", "asking you", "", e.agent, e.slot)
     : e.working ? one("working", "working", "", e.agent, e.slot) : one("waiting", "waiting for you", "", e.agent, e.slot)).join("")
@@ -1032,11 +1031,11 @@ function projectState(p){
 function projectNote(p, band = false){
   const here = withMe(p.name).length > 0;
   // What holds it back is said ahead of a wait that would end by itself
-  // (B826: a copy going up was said and the missing Claude Code that really
+  // (a copy going up was said and the missing Claude Code that really
   // held it never was).
   const held = p.held && !state?.mapping?.[p.name]?.running ? p.held : "";
   // Not this account's to change: nothing is said and Start agent is not
-  // drawn (the operator, 21 Oct: a role somebody lacks is not advertised to
+  // drawn (a role somebody lacks is not advertised to
   // them, and a reason a button is off is not an error, so no line is red).
   if (!p.locked_me && writeWhy(p)) return "";
   // Your session running here and behind what changed since it started (a
@@ -1045,9 +1044,9 @@ function projectNote(p, band = false){
   const behind = !here ? [] : [...new Set(((state?.claude_where || {})[tmuxName(p.name)] || (state?.claude_where || {})[p.name] || [])
     .filter(r => r.who === state?.me).flatMap(r => r.behind || []))];
   // A band between the header and the view strip, put away with its x for
-  // as long as it says the same (the operator, 28 Oct); what changed next
-  // brings it back, and so does leaving the notebook and coming back to it
-  // (the operator, 29 Oct). Every note the header carries is one (pnoteBand).
+  // as long as it says the same; what changed next
+  // brings it back, and so does leaving the notebook and coming back to it.
+  // Every note the header carries is one (pnoteBand).
   if (behind.length){
     const text = `Restart your session to use what changed: ${behind.join("; ")}.`;
     return band ? pnoteBand(p, text) : `<div class="pnote warn">${esc(text)}</div>`;
@@ -1058,27 +1057,27 @@ function projectNote(p, band = false){
   const said = held || p.session_why;
   // An error where no session can run there and nothing passes by itself
   // (a node removed, disabled, off or hosting only); a warning where it is a
-  // wait or a hold (the operator, 29 Oct: warnings yellow, errors red).
+  // wait or a hold (warnings yellow, errors red).
   const tone = held || p.session_waiting ? "warn" : "bad";
   if (said && !p.locked_me && !here) return band ? pnoteBand(p, said, tone) : `<div class="pnote dim">${esc(said)}</div>`;
-  // ...and otherwise why Start agent is dead, whatever made it so (B88):
+  // ...and otherwise why Start agent is dead, whatever made it so:
   // a Profile with no commit author, somebody else's node. A locked one
   // says so by its mark, and is left out.
   const dead = p.locked_me ? "" : claudeDeadWhy(p);
   return !dead ? "" : band ? pnoteBand(p, dead) : `<div class="pnote dim">${esc(dead)}</div>`;
 }
-// A note in the project's header as a band with its x (the operator, 28 and
-// 29 Oct: every one, the way the restart band is), or "" while it is put away.
+// A note in the project's header as a band with its x
+// (every one, the way the restart band is), or "" while it is put away.
 function pnoteBand(p, text, tone = "warn"){
   if (pnotePutAway(p.name) === text) return "";
   return `<div class="pnote ${tone === "bad" ? "bad" : "warn"} pband" data-pnote="${esc(p.name)}"><span class="grow">${esc(text)}</span><button type="button" class="ic" data-pnote-x aria-label="put this away">×</button></div>`;
 }
 // The node to install Claude Code on in place of starting a session, or "":
 // the project's node has none and this account may install toolchains there
-// (the operator, 21 Oct: the button opens that node's Toolchains).
+// (the button opens that node's Toolchains).
 const claudeInstall = p => !p.locked_me && !myLiveSession(p.name) && p.claude_missing
   && mayToolchains(p.claude_missing) ? p.claude_missing : "";
-// ...and the same for any agent (R95 step 18): another agent is missing where
+// ...and the same for any agent: another agent is missing where
 // the project's node does not list it among the agents installed there, the
 // list Start's chooser offers from.
 function agentInstall(p, ag){
@@ -1096,19 +1095,19 @@ function claudeDeadWhy(p){
   const mine = !!myLiveSession(p.name);
   if (p.locked_me) return lockedWhy(p);
   if (notMine(p)) return NOT_MINE_WHY;
-  // A Claude session is work on the project (B86): Projects Write.
+  // A Claude session is work on the project: Projects Write.
   if (p.write_why) return p.write_why;
   if (heldWhy(p)) return heldWhy(p);
   if (!p.session_at && p.session_why && !mine) return p.session_why;
   if (p.node_removed && !mine) return p.session_why || "its node was removed: pick another in its settings";
   return "";
 }
-// Why a lock holds this account out, as the server says it (R119).
+// Why a lock holds this account out, as the server says it.
 const lockedWhy = p => p.locked_admin
   ? "locked by an administrator: nobody starts a session or changes it until one unlocks it"
   : `locked by ${p.owner_name || "its owner"}, its owner: only they work in it until they unlock it`;
-// The lock's press in a menu: an administrator's says it is one (the
-// operator, 23 Oct), since it holds the project's owner out too.
+// The lock's press in a menu: an administrator's says it is one,
+// since it holds the project's owner out too.
 const lockLabel = p => {
   const asAdmin = p.locked ? p.locked_admin : !p.owner_mine;
   return (asAdmin ? "Admin: " : "") + (p.locked ? "Unlock" : "Lock");
@@ -1116,9 +1115,9 @@ const lockLabel = p => {
 // The agent's button, on a project's card and a repository's header: Start
 // agent, Manage agent while this account's session runs, or Install where
 // the project's agent is missing on its node. A project's one session runs
-// on its first repository (R136), so every repository's opens that.
+// on its first repository, so every repository's opens that.
 function agentButton(p){
-  // The agent the project's Start opens (R95 step 4): Claude's unless its
+  // The agent the project's Start opens: Claude's unless its
   // settings name another. Its own session running here makes it Open.
   const ag = projectAgent(p);
   const rk = state?.repos?.[p.project];
@@ -1143,8 +1142,8 @@ function agentButton(p){
   const say = said.startsWith(`${ag.name}:`) ? said : `${ag.name}: ${said}`;
   // Green only while your session runs, and then Manage agent, since the
   // press opens the chooser with the session's Open, Restart and End;
-  // otherwise a plain Start agent, the chooser under it picking which (the
-  // operator, 16 Oct: green on every card read as running everywhere; 22
+  // otherwise a plain Start agent, the chooser under it picking which
+  // (green on every card read as running everywhere; 22
   // Oct: one word for every agent; 23 Oct: Manage agent, not Open Claude).
   const inst = agentInstall(p, ag);
   return inst ? `<button type="button" data-tcinst="${esc(inst)}" data-agent="${esc(ag.id)}" title="${
@@ -1153,7 +1152,7 @@ function agentButton(p){
         mine ? "Manage agent" : "Start agent"}</button>`;
 }
 // A repository's header: the agent, a shell, and the rest behind one menu
-// (R238: nine look-alike icons on a row were one too many). Its data-*
+// (nine look-alike icons on a row were one too many). Its data-*
 // names are wireProjectRows', which serves them; the marks act on its
 // project.
 function projectActions(p){
@@ -1165,7 +1164,7 @@ function projectActions(p){
     p.phone?.mine ? `<button type="button" data-ph="${esc(name)}"${phoneWhy(p) ? " disabled" : ""}>${
         p.phone?.lease?.project === name ? "Take your phone back" : "Lend your phone"}</button>` : "",
     p.mine === false ? "" : `<button type="button" data-bug="${esc(name)}">Report an AerieOS bug</button>`,
-    // Archive is out of sight only (R119, the operator, 23 Oct): its card
+    // Archive is out of sight only: its card
     // folds away at the foot of the Projects page and leaves Home, and the
     // project works on. Its owner's or an administrator's.
     c.may_archive ? `<button type="button" data-k="${esc(key)}" data-on="${c.archived ? "0" : "1"}">${c.archived ? "Unarchive" : "Archive"}</button>` : "",
@@ -1182,9 +1181,9 @@ function projectActions(p){
 function projectHeader(t){
   const name = t.arg, p = (state?.projects || []).find(x => x.name === name);
   if (!p) return `<div class="phead"><span class="pname">${esc(projLabel(name))}</span></div>`;
-  // A repository of a project of several (R136): the project's name, and
+  // A repository of a project of several: the project's name, and
   // its repositories as a pulldown, this one picked, each opening its own
-  // notebook (the operator, 27 Oct: a switch of buttons is no way to hold a
+  // notebook (a switch of buttons is no way to hold a
   // list that may be long), in the project's color as its buttons are.
   const rk = state?.repos?.[p.project];
   const repoSwitch = rk?.members.length > 1 ? `<select class="prepos" data-reposw aria-label="${esc(rk.name)}'s repositories: the one this notebook is">${
@@ -1200,7 +1199,7 @@ function projectHeader(t){
 // The row's handlers serve the header too (the same data-* names); the
 // menu's own button is the one thing the row did differently.
 // The header's band put away, by project: the text it had, for this visit
-// to the notebook alone (the operator, 29 Oct: it comes back once you fully
+// to the notebook alone (it comes back once you fully
 // leave the notebook and return). A view of the same notebook is the same
 // visit; another page, another project or a reload is not.
 const pnoteAway = {};
@@ -1225,16 +1224,16 @@ function wireProjectHeader(bar){
   });
   bar.querySelectorAll("select[data-reposw]").forEach(s => s.onchange = () => openNotebook(s.value));
   // On the project's own page its menu's Settings is the notebook's Settings
-  // view (R259: the view strip carries no tab for it), not the dialog. Only
+  // view (the view strip carries no tab for it), not the dialog. Only
   // there: a card on the Projects page keeps wireProjectRows' Settings, which
-  // goes to the page (B82: this one turned the notebook in the background).
+  // goes to the page (this one turned the notebook in the background).
   bar.querySelectorAll("[data-rn]").forEach(b => b.onclick = () => {
     const n = getNotebook(b.dataset.rn);
     if (n) n.view("settings"); else openProjectSettings(b.dataset.rn);
   });
   wireProjectMenu(bar);
 }
-// The other repositories of a project of several (R136), under one
+// The other repositories of a project of several, under one
 // repository's own list: their open roadmap items or open bugs, merged,
 // each row naming its repository and opening its view there. Read-only
 // here, as each repository's list is its own to change.
@@ -1277,7 +1276,7 @@ function wireProjectMenu(bar){
 
 // A project's lock, said one way on its card, its page's header and Home
 // (consistency batch J: the header said locked where the card said
-// archived): locked when its owner or an administrator locked it (R119),
+// archived): locked when its owner or an administrator locked it,
 // whomever it holds out, read-only when it is not this account's to change
 // (not taken on, or a role that reads it alone). Archived is said by where
 // the card sits, not by a mark.

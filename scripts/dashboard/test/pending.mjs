@@ -49,9 +49,9 @@ ok(/added R\d+/.test(first) && roadmapItems().some(r => r.text === 'a thing adde
 const firstId = first.match(/added R(\d+)/)[1];
 
 // ---- the setting, in the project's settings dialog -------------------------
-await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
 await page.waitForSelector('#rnmodal:not([hidden])');
-// A repository's door (R208 step 6): each dial offers "as the project
+// A repository's door: each dial offers "as the project
 // (auto)" first, which is what it reads until something is set here.
 const opts = await page.$$eval('#rnGateRoadmap option', os => os.map(o => o.value));
 const inh = await page.$eval('#rnGateRoadmap option', o => o.textContent);
@@ -71,7 +71,7 @@ ok(gate().roadmap === 'ask' && gate().bugs === 'ask' && gate().rules === 'deny' 
    'saving writes the four words beside the space\'s other settings');
 await page.waitForFunction(() => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.gate?.rules === 'deny',
                            null, { timeout: 30000 });
-await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
 await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnGateBugs', e => e.value) === 'ask'
    && await page.$eval('#rnGateRules', e => e.value) === 'deny',
@@ -259,7 +259,7 @@ ok(ap.status === 200 && ap.body.approved?.length === 2
 ok(/no rule is waiting/.test(bb('rules', 'pending')),
    'and aerie rules pending says so');
 
-await done(browser);// A session asking for an item back off the shelf (R78) is held whatever the
+await done(browser);// A session asking for an item back off the shelf is held whatever the
 // gate says, with its reason, and a person's Approve replays it: a decision
 // with a notification behind it, not a gate on creation.
 await section("gate says, with its reason, and a person's Approve replays it", async () => {

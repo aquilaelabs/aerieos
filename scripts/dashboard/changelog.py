@@ -161,7 +161,7 @@ def groups(d):
     return out
 
 
-# A bug's or a roadmap item's number (B655, R209, R209.3): the notebook's,
+# A bug's or a roadmap item's number: the notebook's,
 # which nobody reading the repository can open. A line names the commit it
 # landed in, as every line does, and the bug is linked with --bug.
 _NOTEBOOK_ID = re.compile(r"\b[BR]\d{2,}(?:\.\d+)?\b")
@@ -267,7 +267,7 @@ def put(d, gs):
     # The limit is on what is being written, not on what is already there:
     # an entry the file holds word for word is kept as it is. Held to the
     # limit too, one long entry refused every add, edit and rm after it,
-    # with a sentence that blamed the new line (B352).
+    # with a sentence that blamed the new line.
     before = [(" ".join(e["text"].split()), tuple(e.get("shas") or ())) for g in groups(d) for e in g["entries"]]
     have = {t for t, _ in before}
     try:
@@ -326,7 +326,7 @@ def put(d, gs):
         _write(d, "\n".join(_tidy(out)) + "\n")
     except OSError as e:
         return {"error": f"could not write {FILE}: {e}"}
-    # A line reworded here keeps the bugs tied to it (R255): an old line
+    # A line reworded here keeps the bugs tied to it: an old line
     # whose words are gone is the one new line naming the same commits.
     after = [(t, tuple(sh)) for _, ents in rows for t, sh in ents]
     now = {t for t, _ in after}
@@ -643,7 +643,7 @@ def unroll(d, version):
         return False
     end = next((i for i in range(start + 1, len(lines))
                 if lines[i].startswith("## ")), len(lines))
-    # The section as groups, category by category (B277): the entries went
+    # The section as groups, category by category: the entries went
     # back as bare lines before, under whatever category Unreleased opened
     # with, so a rolled-back release filed everything under Added.
     sec, cur = [], {"name": "", "entries": []}
@@ -778,9 +778,9 @@ def roll(d, version, date, resolve=None, keep=None):
     choosing which of their lines a reader upgrading from that stable needs.
 
     `resolve(text)` answers the commits that carry an entry, when the caller
-    has git: add() stamps the HEAD of the moment, which is the commit
+    has git: add stamps the HEAD of the moment, which is the commit
     before the one the entry lands in, so the record cited the wrong
-    commit until the roll fixed it up (B284).
+    commit until the roll fixed it up.
     """
     pending = [] if is_pre(version) else since_stable(read(d) or "")
     if not unreleased(d) and not pending:
@@ -909,8 +909,8 @@ _TITLE_VER = re.compile(r"^(\d+\.\d+\.\d+)\b")
 
 
 def stitch(ours, theirs):
-    """A patch line's changelog carried into the next line's (R112 step 3,
-    aerie version forward): this line's file with every dated section the patch
+    """A patch line's changelog carried into the next line's
+    (aerie version forward): this line's file with every dated section the patch
     line has and this one does not, placed among the others by version, and
     this line's Unreleased without an entry the patch already released (a fix
     made on both lines is said once, under the release that shipped it).
@@ -995,7 +995,7 @@ def editor_verb(name, req):
             return r, 400
         return r | {"text": read(d), "groups": groups(d)}, 200
     if req.get("action") == "line":
-        # One new line, from a fixed bug's Write a line (R255): its words,
+        # One new line, from a fixed bug's Write a line: its words,
         # its category and the commits that fixed it; the server ties the
         # bug to the words this answers with.
         shas = [str(x) for x in req.get("shas") or [] if re.fullmatch(r"[0-9a-f]{7,40}", str(x))][:20]

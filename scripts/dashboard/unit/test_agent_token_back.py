@@ -1,5 +1,5 @@
 """The token before the last rotation tried when the controller does not
-know the newest (B655): written to node.json first, taken for the next
+know the newest: written to node.json first, taken for the next
 call, once per rotation, and nothing to go back to without a rotation."""
 import os
 import sys
@@ -43,7 +43,7 @@ class TokenBack(unittest.TestCase):
             self.assertFalse(a.token_back())
 
     def test_the_newest_is_kept_ahead_of_the_one_gone_back_to(self):
-        # B759: a move's new home refused the newest (it had not issued it),
+        # A move's new home refused the newest (it had not issued it),
         # the node went back a token and was taken back there; the old home,
         # running again, holds the newest live and the one before retired.
         a = bare("bbn_x", "bbn_w")
@@ -66,7 +66,7 @@ class TokenBack(unittest.TestCase):
 
 
 class Recovered(unittest.TestCase):
-    """A controller restored from a backup (the operator, 6 Nov): the node
+    """A controller restored from a backup: the node
     keeps a month of its tokens, newest first, and offers them a chunk a call
     until the controller answers with a fresh one."""
     def test_each_rotation_keeps_the_one_before_and_a_month_alone(self):

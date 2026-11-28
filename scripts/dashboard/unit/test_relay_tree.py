@@ -2,7 +2,7 @@
 or one of its worktrees on the share, and anything else the space's
 directory, said as not the one asked for, so a verb that writes its tree
 (aerie changelog add) is refused rather than written somewhere else
-(B1131: a worktree in a node's /tmp had its line land in the project)."""
+(a worktree in a node's /tmp had its line land in the project)."""
 import os
 import shutil
 import sys

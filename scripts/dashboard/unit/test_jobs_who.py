@@ -1,6 +1,6 @@
 """A container job is asked for by the account that pressed the button, and a
 canceled job ends naming whoever pressed Cancel, where every compose job said
-'operator' and every cancel 'stopped by the operator' (B69)."""
+'operator' and every cancel 'stopped by the operator'."""
 import os
 import sys
 import tempfile

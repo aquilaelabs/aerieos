@@ -1,4 +1,4 @@
-// The Schedules page (R117): an administrator's own cron. The built-in scan
+// The Schedules page: an administrator's own cron. The built-in scan
 // is there and off; a schedule added on the page says its timetable in
 // words, Run now runs it once as a job whose log is on the Jobs page, and
 // Turn off and Remove do what they say. A session's token and an account
@@ -23,7 +23,7 @@ await page.goto(URL);
 await ready(page);
 
 // The page, on the rail beside Jobs: a person's own cron, nothing built in
-// since the scan became the Scanners page's (R145).
+// since the scan became the Scanners page's.
 await page.evaluate(() => openSchedulesTab());
 await page.waitForSelector('.schedulestab #bSchedNew', { timeout: 15000 });
 ok((await page.$$('.schedulestab .schedrow[data-sched="scan"]')).length === 0,
@@ -35,7 +35,7 @@ ok(await page.evaluate(() => location.hash) === '#/jobs/schedules'
 // A schedule added on the page: its timetable in words once saved.
 await page.click('#bSchedNew');
 await page.waitForSelector('#schedmodal:not([hidden]) [data-schedform="new"]', { timeout: 10000 });
-// A dialog over the page (the operator, 26 Oct), not a form in its list.
+// A dialog over the page, not a form in its list.
 const dlg = await page.evaluate(() => {
   const m = $('schedmodal');
   return { dialog: m.getAttribute('role') === 'dialog' && m.getAttribute('aria-modal') === 'true',
@@ -44,7 +44,7 @@ const dlg = await page.evaluate(() => {
 });
 ok(dlg.dialog && dlg.title === 'New schedule' && !dlg.inPage && dlg.foot === 'Add,Cancel',
    `New schedule opens a dialog, its foot Add then Cancel (${JSON.stringify(dlg)})`);
-// As few fields as User Scripts (the operator, 26 Oct): a name, When as a
+// As few fields as User Scripts: a name, When as a
 // pick, where it runs (the controller first, and picked), and the script;
 // no timeout, and Runs as only for a sandbox node, where root is AerieOS's.
 const form = await page.evaluate(() => {
@@ -127,7 +127,7 @@ await section("A session's token is refused, reading or writing", async () => {
   ok(read.status === 403 && write.status === 403 && /a session has no say/.test(write.body.error || ''),
      `a session's token is refused, reading and writing (${read.status}/${write.status})`);
   // ...nor does it see a schedule's runs among the jobs, or one by its id:
-  // the scripts and their logs are an administrator's (the operator, 26 Oct).
+  // the scripts and their logs are an administrator's.
   const one = await api(`/api/v1/jobs?id=${ran.last.job}`, undefined, SH);
   const list = await api('/api/v1/jobs?n=500', undefined, SH);
   const mineToo = (await api('/api/v1/jobs?n=500')).body.jobs || [];

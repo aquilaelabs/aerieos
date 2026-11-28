@@ -54,7 +54,7 @@ KEY_PIN_WHOLE = re.compile(re.escape(KEY_PIN) + r"[A-Za-z0-9+/]{43}=")
 
 
 def follow(state, url="", expect="", pin=""):
-    """The knock (R90 step 12, R175 step 3): `state["move"]` names where and
+    """The knock: `state["move"]` names where and
     what to expect, or `url` and `expect` do (the follow verb, run by hand
     on a node that outlived the old controller, which may name the new
     home's key with `pin`). The new address is asked, with the node's own
@@ -100,7 +100,7 @@ def follow(state, url="", expect="", pin=""):
         ctl = Controller(to, state["token"], under)
         st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
         # A token handed out after the bundle was packed is one the new
-        # home never saw (B935): this node taken back there by one it held
+        # home never saw: this node taken back there by one it held
         # before, as a hello does at a restored controller, and asked again.
         if st == 401 and _recover_at(ctl, state):
             st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
@@ -138,7 +138,7 @@ def follow(state, url="", expect="", pin=""):
             if r.get("pin"):
                 state["pin"] = str(r.get("pin"))
             elif not r.get("url"):
-                # The address knocked at is kept (B936), so its certificate is the
+                # The address knocked at is kept, so its certificate is the
                 # one just met there, which answered the challenge; plain http has
                 # none.
                 seen = getattr(ctl, "seen_pin", "") or ""
@@ -181,20 +181,20 @@ def _recover_at(ctl, state):
 
 
 
-# A node's past tokens kept for a restored controller (the operator, 6 Nov):
+# A node's past tokens kept for a restored controller:
 # a month of them, at most PAST_MOST, offered RECOVER_CHUNK a call.
 PAST_KEEP_S = 30 * 86400
 PAST_MOST = 9000
 RECOVER_CHUNK = 200
 
 # What a call says when nobody is listening at the controller's port yet: a
-# restart under way (B760).
+# restart under way.
 RESTARTING = re.compile(r"ConnectionRefused|RemoteDisconnected|ConnectionReset|Connection refused")
 
 
 def turn_part(turn, name, fn, *a):
-    """One part of the agent's turn, run and timed into `turn` (B841). One
-    that raises is that part's alone (B979): logged once an hour with where,
+    """One part of the agent's turn, run and timed into `turn`. One
+    that raises is that part's alone: logged once an hour with where,
     and None, as a part with nothing to say, so the other passes and the
     work poll still run."""
     t0 = time.monotonic()
@@ -211,8 +211,8 @@ def turn_part(turn, name, fn, *a):
 
 
 def keep_turning(turns, pause=5):
-    """turns() taken up again whenever it raises, after `pause` seconds, and
-    the fault logged (B979): one exception in the loop's own code ended the
+    """turns taken up again whenever it raises, after `pause` seconds, and
+    the fault logged: one exception in the loop's own code ended the
     agent with no bye, its running jobs orphaned and read lost, and a fault
     that came back restarted it every five seconds with a census each start.
     SystemExit and KeyboardInterrupt still end it, as a stop should."""
@@ -229,11 +229,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             TokensMixin, ScanMixin):
     def __init__(self, state):
         self.state = state
-        # Its own directory under the toolchain store, by its node id (R196),
+        # Its own directory under the toolchain store, by its node id,
         # before anything reads where its toolchains are.
         use_scope((state.get("stores") or {}).get("toolchains") or "", state.get("node_id"))
         self.ctl = Controller(state["controller"], state["token"], state.get("pin", ""))
-        self.quiet = 0                    # hellos in a row the controller did not answer (R90 step 12: a move's knock)
+        self.quiet = 0                    # hellos in a row the controller did not answer (a move's knock)
         self.jobs = {}
         self.lock = threading.Lock()
         self.sampler = Sampler()
@@ -259,25 +259,25 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.session_stale = ""           # a newer bundle's directory, for the loop to restart onto
         self.session_bound = ""           # the address the relay was bound to, to notice it moving
         # The census for the loop's next hello, taken beside the loop rather
-        # than in it (B380): the thread, and what it came back with.
+        # than in it: the thread, and what it came back with.
         self.census_thread = None
         self.census_next = None
         self.fw_checked = 0.0             # when the session ports' firewall rule was last checked
         self.tool_lock = threading.Lock()  # the session tool's files, written from two threads
-        self.sessnet = SessionNet(self)    # each session kept to its own project's network (R79)
+        self.sessnet = SessionNet(self)    # each session kept to its own project's network
         self.sesswatch = SessionWatch(self)  # its sessions reported as they change
-        self.ftp = FtpServers(self)        # a project's file access over FTP (R151)
+        self.ftp = FtpServers(self)        # a project's file access over FTP
         # The console's admin account made again from its kept hash: the
-        # OS's root forgets it at every boot (R194).
+        # OS's root forgets it at every boot.
         try:
             console_apply()
         except (OSError, subprocess.SubprocessError) as e:
             log(f"console: the admin account was not made: {e}")
-        # http://THE-MACHINE/ finds the dashboard, on its own machine (R202).
+        # http://THE-MACHINE/ finds the dashboard, on its own machine.
         http80.start()
-        self.screen = ScreenRelay(self)    # its VMs' screens, for the dock (R99)
-        self.wssync = WorkspaceSync(self)  # its projects as a synced copy, where it holds them so (R162)
-        self.claudesync = ClaudeMirror(self, self.wssync)  # ...and its sessions' conversations with them (B613)
+        self.screen = ScreenRelay(self)    # its VMs' screens, for the dock
+        self.wssync = WorkspaceSync(self)  # its projects as a synced copy, where it holds them so
+        self.claudesync = ClaudeMirror(self, self.wssync)  # ...and its sessions' conversations with them
         # The runner as a child of this process where there is no systemd:
         # run.sh in the foreground, supervised here.
         self.runner_procs = {}            # runner directory -> its process
@@ -296,7 +296,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return who
 
     def docker_by_root(self):
-        """Whether docker work here is the root agent's own (B743): the
+        """Whether docker work here is the root agent's own: the
         controller's machine, where the job and session accounts stay out of
         the docker group because docker is root over the controller, so
         docker runs from this process, as this machine's VMs do."""
@@ -309,7 +309,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         """A home a job run as this agent's own account can write: its own,
         or one under the data store where it has none. Run as a uid with no
         passwd entry, a job had no HOME at all and npm stopped on
-        uv_os_homedir (B145, diagnostics #122)."""
+        uv_os_homedir (diagnostics #122)."""
         home = os.environ.get("HOME") or os.path.expanduser("~")
         if home and home != "/" and os.path.isdir(home) and os.access(home, os.W_OK):
             return home
@@ -336,7 +336,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": groups}
 
     def take_token(self, new):
-        """The controller's next token for this node (R135 step 4): kept in
+        """The controller's next token for this node: kept in
         node.json in place of the old one and used from the next call. The
         old one is remembered for the screen relay's grace, since the
         controller signs with it until this node has used the new one."""
@@ -348,7 +348,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # copy to the record's own change, so no other save writes the old
         # token over the new between the two.
         # The tokens of the last month kept, newest first: a controller
-        # restored from a backup knows one of them (the operator, 6 Nov).
+        # restored from a backup knows one of them.
         now = int(time.time())
         with STATE_LOCK:
             old = self.state.get("token") or ""
@@ -389,9 +389,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
 
     def token_back(self):
         """The token before the last rotation tried again when the
-        controller says it does not know the newest (B655): a controller
-        back from a restart with a record older than its last hello (3 Nov:
-        25 minutes of its write-ahead log dropped on a FUSE share) still
+        controller says it does not know the newest: a controller
+        back from a restart with a record older than its last hello
+        (25 minutes of its write-ahead log dropped on a FUSE share) still
         holds the one it handed out before, live there until the newer one
         is used. A token this node was handed is what it presents on every
         call, so a controller that retired it answers as it would have, and
@@ -402,7 +402,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return False
         # The newest is kept among the past, ahead of the one gone back to:
         # a controller that refused it may not be the one that issued it (a
-        # move's new home, B759), and the one that did takes this node back
+        # move's new home), and the one that did takes this node back
         # by it once it is here again.
         with STATE_LOCK:
             newest = self.state.get("token") or ""
@@ -440,7 +440,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
 
     def hello_step(self):
         """The loop's ten-minute hello, with its census taken on a thread
-        beside the loop (B380). The census asks the slow questions (the
+        beside the loop. The census asks the slow questions (the
         toolchain store, docker, the session half), and the loop used to
         stand still for it right after holding a full-length work poll; the
         controller stamps last heard from at the start of each work call and
@@ -460,7 +460,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         on the loop, a minute on a busy node with no work poll meanwhile,
         and a controller nudging once a minute kept the node in census all
         day while every docker ps the Containers page sent waited its 25s out and
-        was taken back (B644, 11 Oct)."""
+        was taken back."""
         if not self.hello_at and not getattr(self, "hello_said", False):
             self.census_thread = None
             self.census_next = None
@@ -473,7 +473,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 and getattr(self, "census_stale", False):
             # Asked for again while this one was on its way: what it found is
             # from before the change the ask was about, so it is let go and a
-            # fresh one taken before the hello (B647's second half: the
+            # fresh one taken before the hello (the
             # toolchain census a refusal asked for came back without the
             # toolchain that had just been installed).
             self.census_stale = False
@@ -501,8 +501,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         """census_take on the loop, with the controller told every twenty
         seconds that this node is still here: the census asks the slow
         questions, over a minute on a busy node, and with the work poll
-        stopped for it the node read as not answering on every project row
-        (the operator, 7 Oct)."""
+        stopped for it the node read as not answering on every project row.
+        """
         done = threading.Event()
 
         def beat():
@@ -525,12 +525,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # being taken beside the loop: that one predates whatever this hello
         # follows (a job that removed a driver), so it is let go when it
         # lands and a fresh one taken, rather than said after this one and
-        # putting back what the job took away (B851).
+        # putting back what the job took away.
         if taken is None and getattr(self, "census_thread", None) is not None \
                 and self.census_thread.is_alive():
             self.census_stale = True
         c = taken if taken is not None else self.census_beating()
-        # This boot's public half and the seals here (R126), in the census
+        # This boot's public half and the seals here, in the census
         # the controller keeps of the node, while there are any.
         if isinstance(c, dict):
             ts = self.token_census()
@@ -538,20 +538,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 c["tokseal"] = ts
         st, r = self.ctl.call("hello", {"census": c,
                                         # Which node this is, for a controller that no
-                                        # longer knows the token (B652).
+                                        # longer knows the token.
                                         "node": self.state.get("node_id", ""),
                                         "version": AGENT_VERSION,
                                         "digest": own_digest(),
                                         "running": self.running_ids(),
                                         "keep": self.keep_report(),
                                         # An update this node would not run and went
-                                        # back from (R241), until one it keeps.
+                                        # back from, until one it keeps.
                                         **({"back": back_note()} if back_note() else {}),
-                                        # A fresh token each hello (R135 step 4).
+                                        # A fresh token each hello.
                                         "rotates": True}, timeout=30)
         if st == 200:
             self.take_token(r.get("token"))
-            # The controller answered: an update on trial is kept (R241).
+            # The controller answered: an update on trial is kept.
             if not getattr(self, "hello_said", False) and trial_note() is not None and trial_passed():
                 log("the updated agent reached its controller: it is kept")
             self.hello_at = time.monotonic()
@@ -575,20 +575,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 self.state["session_idle_minutes"] = im
                 save_state(self.state)
                 log(f"sessions: idle rule is {im} minute(s)" if im else "sessions: no idle rule")
-            # How many workers a test run here may use (R81), kept in
+            # How many workers a test run here may use, kept in
             # node.json the same way; 0 is this machine's cores.
             tw = r.get("test_workers")
             if isinstance(tw, int) and tw >= 0 and tw != self.state.get("test_workers", 0):
                 self.state["test_workers"] = tw
                 save_state(self.state)
                 log(f"tests: {tw} worker(s) per run" if tw else "tests: every core per run")
-            # Fresh credentials for the Claude sessions alive here (R27). A
+            # Fresh credentials for the Claude sessions alive here. A
             # session that is talking slides its own token forward on every
             # answer it gets; one sitting idle has nothing to slide it, and a
             # dead token is never renewed, which is what makes the life mean
             # anything for one that leaked. So the machine the session is on
             # keeps it, on the beat it already has.
-            # Hosting only (the operator, 10 Oct): kept in node.json, and the
+            # Hosting only: kept in node.json, and the
             # session half stopped the moment it is said; nothing of a
             # session, a synced copy or bb runs here after.
             ho = bool(r.get("host_only"))
@@ -599,11 +599,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                     else "no longer hosting only")
                 if ho:
                     self.session_stop()
-            # Accounts as their own users (R125): the controller's switch,
+            # Accounts as their own users: the controller's switch,
             # kept in node.json. When it moves the layout file and the sudo
             # rule are rewritten and the terminals open the other way from
             # then on; tmux sessions are untouched either way.
-            # A move prepared on the controller (R90 step 12): the new address
+            # A move prepared on the controller: the new address
             # and this node's challenge, kept in node.json; when this
             # controller goes quiet or says it moved, the node knocks there.
             mv = r.get("move") if isinstance(r.get("move"), dict) else {}
@@ -628,30 +628,30 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 self.account_users_pass()
                 self.refresh_session_tool()
                 self.session_renew()
-            # The accounts' SMB passwords on the controller's own machine
-            # (R164 step 1), imported into Samba once per change.
+            # The accounts' SMB passwords on the controller's own machine,
+            # imported into Samba once per change.
             if isinstance(r.get("smb_users"), list):
                 self.smb_users_want(r["smb_users"])
-            # What each added pack is configured with here (R172): its env
+            # What each added pack is configured with here: its env
             # written into the store for its verbs, once per change.
             if isinstance(r.get("pack_config"), list):
                 self.pack_config_want(r["pack_config"])
-            # ...and each account's own (R172 step 5), into its home.
+            # ...and each account's own, into its home.
             if isinstance(r.get("pack_people"), list):
                 self.pack_people_want(r["pack_people"])
-            # Other disks and shares on the controller's own machine (R162
-            # step 4): the record mounted and unmounted as it says.
+            # Other disks and shares on the controller's own machine:
+            # the record mounted and unmounted as it says.
             if isinstance(r.get("ext_mounts"), list):
                 self.ext_mounts_want(r["ext_mounts"])
-            # ...and the backups it copies (R162 step 5), the record the job names a row of.
+            # ...and the backups it copies, the record the job names a row of.
             if isinstance(r.get("store_backups"), list):
                 self.backups_want(r["store_backups"])
-            # ...and the passphrases of its encrypted pools (R162 step 3),
+            # ...and the passphrases of its encrypted pools,
             # kept in memory and every locked pool among them unlocked.
             if isinstance(r.get("pool_keys"), list):
                 self.pool_keys_want(r["pool_keys"])
-            # The coding agents' sign-ins sealed (R126): the controller's
-            # switch, and each account's X25519 public here (R158 step 3),
+            # The coding agents' sign-ins sealed: the controller's
+            # switch, and each account's X25519 public here,
             # kept in node.json. The format before's publics are not kept.
             ts = bool(r.get("token_seal"))
             pubs2 = r.get("token_pubs2") if isinstance(r.get("token_pubs2"), dict) else {}
@@ -666,9 +666,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                     log("the coding agents' sign-ins are kept sealed here" if ts else "sign-ins are no longer sealed here")
             self.keep_session_tokens(r.get("session_tokens") or [])
             # Whether each session here is kept to its own project's network,
-            # and what each project owns here (R79), kept in node.json so it
+            # and what each project owns here, kept in node.json so it
             # holds while the controller is down.
-            # The FTPS servers for its projects' file access (R151).
+            # The FTPS servers for its projects' file access.
             ft = r.get("ftp")
             if isinstance(ft, list):
                 self.ftp.want(ft)
@@ -676,18 +676,18 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if isinstance(sn, dict) and sn != self.state.get("session_net"):
                 self.state["session_net"] = {"on": bool(sn.get("on")),
                                              "own": sn.get("own") if isinstance(sn.get("own"), dict) else {},
-                                             # ...and the containers' (R178): whether each project's
+                                             # ...and the containers': whether each project's
                                              # are kept to their own network here, and the map.
                                              "ctr_on": bool(sn.get("ctr_on")),
                                              "ctr": sn.get("ctr") if isinstance(sn.get("ctr"), dict) else {}}
                 save_state(self.state)
-            # Published ports bound to 127.0.0.1 by default (R190): the
+            # Published ports bound to 127.0.0.1 by default: the
             # controller's switch, kept in node.json, and applied on every
             # hello rather than only when it moves: apply_ports_local writes
             # and restarts docker only when daemon.json differs, and an agent
-            # that learned a second key (B666) met a switch already on and
-            # never wrote it (a hosting node, 11 Oct).
-            # The journal kept across boots on a managed node (R185).
+            # that learned a second key met a switch already on and
+            # never wrote it (a hosting node).
+            # The journal kept across boots on a managed node.
             self.keep_journal()
             # ...and the files the node writes itself kept to their size.
             self.cap_logs()
@@ -737,7 +737,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # The helper the new bundle carries goes in with the bundle. The
             # loop refreshes it before its hello and the bundle arrives after,
             # so it waited for the next hello: for ten minutes a session was
-            # started by the new launcher under the old helper (B377).
+            # started by the new launcher under the old helper.
             if self.session_bundle != before:
                 self.refresh_session_tool()
                 self.refresh_virtiofsd_wrap()
@@ -749,7 +749,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # A bundle that moved carries a catalog that may have moved with
             # it, and the census read that catalog before the fetch: one more
             # hello now, so the row does not show the old answer until the
-            # next ten-minute one (R57). Once: the second sees no move.
+            # next ten-minute one. Once: the second sees no move.
             if before and self.session_bundle != before and not getattr(self, "_rehello", False):
                 self._rehello = True
                 try:
@@ -760,8 +760,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return st, r
 
     def cap_logs(self):
-        """The node's own log files kept bounded on every hello (the
-        operator, 12 Oct): the runners' in the data store, this agent's own output where it goes to a file (a
+        """The node's own log files kept bounded on every hello:
+        the runners' in the data store, this agent's own output where it goes to a file (a
         guest's and a Mac's unit, OpenRC's), and each runner's _diag to its
         newest RUNNER_DIAG_KEEP."""
         data = (self.state.get("stores") or {}).get("data") or "/tmp"
@@ -772,7 +772,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 files.append(out)
         cut = [f for f in files if cap_file(f)]
         # Each runner's _diag is the jobs account's, and pruned as it: a CI
-        # job that made it a link had root delete through it (R247 step 5).
+        # job that made it a link had root delete through it.
         # Left as they are where this machine does not do that as the
         # account (fs_holds says why in the log): the hello goes on.
         trimmed = 0
@@ -804,7 +804,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return True
 
     def move_hint(self, mv):
-        """A move the controller names in its "moved" answer (R175 step 2):
+        """A move the controller names in its "moved" answer:
         kept in node.json when this node holds none, so a node that was
         off while the move was armed knocks like the others. True when it
         was taken."""
@@ -820,7 +820,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return True
 
     def knock(self, url=""):
-        """Knock on the controller a move named (R90 step 12): the new
+        """Knock on the controller a move named: the new
         address asked, with this node's own token, for the answer only a
         holder of the move key gives; right, this node re-adopts the
         controller there (its address and TLS pin taken, node.json written)
@@ -850,7 +850,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
     def hello_again(self, why):
         """Ask the loop for a fresh hello, saying why in the journal: a node
         was saying hello every hundred seconds with nothing in its log to
-        say which of the dozen askers it was (B647)."""
+        say which of the dozen askers it was."""
         log(f"hello again: {why}")
         if getattr(self, "census_asked", False):
             self.census_stale = True         # the one on its way predates this ask
@@ -873,8 +873,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
 
     def reexec_when_idle(self):
         """The new agent, once no job is running: one taken beside the update,
-        after its busy check, was lost to an exec mid-way (B134). Asked again
-        by finished() as each job ends."""
+        after its busy check, was lost to an exec mid-way. Asked again
+        by finished as each job ends."""
         with self.lock:
             busy = bool(self.jobs)
             self.reexec_pending = busy
@@ -884,8 +884,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.reexec()
 
     def trial_over(self):
-        """The time an updated agent has to reach its controller is up (the
-        operator, 13 Nov: ten minutes): one that has not gives way to the
+        """The time an updated agent has to reach its controller is up
+        (ten minutes): one that has not gives way to the
         agent before it, which the entry puts back as this process starts
         again. A controller that was away that long costs a press of Update
         agent; an agent that cannot reach it at all costs nothing more."""
@@ -903,7 +903,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         for j in hit:
             # Said once: the controller repeats a cancel on every poll until
             # the job has ended, and one stuck in a syscall wrote the line
-            # dozens of times a second into the journal (B244).
+            # dozens of times a second into the journal.
             if not getattr(j, "cancel_said", False):
                 log(f"job {j.job['id']}: canceled by the controller")
                 j.cancel_said = True
@@ -914,7 +914,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         unsigned builds, root commands) changed since the last turn. It is
         the census's, and the controller holds a root ask by it before a
         person is asked, so a change is told at the next turn rather than at
-        the next hello up to ten minutes on (R227 step 2). A file of a few
+        the next hello up to ten minutes on. A file of a few
         hundred bytes, read once a turn; the first read is no change."""
         said_here = console_said()
         moved = said_here != getattr(self, "console_was", said_here)
@@ -922,7 +922,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return moved
 
     def loop(self):
-        # An update on trial gets TRIAL_S to reach its controller (R241).
+        # An update on trial gets TRIAL_S to reach its controller.
         if trial_note() is not None:
             t = threading.Timer(TRIAL_S, self.trial_over)
             t.daemon = True
@@ -938,7 +938,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # That was already the intent and systemd was undoing it: the default
         # KillMode=control-group takes every process in the cgroup after this
         # handler returns, tmux included, so Update agent ended every session
-        # on the machine (B107). The unit says KillMode=process now, which
+        # on the machine. The unit says KillMode=process now, which
         # means the jobs are this handler's to end too. With control-group
         # systemd was killing those, and leaving a build running while the
         # controller re-queues it is the one thing that change could have
@@ -950,11 +950,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 j.cancel()
             # Each job's end, said by this process before it goes: the job
             # threads die with it and the row read "lost: the agent
-            # restarted" for a stop that was ordered (B287). Best effort, a
+            # restarted" for a stop that was ordered. Best effort, a
             # few seconds each; a controller that is away hears it at the
             # next hello's reconcile instead.
             for j in running:
-                # An uninstall's work IS this stop: done, not canceled (B703).
+                # An uninstall's work IS this stop: done, not canceled.
                 own = (j.job.get("spec") or {}).get("apply") == "uninstall"
                 try:
                     self.ctl.call("result", {"job": j.job["id"],
@@ -976,15 +976,15 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # fetch and the hello alike, and the hello that eventually succeeds
         # starts the sessions then.
         self.refresh_session_tool()
-        # The sign-ins' pass before anything here waits on the controller
-        # (B1043): a refresh written while the agent before this one was
+        # The sign-ins' pass before anything here waits on the controller:
+        # a refresh written while the agent before this one was
         # giving way is sealed now, not after the bundle and the first hello.
         turn_part({}, "tokens", self.token_pass_early)
         self.quiet_distro_ttyd()
         self.keep_sessions_through_restart()
         self.session_try()
         self.sessnet.start()
-        # The LAN card in a bridge on AerieOS, once, at a boot (R219): on a
+        # The LAN card in a bridge on AerieOS, once, at a boot: on a
         # thread of its own, since it waits up to a minute for the address.
         self.bridging = threading.Thread(target=self._lan_bridge, name="lanbridge", daemon=True)
         self.bridging.start()
@@ -993,12 +993,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.claudesync.start()
         self.screen.start()
         test_lock_ready()
-        # The other mounts on a thread of their own (B980): a share that
+        # The other mounts on a thread of their own: a share that
         # stopped answering held the turn, and the work poll behind it, for
         # minutes at a time.
         self.ext_mounts_start()
         # A turn that raises is logged and the next one taken, never the end
-        # of the agent (B979): one exception left the process with no bye,
+        # of the agent: one exception left the process with no bye,
         # its running jobs orphaned and read lost, and a fault that came back
         # restarted it every five seconds with a census at each start.
         keep_turning(self.turns)
@@ -1008,16 +1008,16 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         the passes, the sample and the work poll, and what the poll hands
         back. loop() takes the next one up again when one raises."""
         delay = wdelay = 1
-        refused_since = 0.0     # when the controller began refusing connections (B760)
+        refused_since = 0.0     # when the controller began refusing connections
         while True:
-            # How long each part of a turn took before its poll (B841): a job
+            # How long each part of a turn took before its poll: a job
             # queued while the agent is between polls waits for all of it,
             # and what the turn spends is said in the next heartbeat.
             turn = {}
             def timed(name, fn, *a, _turn=turn):
                 return turn_part(_turn, name, fn, *a)
             turn_t0 = time.monotonic()
-            # The sign-ins' pass ahead of a hello (B1043): the first one's
+            # The sign-ins' pass ahead of a hello: the first one's
             # census is taken on the loop, a minute on a busy node, and a
             # controller that does not answer one sends the turn round again
             # before any pass below is reached. It keeps its own ten seconds,
@@ -1026,7 +1026,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if self.console_moved():
                 self.hello_at = 0
             # The monotonic clock: a clock step killed a running job as timed
-            # out and stopped hello for the size of the step (B286). Zero
+            # out and stopped hello for the size of the step. Zero
             # means due now, whichever clock.
             if not self.hello_at or time.monotonic() - self.hello_at > 600:
                 self.refresh_session_tool()
@@ -1036,9 +1036,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 # heartbeat meanwhile, and the next turn of the loop asks again.
                 st, r = said if said is not None else (200, {})
                 if st == 410 and isinstance(r, dict) and r.get("moved"):
-                    # The controller moved (R90 step 12): knocked on at once,
+                    # The controller moved: knocked on at once,
                     # with the challenge its answer carries when this node
-                    # never heard the move while it was armed (R175 step 2).
+                    # never heard the move while it was armed.
                     self.move_hint(r.get("move"))
                     self.knock(r.get("to") or "")
                     continue
@@ -1049,7 +1049,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                     elif self.quiet >= 3:
                         # No move known and the controller quiet: node.json
                         # may have been pointed elsewhere by hand (the
-                        # follow verb, R175 step 3), so it is read again.
+                        # follow verb), so it is read again.
                         self.reread_state()
                 else:
                     self.quiet = 0
@@ -1103,7 +1103,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if self.session_up:
                 sample["sessions"] = timed("sessions", self.sessions_now)
             # ...and the ports its containers publish, for other nodes'
-            # sessions of the same project (R82).
+            # sessions of the same project.
             pub = timed("published", self.published_now)
             if pub is not None:
                 sample["published"] = pub
@@ -1113,26 +1113,26 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if dig is not None:
                 sample["ctr_digest"] = dig
             # ...and what each running container uses, once a minute, for
-            # its hour on the controller (R218 step 9).
+            # its hour on the controller.
             ctr = timed("stats", self.stats_now)
             if ctr is not None:
                 sample["ctr_stats"] = ctr
             # ...and the sessions a controller outage held, for the bell's
-            # "stopped by the update" once it answers again (R251).
+            # "stopped by the update" once it answers again.
             sample["held"] = timed("held", self.held_now)
             # ...and what each account here is signed in to Claude as, on its
             # own slower clock, so the controller's record is true without a
-            # session having to run (B104). Absent from most heartbeats,
+            # session having to run. Absent from most heartbeats,
             # which the controller reads as "no news" rather than as none.
             logins = timed("logins", self.logins_now)
             if logins is not None:
                 sample["logins"] = logins
-            # ...and each synced project's state here (R162).
+            # ...and each synced project's state here.
             synced = timed("sync", self.wssync.status)
             if synced is not None:
                 sample["sync"] = synced
             # ...and, leaving it, what is still to go up; and the last
-            # clean-up's answer, until the controller has read it (R164).
+            # clean-up's answer, until the controller has read it.
             drain = timed("sync_drain", self.wssync.drain)
             if drain is not None:
                 sample["sync_drain"] = drain
@@ -1168,7 +1168,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 continue
             if st == 200 and r.get("sync"):
                 # ...or synced projects that moved: the sync thread asks
-                # what changed now rather than at its next look (R162).
+                # what changed now rather than at its next look.
                 self.wssync.nudge(r["sync"] if isinstance(r["sync"], dict) else {})
                 continue
             if st == 200 and r.get("hello"):
@@ -1178,12 +1178,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 # coarse for a gate. Say it again now, so the retry the
                 # operator is about to make reasons about this machine as it
                 # is rather than as it was. Logged, so a controller asking
-                # every minute is on the box's own record (B644).
+                # every minute is on the box's own record.
                 self.hello_again("the controller asked for a fresh census")
                 continue
             if st == 200 and r.get("console_close"):
                 # ...or setup has ended on a machine whose screen still
-                # takes admin with no password (R194).
+                # takes admin with no password.
                 self.console_close()
                 continue
             if st == 200 and r.get("id"):
@@ -1213,7 +1213,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # of it saying it is down, is a controller restarting (an update
             # takes a minute): asked again every few seconds for its first
             # ten minutes, so the node is back within seconds of it rather
-            # than up to a minute after and read as quiet meanwhile (B760).
+            # than up to a minute after and read as quiet meanwhile.
             # Anything else, and a controller gone longer, backs off to a
             # minute as before.
             down = (st == 0 and bool(RESTARTING.search(str(r.get("error") or "")))) or st in (502, 503, 530)
@@ -1355,10 +1355,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         want = spec.get("digest") or self.controller_digest
         # A job is passed over only when it is stuck: its work has ended and
         # it is only posting its end, AND the controller has it as finished
-        # or dropped (spec "settled", B520). One like that blocked the update
+        # or dropped (spec "settled"). One like that blocked the update
         # that was the only way to unstick it. A job still working is never
         # left behind, whatever the controller says. The rest are named, so
-        # one is seen rather than guessed at (B519).
+        # one is seen rather than guessed at.
         settled = set(spec.get("settled") or [])
         with self.lock:
             held = dict(self.jobs)
@@ -1366,7 +1366,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                         and not (i in settled and getattr(j, "reporting", False)))
         if others:
             # What each one is doing, said in the job's error as well as its
-            # log, so the failure the bell shows names what held it (B862).
+            # log, so the failure the bell shows names what held it.
             def what(i):
                 j = getattr(held[i], "job", None) or {}
                 sp = j.get("spec") or {}
@@ -1376,7 +1376,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             job.why = f"busy with {', '.join(what(i) for i in others)}: not retried; press Update agent again when they finish"
             job.say(job.why + "\n")
             return "failed", 75
-        # Not while the LAN card is being put in a bridge (R219): a re-exec
+        # Not while the LAN card is being put in a bridge: a re-exec
         # mid-way left the files written and neither confirmed nor put back
         # (walked on the 4951 stick: the controller's update came a second in).
         br = getattr(self, "bridging", None)
@@ -1421,8 +1421,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             log(f"the agent update {got[:19]}… was not installed. {said}")
             return "failed", 77
         pin = release.first_pin(trust, got, sig, named)
-        # One this node already went back from is not taken again by itself
-        # (the operator, 13 Nov): Update agent, a person's press, asks again.
+        # One this node already went back from is not taken again by itself:
+        # Update agent, a person's press, asks again.
         went = back_note()
         if went and went["digest"] == got and not spec.get("again"):
             job.why = (f"this node went back from this build already ({went['why'] or 'it did not start here'}): "
@@ -1435,7 +1435,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             f.write(body)
         os.chmod(tmp, 0o755)
         # The new file asked to load itself here, before it is the one this
-        # node runs (R241): one that cannot, or that has no way to be asked,
+        # node runs: one that cannot, or that has no way to be asked,
         # is never installed, since nothing would put the old one back.
         ok, said = selfcheck(tmp)
         if not ok:
@@ -1507,7 +1507,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         os.replace(tmp, me)
         # Only a file actually installed restarts the agent: "already current"
         # above did too, and a second update queued behind the first ended
-        # the rebuild taken beside it (B134).
+        # the rebuild taken beside it.
         job.installed = True
         job.say(f"installed {got[:19]}…; restarting once nothing else runs\n")
         return "succeeded", 0
@@ -1516,7 +1516,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         """One command as the enrolled account, in the runner's directory,
         its output into the log. config.sh refuses to run as root. A token
         goes in `secret_env`, never in `argv`, which any account on the
-        machine reads in /proc for as long as the command runs (B849)."""
+        machine reads in /proc for as long as the command runs."""
         job.say("$ " + " ".join(argv) + "".join(f" ({k} set)" for k in secret_env or {}) + "\n")
         env = {"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"), "LANG": "C.UTF-8",
                "HOME": cwd, **(secret_env or {})}
@@ -1543,7 +1543,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # The file-access servers are this process's, and an exec keeps its
         # pid, so a bb-ftpd left running never sees its parent go: it held
         # the port, refused every login with nobody left to ask, and the new
-        # agent's own could not bind it (B573).
+        # agent's own could not bind it.
         self.ftp.stop_all()
         log("re-executing the new agent")
         if _COV_OUT:

@@ -1,4 +1,4 @@
-"""Projects by id (registry.py, R154): every directory has a number and a
+"""Projects by id (registry.py): every directory has a number and a
 shown name, a directory is never handed out twice, shown names are unique
 among live projects with -2 after a second, a name follows GitHub's rules
 for a repository's, and the trash keeps a project's directory for it."""
@@ -39,7 +39,7 @@ class Registry(unittest.TestCase):
         self.assertEqual(registry.new_dir("byhand"), "byhand-2", "...and its name is not handed out")
 
     def test_an_empty_workspace_is_a_disk_not_there_not_every_project_gone(self):
-        # B595: a purge has no way back, and the disk may only be late.
+        # A purge has no way back, and the disk may only be late.
         (self.ws / "beta").mkdir()
         registry.sync()
         shutil.rmtree(self.ws)
@@ -61,7 +61,7 @@ class Registry(unittest.TestCase):
         registry.mark("gone", "purged")
         self.assertEqual(registry.new_dir("gone"), "gone-2", "deleted for good still counts")
         self.assertEqual(registry.new_dir("fresh"), "fresh")
-        # What the New project dialog reads to say so before Create (B63).
+        # What the New project dialog reads to say so before Create.
         taken = registry.taken_dirs()
         self.assertIn("gone", taken, "a purged directory is listed as taken")
         self.assertIn("alpha", taken)
@@ -110,7 +110,7 @@ class Registry(unittest.TestCase):
         self.assertEqual(registry.sync()["projects"]["alpha"]["state"], "live", "moved back: it")
 
     def test_names_follow_githubs_rules_for_a_repository(self):
-        # the operator, 9 Oct: a rename to "Turing Lens" kept the space
+        # a rename to "Turing Lens" kept the space
         self.assertEqual(registry.clean_name("Turing Lens"), "Turing-Lens")
         self.assertEqual(registry.clean_name("  My   App\n\x07 "), "My-App")
         self.assertEqual(registry.clean_name("Clanker-Detector"), "Clanker-Detector")

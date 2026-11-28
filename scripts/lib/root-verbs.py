@@ -1,5 +1,5 @@
-"""Behind `aerie root` (cmd_root in bb): one command as root on the project's node
-(roadmap R38), the phone's shape applied to root: the reason and the exact
+"""Behind `aerie root` (cmd_root in bb): one command as root on the project's node,
+the phone's shape applied to root: the reason and the exact
 command in front of a person, Allow runs it on the node, Deny says no.
 
 The first argument is the verb (status or run); for run the rest are the
@@ -30,7 +30,7 @@ def status():
 def run():
     def post(body):
         # The ask itself: one nothing answered may still have been made, so
-        # that is said, and where to look (B1070), rather than the bare error.
+        # that is said, and where to look, rather than the bare error.
         st, got = bbapi.request("/api/phone", body)
         if st is None:
             sys.exit(f"[builderbot] ERROR: the controller did not answer the ask ({got.get('error') or 'no answer'}), "
@@ -39,8 +39,8 @@ def run():
 
     # A file under /tmp: on a sandbox node a session's /tmp is its own view
     # (bb-session), and the root command runs outside it, so the file is not
-    # there and the command failed with a bare exit code (B253). Refused
-    # before the ask, since an approval spent on it could only fail (B159).
+    # there and the command failed with a bare exit code. Refused
+    # before the ask, since an approval spent on it could only fail.
     for a in sys.argv[2:]:
         if a.startswith(("/tmp/", "/var/tmp/", "/dev/shm/")) and os.path.exists(a):
             sys.exit(f"[builderbot] ERROR: {a} is under a directory that is this session's own view; "

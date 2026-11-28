@@ -1,4 +1,4 @@
-"""A pack's or an app's own icon on its Library card (R182): named in its
+"""A pack's or an app's own icon on its Library card: named in its
 manifest, read from its files at the commit it is pinned to, held to the
 image its name says and the size cap, kept under the state and taken away
 with it, never anything but bytes the server hands back as an image."""

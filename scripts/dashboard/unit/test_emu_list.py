@@ -1,4 +1,4 @@
-"""aerie emu list and the default AVD read the AVDs' own files (B425), not
+"""aerie emu list and the default AVD read the AVDs' own files, not
 avdmanager, which scanned the whole shared SDK first and took 105 s: names,
 the target and the image, and the newest builderbot-N as the default."""
 import os

@@ -9,7 +9,7 @@ import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DI
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 
 // Named as Claude Code names a tree's folder: every character that is not a
-// letter or a digit a dash (B349; the fixture's directory has a dot in it).
+// letter or a digit a dash (the fixture's directory has a dot in it).
 const MEM = `${DIR}/home/.claude/projects/${(DIR + '/ws/alpha').replace(/[^A-Za-z0-9]/g, '-')}/memory`;
 const read = f => readFileSync(`${MEM}/${f}`, 'utf8');
 
@@ -21,11 +21,11 @@ await ready(page);
 // ---- the way in --------------------------------------------------------
 // The icon carries the to-do count (roadmap.mjs covers that); memory rides in
 // the same panel, folded under it.
-const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page (R218 step 3)
+const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page
 // A locked project keeps its notebook, which is the whole difference from
 // the exclusion this replaced, which hid it. It opens read-only.
 await page.evaluate(() => openProjectsTab());
-// Locked is archived now (the operator, 18 Oct): its card is in the Archived
+// Locked is archived now: its card is in the Archived
 // fold at the page's foot, opened to reach it.
 await page.waitForSelector('.projtab details[data-sect="projects:archived"]', { state: 'attached', timeout: 15000 });
 await page.evaluate(() => { document.querySelector('.projtab details[data-sect="projects:archived"]').open = true; });
@@ -36,7 +36,7 @@ ok(await page.$$eval(`${row('delta')} [data-open]`, b => b.length === 1),
 await page.evaluate(n => openNotebook(n), 'alpha');
 await nbShown(page);
 await page.waitForFunction(() => document.querySelectorAll('#memList .mem').length === 2);
-// Every section opens by default (the operator, 8 Oct: d890eda), the
+// Every section opens by default (d890eda), the
 // memories with it, the count on the heading. Read once it has finished
 // sliding open, since the notebook's draw opens it.
 await page.waitForFunction(() => { const d = document.getElementById('memSect');
@@ -158,7 +158,7 @@ await page.$eval(`#memList .mem:has(.mname:text-is("tabs")) textarea[data-file]`
   t.value = t.value.replace('asked for it twice', 'asked for it three times');
   t.dispatchEvent(new Event('input'));
 });
-// The Memories section's own Save (the operator, 5 Oct): each section saves
+// The Memories section's own Save: each section saves
 // its own changes. There was one Save for the whole panel at its foot, and on
 // a phone it was a long scroll from the memory being edited.
 ok(!await page.$eval('[data-ssave="briefing:memories"]', b => b.disabled),
@@ -181,7 +181,7 @@ await page.click(`#memList .mem:has(.mname:text-is("tabs")) [data-del]`);
 await page.waitForFunction(() => document.querySelectorAll('#memList .mem').length === 1);
 ok(page.dialogs.some(d => d.includes('Forget tabs.md')),
    'forgetting asks first');
-// Off the list once it is asked (the operator, 22 Nov); the file follows.
+// Off the list once it is asked; the file follows.
 ok(await until(() => !existsSync(`${MEM}/tabs.md`) && !read('MEMORY.md').includes('tabs.md'), 10000),
    'the file is gone, the row having gone on the press');
 ok(!read('MEMORY.md').includes('tabs.md') && read('MEMORY.md').includes('vanished.md'),
@@ -189,11 +189,11 @@ ok(!read('MEMORY.md').includes('tabs.md') && read('MEMORY.md').includes('vanishe
 ok((await page.$eval('#memWhere', el => el.textContent.replace(/\s+/g, ' '))).includes('1 memory'),
    'the fold redraws without it');
 
-// ---- a line for a memory that is gone, taken out with one press (B455) ----
+// ---- a line for a memory that is gone, taken out with one press ----
 // The fold said "saving takes the line out" while Save had nothing staged and
 // could not be pressed. It offers the press itself now, and nothing else in
 // the index moves.
-// One section open at a time in a notebook (the operator, 5 Oct): the
+// One section open at a time in a notebook: the
 // Index is opened, which closes Memories.
 await page.waitForSelector('#memDrift details.sect', { state: 'attached', timeout: 10000 });
 await openFold(page, '#memDrift details.sect');
@@ -273,13 +273,13 @@ await section("and folding back is the same motion, in reverse", async () => {
   await page.waitForSelector('#naTitle');
   // Open all the way first. A Cancel pressed before the fold has moved at
   // all rolls up from where the box already is, which is no motion, and a
-  // loaded box got there (B291).
+  // loaded box got there.
   await page.waitForFunction(() => !document.getElementById('memAdd').getAnimations().length,
                              null, { timeout: 10000 });
   const seen = await animatedDuring(page, async () => {
     // Pressed in the page: a click Playwright retried after its hit-target
     // check once landed on the button that replaced Cancel, opening the form
-    // again (B262, B124's family).
+    // again.
     await page.$eval('#naCancel', b => b.click());
     await page.waitForFunction(() => !document.getElementById('naTitle'));
   });
@@ -422,7 +422,7 @@ writeFileSync(`${MEM}/clash.md`,
   '---\nname: clash\ndescription: two writers\nmetadata:\n  type: space\n---\n\nwhat the session wrote\n');
 // Save once it is live (the typing wakes it a tick later) and give the
 // refusal's band the patient wait: a flat one ran out under load with the
-// save still in flight (B332).
+// save still in flight.
 await page.waitForFunction(() => !document.querySelector('[data-ssave="briefing:memories"]').disabled, null, { timeout: patience(10000) });
 await page.click('[data-ssave="briefing:memories"]');
 await page.waitForFunction(() => !document.getElementById('memClash').hidden,
@@ -439,7 +439,7 @@ ok((await page.$eval(`#memList .mem:has(.mname:text-is("clash")) textarea[data-f
 await page.click('#memClashMine');
 // Waited on the WRITE, not on the band: Use mine hides the band before it
 // posts, so a wait on the band returned while the save was still on its
-// way, and the file was read before it landed (B207). The editor closes
+// way, and the file was read before it landed. The editor closes
 // only after the post succeeded and the list has been re-read.
 await page.waitForFunction(() => document.getElementById('memClash').hidden
                                  && !document.querySelector('#memList textarea[data-file="clash.md"]'),
@@ -448,7 +448,7 @@ ok(read('clash.md').includes('what the operator typed'),
    'Write mine over it does exactly that, against what is there now');
 
 // ---- who else is in here: not said ---------------------------------------
-// The operator, 17 Oct: the line naming who else had the notebook open was
+// The line naming who else had the notebook open was
 // not necessary, since two windows writing one thing are caught at the save
 // (above: the second is refused, both versions shown). A second window on
 // the same notebook draws no line about it.
@@ -471,12 +471,12 @@ await section("who else is in here", async () => {
 // It is a tab, so it closes the way tabs close and not on a stray Escape.
 await page.keyboard.press('Escape');
 ok(!!await page.$('.pane .nb'), 'Escape does not dismiss it; a tab is not a dialog');
-// The project's page (R218 step 3), its header named for the project.
+// The project's page, its header named for the project.
 ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'notebook'
      && /alpha/.test(document.querySelector('#pane0 .bar.proj .pname')?.textContent || '')),
    'it is the page on show, its header named for its space');
 // A notebook whose project this account no longer has (deleted) sends no
-// presence beat, which the server answers with a 400 on every poll (B65);
+// presence beat, which the server answers with a 400 on every poll;
 // its project back, it beats again. Planted and read in one evaluate.
 await section("A notebook whose project this account no longer has", async () => {
   const asked = await page.evaluate(async () => {
@@ -499,10 +499,10 @@ await page.evaluate(() => hideTab(tabs.find(t => t.kind === 'notebook').id));
 await nbGone(page);
 ok(true, '...and closing that tab puts it away');
 
-// B196: two memories added at once. Each create reads MEMORY.md, appends its
+// Two memories added at once. Each create reads MEMORY.md, appends its
 // line and writes it back, and nothing held the read and the write together,
 // so one rename won and the other memory was left on disk with no index line:
-// invisible to every session, which is what create() promises cannot happen.
+// invisible to every session, which is what create promises cannot happen.
 await section("B196: two memories added at once", async () => {
   const mk = name => ({ action: 'create', project: 'alpha', name, title: `T ${name}`,
                         hook: `what ${name} is for`, type: 'user', body: `the body of ${name}` });

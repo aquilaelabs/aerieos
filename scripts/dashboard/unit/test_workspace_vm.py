@@ -1,5 +1,5 @@
 """workspace._safe_name, which decides what a node may write into dist/, and
-vmtemplate's minted identity (R86 named these modules as untested)."""
+vmtemplate's minted identity."""
 import os
 import re
 import sys

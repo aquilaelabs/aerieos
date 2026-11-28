@@ -1,4 +1,4 @@
-// A person's editor on a project's files (R159): the controller's Files API
+// A person's editor on a project's files: the controller's Files API
 // and the VS Code extension in apps/vscode/, which signs in as the person and can
 // do nothing their account cannot. Every check here is the SERVER's answer
 // for an account: with read and write, read only, no access, not on the
@@ -39,14 +39,13 @@ for (const [n, pw] of Object.entries(people)) addUser(n, pw);
 for (const n of ['ed.rw', 'ed.r', 'ed.none', 'ed.cap', 'ed.mem'])
   await admin('/api/users', { action: 'edit', name: n, projects: ['alpha'] });
 // Each holds a role on alpha that gives the files area write, but ed.cap's
-// gives read: its rw in the settings is capped at r by the role (R152 (f)).
+// gives read: its rw in the settings is capped at r by the role.
 await admin('/api/roles', { action: 'set', name: 'ed-files-w', scope: 'projects',
   perms: { projects: 'write', files: 'write' } });
 await admin('/api/roles', { action: 'set', name: 'ed-files-r', scope: 'projects',
   perms: { projects: 'write', files: 'read' } });
 // ed.none is on alpha with a role that gives no File access; ed.mem is on it
-// with File access and no choice of its own on alpha's list, which since
-// R104 is enough: being on the project is what lets a person's editor in.
+// with File access and no choice of its own on alpha's list, which is enough: being on the project is what lets a person's editor in.
 await admin('/api/roles', { action: 'set', name: 'ed-nofiles', scope: 'projects', perms: { projects: 'write' } });
 for (const n of ['ed.rw', 'ed.r', 'ed.mem'])
   await admin('/api/roles', { action: 'assign', name: n, project_roles: { alpha: ['ed-files-w'] } });
@@ -101,7 +100,7 @@ await section("reading and writing, as each", async () => {
      && w['ed.r'].status === 403 && /read-only/.test(w['ed.r'].error) && w['ed.cap'].status === 403,
      `a write needs read and write: it lands for ed.rw, and read-only and the role-capped account are refused (${w['ed.r'].error})`);
   // A project locked against an account is read-only through this door
-  // too, as it is on the page (B263): the lock is the owner's or an
+  // too, as it is on the page: the lock is the owner's or an
   // administrator's, and ed.rw is neither.
   const lk = await admin('/api/lock', { name: 'alpha', locked: true });
   const held = await as(c['ed.rw'], 'alpha', 'write', { path: 'editor-probe.txt', data, overwrite: true });
@@ -224,7 +223,7 @@ await section("the extension itself, under a stand-in for VS Code", async () => 
   Module._load = load;
   ext.activate({ subscriptions: [], secrets: { get: async k => secrets.get(k), store: async (k, v) => secrets.set(k, v),
                                                 delete: async k => secrets.delete(k) } });
-  // Any coding agent's session terminal (R128): its argument is the page's.
+  // Any coding agent's session terminal: its argument is the page's.
   ok(ext.AGENTS.map(a => a.id).join() === 'claude,codex,copilot,grok,open' && ext.sessionArg('codex', 'alpha') === 'codex:alpha'
      && ext.sessionArg('grok', 'alpha') === 'grok:alpha'
      && ext.sessionArg('copilot', 'alpha') === 'copilot:alpha' && ext.sessionArg('nope', 'alpha') === 'claude:alpha'
@@ -269,7 +268,7 @@ await section("the extension itself, under a stand-in for VS Code", async () => 
      `...and a file a session writes is told to VS Code as created, for open editors to follow (${Date.now() - t0} ms)`);
 });
 
-// ---- the session's terminal, AerieOS's own (R133) ---------------------------------
+// ---- the session's terminal, AerieOS's own ---------------------------------
 await section("the session's terminal, AerieOS's own", async () => {
   // Opened, written to and ended through the extension's own client; the
   // reason a terminal ends with, a refusal among them, is what it closes on.
@@ -294,7 +293,7 @@ await section("the session's terminal, AerieOS's own", async () => {
   const sh = await run(owner, 'sh:1:alpha', 'echo walk-$((6*7))\r', /walk-42/);
   ok(/walk-42/.test(sh.out),
      `the terminal is the dashboard's, and what is typed runs (${sh.out.slice(-80)})`);
-  // Another agent's session as Open Agent Session opens it (R128): the
+  // Another agent's session as Open Agent Session opens it: the
   // argument names the agent and carries the boot the status gives, which
   // is what lets bb-tty start one that is not running. The fixture has no
   // node, so the server takes it as an agent's session and says there is

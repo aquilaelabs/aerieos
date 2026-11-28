@@ -13,14 +13,14 @@ already in, which is how a session stays current without anybody pressing
 a button, roadmap #27), and `turn` and `turn-done` (a prompt about to
 start, or a turn over: turns.py).
 
-The house rules ride on the same round trips (R200, B686): a `note`'s
+The house rules ride on the same round trips: a `note`'s
 answer carries the named rules the file fires and a `seen`'s the ones the
 prompt fires, said whole, with their names so the session's hook can
 remember what fired; `guards` is what the Bash guard refuses here; and
 `recall` says again, after a summary, the rules a conversation was told.
 
 The account is the token's, never the request's: the server checks the
-token and hands verb() the account and project it was minted for, and
+token and hands verb the account and project it was minted for, and
 that is who the note is filed under and who the feed says asked.
 """
 import agents
@@ -43,11 +43,11 @@ nodes = None
 seen_note = None
 agent_state = None     # (project, uid, agent, state): another agent's working or waiting
 turn_scope = None
-# server.asking_set and asking_clear: a session on its permission prompt (B52).
+# server.asking_set and asking_clear: a session on its permission prompt.
 asking_set = None
 asking_clear = None
-asked = None          # projsessions.asked: what a session was last asked (B59)
-agent_conv = None     # (project, uid, agent, slot, id): the conversation a session is in (R143)
+asked = None          # projsessions.asked: what a session was last asked
+agent_conv = None     # (project, uid, agent, slot, id): the conversation a session is in
 heard_from = None     # (project, uid, agent, slot): a hook of that session spoke
 # (project, uid, agent, slot) -> [why]: what changed since the session
 # started that its briefing does not know (server.session_behind), which the
@@ -83,15 +83,15 @@ def verb(kind, req, me, uid, project):
     `project`. (payload, status)."""
     store = users.load()["users"]
     name = next((n for n, u in store.items() if u.get("uid") == uid), "") or uid
-    # Which coding agent's session spoke (R95 step 7): its hooks say so,
+    # Which coding agent's session spoke: its hooks say so,
     # Claude's when they do not.
     ag = agents.get(req.get("agent")) if isinstance(req, dict) else None
     agent = ag.id if ag and ag.live else "claude"
-    # ...and which of its slots on the project (R143), the first when the
+    # ...and which of its slots on the project, the first when the
     # hook does not say, as a session from before slots does not.
     slot = req.get("slot") if isinstance(req, dict) else 1
     slot = int(slot) if str(slot).isdigit() and 1 <= int(slot) <= agents.MAX_SLOTS else 1
-    # Any hook's word says the session's hooks run (turns.watch, B1009).
+    # Any hook's word says the session's hooks run (turns.watch).
     if heard_from is not None:
         heard_from(project, uid, agent, slot)
     if kind == "alive":
@@ -100,7 +100,7 @@ def verb(kind, req, me, uid, project):
         path = str(req.get("path") or "")[:400]
         if not path:
             return {"error": "a note names a file"}, 400
-        # Keyed by account and agent (R95): a person's Codex session is told
+        # Keyed by account and agent: a person's Codex session is told
         # of their own Claude session's edits, and named for its agent.
         me_key = overlap.key(uid, agent, slot)
         others = overlap.others_touching(project, me_key, path)
@@ -138,13 +138,13 @@ def verb(kind, req, me, uid, project):
         # after a summary (recall), not on every prompt that names it.
         told = set(req.get("told") or []) if isinstance(req.get("told"), list) else set()
         prompt = str(req.get("prompt") or "")[:20000]
-        # ...and what it was asked, for its row's task (B59).
+        # ...and what it was asked, for its row's task.
         if asked:
             asked(uid, project, prompt, agent=agent, slot=slot)
         hit = [r for r in rules.matching(project, prompt=prompt) if r["name"] not in told]
-        # ...and the open items and bugs the prompt names (R202), the same way.
+        # ...and the open items and bugs the prompt names, the same way.
         related, rnames = preamble.mentioned(project, prompt, told)
-        # ...and a briefing gone stale (the operator, 27 Oct): the card says
+        # ...and a briefing gone stale: the card says
         # so to the person, and the session was never told, so it acted on
         # what its briefing said. Said once for each change, as a rule is.
         stale, snames = stale_note(project, uid, agent, slot, told)
@@ -153,7 +153,7 @@ def verb(kind, req, me, uid, project):
         return {"ok": True, "line": line, "rules": rules.said(hit), "related": related,
                 "names": [r["name"] for r in hit] + rnames + snames}, 200
     if kind == "asking":
-        # Claude Code waits on its own permission prompt (B52): marked until
+        # Claude Code waits on its own permission prompt: marked until
         # it works again, its turn ends or it is sent a prompt.
         if asking_set is not None:
             asking_set(project, uid, str(req.get("text") or ""), agent, slot)
@@ -168,10 +168,10 @@ def verb(kind, req, me, uid, project):
         # sessions on one node work at once, when an administrator has
         # said. No node to count on, or no limit, and every turn goes.
         # Another agent's session says working and waiting by its turns,
-        # which is all it has to say it with (R95 step 7).
+        # which is all it has to say it with.
         if agent_state is not None and agent != "claude":
             agent_state(project, uid, agent, "working" if kind == "turn" else "waiting", slot)
-        # ...and which conversation it is in, with every prompt (R143): one
+        # ...and which conversation it is in, with every prompt: one
         # resumed or begun since the last is the one it is in now.
         if kind == "turn" and agent_conv is not None and req.get("conv"):
             agent_conv(project, uid, agent, slot, str(req.get("conv"))[:100])
@@ -182,7 +182,7 @@ def verb(kind, req, me, uid, project):
         if kind == "turn-done":
             turns.done(nid, key)
             return {"ok": True}, 200
-        # A store move on the node (R120 step 7): no new turn starts while
+        # A store move on the node: no new turn starts while
         # it waits for the node to go quiet or runs; the session is kept,
         # and its prompt waits with the reason.
         mv = nodes.storage_moving(nid) if nodes is not None else None

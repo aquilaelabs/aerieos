@@ -80,7 +80,7 @@ def mint(kind, node_id, slot, runner_id=""):
     return {"error": f"the controller cannot mint a runner token: {_why(r)}"}
 
 
-# What --list said, kept TOKENS_KEEP_S (R228 step 6): the Nodes listing
+# What --list said, kept TOKENS_KEEP_S: the Nodes listing
 # asked on every read, a sudo and a process each. A store, a forget or a
 # reset here forgets it; one made outside the dashboard shows within the time.
 TOKENS_KEEP_S = 60.0
@@ -185,7 +185,7 @@ def is_public(url):
 
 
 def exposed(url, node_name, docker):
-    """What a runner on a public repository means, for its row (B761): a
+    """What a runner on a public repository means, for its row: a
     pull request from a fork runs whatever workflow it carries on this
     machine, as its jobs account. "" for a repository that is not public."""
     if is_public(url) is not True:
@@ -226,7 +226,7 @@ def listing():
                         "listening": bool(rep.get("active")), "busy": bool(rep.get("busy")),
                         "name": rep.get("name") or "", "url": rep.get("url") or want.get("url") or "",
                         "labels": rep.get("labels") or want.get("labels") or [],
-                        # A public repository's runner takes a stranger's pull request (B761).
+                        # A public repository's runner takes a stranger's pull request.
                         "exposed": exposed(rep.get("url") or want.get("url") or "", n["name"],
                                            bool((n.get("reported") or {}).get("docker"))),
                         # Why a runner that was asked for is not there, and

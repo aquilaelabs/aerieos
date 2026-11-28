@@ -1,9 +1,9 @@
 """What a node's view takes from what a session can write, its space's tree
 and its home: the CI logs it binds are the folder the controller names with
-a terminal, never the name in the tree's git config (B886); a worktree is
-made only of a repository whose .git is its own (B890); the folders a bind
-lands on are made through no link a session left (B887); and the mapped
-tree is no way to root (B889)."""
+a terminal, never the name in the tree's git config; a worktree is
+made only of a repository whose .git is its own; the folders a bind
+lands on are made through no link a session left; and the mapped
+tree is no way to root."""
 import importlib.machinery
 import importlib.util
 import os
@@ -113,7 +113,7 @@ class Mkdirs(unittest.TestCase):
 
 class Idmap(unittest.TestCase):
     def test_root_is_mapped_on_neither_side(self):
-        # B889: a tree root owns is not one to write as the account, nor is
+        # A tree root owns is not one to write as the account, nor is
         # an account root; asked for either, no namespace is made.
         for owner, account in (((0, 1000), (2000, 2000)), ((1000, 0), (2000, 2000)),
                                ((1000, 1000), (0, 2000)), ((1000, 1000), (2000, 0))):

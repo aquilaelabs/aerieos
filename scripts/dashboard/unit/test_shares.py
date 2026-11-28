@@ -1,4 +1,4 @@
-"""SMB and NFS shares on the controller's own machine (R162 step 1): the
+"""SMB and NFS shares on the controller's own machine: the
 agent reads its two files whole into the census and writes them whole from
 the storage-share job, each argument held to its shape, each user to the
 machine's and the path to a folder under a pool; the controller keeps the
@@ -110,7 +110,7 @@ class TheAgent(unittest.TestCase):
         self.assertNotIn("/mnt/tank/media", open(self.nfs).read())
 
     def test_a_share_with_a_space_in_its_name_is_served_and_read_back(self):
-        # R163 step 13: another NAS names one TV Shows; a doubled space, a
+        # Another NAS names one TV Shows; a doubled space, a
         # quote or a newline is still refused.
         state, code, text = self.run_job({"share": "set", "name": "TV Shows", "path": "/mnt/tank/TV Shows",
                                           "smb": {"on": True, "guest": True, "ro": False, "users": []},
@@ -188,7 +188,7 @@ class TheAgent(unittest.TestCase):
         self.assertIn(["/usr/bin/pdbedit", "-x", "-u", "bbu-feedface"], runs)
         text = [r[1] for r in runs if isinstance(r, tuple)][0]
         # X and a real time: LCT-00000000 tells Samba the password must change
-        # first, which no share client can do (B672).
+        # first, which no share client can do.
         self.assertRegex(text, r"\Abbu-0a1b2c3d:1001:X{32}:8846F7EAEE8FB117AD06BDD830B7586C:\[UX {9}\]:LCT-[0-9A-F]{8}:\n")
         self.assertRegex(text, r"\nbbu-deadbeef:1002:X{32}:31D6CFE0D16AE931B73C59D7E0C089C0:\[UX {9}\]:LCT-[0-9A-F]{8}:\n\Z")
         self.assertNotIn("LCT-00000000", text)
@@ -196,7 +196,7 @@ class TheAgent(unittest.TestCase):
         self.assertTrue(a.state.get("smb_users_sig"))
 
     def test_an_accounts_user_the_share_names_is_made_here_when_missing(self):
-        # B633 (the VM walk, 2 Nov): a share adopted from another system
+        # A share adopted from another system
         # named a person who had never signed in, so their bbu- user was not
         # here yet and the whole share was refused; it is made at share time.
         made = []
@@ -221,7 +221,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(open(self.smb).read(), before)
 
     def test_samba_is_told_of_the_shares_file_and_the_names_map_once(self):
-        # B672: the image's smb.conf includes neither.
+        # The image's smb.conf includes neither.
         main = os.path.join(self.d, "smb.conf")
         with open(main, "w") as f:
             f.write("[global]\n   workgroup = WORKGROUP\n\n[printers]\n   path = /x\n")
@@ -235,7 +235,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(lines[-2], "   include = /s/file", "the include comes last, since it starts sections of its own")
 
     def test_a_shares_missing_folder_is_made_only_on_a_disk_the_machine_has(self):
-        # B672: the Storage page says it is made; never on the root's tmpfs.
+        # The Storage page says it is made; never on the root's tmpfs.
         sm = self.sm
         base = os.path.join(self.d, "pool")
         os.makedirs(base)
@@ -248,7 +248,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(os.stat(os.path.join(base, "media")).st_mode & 0o777, 0o770)
 
     def test_a_share_with_no_export_is_a_share_samba_never_hears_of(self):
-        # The operator, 4 Nov: internal until it is exported.
+        # Internal until it is exported.
         state, code, text = self.run_job({"share": "set", "name": "photos", "path": "/mnt/tank/photos", "smb": {"on": False}, "nfs": {"on": False}})
         self.assertEqual((state, code), ("succeeded", 0), text)
         self.assertIn("internal, not exported", text)
@@ -307,7 +307,7 @@ class TheAgent(unittest.TestCase):
 
 class SambaOwn(unittest.TestCase):
     def test_samba_s_own_section_names_are_never_a_share(self):
-        # R247 step 5: [global] in the included file reopened Samba's own
+        # [global] in the included file reopened Samba's own
         # section, its path, guest ok and force user every share's after it.
         sh = agentpkg.load("aerieos_agent_shares_names").module("shares")
         for bad in ("global", "Global", "HOMES", "printers"):

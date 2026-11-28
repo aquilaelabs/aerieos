@@ -1,4 +1,4 @@
-"""What the supervisor asks of the dashboard (R246; the audit of 13 Nov):
+"""What the supervisor asks of the dashboard:
 it found the server by 'dashboard/server.py' on any command line, which a
 test harness's copy answers to as well, and wrote its saved-sessions file
 with printf, so a folder's name with a quote in it spoiled the file. The

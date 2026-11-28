@@ -10,7 +10,7 @@ the background, whose launcher has since exited), and its own files in
 /tmp, which in a session is memory
 (a tmpfs). What it keeps is named with --keep and a reason said in the
 reply: the next task uses the emulator, a daemon is warm for a build
-about to run (the operator, 6 Oct: one verb for every resource a task
+about to run (one verb for every resource a task
 holds, not one per resource).
 
 Only this session's own: its view holds only its processes, and only this
@@ -19,7 +19,7 @@ the terminal server or anything this command runs under; never Claude
 Code's own folder in /tmp (the scratchpad, background commands' output);
 never a socket, and never a file a running process still has open.
 
-And the project's phones' disk (R129, the operator, 23 Oct): the quick-boot
+And the project's phones' disk: the quick-boot
 snapshot of each phone not started for a week goes (the phone and its data
 stay; its next start boots cold), and a phone that is not the project's
 default and has not run for two weeks is named, with where to remove it: a
@@ -142,7 +142,7 @@ def orphaned(pid, root=PROC):
     call put in the background once that call's shell has ended. Or it is a
     background tool call's own job still running, reached from Claude Code
     through nothing but shells and aerie run: nobody keeps that open once the
-    task is done, and tidy said nothing was running beside one (B840)."""
+    task is done, and tidy said nothing was running beside one."""
     ppid = ppid_of(pid, root)
     if ppid < 0:
         return False
@@ -174,7 +174,7 @@ def suite_running(tmp=None):
             with open(lock, encoding="utf-8") as f:
                 pid = int(f.read().strip() or 0)
             if pid and os.path.isdir(os.path.join(PROC, str(pid))):
-                # ...unless what started it is gone (B926): a gate ended by
+                # ...unless what started it is gone: a gate ended by
                 # its own pid left its harness running under nobody, holding
                 # the lock, and that is a run to end, not one to spare.
                 return ppid_of(pid, PROC) > 1 or held_on_purpose(pid)
@@ -220,7 +220,7 @@ def processes(root=PROC, uid=None, spare=None):
         if not info or info[2] != uid:
             continue
         fds = fds_of(pid, root)
-        # A server left listening (the operator, 7 Oct: an aquilaeLabs session's
+        # A server left listening (an aquilaeLabs session's
         # astro preview held files in the project tree until npm ci failed):
         # listening, and its launcher gone. node is otherwise spared, since
         # Claude Code's own helpers run as node; a node that is an orphan
@@ -228,7 +228,7 @@ def processes(root=PROC, uid=None, spare=None):
         serving = bool(socks) and not any(h in info[1] for h in HARNESS) and orphaned(pid, root) \
             and any(f.startswith("socket:[") and f[8:-1] in socks for f in fds)
         # A harness's server with no run holding the lock (a kept fixture
-        # holds it too): what a run cut by its process group left (B650).
+        # holds it too): what a run cut by its process group left.
         if not running and any(h in info[1] for h in HARNESS) and orphaned(pid, root):
             out.append((int(pid), info[0], "test server"))
             continue
@@ -314,13 +314,13 @@ def card_used():
 
 
 # A phone idle this long gives back its quick-boot snapshot; one that is not
-# the default, this long, is named for removal (R129).
+# the default, this long, is named for removal.
 SNAPSHOT_IDLE_DAYS = 7
 SPARE_PHONE_DAYS = 14
 
 
 def phones_dir():
-    """This project's phones, where aerie emu keeps them (B511)."""
+    """This project's phones, where aerie emu keeps them."""
     project = os.environ.get("BB_PROJECT", "")
     if not project or "/" in project:
         return ""

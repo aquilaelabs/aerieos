@@ -1,6 +1,6 @@
-"""R77: a tool pack installs on a node the way a shipped toolchain does. A
+"""A tool pack installs on a node the way a shipped toolchain does. A
 copy laid out as the bundle a node unpacks (scripts/aerie, scripts/lib and the
-catalog, with the packs' toolpacks.json beside it, as workspace.bundle()
+catalog, with the packs' toolpacks.json beside it, as workspace.bundle
 writes it) installs a pack repository at its pinned commit into a scratch
 store, runs its install steps and its verify, and puts its bin on PATH."""
 import json
@@ -110,7 +110,7 @@ class Install(unittest.TestCase):
 
 
 class NotExecutable(Install):
-    """B83: the tool committed without its executable bit, as a file added
+    """The tool committed without its executable bit, as a file added
     through Gitea's or GitHub's web editor is. Every install failed
     'Permission denied'; the install marks what the pack runs executable,
     so the whole of the test above passes on it too."""

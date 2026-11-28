@@ -1,8 +1,8 @@
-"""Features switched off for a whole install from its environment (R81).
+"""Features switched off for a whole install from its environment.
 
 FEATURES_OFF names them, comma-separated, from the fixed list below, and
 FEATURES_OFF_WHY is the sentence a person is shown for each: under every
-control the feature draws (the page reads `off()` from the status read), and
+control the feature draws (the page reads `off` from the status read), and
 as the refusal of every request that would use it, which is the rule; the
 page's dead controls are the courtesy. Settings lists what is off.
 
@@ -26,7 +26,7 @@ FEATURES = {
     "enroll": "enrolling a node",
     "shell": "a terminal on the controller itself",
     "vms": "virtual machines on nodes",
-    # An install meant to run with no way out (R88): what reaches the
+    # An install meant to run with no way out: what reaches the
     # internet is off with it, and the Doctor skips asking.
     "internet": "reaching the internet from this install",
 }
@@ -110,7 +110,7 @@ def refused(method, path, req=None):
     return sentences().get(f, "")
 
 
-# ---- the install banner (R88) ----------------------------------------------
+# ---- the install banner ----------------------------------------------
 # One line every visitor sees, on every page and the sign-in page: a shared
 # install's word to whoever is on it ("a classroom install: paste no real
 # keys", a maintenance notice). Drawn by the page as a band under its

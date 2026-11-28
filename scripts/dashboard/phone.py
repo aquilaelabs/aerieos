@@ -60,54 +60,54 @@ env_writer = None
 ctl_runner = None
 remover = None
 # containers.create_container, injected the same way: what Allow on a container
-# ask calls (R71). None where no docker path is wired up. container_free is
-# its name check, asked before a request is queued (B309), and
-# container_builds whether the file would build from an empty directory
-# (B329), asked at the same moment.
+# ask calls. None where no docker path is wired up. container_free is
+# its name check, asked before a request is queued, and
+# container_builds whether the file would build from an empty directory,
+# asked at the same moment.
 container_maker = None
-# A VM's create or action, run on Allow (R91): vms.create or vms.act, as the
+# A VM's create or action, run on Allow: vms.create or vms.act, as the
 # page runs them, with the asking session's project.
 vm_runner = None
-# (project, held, by) -> the tool a session asked for (R169 step 5), installed
+# (project, held, by) -> the tool a session asked for, installed
 # on the node the ask names by the person who allowed it: {ok, job, said}.
 pack_runner = None
 # signing.start(principal, project, file, route), set by the server: what
-# Allow on a session's `aerie sign` runs (R106), queued as the session asked.
+# Allow on a session's `aerie sign` runs, queued as the session asked.
 signer = None
-# What Allow on a session's key change runs (R106 step 6), set by the
+# What Allow on a session's key change runs, set by the
 # server: keymaker(action, project, args) -> (payload, status), where
 # action is generate (args: key, route) or map (args: package, key).
 keymaker = None
 # releaser(project, comp, asker_name, principal, dev=False, pre="") -> (payload, status): the
-# release a session asked for, run as Release on the Artifacts tab runs it
-# (R138). Set by the server.
+# release a session asked for, run as Release on the Artifacts tab runs it.
+# Set by the server.
 releaser = None
 # (project, action, env, ref, principal, uid, asker, allowed by) -> {ok, job}
-# or {error}: a session's deploy or rollback, allowed (R281 step 6).
+# or {error}: a session's deploy or rollback, allowed.
 deployer = None
 # (project, plan, asker_name, principal) -> (payload, status): an edit of a
-# published release (R139), the controller's, with the project's token.
+# published release, the controller's, with the project's token.
 release_editor = None
 # (project, layout text, principal, allowed by) -> {ok, done, left} or {error}:
-# a session's Discord layout applied, a person having allowed it (R293).
+# a session's Discord layout applied, a person having allowed it.
 discorder = None
 # (project, plan, asker_name, principal) -> (payload, status): files taken
-# off a published release, its own ask (the operator, 5 Oct).
+# off a published release, its own ask.
 release_remover = None
 release_withdrawer = None
 # (project) -> (payload, status): a release's APK looked for and signed
-# again (releasesign.check, R134), what Allow on a session's ask runs.
+# again (releasesign.check), what Allow on a session's ask runs.
 release_signer = None
 container_free = None
 container_builds = None
-pusher = None         # a held push run after Approve (R219): (record, by) -> {code, out, err, apply?}
-# ...and what verb() needs to know about the one asking, set by server.py
+pusher = None         # a held push run after Approve: (record, by) -> {code, out, err, apply?}
+# ...and what verb needs to know about the one asking, set by server.py
 # beside the rest: the account store, the projects an account sees, the
 # node a project builds on and its Run its container dial, a container's
-# node held to its project's (R79), the dial's refusal, and the sessions'
-# networks told when a container is made (R79).
+# node held to its project's, the dial's refusal, and the sessions'
+# networks told when a container is made.
 users = None
-leasing = None        # phonelease, set by server.py: a phone lent to a project (R113)
+leasing = None        # phonelease, set by server.py: a phone lent to a project
 project_names = None
 project_node = None
 project_hosts = None  # a project -> the nodes it hosts containers on (prefs.hosts), set by server.py
@@ -168,7 +168,7 @@ def _rec(nid):
 def by_node(uid):
     """{node id: {owner, mine, lease}} for every node with a phone connected,
     from one read of the store and no adb: what a project row says about its
-    node's phone (R120). `lease` is {project, by_name, left} or None."""
+    node's phone. `lease` is {project, by_name, left} or None."""
     out, now = {}, time.time()
     for nid, rec in (load().get("nodes") or {}).items():
         if not isinstance(rec, dict):
@@ -235,7 +235,7 @@ def forget(nid, ip, me=None, admin=False):
     keep = [r for r in rows if r.get("ip") != ip]
     if len(keep) == len(rows):
         return {"error": f"nothing remembered at {ip} on this node"}
-    # A row is its maker's to forget, or an administrator's (B490).
+    # A row is its maker's to forget, or an administrator's.
     if me is not None and not admin:
         for r in rows:
             if r.get("ip") == ip and (r.get("by") or "") != me:
@@ -297,7 +297,7 @@ def devices(nid, force=False):
         return list(c["devs"])
     # Not asked of a node that has no adb: the census says what the node
     # carries, and a probe there is a job that fails on every poll, which
-    # filled a fresh node's Jobs tab with 'could not start adb' rows (B138).
+    # filled a fresh node's Jobs tab with 'could not start adb' rows.
     # The tab says what is missing instead (no_adb).
     if no_adb(nid):
         _dev_fail[nid] = True
@@ -437,8 +437,8 @@ def connect(nid, ip, port, uid, name):
     # The port comes from the phone: the companion app reads it off its own
     # adbd's announcement, or the person types it from the Wireless debugging
     # screen. Never scanned for: probing thousands of ports on a phone across
-    # a VPN is what a provider or a network flags as port scanning (the
-    # operator, 9 Oct), whoever's phone it is.
+    # a VPN is what a provider or a network flags as port scanning,
+    # whoever's phone it is.
     n = _valid_port(port)
     if not n:
         return {"error": "the phone's connect port is needed: the AerieOS app finds it, or read "
@@ -446,7 +446,7 @@ def connect(nid, ip, port, uid, name):
                          "number after the colon) and type it in"}
     # "connected to" is a socket, not a phone: the port of something else
     # says it and the phone never becomes a device, which the app took for
-    # success while the Phone tab said not connected (B598).
+    # success while the Phone tab said not connected.
     r = _adb(nid, "connect", f"{ip}:{n}", timeout=30, by=f"user:{name}")
     if "connected to" not in r["out"]:
         return {"error": (r["out"].strip().splitlines() or ["connect failed"])[-1]}
@@ -469,7 +469,7 @@ def connect(nid, ip, port, uid, name):
 
 
 def disconnect(nid, uid, name, admin=False):
-    """The owner ends it, or an administrator (R120, the operator 4 Oct): a
+    """The owner ends it, or an administrator: a
     phone left connected and lent is a machine-wide fact somebody has to be
     able to end. Nobody else: a connection another person made is theirs to
     drop, and the refusal names them. Its lease goes with it."""
@@ -496,7 +496,7 @@ def _node_row(n, uid, probe, who=None):
     mine = bool(rec and rec.get("owner") == uid)
     admin = bool(who is not None and users.is_admin(who))
     me = (who or {}).get("name") or ""
-    # Another account's phone (B490): that one is connected, and whose, and
+    # Another account's phone: that one is connected, and whose, and
     # nothing that names it (no model, no serial, no address); the remembered
     # rows are the account's own, every row an administrator's.
     shown = dev
@@ -511,7 +511,7 @@ def _node_row(n, uid, probe, who=None):
             "owner": owner_of(n["id"]) if rec else None,
             "mine": mine,
             "may_drive": may_drive(n["id"], uid),
-            # R113: who the phone is lent to, and (for its owner) which
+            # Who the phone is lent to, and (for its owner) which
             # projects on this node it could be.
             "lease": leasing.view(n["id"]) if leasing is not None else None,
             # Allowed for a session (the owner's to see and take back).
@@ -530,7 +530,7 @@ def payload(uid, node="", probe=False, admin=False, project="", who=None):
     for n in (nodes.phone_nodes() if nodes is not None else []):
         rows.append(_node_row(n, uid, probe and n["id"] == node, who))
     return {"nodes": rows, "asks": requests_open(uid, admin, project),
-            # ...and an account's own that ended (R280); a session's view has none.
+            # ...and an account's own that ended; a session's view has none.
             "ended": [] if project else requests_ended(uid, admin)}
 
 
@@ -724,7 +724,7 @@ def _req_public(r):
            "node_name": r["node_name"], "project": r["project"],
            "kind": r.get("kind") or "phone", "asker": r.get("asker") or "",
            "left": max(0, WAIT_SECONDS - (int(time.time()) - r["at"]))}
-    # How an answered or expired one ended, and when (R280): the bell moves
+    # How an answered or expired one ended, and when: the bell moves
     # it from Active to Earlier, saying so.
     if r["state"] != "pending":
         out["ended"] = int(r.get("ended") or 0)
@@ -736,16 +736,16 @@ def _req_public(r):
     # keys are, so the reader knows what it sets.
     # ...and a rebuild that creates the container or writes its env says so,
     # with the env's keys for the same reason.
-    # A release names the tag and the commit it would mark (R138).
+    # A release names the tag and the commit it would mark.
     if r.get("kind") == "release":
         out["tag"], out["sha"] = r.get("tag") or "", r.get("sha") or ""
-    # A Discord apply is read change by change (R293), each that asks marked.
+    # A Discord apply is read change by change, each that asks marked.
     if r.get("kind") == "discord":
         out["detail"] = r.get("detail") or ""
-    # A deploy names its environment and what it would send there (R281).
+    # A deploy names its environment and what it would send there.
     if r.get("kind") == "deploy":
         out["env"], out["ref"], out["production"] = r.get("env") or "", r.get("ref") or "", bool(r.get("production"))
-    # ...and an edit of one (R139) is approved by reading it: the notes it
+    # ...and an edit of one is approved by reading it: the notes it
     # would put on the page, whole, and each file with its size.
     if r.get("kind") == "release-edit":
         out["tag"] = r.get("tag") or ""
@@ -768,7 +768,7 @@ def _req_public(r):
                            if "=" in ln and not ln.lstrip().startswith("#")]
         out["name"] = r.get("name") or ""
         out["for"] = r.get("for") or ""
-    # A push (R219) is approved by reading the lines that look sensitive:
+    # A push is approved by reading the lines that look sensitive:
     # each with its file and line, whole, in a box.
     if r.get("kind") == "push":
         out["detail"] = r.get("detail") or ""
@@ -799,7 +799,7 @@ def _for(r, uid, admin):
     if r.get("kind") in ("sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw",
                          "release-sign"):
         return r["to"] == uid
-    # A held push (R219) is the asking account's to answer, and an
+    # A held push is the asking account's to answer, and an
     # administrator's, since what it would send is the project's.
     if r.get("kind") == "push":
         return admin or r["to"] == uid
@@ -832,7 +832,7 @@ ENDED_SHOWN_S = 86400
 
 def requests_ended(uid, admin=False):
     """The asks that waited on this account and ended in the last day,
-    approved, denied or expired, newest first (R280, the operator, 24 Nov):
+    approved, denied or expired, newest first:
     the bell's Earlier section says how each went, where it used to vanish
     the moment it was answered. Kept with the others, the latest MAX_REQS,
     so a restart forgets them as it forgets the pending ones."""
@@ -871,7 +871,7 @@ def ask(why, argv, nid, node_name, project, by="claude", asker="", asker_uid="")
                                      extra={"asker_uid": asker_uid}))
 
 
-# ---- Allow for this session (the operator, 4 Oct) ----------------------------
+# ---- Allow for this session ----------------------------
 # Answering every command a session sends to a phone was too much: the
 # owner's second answer, "Allow for this session", lets the commands that
 # account's sessions in that project send to that phone run without asking
@@ -941,7 +941,7 @@ def untrust(nid, uid, project="", asker_uid="", all_=False):
 
 
 def wait_token(uid, admin=False):
-    """What the companion app's live connection waits on (R125): a short
+    """What the companion app's live connection waits on: a short
     hash of the asks waiting on this account, the lease revision and the
     grants. It moves exactly when the app has something new to post or to
     take out of the shade."""
@@ -967,7 +967,7 @@ def _allow_if_trusted(q):
         return q
     with _lock:
         r = _find(q["id"])
-    # A touch on whatever app is in front (--any-app, B485) is asked every
+    # A touch on whatever app is in front (--any-app) is asked every
     # time: the owner trusted the session with the lease's apps, not the phone.
     if r and r.get("kind") in ("phone", "phone-use") and not (r.get("args") or {}).get("anyapp") \
             and trusted(r["node"], r["project"], r.get("asker_uid") or ""):
@@ -1002,8 +1002,8 @@ MAX_LIVE = 200
 
 
 def _trim():
-    """The list cut, under _lock: every ask still waiting or running (B997:
-    the newest twenty were kept whatever their state, and every phone use
+    """The list cut, under _lock: every ask still waiting or running
+    (the newest twenty were kept whatever their state, and every phone use
     is an ask, auto-allowed ones too, so twenty of them dropped another
     session's root ask from the bell, and its verb ended 'no such
     request'), and the newest MAX_REQS of those that are over."""
@@ -1020,7 +1020,7 @@ ARGS_MAX, ARG_MAX = 40, 500
 
 def _too_long(argv):
     """Why `argv` is too long to put in front of somebody, naming the limit it
-    passed (B1071: the refusal named none, so a session shortened its command
+    passed (the refusal named none, so a session shortened its command
     by guessing), or ""."""
     if len(argv) > ARGS_MAX:
         return f"that command is too long to put in front of somebody: {len(argv)} arguments, where {ARGS_MAX} is the most"
@@ -1057,7 +1057,7 @@ def _owner_ask(kind, why, hint, project, cmd, to_uid, to_name, asker_name="", ex
 
 
 def ask_push(project, cwd, args, findings, asker_uid="", asker_name="", asker_admin=False):
-    """A session's push held for a person (R219): the lines pushscan
+    """A session's push held for a person: the lines pushscan
     flagged, in a box on the bell, for the account whose session pushes
     (and any administrator). Approve runs the push on the controller
     (pusher) and okays those lines; Deny drops it. Returns the request."""
@@ -1074,8 +1074,8 @@ def ask_push(project, cwd, args, findings, asker_uid="", asker_name="", asker_ad
 
 def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
              asker_uid="", asker_name="", asker_admin=False, locked=""):
-    """A session asking for ONE command as root on its project's node
-    (roadmap R38). Not sudo, which would be every command from then on
+    """A session asking for ONE command as root on its project's node.
+    Not sudo, which would be every command from then on
     with nobody reading them, and not a sudo that pretends. This is the
     phone's shape applied to root: the reason and the exact command go to
     a person, they allow or deny, and the node runs that command and
@@ -1117,7 +1117,7 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
 
 def ask_sign(why, project, file, route, to_uid, to_name, asker_name="", principal="", key=""):
     """A session asking to sign a build with one of its project's keys, on a
-    project whose dial is `ask` (Agents may: Sign a build, R106). It goes
+    project whose dial is `ask` (Agents may: Sign a build). It goes
     to the project's owner, who reads which build and which key; Allow
     queues the signing as the session's own."""
     return _owner_ask(
@@ -1129,7 +1129,7 @@ def ask_sign(why, project, file, route, to_uid, to_name, asker_name="", principa
 
 def ask_release(why, project, comp, plan, to_uid, to_name, asker_name="", principal="", dev=False, pre=""):
     """A session asking to tag and publish a release, on a project whose
-    dial is `ask` (Agents may: Tag and publish a release, R138). It goes to
+    dial is `ask` (Agents may: Tag and publish a release). It goes to
     the project's owner, who reads the tag and the commit it would mark;
     Allow runs Release as the Artifacts view does, with the project's own
     credentials, which the session never holds."""
@@ -1145,7 +1145,7 @@ def ask_release(why, project, comp, plan, to_uid, to_name, asker_name="", princi
 
 def ask_deploy(why, project, action, env, ref, to_uid, to_name, asker_name="", principal="", uid=""):
     """A session asking to deploy to, or roll back, one of its space's
-    Kubernetes environments (R281 step 6), where the space's Deploy to
+    Kubernetes environments, where the space's Deploy to
     Kubernetes dial is `ask` or the environment is marked production. It
     goes to the space's owner (and any administrator), who reads which
     environment and which ref; Allow starts it as the session's own, with
@@ -1161,7 +1161,7 @@ def ask_deploy(why, project, action, env, ref, to_uid, to_name, asker_name="", p
 
 
 def ask_discord(why, project, text, changes, to_uid, to_name, asker_name="", principal=""):
-    """A session asking to apply its space's Discord layout (R293) where its
+    """A session asking to apply its space's Discord layout where its
     Manage Discord dial is `ask`, or where the plan removes something,
     changes a permission or reaches members, which asks whatever the dial
     says. It goes to the space's owner (and any administrator), who reads
@@ -1175,7 +1175,7 @@ def ask_discord(why, project, text, changes, to_uid, to_name, asker_name="", pri
 
 
 def ask_release_edit(why, project, plan, to_uid, to_name, asker_name="", principal=""):
-    """A session asking to change its project's published release (R139):
+    """A session asking to change its project's published release:
     the notes replaced, files attached. Every edit is its own ask, to the
     project's owner, who reads the notes whole and each file by its name
     and size before Allow."""
@@ -1194,8 +1194,8 @@ def ask_release_edit(why, project, plan, to_uid, to_name, asker_name="", princip
 def ask_release_remove(why, project, plan, to_uid, to_name, asker_name="", principal=""):
     """A session asking to take files off its project's published release:
     always its own ask, never part of an edit, since it is the one change
-    that takes something away from the people downloading (the operator,
-    5 Oct). The files are named as the forge listed them, with their sizes."""
+    that takes something away from the people downloading.
+    The files are named as the forge listed them, with their sizes."""
     return _owner_ask(
         "release-remove", why, "say why they come off: --why \"...\" (a build that was broken, a duplicate ...)", project,
         lambda: ["version", "release", "--remove", plan["tag"]] + [
@@ -1206,8 +1206,8 @@ def ask_release_remove(why, project, plan, to_uid, to_name, asker_name="", princ
 
 
 def ask_release_withdraw(why, project, plan, to_uid, to_name, asker_name="", principal=""):
-    """A session asking to take a published release back, its tag with it
-    (R190 step 3): always an ask, whatever the dial, since nothing undoes
+    """A session asking to take a published release back, its tag with it:
+    always an ask, whatever the dial, since nothing undoes
     it. The person reads which tag, whether it is a pre-release and how
     many files go with it."""
     def cmd():
@@ -1224,8 +1224,8 @@ def ask_release_withdraw(why, project, plan, to_uid, to_name, asker_name="", pri
 
 def ask_release_sign(why, project, to_uid, to_name, asker_name="", tag=""):
     """A session asking for its project's release APKs to be looked for and
-    signed again, as the Signing view's Look for unsigned APKs now does
-    (R134 step 5), under its Sign a build dial. 0.7.0's retry after its key
+    signed again, as the Signing view's Look for unsigned APKs now does,
+    under its Sign a build dial. 0.7.0's retry after its key
     was added had to be a person's press. With `tag`, the release whose
     signed APK is to be replaced by its own run's, signed again."""
     return _owner_ask("release-sign", why,
@@ -1240,7 +1240,7 @@ def _size(n):
 
 def ask_keys(why, project, action, args, to_uid, to_name, asker_name=""):
     """A session proposing a new key or a package's key, on a project whose
-    Manage signing keys dial is `ask` (R106 step 6). It goes to the project's
+    Manage signing keys dial is `ask`. It goes to the project's
     owner: a new sideload key is an app's identity for good, which is why a
     person says yes to it."""
     def cmd():
@@ -1308,7 +1308,7 @@ def ask_rebuild(why, project, instance, name, asker_uid="", asker_name="",
 def ask_container(why, name, compose, env, nid, node_name, project, for_project="",
                   asker_name=""):
     """A session asking for a CONTAINER: a compose file it wrote, built and
-    started on a node once an administrator approves (roadmap R71).
+    started on a node once an administrator approves.
 
     The root shape applied to docker. The session names nothing docker runs:
     it hands over the file, and Allow gives that file to the same function
@@ -1339,7 +1339,7 @@ def ask_container(why, name, compose, env, nid, node_name, project, for_project=
 
 
 def ask_vm(why, project, req, asker_name=""):
-    """A session asking for a VM, or for one thing done to one (R91), with
+    """A session asking for a VM, or for one thing done to one, with
     its project's Make VMs dial at ask: held for the administrators as a
     container is, since a VM is a machine on a node. Allow runs the same
     create or action the VMs page runs."""
@@ -1359,7 +1359,7 @@ def ask_vm(why, project, req, asker_name=""):
     if keep.get("node_agent"):
         shown.append("--node-agent")
     # What the person allowing reads on the bell: the hardware as aerie vm's
-    # own words (R100), a disk's size, autostart's way.
+    # own words, a disk's size, autostart's way.
     hw = keep.get("hw") if isinstance(keep.get("hw"), dict) else {}
     if "cpuset" in hw:
         shown += ["--pin", ",".join(map(str, hw["cpuset"])) or "none"]
@@ -1374,7 +1374,7 @@ def ask_vm(why, project, req, asker_name=""):
         shown += [str(keep["disk"])] * bool(keep.get("disk")) + [f"{keep['gb']}G"]
     if action == "autostart":
         shown.append("on" if keep.get("on") else "off")
-    # A USB device to a VM (R116), as aerie vm usb names it.
+    # A USB device to a VM, as aerie vm usb names it.
     if action in ("usb-give", "usb-take") and isinstance(keep.get("usb"), dict):
         u = keep["usb"]
         shown = ["vm", "usb", name, "give" if action == "usb-give" else "take",
@@ -1389,7 +1389,7 @@ def ask_vm(why, project, req, asker_name=""):
 
 def ask_pack(why, project, held, asker_name=""):
     """A session asking for a tool on the node it runs on (aerie tool
-    install, R169 step 5), its project's Install a tool pack dial at ask:
+    install), its project's Install a tool pack dial at ask:
     held for the administrators, since a toolchain goes into a node's
     store and a pack joins every node's catalog. `held` names the tool, the
     node, whether it is a toolchain AerieOS ships and, for a pack of the
@@ -1493,7 +1493,7 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
         if not res.get("error") and (r.get("create") or r.get("env") is None):
             # Allow is the answer the project's `ask` puts a person in front
             # of, so the build does not stop again at the confirmation a
-            # person's own Build on the row gives (the operator, 26 Sep).
+            # person's own Build on the row gives.
             res = rebuilder(key, r.get("instance") or "", gate=False) or {}
         elif not res.get("error"):
             res = {"job": "env written"}
@@ -1635,8 +1635,8 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             return {"error": res["error"]}
         return {"ok": True}
     if r.get("kind") == "vm":
-        # The VMs page's own create or action, under the session's project
-        # (R91); its refusal comes back to whoever pressed Allow as well.
+        # The VMs page's own create or action, under the session's project;
+        # its refusal comes back to whoever pressed Allow as well.
         res = vm_runner(r.get("project") or "", r.get("vm") or {}, name or "a person") if vm_runner else \
             {"error": "no VM path is wired up here"}
         with _lock:
@@ -1644,10 +1644,10 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
                      out=str(res.get("error") or res.get("job") or "done"))
         return {"error": res["error"]} if res.get("error") else {"ok": True}
     if r.get("kind") == "pack":
-        # A tool a session asked for (R169 step 5), installed on the node it
+        # A tool a session asked for, installed on the node it
         # asked from: the outcome names the job, for the session's verb, and
         # the answer to this press carries it too, for the person's toast.
-        # Allow used to keep the pack and install it nowhere (B1040).
+        # Allow used to keep the pack and install it nowhere.
         res = pack_runner(r.get("project") or "", {**(r.get("pack") or {}), "node": r.get("node") or "",
                                                   "node_name": r.get("node_name") or ""}, name or "a person") \
             if pack_runner else {"error": "no tool pack path is wired up here"}
@@ -1659,7 +1659,7 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             return {"error": res["error"]}
         return {"ok": True, **{k: res[k] for k in ("job", "said") if res.get(k)}}
     if r.get("kind") == "phone-use":
-        # A lent phone's command, allowed by its owner (R120): run as the
+        # A lent phone's command, allowed by its owner: run as the
         # lease would have run it, on a thread (a recording takes its
         # seconds), its answer kept as JSON for the session's verb to read.
         def finish_use():
@@ -1714,7 +1714,7 @@ ROOT_HEAD = "# root on this node, allowed by "
 
 
 def root_said(log):
-    """A root job's log as the session that asked reads it (B58): from who
+    """A root job's log as the session that asked reads it: from who
     allowed it on, without the agent's lines about the job before that,
     which the Jobs page keeps. A log without that line is left whole."""
     at = log.find(ROOT_HEAD)
@@ -1895,8 +1895,8 @@ def verb(action, req, who, fresh):
         r = forget(nid, field(req, "ip"), me=me, admin=users.is_admin(who))
     elif act == "ask":
         # A session asking to reach the phone on its project's node,
-        # or, with kind "root", for one command as root there (roadmap
-        # R38). It runs nothing itself; the account that connected that
+        # or, with kind "root", for one command as root there.
+        # It runs nothing itself; the account that connected that
         # phone, or an administrator, is asked, and on Allow the node
         # runs it. The project is the session's own; a person asking
         # through the API names one they may see.
@@ -1913,7 +1913,7 @@ def verb(action, req, who, fresh):
         asker_uid = str(acct.get("uid") or "")
         asker_name = str(acct.get("name") or "")
         if field(req, "kind") == "container":
-            # A container asked for (roadmap R71): the compose file the
+            # A container asked for: the compose file the
             # session wrote, on the node it names or the project's own.
             # Always the administrators', whoever asks. The node is
             # resolved here so the row can say where, and so a name that
@@ -1936,8 +1936,8 @@ def verb(action, req, who, fresh):
                 return {"error": f"not a space: {under}"}, 400
             # ...and it lands on that project's node: a node named that
             # is not the project's is refused now, since a container
-            # anywhere else is out of reach of the project's sessions
-            # (R79, the operator 25 Sep); a project with no node has to
+            # anywhere else is out of reach of the project's sessions;
+            # a project with no node has to
             # be given one first.
             if under:
                 why, un = on_project_node(under, target["id"] if target else "")
@@ -1945,8 +1945,8 @@ def verb(action, req, who, fresh):
                     return {"error": why}, 400
                 target = nodes.node(un) if nodes is not None else None
             # A session's is under its project's dial, Agents may: Run
-            # its container, like every other container verb (B250, the
-            # operator, 24 Sep: at auto it was still asked). Refused at
+            # its container, like every other container verb
+            # (at auto it was still asked). Refused at
             # deny; at auto, its own project's on its own node is made
             # now and built, the way Allow would; one for another project
             # or on a node it names is always a person's.
@@ -1962,14 +1962,14 @@ def verb(action, req, who, fresh):
                         return r, 400
                     net_nudge()
                     # Built whatever the compose asks for: auto is the
-                    # project's answer (the operator, 26 Sep).
+                    # project's answer.
                     built = rebuilder(r["project"], r["instance"], gate=False) or {}
                     if built.get("error"):
                         return r | {"error": f"{r['name']} is registered on the Docker "
                                              f"tab, and its build did not start: {built['error']}"}, 400
                     return r | {"job": built.get("job")}, 200
             # A name nothing could build under is refused here, before the
-            # request is on anybody's bell (B309), with the words the
+            # request is on anybody's bell, with the words the
             # create would use.
             why = container_free(field(req, "name")) if container_free is not None else ""
             if not why and container_builds is not None:
@@ -1984,8 +1984,8 @@ def verb(action, req, who, fresh):
                               for_project=under, asker_name=asker_name)
         elif field(req, "kind") == "root":
             # On the project's node, or on one of the nodes the project
-            # hosts its containers on when the ask names it (the operator,
-            # 11 Oct): a hosting-only node runs no session, so a session
+            # hosts its containers on when the ask names it:
+            # a hosting-only node runs no session, so a session
             # reaches root there only by name, and the node's own root-asks
             # switch decides, as it does for the project's node.
             rn = pn
@@ -2027,9 +2027,9 @@ def verb(action, req, who, fresh):
         if st != 200:
             return r, st
     elif act == "use":
-        # A session's verb on the phone lent to its project (R113): its own
-        # project only, and phonelease says what a lease allows. Since R120
-        # (the operator, 4 Oct) every one but reading the lease ASKS the
+        # A session's verb on the phone lent to its project: its own
+        # project only, and phonelease says what a lease allows.
+        # Every one but reading the lease ASKS the
         # phone's owner, and runs on their Allow: whether a session drives a
         # phone is its owner's call each time, not a project's setting.
         proj = who.get("session") or field(req, "project")
@@ -2038,7 +2038,7 @@ def verb(action, req, who, fresh):
         op = field(req, "op")
         # A person drives a lent phone only as its owner: anybody else who
         # sees the space reads its status, and the rest is its owner's Allow
-        # on a session's ask (R277, the audit of 24 Nov: seeing the space
+        # on a session's ask (seeing the space
         # drove the phone somebody lent it, with nobody asked).
         if not who.get("session") and op != "status":
             lnid, _got = leasing.leased_to(proj)

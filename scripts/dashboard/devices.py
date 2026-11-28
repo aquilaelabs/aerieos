@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A person's devices (R272 step 1): an app a person signed in with on a
+"""A person's devices: an app a person signed in with on a
 machine of their own (the Windows companion today; the phone and an editor
 in time), each holding a token of its own that acts as that person for the
 app's calls and nothing else.
@@ -34,7 +34,7 @@ ACCESS = None                   # (account, project) -> "rw" | "r" | "": the edi
 PROJECTS = None                 # (account) -> [project names this account may see]
 FLAGS = None                    # (account, project) -> {archived, locked, locked_why}: projects.app_flags
 WAIT_MAX = 25                   # seconds a device's long poll is held
-# The door's compatibility window (R270 step 9, R79 step 8), as the agent's:
+# The door's compatibility window, as the agent's:
 # an app says which door it speaks in X-BB-Door (none is 1) and which app and
 # release it is in X-BB-App ("companion/0.3.1"), and one from before DOOR_MIN
 # is refused with the way to update rather than half working. The controller
@@ -61,7 +61,7 @@ def door_refused(said, app=""):
             "update the app from the Library, or let it update itself")
 
 
-UNLOCK = None            # (uid, key) -> unlocks.unlock, set by the server (R157)
+UNLOCK = None            # (uid, key) -> unlocks.unlock, set by the server
 
 
 def configure(*, users, access=None, projects=None, flags=None, unlock=None):
@@ -137,7 +137,7 @@ def listed(account):
 def revoke(account, did, by=""):
     """Sign one of this account's devices out. Another account's id is not
     found, the same as one that does not exist. `by` is an administrator
-    doing it for them (R272 step 8: a lost laptop cut off without its
+    doing it for them (a lost laptop cut off without its
     owner), the audit's principal in place of the account's own."""
     uid = (account or {}).get("uid") or ""
     rows = _rows("SELECT id, name FROM devices WHERE id = ? AND uid = ? AND revoked = 0", (str(did or ""), uid))
@@ -155,7 +155,7 @@ def revoke(account, did, by=""):
 # editor uses: a project the person may edit there (ftp.access_for's
 # "editor" door) comes down and goes up, one they may read comes down only,
 # any other is not there. The sync is the node's (wssync), with the device in
-# a node's place: R270 step 2.
+# a node's place.
 
 def _access(auth, project):
     if not project or not ACCESS:
@@ -169,7 +169,7 @@ def _nid(auth):
 
 
 APPS = None
-PC = None               # pcwork.py: a PC lent to a project (R270 step 6)
+PC = None               # pcwork.py: a PC lent to a project
 
 
 def configure_pc(mod):
@@ -178,7 +178,7 @@ def configure_pc(mod):
 
 def configure_apps(mod):
     """apps.py, for the apps verb and app-file: how a device's app keeps
-    itself current (R270 step 9)."""
+    itself current."""
     globals()["APPS"] = mod
 
 
@@ -201,7 +201,7 @@ def verb(name, auth, req):
     if name == "pc-result" and PC:
         return PC.result(auth["device"], req.get("id"), req)
     if name == "unlock":
-        # The key its person keeps, held by the app (R157): their store
+        # The key its person keeps, held by the app: their store
         # opened for their window, as a passkey would.
         if not UNLOCK:
             return {"error": "this controller takes no unlock from a device"}, 400
@@ -212,7 +212,7 @@ def verb(name, auth, req):
         return {"version": v.get("version", ""), "door": DOOR, "door_min": DOOR_MIN,
                 "apps": [{k: a[k] for k in ("name", "version", "files")} for a in v["apps"] if a["offered"]],
                 # The release's signed list of files and its signature, which
-                # the companion checks with keys it carries (B1168).
+                # the companion checks with keys it carries.
                 "proof": v.get("proof")}, 200
     if name == "whoami":
         return {"device": auth["device"], "name": auth["name"], "kind": auth["kind"],
@@ -222,7 +222,7 @@ def verb(name, auth, req):
         for p in (PROJECTS(auth["account"]) if PROJECTS else []):
             a = _access(auth, p)
             if a:
-                # ...with its archive and lock (R128), for the app's list.
+                # ...with its archive and lock, for the app's list.
                 out.append({"project": p, "access": a, "rev": wssync.rev_of(p),
                             **(FLAGS(auth["account"], p) if FLAGS else {})})
         return {"projects": out, "door": DOOR, "door_min": DOOR_MIN}, 200

@@ -1,5 +1,5 @@
 """Behind `aerie k8s` (cmd_k8s in aerie): a space's Kubernetes environments
-from a session (R281 step 6), relayed through the controller's /api/k8s,
+from a session, relayed through the controller's /api/k8s,
 which holds every credential; a session never holds a kubeconfig.
 
   aerie k8s [status] [ENV]          each environment's workloads: ready of

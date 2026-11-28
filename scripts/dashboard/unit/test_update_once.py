@@ -1,7 +1,7 @@
 """An agent update that succeeded is the node's agent at once: the hello that
 says so waits on the new agent's census, a minute on bb-sandbox, and meanwhile
 the node read as behind, so a second update went out, was refused as busy
-behind the first, and the bell asked for a press (the operator, 19 Oct: the
+behind the first, and the bell asked for a press (the
 VM node kept asking to be updated, the hosting one never did)."""
 import os
 import sys

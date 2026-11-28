@@ -1,4 +1,4 @@
-"""bb-session's --cuda word (R102): on or off, a word and its value so the
+"""bb-session's --cuda word: on or off, a word and its value so the
 agent can read a launcher line back and respawn it."""
 import importlib.machinery
 import importlib.util

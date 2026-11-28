@@ -1,4 +1,4 @@
-"""The doctor says a TLS key probe that failed with nothing said (B1101).
+"""The doctor says a TLS key probe that failed with nothing said.
 
 Its stderr was thrown away and its exit ignored, so a traceback in the probe
 printed nothing and the doctor said nothing of the key every node pins.

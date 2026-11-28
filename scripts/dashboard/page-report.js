@@ -1,4 +1,4 @@
-// Report a bug in AerieOS from a project's row (the operator, 2 Oct): a
+// Report a bug in AerieOS from a project's row: a
 // person's way into the same diagnostics a session reaches with
 // `aerie report`. The dialog asks for a category, what happened and how to make
 // it happen; the project is the row's, and the server adds the node and the
@@ -18,10 +18,10 @@ const REPORT_CATS = [
 let reportProject = "";
 
 // ---- its form ----
-// One form over the dialog's own foot (R301): which repository beside what
+// One form over the dialog's own foot: which repository beside what
 // kind of thing, where a space has several (with one, Category runs across);
 // what happened and how to make it happen; and the latest conversation on the
-// space, which is usually the bug (the operator, 2 Oct), off unless ticked
+// space, which is usually the bug, off unless ticked
 // with the line under it saying which one it is.
 function reportDrawForm(){
   const at = document.querySelector('#reportModal [data-dlgform="report"]');
@@ -38,7 +38,7 @@ function reportDrawForm(){
       <div class="sub" id="reportConvWhich"></div></div>`]});
 }
 
-// From a project's card, which of its repositories (R138: the first unless
+// From a project's card, which of its repositories (the first unless
 // another is picked), each sending its own node and conversation.
 function openReport(project, repos = []){
   reportProject = project;
@@ -79,7 +79,7 @@ function reportConvFor(project){
       const c = (j.rows || [])[0];
       if (!c || reportProject !== project) return;
       // Its first words when it has any; a conversation that opened with
-      // nothing typed printed `just now: "".` (B453).
+      // nothing typed printed `just now: "".`.
       const first = String(c.first || "").trim().slice(0, 90);
       $("reportConvWhich").textContent = `${ago(c.at)}${first ? `: "${first}"` : ""}. `
         + "Its last part goes with the report, with secrets taken out, to whoever reads the diagnostics.";

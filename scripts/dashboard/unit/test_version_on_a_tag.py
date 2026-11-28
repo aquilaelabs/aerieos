@@ -1,5 +1,5 @@
-"""A build of a pre-release's tag reports what the tag says (R206 step 9;
-R217's one clock for every name). The image's workflow stamped the tag's own
+"""A build of a pre-release's tag reports what the tag says
+(one clock for every name). The image's workflow stamped the tag's own
 words in shell while `aerie version` said X.Y.Z-dev.N+sha of the same commit,
 and read a release candidate's tag as a dev build; the workflow asks the tool
 now, so the tool has to know the tag. In a scratch repository."""

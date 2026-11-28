@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.lerp
 // dark half darkens the panel for the sunk ground and fills an accent
 // surface with the second color darkened (capped, so ink stays readable);
 // the light half darkens the panel less and tints it with the second color,
-// the ink on it, as the stylesheet's light half does (R216).
+// the ink on it, as the stylesheet's light half does.
 class Half(bg: Long, panel: Long, ink: Long, dim: Long, line: Long,
            accent: Long, warn: Long, bad: Long, note: Long, val light: Boolean = false,
            lit: Long = note) {

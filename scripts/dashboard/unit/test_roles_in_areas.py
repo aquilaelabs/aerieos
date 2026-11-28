@@ -1,4 +1,4 @@
-"""Migration 0036 (R295): roles from before areas (grants, a flat nodes list)
+"""Migration 0036: roles from before areas (grants, a flat nodes list)
 and accounts with one role and no list, written in today's shape once. What
 roles.py makes of each migrated role is what its reader made of the old shape
 on 26 Nov, before that reader was deleted (frozen here)."""

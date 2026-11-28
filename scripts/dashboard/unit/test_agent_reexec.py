@@ -1,4 +1,4 @@
-"""The agent restarts into a new version only once nothing else runs (B134):
+"""The agent restarts into a new version only once nothing else runs:
 a rebuild taken beside an update, after its busy check, was lost to the
 exec, and an update that installed nothing restarted it all the same."""
 import os

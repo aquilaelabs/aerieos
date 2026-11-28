@@ -73,7 +73,7 @@ if not rows:
 for tag, e in rows:
     when = time.strftime("%d %b %H:%M", time.localtime(e.get("at", 0)))
     where = f" step {e['step'] + 1} of" if e.get("step") is not None else ""
-    # The tab's own letter on the number (R12, B62), because a merged log is
+    # The tab's own letter on the number, because a merged log is
     # exactly where a bare number could be read against the wrong list.
     kind = tag
     if tag == "waiting":

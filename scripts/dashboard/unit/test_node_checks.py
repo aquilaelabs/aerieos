@@ -1,5 +1,5 @@
 """A node's toolchain versions are checked weekly like the controller's own
-(the operator, 6 Oct: a node's tab said twelve days ago). The loop checked
+(a node's tab said twelve days ago). The loop checked
 only the controller's store, and a node's answers aged until somebody
 pressed Check."""
 import os
@@ -36,7 +36,7 @@ class NodeChecks(unittest.TestCase):
 
         # The check's own cadence read without settings, so weekly: under the
         # parallel tier settings.FILE was another module's temp directory,
-        # gone by the time this read it (B468).
+        # gone by the time this read it.
         was = toolchains.nodes, toolchains.node_job, toolchains.TOOLCHAINS, checks.settings
         checks.settings = None
         toolchains.nodes = Nodes
@@ -60,7 +60,7 @@ class NodeChecks(unittest.TestCase):
         self.assertEqual(got, [])
 
     def test_a_node_that_has_just_started_is_checked_whatever_its_last_check(self):
-        # The operator, 6 Oct: check for updates at a node's start up.
+        # Check for updates at a node's start up.
         got, _ = self.run_with([node("n1")], {"n1": [
             {"state": "succeeded", "ended": NOW - 2 * DAY, "spec": {"action": "check"}}]}, wanted={"n1"})
         self.assertEqual(got, ["n1"])

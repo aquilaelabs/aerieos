@@ -1,5 +1,5 @@
-"""The controller's half of the sealed sign-ins (R126, tokenkeys.py): the
-public key a node seals with, made from the account's own key (R154), and
+"""The controller's half of the sealed sign-ins (tokenkeys.py): the
+public key a node seals with, made from the account's own key, and
 the keys a person's own terminal carries, wrapped to the agent's boot key,
 that open those seals and nothing else; the key each seal names is the one
 sent, as |prev when it is not the account's own today (a key before it, or

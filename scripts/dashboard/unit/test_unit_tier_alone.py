@@ -1,6 +1,6 @@
 """The unit tier runs a module that failed once more, alone, and one that
-passes then does not fail the tier (R206; the operator's rule for a suite,
-14 Nov). The tier gates every release's tag since CI runs it, and a module
+passes then does not fail the tier (the operator's rule for a suite).
+The tier gates every release's tag since CI runs it, and a module
 can fail for the company it kept: a bucket's modules share a process, so
 what one leaves set is there for the next (a helper's path, a switch in the
 environment), and a test bound to a clock loses with sixteen at once."""
@@ -48,7 +48,7 @@ class Alone(unittest.TestCase):
         self.assertIn("== test_b_minds failed in the whole run: once more, alone", r.stdout)
         self.assertIn("flaky: test_b_minds failed in the whole run and passed again alone", r.stdout)
         # ...named on the last line too, which is the one a reader piping
-        # through tail keeps (B785).
+        # through tail keeps.
         self.assertTrue(r.stdout.rstrip().endswith("OK; flaky, passed alone: test_b_minds"), r.stdout[-200:])
 
     def test_a_module_that_fails_alone_too_fails_the_tier_with_its_own_count(self):

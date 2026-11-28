@@ -47,7 +47,7 @@ object Watch {
     suspend fun tick(context: Context, api: Api, store: Store, p: Pairing) {
         val nm = context.getSystemService(NotificationManager::class.java)
         val mem = store.memory(p.id)
-        // Each pairing's notes in a slot of ids of its own (R132), and
+        // Each pairing's notes in a slot of ids of its own, and
         // named for it once there is more than one.
         val base = slotBase(p)
         val from = if (store.pairings.size > 1) "${p.label}: " else ""
@@ -67,7 +67,7 @@ object Watch {
         }
         mem.notifiedAsks = seen.intersect(live)
 
-        // What stays on while it lasts (the operator, 4 Oct): your phone lent
+        // What stays on while it lasts: your phone lent
         // to a project, and a session allowed to drive it without asking.
         // Tapping either ends it: the lend taken back and adb disconnected,
         // or the session asking every time again.
@@ -130,13 +130,13 @@ object Watch {
         // the last look and can take a message now. Told once, on the
         // change; a session already waiting when the watch first looks is
         // not news. What "busy" is follows the project's During-a-test-run
-        // setting (the operator, 30 Sep): where a new ask cuts into a run
+        // setting: where a new ask cuts into a run
         // (restart), a session that put its tests in the background and
         // handed the turn back can be interrupted, so it is waiting; where a
         // new ask waits for the run (wait), the note waits for the run too,
         // and comes when the tests finish. The run itself is what `aerie test`
         // reports to the dashboard (the project's `testing`).
-        // Any agent's session of the account's own (R128), the first running
+        // Any agent's session of the account's own, the first running
         // per project as the page reads it; which agent is named on the note.
         val prefix = st.str("tmux_prefix")
         val names = st.arr("sessions").associateBy { it.str("name") }
@@ -173,7 +173,7 @@ object Watch {
         // Nodes that need attention: an agent behind or out of window, or
         // toolchains behind what is out, Claude Code among them.
         val att = st.arr("attention")
-        // The server names the projects on the node as a list (B275).
+        // The server names the projects on the node as a list.
         val attKey = att.joinToString(",") { "${it.str("kind")}:${it.str("id")}${it.strs("projects").joinToString("+")}:${it.str("to")}${
             it.arr("tools").joinToString("+") { t -> t.str("name") + "@" + t.str("to") }}" }
         if (attKey != mem.lastAttention) {
@@ -216,7 +216,7 @@ object Watch {
         if (!store.signedIn) { stop(context); Live.stop(context) }
     }
 
-    /** One round over every pairing (R132). A refused sign-in forgets that
+    /** One round over every pairing. A refused sign-in forgets that
      *  pairing; anything else is one missed round for it. */
     suspend fun tickAll(context: Context, store: Store) {
         for (p in store.pairings) {
@@ -262,7 +262,7 @@ object Watch {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setColor(if (kind == "root") 0xFFE5534B.toInt() else 0xFFD29922.toInt())
             .setContentIntent(openApp(context, "approvals"))
-            // Root on a node is not granted from a locked phone (B272): the
+            // Root on a node is not granted from a locked phone: the
             // actions need the device unlocked, and the lock screen shows
             // that an answer is wanted, not the command.
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
@@ -325,7 +325,7 @@ object Watch {
     // said by its kind and node, never as an agent's version sentence.
     fun attentionLine(a: JSONObject): String = when (a.str("kind")) {
         // Toolchains behind what is out on a node (API 9), and the coding
-        // agents' own (R95, the Agents page's): one line per node.
+        // agents' own (the Agents page's): one line per node.
         "toolchain", "agents" -> "${a.str("node")}: " + a.arr("tools").joinToString(", ") {
             "${it.str("label")} ${it.str("from").ifBlank { "?" }} → ${it.str("to").let { v -> if (v == "newer") "a newer version" else v }}" } +
             (if (a.str("kind") == "agents" && a.arr("tools").any { it.str("name") == "claude-code" } && a.optInt("sessions") > 0)
@@ -340,7 +340,7 @@ object Watch {
         "token-reuse" -> "${a.str("node")}'s credential was used from a copy: every token of that node is revoked"
         "acme" -> "${if (a.bool("bad")) "No certificate" else "A certificate"} for ${a.str("host")} on ${a.str("node")}"
         "scan" -> "${if (a.str("what") == "failed") "Scan failed" else "Scanner update"} on ${a.str("node")}"
-        // A release short of a file its project lists (R190).
+        // A release short of a file its project lists.
         "release-files" -> "${a.str("tag")} of ${a.str("project")} is missing a file: ${a.str("why")}"
         "room" -> "${a.str("node")} is running short of room: " + (a.arr("short").map {
                 if (it.has("used_pct") && !it.isNull("used_pct")) "${it.str("what")} has been ${it.optInt("used_pct")}% used for ten minutes"
@@ -370,20 +370,20 @@ object Watch {
         "root" -> "Root on ${a.str("node_name")}"
         "rebuild" -> "Rebuild in ${a.str("project").ifBlank { "a space" }}"
         "container" -> "Container ${a.str("name")} on ${a.str("node_name").ifBlank { "the default node" }}"
-        // Signing (R106): asked of the project's owner.
+        // Signing: asked of the project's owner.
         "sign" -> "Sign a build of ${a.str("project").ifBlank { "a space" }}"
         "sign-key" -> "A signing key change in ${a.str("project").ifBlank { "a space" }}"
         "release" -> "Release ${a.str("project").ifBlank { "a space" }} ${a.str("tag")}"
         "release-edit" -> "Edit the ${a.str("tag")} release of ${a.str("project").ifBlank { "a space" }}"
         "release-remove" -> "Remove files from the ${a.str("tag")} release of ${a.str("project").ifBlank { "a space" }}"
         "release-sign" -> "Sign the release APKs of ${a.str("project").ifBlank { "a space" }} again"
-        // A release taken back with its tag (R190), always its owner's answer.
+        // A release taken back with its tag, always its owner's answer.
         "release-withdraw" -> "Withdraw the ${a.str("tag")} release of ${a.str("project").ifBlank { "a space" }} and its tag"
-        // A push held for the lines in it that look like a secret (R219).
+        // A push held for the lines in it that look like a secret.
         "push" -> "A push from ${a.str("project").ifBlank { "a space" }} looks sensitive"
         // A session asking to use its person's own phone, lent or not.
         "phone-use" -> "Your phone, from ${a.str("project").ifBlank { "a space" }}"
-        // A VM a session asks to make, start or remove (R91), under its
+        // A VM a session asks to make, start or remove, under its
         // project's Make VMs setting.
         "vm" -> "A VM in ${a.str("project").ifBlank { "a space" }}"
         else -> "The phone on ${a.str("node_name")}"

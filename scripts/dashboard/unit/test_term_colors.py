@@ -1,5 +1,5 @@
-"""A terminal's look keeps each scheme's colors as a person changed them
-(R133, the operator, 25 Oct): by scheme, each a terminal color's name and a
+"""A terminal's look keeps each scheme's colors as a person changed them:
+by scheme, each a terminal color's name and a
 #rrggbb, anything else dropped rather than kept."""
 import json
 import os

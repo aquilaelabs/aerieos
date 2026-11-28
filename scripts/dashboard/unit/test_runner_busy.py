@@ -1,8 +1,8 @@
 """A self-hosted runner is busy while a job of its own runs, and listening
 while its listener runs, whichever bin folder it runs from: a runner that
 updated itself runs from bin.VERSION/, which the checks under bin/ alone read
-as idle (B755: the .env sync restarted it under the job) and as not listening
-(B971: its row said Reinstall runner while it took jobs)."""
+as idle (the .env sync restarted it under the job) and as not listening
+(its row said Reinstall runner while it took jobs)."""
 import os
 import sys
 import tempfile

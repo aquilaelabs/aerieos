@@ -1,4 +1,4 @@
-"""AerieOS's own terminal, the controller's half (R133): the page's
+"""AerieOS's own terminal, the controller's half: the page's
 websocket at /termws, answered here.
 
 server.py decides everything first: whose terminal it is, whether this
@@ -14,7 +14,7 @@ for a node the session token, the name and the owner mark). This module only car
 
 The wire is the same at every hop: binary frames, the browser's a type
 byte (0 keys, 1 a resize as JSON) and its body, the terminal's the pty's
-bytes; the close says why it ended. `alive()`, asked every few seconds,
+bytes; the close says why it ended. `alive`, asked every few seconds,
 ends a terminal whose grant was taken away while it was open (step 9).
 """
 import base64
@@ -51,7 +51,7 @@ def term():
 
 def relaytls():
     """The node agent's relaytls.py, loaded once by path as term.py is: the
-    TLS the relay's port is spoken to with, and the pin (R243)."""
+    TLS the relay's port is spoken to with, and the pin."""
     if "tls" not in _term:
         spec = importlib.util.spec_from_file_location(
             "bb_agent_relaytls", os.path.join(str(AGENT_DIR), "aerieos_agent", "relaytls.py"))
@@ -147,10 +147,10 @@ def local(conn, words, *, bbtty, env, cwd, ro, cols, rows, alive):
 def node(conn, *, host, port, key, kind, words, cols, rows, alive, extra=None, pin="", once=False):
     """A terminal on a node: its screen relay's /term, signed, then the
     two sockets spliced until either closes or `alive` says no more.
-    `extra`: more fields for the signed open (the sealed sign-ins' keys,
-    R126). `pin`: the relay's certificate as the node reported it, so the
+    `extra`: more fields for the signed open (the sealed sign-ins' keys).
+    `pin`: the relay's certificate as the node reported it, so the
     stream is TLS to that certificate and no other; `once`: the node takes
-    a request once, so a value made here is signed with it (R243)."""
+    a request once, so a value made here is signed with it."""
     t, rt = term(), relaytls()
     blob = t.pack({**(extra or {}), "kind": kind, "argv": list(words), "cols": cols, "rows": rows})
     when = int(time.time())
@@ -204,7 +204,7 @@ def node(conn, *, host, port, key, kind, words, cols, rows, alive, extra=None, p
         up.close()
 
 
-# ---- a log, followed (R133 step 12) ---------------------------------------
+# ---- a log, followed ---------------------------------------
 # A log read in the dock: no program and no pty, the controller reading the
 # log itself once a second and sending what is new, read-only, until the
 # thing it is the log of ends or the reader's grant goes. `read` answers

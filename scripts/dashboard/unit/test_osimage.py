@@ -1,4 +1,4 @@
-"""AerieOS updated from the page (R160 step 4): the agent's os-update
+"""AerieOS updated from the page: the agent's os-update
 job fetches the release's ISO (or takes it from a folder), holds it to its
 sha256, takes the slot, kernel, initrd and release stamp out of its live/
 folder, writes the slot not in use, puts the kernel beside it on
@@ -215,7 +215,7 @@ class TheAgent(unittest.TestCase):
                 self.assertEqual(f.read(), files[piece])
         self.assertEqual(open(w.nextf).read().strip(), "b")
         self.assertIn("slot b holds AerieOS 0.9.1", text)
-        # On trial (R161 step 2), going back to slot a; and the configuration
+        # On trial, going back to slot a; and the configuration
         # as it was kept beside it, without its logs.
         self.assertEqual(open(w.trialf).read().strip(), "prev=a ver=0.9.1")
         kept = os.path.join(w.work, "before", "0.9.0.tar.gz")
@@ -229,7 +229,7 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(got["fell_back"], "")
         self.assertIn("gh attestation verify", text)
         # ...held to the release workflow on a version's tag, not the
-        # repository alone (B729).
+        # repository alone.
         self.assertIn("--cert-identity-regex", text)
         self.assertIn("build-image", text)
         self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "the working files are gone")
@@ -267,7 +267,7 @@ class TheAgent(unittest.TestCase):
             self.assertEqual(f.read(), b"\0" * 4096, "the other slot untouched")
 
     def test_a_slot_on_trial_is_never_the_one_an_update_runs_from(self):
-        # B470: running slot b on trial, slot a is the only good one, and an
+        # Running slot b on trial, slot a is the only good one, and an
         # update would have written it.
         w = World(slot="b")
         with open(w.nextf, "w") as f:
@@ -293,7 +293,7 @@ class TheAgent(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "a failed update leaves nothing behind")
 
     def test_an_image_that_would_not_fit_is_not_fetched(self):
-        # R191 step 4: refused before a byte is written, saying how much.
+        # Refused before a byte is written, saying how much.
         w = World(slot="a")
         w.publish("0.9.1")
         full = mock.Mock(f_bavail=10, f_frsize=4096)
@@ -305,7 +305,7 @@ class TheAgent(unittest.TestCase):
             self.assertEqual(f.read(), b"\0" * 4096)
 
     def test_an_offline_folder_without_its_attestation_writes_nothing(self):
-        # R191 step 1: a folder on a share is no proof of who built it.
+        # A folder on a share is no proof of who built it.
         w = World(slot="a")
         d, _ = w.publish("0.9.2")
         os.unlink(os.path.join(d, "aerieos-os-0.9.2.attestation.jsonl"))
@@ -384,7 +384,7 @@ class TheAgent(unittest.TestCase):
         self.assertIn("is not a folder", text)
 
     def test_an_image_whose_name_is_not_its_release_writes_nothing(self):
-        # B847: the folder's file name named the version, never read
+        # The folder's file name named the version, never read
         # against the image's own release file. (A renamed file is refused
         # by the release's signed list first; this is what an image whose
         # inside says another version than its name meets after it.)
@@ -396,7 +396,7 @@ class TheAgent(unittest.TestCase):
         self.assertIn("the image's own release says 0.9.2, and its name says 0.9.3", text)
 
     def test_an_older_version_is_not_taken(self):
-        # B847: an update only goes forward; the version before is on the
+        # An update only goes forward; the version before is on the
         # boot menu.
         w = World(slot="b", version="0.9.5")
         d, _files = w.publish("0.9.2")
@@ -407,7 +407,7 @@ class TheAgent(unittest.TestCase):
         self.assertLess(self.av.version_key("0.9.1"), self.av.version_key("0.9.2-dev.3"))
 
     def test_a_dev_build_is_taken_by_its_tag(self):
-        # B589: the dev channel's update names a dev build, v0.9.1-dev.12.
+        # The dev channel's update names a dev build, v0.9.1-dev.12.
         w = World(slot="a")
         w.publish("0.9.1-dev.12")
         state, code, text = self.run_update(w, {"release": "v0.9.1-dev.12"})

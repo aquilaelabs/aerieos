@@ -1,4 +1,4 @@
-"""Behind `aerie capture reel` (cmd_capture in bb): eyes on change over time (R95).
+"""Behind `aerie capture reel` (cmd_capture in bb): eyes on change over time.
 
 A screenshot shows one moment; what a session cannot see is an element
 popping in or a transition. So: the frames of a recording that CHANGED,
@@ -18,7 +18,7 @@ this says fewer; see recorded_fps). BB_CAPTURE_OUT is dist/reel,
 BB_CAPTURE_FFMPEG the ffmpeg binary, BB_CAPTURE_NODE_PATH and BB_CAPTURE_CHROME what
 the page source needs, BB_CAPTURE_ADB the emulator's adb.
 
-Only the sheet and frames.json land in dist/reel/NAME (R96): the recording
+Only the sheet and frames.json land in dist/reel/NAME: the recording
 and the full-size frames are working files, under the capture's scratch
 directory (capture.scratch), which frames.json names in `work` and in each
 frame's `file`. frames.json also says who asked and when (capture.maker),
@@ -42,14 +42,14 @@ from capture import die, ffmpeg, font, from_display, from_emu, from_url, maker, 
 
 # What counts as a change, by source. ffmpeg's scene score is the whole
 # frame's mean difference, so it scales with how much of the screen moved:
-# measured on a 1080x2400 keyboard screen (30 Sep), a typed letter scores
+# measured on a 1080x2400 keyboard screen, a typed letter scores
 # about 0.0004, a key's preview bubble 0.0026, a blinking text cursor 0.0001,
 # and a still frame 0.00005. At 0.02 every one of those was dropped, and a
-# reel of eight seconds of typing was one frame (Shebang-DevBoard, 30 Sep).
+# reel of eight seconds of typing was one frame (Shebang-DevBoard).
 # The emulator's is 0.0002: every letter, not the cursor. A page and an X
 # display keep 0.02, where a change is usually a region and a browser's
 # encoder is noisier; --threshold asks for another.
-# The default since R261 (the operator, 17 Oct): a frame is kept when any
+# The default: a frame is kept when any
 # 8x8 patch of it differs from the LAST FRAME KEPT by more than `hi` (ffmpeg's
 # mpdecimate), not when the whole frame's score against the frame before it
 # passes a bar. Against the frame before, a slow scroll never counted, each
@@ -330,7 +330,7 @@ def main():
     video = (a.video if a.video else from_url(a.url, a.seconds, drive, work, page) if a.url
              else from_emu(a.emu, a.seconds, drive, work, out) if a.emu is not None
              else from_display(a.display, a.seconds, drive, work))
-    # A dry run (the operator, 17 Oct): what a reel at these settings would
+    # A dry run: what a reel at these settings would
     # hold, counted and nothing drawn, so --patch and --max can be chosen
     # before the sheet is made: how many frames changed, how many runs of
     # motion, and how many the sheet would keep on how many pages.

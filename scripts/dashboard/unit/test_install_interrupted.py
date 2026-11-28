@@ -1,5 +1,5 @@
 """An install cut short never reads as installed, and an aborted batch fails
-only what it began (the operator, 12 Oct: Abort on flutter left half of it
+only what it began (Abort on flutter left half of it
 reading installed, and the twelve behind it reading failed)."""
 import os
 import shutil

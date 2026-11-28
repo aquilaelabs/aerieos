@@ -34,7 +34,7 @@ r = call("/api/v1/jobs", {"action": "run", "project": proj, "role": role, "node"
                           "from": "session" if os.environ.get("CLAUDECODE") or os.environ.get("BB_AGENT") else "operator"})
 need(r)
 names = {n["id"]: n["name"] for n in (call("/api/v1/nodes").get("nodes") or [])}
-# Its place on that node (R151 step 5): one job at a time runs there, so a
+# Its place on that node: one job at a time runs there, so a
 # run behind another says how many are ahead rather than looking stuck.
 ahead = [j for j in (call("/api/v1/jobs?active=1").get("jobs") or [])
          if j.get("node") == r["node"] and j.get("id") != r["job"] and j.get("state") in ("queued", "assigned", "running")]

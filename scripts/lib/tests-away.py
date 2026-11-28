@@ -1,5 +1,5 @@
 """Behind `aerie tests` when the project's settings name a test node that is not
-this machine (R151, tests_node_away in bb): which node, how many workers it
+this machine (tests_node_away in bb): which node, how many workers it
 has room for, and its place in that node's queue, printed one per line for
 bb to read:
 

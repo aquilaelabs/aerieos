@@ -1,4 +1,4 @@
-"""Every release starts a draft (the operator, 1 Nov): a draft is found by
+"""Every release starts a draft: a draft is found by
 its tag where GitHub's by-tag look-up cannot see one, it is published only
 when whole, the update check sees drafts only with the debug-mode token on
 the dev channel, and that token is debug mode's alone."""
@@ -55,8 +55,8 @@ class Drafts(unittest.TestCase):
                 mock.patch.object(forgerelease, "_req", req):
             r = forgerelease.publish_draft("p", "v1.0.0", notes="read and corrected")
             self.assertTrue(r.get("ok"), r)
-            # The tag goes with it: GitHub drops a draft's tag patched without one (B696).
-            # ...as a stable release, the latest only if it is the newest (R206 step 3).
+            # The tag goes with it: GitHub drops a draft's tag patched without one.
+            # ...as a stable release, the latest only if it is the newest.
             self.assertEqual(sent[-1], ("PATCH", {"draft": False, "tag_name": "v1.0.0", "prerelease": False,
                                                   "make_latest": "legacy", "body": "read and corrected"}))
             rel["draft"] = False
@@ -64,10 +64,10 @@ class Drafts(unittest.TestCase):
 
 
 class Holds(unittest.TestCase):
-    """What Publish checks beyond the files (R206 step 3): the tag is on the
+    """What Publish checks beyond the files: the tag is on the
     git host, and the notes are not CI's placeholder. A draft published from
-    the git host's form with its tag field emptied went out as untagged-ID
-    (B636), and 4818's notes said nothing."""
+    the git host's form with its tag field emptied went out as untagged-ID,
+    and 4818's notes said nothing."""
 
     def world(self, rel, tag_there=True):
         self.sent = []
@@ -127,7 +127,7 @@ class Holds(unittest.TestCase):
 
 class TheSigningAttach(unittest.TestCase):
     def test_the_apks_attach_leaves_a_draft_a_draft(self):
-        # B590: its notes sent alone published v0.9.0-dev.4750 unread.
+        # Its notes sent alone published v0.9.0-dev.4750 unread.
         import releasesign
         sent = []
 

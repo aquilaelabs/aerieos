@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write the companion app's color schemes from the design record, both
 halves, so the app's twelve are the dashboard's by construction rather than
-a copy kept by hand (R50 step 16).
+a copy kept by hand.
 
     aerie design json | python3 tools/app-schemes.py
 

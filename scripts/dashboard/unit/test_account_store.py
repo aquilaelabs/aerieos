@@ -1,4 +1,4 @@
-"""An account's own key store (R154): a token it gives a repository is kept
+"""An account's own key store: a token it gives a repository is kept
 sealed under its own key, any number for one host, and sealed again when
 that key changes; its own git work asks it before the project's, the entry
 its project is linked to first; git's helper answers from it; a token kept
@@ -36,7 +36,7 @@ class Store(unittest.TestCase):
         accountkeys.configure(state=self.d)
         gitcreds.configure(state=self.d, seal_fn=signing.seal, unseal_fn=signing.unseal,
                            sealing_fn=lambda: signing.MASTER is not None)
-        # A token is used only while its person is signed in (R159): this
+        # A token is used only while its person is signed in: this
         # account is, in a browser.
         logins.configure(state=self.d, devices_of=lambda uid: [])
         logins.mint(UID, "a browser")
@@ -55,7 +55,7 @@ class Store(unittest.TestCase):
         self.assertEqual(accountkeys.forges_of(UID)[0]["login"], "octo")
         self.assertEqual(accountkeys.forge_line("u_0000000b", host="github.com"), "")
         # The same token again is the same entry; a new one for that account
-        # on the host replaces it in place (the operator, 30 Oct: no record
+        # on the host replaces it in place (no record
         # of the tokens before); another account on the host is its own.
         self.assertEqual(accountkeys.link_forge(UID, "github.com", LINE, "octo")[0]["id"], self.fid)
         new = LINE.replace("ghp_abcdef", "ghp_zzzzzz")
@@ -84,7 +84,7 @@ class Store(unittest.TestCase):
         self.assertEqual(accountkeys.link_forge(UID, "192.168.1.16:3000", line, "octo")[0]["id"], got["id"])
 
     def test_a_key_that_does_not_open_is_kept_not_made_anew(self):
-        # B542: started with another install key, the account's key does not
+        # Started with another install key, the account's key does not
         # open; it is kept as it was (and nothing is opened), and with the
         # right install key back, the token sealed under it opens again.
         was = (self.d / "account-keys.json").read_text()
@@ -102,7 +102,7 @@ class Store(unittest.TestCase):
         self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
 
     def test_the_key_before_stays_while_a_token_is_under_it_alone(self):
-        # B548: a token the change could not seal again stayed under the key
+        # A token the change could not seal again stayed under the key
         # before, which was dropped at once, and never opened again.
         old = accountkeys.key_of(UID)
         real = signing.seal
@@ -130,8 +130,8 @@ class Store(unittest.TestCase):
         self.assertEqual(gitcreds.git_c("nothing-here"), [])
 
     def test_their_own_work_is_handed_their_token_opened_per_use(self):
-        # Their token, given to the project, reaches git as a handout file
-        # (R158 step 5): one line, theirs, for the window; the helper
+        # Their token, given to the project, reaches git as a handout file:
+        # one line, theirs, for the window; the helper
         # opens nothing itself, and the use is on their Profile.
         gitcreds.link_account("web", UID, self.fid)
         hs = gitcreds.helpers("web", UID, why="push")

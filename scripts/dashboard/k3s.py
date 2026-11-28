@@ -1,4 +1,4 @@
-"""k3s on a node (R281 step 1): a one-node Kubernetes cluster run as one of
+"""k3s on a node: a one-node Kubernetes cluster run as one of
 AerieOS's own services, for the spaces to deploy to.
 
 The Library installs it on a node as it installs nginx or the model router
@@ -8,7 +8,7 @@ compose job there, so the Containers page lists it with Up, Down and its
 log. Its state is a volume of its own, so Update keeps the cluster.
 
 Traefik and k3s's own load balancer are left off on a node where AerieOS's
-nginx runs (the operator, 25 Nov), so one front door answers on 80 and 443;
+nginx runs, so one front door answers on 80 and 443;
 on a node without it they are on, and the cluster answers there itself.
 
 The controller's way in is made here, never read back off the node: a

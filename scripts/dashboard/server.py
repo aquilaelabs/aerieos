@@ -6,7 +6,7 @@ that it gets rebuilt often; a dashboard that drags in a web framework would be
 one more thing to keep current, and http.server is more than adequate for one
 operator on a LAN.
 
-The terminals are AerieOS's own (R133): a websocket at /termws, a pty
+The terminals are AerieOS's own: a websocket at /termws, a pty
 here (termws.local) or carried signed to a node's screen relay (termws.node).
 """
 import base64
@@ -47,7 +47,7 @@ import refusals  # noqa: E402
 HERE = Path(__file__).resolve().parent
 WORKSPACE = Path(os.environ.get("WORKSPACE", "/workspace"))
 PORT = int(os.environ.get("DASHBOARD_PORT", "7680"))
-# A node's screen relay (R99, R133): its terminals and its VMs' screens, on
+# A node's screen relay: its terminals and its VMs' screens, on
 # the one port its firewall opens to this controller. A node says its own in
 # its census; this is what one that has not said listens on.
 SCREEN_PORT = 7684
@@ -113,7 +113,7 @@ def _session_secret():
     outcome is a dashboard that runs and forgets its sessions on restart.
     Basic auth is unaffected either way.
 
-    With an install key (R135) it is made from the key and kept nowhere, so
+    With an install key it is made from the key and kept nowhere, so
     a copy of /config forges no sign-in; the file an install kept before is
     removed. Taking the key on signs everybody out once.
     """
@@ -155,7 +155,7 @@ def make_token(u, lid=""):
     the stamp buys is the revocation such a table would have given: changing a
     password or deleting an account moves it, and every cookie signed against
     the old one stops verifying on the next request. The sign-in's id names
-    the row logins.py keeps (R159), which says the browser is signed in
+    the row logins.py keeps, which says the browser is signed in
     until it signs out or the cookie runs out; a cookie minted again for the
     same browser (a rename) keeps the id it had.
     """
@@ -168,7 +168,7 @@ def make_token(u, lid=""):
 
 
 def purpose_token(u, purpose, secs, extra=""):
-    """A short cookie for one step of signing in (R127): the account, an
+    """A short cookie for one step of signing in: the account, an
     expiry, what it is for, and a signature over those and the password
     stamp, as make_token's. `extra` rides along signed (a remembered
     browser's id)."""
@@ -285,7 +285,7 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
   <button type="submit">Restore it</button>
   <p class="note"><a href="/">Not restoring one: make the first account instead</a>.</p>"""
 
-# On a stick the first run's move door is shut (the operator, 1 Nov): the
+# On a stick the first run's move door is shut: the
 # bundle never lands on the stick, so the disks come first.
 STICK_MOVE_FIRST = ("This machine runs from a stick, and a move lands on its disks, never on the stick. Answer yes on the first page "
                     "and give the move token: the next page walks you through the disks, where the spaces go and landing the move, "
@@ -314,7 +314,7 @@ LOGIN_FIELDS = """  <!--ERR-->
   <input id="p" name="password" type="password" autocomplete="current-password" required>
   <button type="submit">Sign in</button>"""
 
-# The second step of signing in (R127): a code from the authenticator app or
+# The second step of signing in: a code from the authenticator app or
 # a recovery code in one field, a passkey by its button where the account has
 # one and the browser can, and the browser remembered for 30 days on a tick.
 MFA_FIELDS = """  <!--ERR-->
@@ -354,7 +354,7 @@ MFA_FIELDS = """  <!--ERR-->
   </script>"""
 
 # The page an account whose role requires a second factor meets before
-# anything else (R127): the authenticator's QR and secret, its first code, the
+# anything else: the authenticator's QR and secret, its first code, the
 # recovery codes once; or a passkey where the browser can make one.
 SETUP_2FA_FIELDS = """  <p class="note">A role of yours, <b><!--NAME--></b>, requires a second factor. Scan the code with an authenticator app (or type the secret), then the code it shows.</p>
   <div id="qr" class="qr"></div>
@@ -546,7 +546,7 @@ LOGIN_HTML = """<!doctype html>
 LOGIN_HTML = LOGIN_HTML.replace("<!--PRODUCT-->", PRODUCT)
 
 # Every command the UI can run and every key it can press, by name, and the
-# operator's own command lists: macros.py (R77).
+# operator's own command lists: macros.py.
 
 
 # Where Claude Code keeps transcripts: one directory per working directory,
@@ -564,7 +564,7 @@ MAX_BODY = 64 * 1024
 # post batches chunks up to 40 kB and then adds a whole chunk of up to 32 kB,
 # characters json.dumps may spell six bytes each, so a post could pass 64 kB,
 # and one refused as too large was retried for good, holding its job in the
-# agent's count and refusing every update as busy (B520: j_cdcb12b7, a phone
+# agent's count and refusing every update as busy (j_cdcb12b7, a phone
 # screenshot, held from 4 to 6 Oct).
 MAX_BODY_FOR = {"/api/v1/agent/log": 512 * 1024,
                 # A keystore a node made or wrapped, as base64 (signing.RESULT).
@@ -598,12 +598,12 @@ import layout                                                    # noqa: E402
 # ...and what each account has put away from its bell: bellseen.py.
 import bellseen                                                  # noqa: E402
 
-# ...and what the page has said to each account, kept: notices.py (R218 step 6).
+# ...and what the page has said to each account, kept: notices.py.
 import notices                                                   # noqa: E402
-# Scheduled scripts (R117): an administrator's cron, kept in the state and
+# Scheduled scripts: an administrator's cron, kept in the state and
 # never on the share.
 import schedules                                                # noqa: E402
-# ...and AerieOS's own docs, read on the Help page: helpdocs.py (R258).
+# ...and AerieOS's own docs, read on the Help page: helpdocs.py.
 import helpdocs                                                  # noqa: E402
 
 
@@ -648,7 +648,7 @@ def version_payload(name):
     here. One function so every answer the tab gets carries the same warning:
     the staged line is drawn from whichever of them came back last."""
     cost = window_cost(name)
-    # {tag: {url, error, forge}} of the forge releases Release made, for the row's link (R123, R124).
+    # {tag: {url, error, forge}} of the forge releases Release made, for the row's link.
     rel = forgerelease.kept(name)
     return (version.payload(name) | ({"window_cost": cost} if cost else {})
             | ({"forge_releases": rel} if rel else {}))
@@ -660,10 +660,10 @@ def window_cost(name):
     Only one project can answer yes: the one whose checkout IS AerieOS,
     because its minor is the compatibility window. What that window still
     holds, now the environment block is assembled per session and cannot be
-    from another one (R63 step 3), is a node's AGENT: bump the minor and every
+    from another one, is a node's AGENT: bump the minor and every
     node running an agent from the old window holds its projects until that
     agent is updated. Sessions on them end. Said before the button is pressed
-    rather than after (B92); the test is the two files that move the window,
+    rather than after; the test is the two files that move the window,
     not a project's name.
     """
     try:
@@ -712,7 +712,7 @@ def node_holds(reap=False):
 
 def compat_holds(reap=False):
     """{project: why} for every project no Claude session may run on right
-    now, which since R63 step 3 means one thing: its node's agent is from
+    now, which means one thing: its node's agent is from
     another compatibility window. Per project on purpose, because another
     project's node being out of window is that project's problem and this
     one's button stays live."""
@@ -724,7 +724,7 @@ def compat_holds(reap=False):
     except OSError:
         return out
     for d in dirs:
-        # The block's window went with the block (R63 step 3): what a session
+        # The block's window went with the block: what a session
         # is told is assembled per session now, so there is no copy to be from
         # another window. A node's agent still can be, and that is this.
         why = holds.get((pp.get(d.name) or {}).get("node") or "", "")
@@ -778,7 +778,7 @@ def compat_reap_once():
     return ended
 
 
-# The log policy on a clock (the operator, 12 Oct): the days were applied at
+# The log policy on a clock: the days were applied at
 # boot and at Apply only, so a controller up for weeks kept what had fallen
 # past them, and its live files grew without bound. Every hour: the earlier
 # generations and the CI runs past the days, a live file past its ceiling,
@@ -787,8 +787,8 @@ LOG_SWEEP_EVERY = 3600
 
 
 def _kube_watch_loop():
-    """The spaces' Kubernetes environments looked at every minute (R281
-    step 7): one stuck or short is the bell's Active row until it is not."""
+    """The spaces' Kubernetes environments looked at every minute:
+    one stuck or short is the bell's Active row until it is not."""
     while True:
         time.sleep(kubeview.WATCH_S)
         try:
@@ -958,11 +958,11 @@ IGNORE_MARKER = ".bbignore"
 
 def _session_nodes(name):
     """One row per node the project works on, for the chooser a Claude press
-    opens when there is more than one (R82): where a session there would
+    opens when there is more than one: where a session there would
     stand (node or refused, with the why), the node's boot for the tab, and
     what the machine has and how busy it is, so the pick is a read. A
     project on one node gets its one row too, so its chooser says what that
-    machine has as well (the operator, 30 Sep); [] for a project on none."""
+    machine has as well; [] for a project on none."""
     p = prefs.get(name) or {}
     set_ = p.get("nodes") or ([p["node"]] if p.get("node") else [])
     if not set_:
@@ -977,7 +977,7 @@ def _session_nodes(name):
                     "sample": rep.get("sample") or {}, "gpu": rep.get("gpu") or "",
                     "tools": sorted((rep.get("toolchains") or {}).keys())[:6],
                     # The coding agents beside Claude installed there, which
-                    # the chooser offers a session of (R95 step 4).
+                    # the chooser offers a session of.
                     "agents": [a.id for a in agents.live() if a.id != "claude"
                                and ((rep.get("session") or {}).get(a.reported) or "")]})
     return out
@@ -1011,10 +1011,10 @@ def _row_git_ready(base, over):
     return bool(g["name"] and g["email"])
 
 
-# What git says of each project, kept until what it depends on moves (R94):
+# What git says of each project, kept until what it depends on moves:
 # three git forks per project on every /api/status, about sixty a poll on a
-# controller with twenty projects, and the status poll at 1.3s on average
-# (12 Oct). Keyed on what .git/HEAD says, .git/config's size and time and
+# controller with twenty projects, and the status poll at 1.3s on average.
+# Keyed on what .git/HEAD says, .git/config's size and time and
 # .git's time: a branch switch rewrites HEAD and a remote change config, so
 # either asks git again; a .git that is a file (a worktree) is asked every
 # time, and nothing is kept longer than GIT_FACTS_S.
@@ -1076,7 +1076,7 @@ def _git_facts(d):
 def _listed(d, cloning):
     """Whether the walk lists directory `d` as a project: the one rule for
     the whole list and for its names alone (project_names)."""
-    # Only what AerieOS made (R154, the operator 8 Oct): a folder made by
+    # Only what AerieOS made: a folder made by
     # hand on the share is not a project, and Import is the way one comes in.
     if not registry.is_project(d.name):
         return False
@@ -1112,7 +1112,7 @@ def _listed(d, cloning):
 
 
 def _place(listed):
-    """Every listed repository in a project (R138): one recorded since, by
+    """Every listed repository in a project: one recorded since, by
     an import, a clone or a first run, gets one of its own, its owner,
     settings, reads, people and marks moving onto it as migration 0010 moves
     them; one put back from the trash by hand goes back into its own. Asked
@@ -1130,7 +1130,7 @@ def project_names(who):
     """The names of the projects `who` may see, in the list's order: what
     project_list answers to "is this a project?" (the access check most
     handlers make), without describing each one, which costs the status
-    read's half second (the operator, 17 Oct: the Git view asked for the
+    read's half second (the Git view asked for the
     whole list five times as it opened)."""
     with timing.timed("project_names"):
         try:
@@ -1141,7 +1141,7 @@ def project_names(who):
         registry.sync()
         rows = [{"name": d.name} for d in here if _listed(d, cloning)]
         _place({r["name"] for r in rows})
-        # ...and each project with no repository (R208), whose key is what
+        # ...and each project with no repository, whose key is what
         # its sessions, its containers and its settings are reached by.
         rows += [{"name": k} for k in repos.empty_keys()]
         return [p["name"] for p in _projects_seen_by(who, rows)]
@@ -1176,7 +1176,7 @@ def _projects_on_disk():
                                   "text": f"cannot list this directory as uid {uid}:{gid}"
                                           "; chown it to PUID:PGID on the host"}]}]
     cloning = projects.busy_name()
-    # Only what AerieOS made (R154, the operator 8 Oct): a folder made by
+    # Only what AerieOS made: a folder made by
     # hand on the share is not a project, and Import is the way one comes in.
     with timing.timed("projects:registry"):
         registry.sync()
@@ -1245,7 +1245,7 @@ def _projects_on_disk():
 
 
 def lock_may(name, uid, admin, rec):
-    """Whether this account may press the project's Lock or Unlock (R119):
+    """Whether this account may press the project's Lock or Unlock:
     its owner or an administrator to lock; to unlock, an administrator's
     lock is an administrator's to lift and an owner's lock the owner's."""
     if not uid:
@@ -1257,7 +1257,7 @@ def lock_may(name, uid, admin, rec):
 
 
 def _project_cards(who, ps):
-    """{key: card} for every project this account sees (R138): its name and
+    """{key: card} for every project this account sees: its name and
     id, its repositories in their order (those it sees), and its marks as
     the account has them (pinned, group, color, archived: a person's own;
     locked: the project's), with what the account may do about each."""
@@ -1312,10 +1312,10 @@ def _project_columns(who, facts):
     # is lifted by the owner, an administrator's by an administrator.
     me_uid = "" if (who or {}).get("session") else users.uid_of(who)
     me_admin = bool(me_uid) and users.is_admin(who)
-    # Each directory's id and the name it is shown under (R154): synced with
+    # Each directory's id and the name it is shown under: synced with
     # the disk here, two listdirs and no write when nothing moved.
     reg = registry.sync()["projects"]
-    # ...and every repository in a project (R138).
+    # ...and every repository in a project.
     _place({f["name"] for f in facts if f.get("name")})
     pins = projects.load_project_pins(users.uid_of(who))
     groups = projects.load_project_groups(users.uid_of(who))
@@ -1326,7 +1326,7 @@ def _project_columns(who, facts):
     # there with nothing set; the settings field offers it as what an
     # empty box means.
     project_prefs = prefs.all_projects(WORKSPACE)
-    # The color this account gives each project (the operator, 18 Oct: a
+    # The color this account gives each project (a
     # person's own, not the project's), starting from what the projects
     # wore before that, for an account that has not picked one yet.
     colors = projects.load_marks("color", users.uid_of(who))
@@ -1342,7 +1342,7 @@ def _project_columns(who, facts):
     # ...and its name, for the row to wear beside the project's.
     node_names = {}
     # ...and which of them were un-enrolled: a project left on one keeps it,
-    # named, so the person can see where it used to run (the operator, 5 Oct).
+    # named, so the person can see where it used to run.
     removed_nodes = set()
     if not NODES_DOWN:
         _t1 = time.monotonic()
@@ -1356,7 +1356,7 @@ def _project_columns(who, facts):
                 if why:
                     node_gaps[n["id"]] = why
         timing.add("projects:setup:nodes", (time.monotonic() - _t1) * 1000)
-    # ...and the phone each node has, from one read (R120): a row's Phone
+    # ...and the phone each node has, from one read: a row's Phone
     # button and the lease line it shows everybody on the project.
     with timing.timed("projects:setup:phones"):
         phones = phone.by_node(users.uid_of(who))
@@ -1365,14 +1365,14 @@ def _project_columns(who, facts):
     with timing.timed("projects:setup:holds"):
         held_nodes = node_holds()
         # ...and the nodes with no Claude Code, whose Start Claude is an
-        # Install Claude that opens the node's Toolchains (the operator, 21 Oct).
+        # Install Claude that opens the node's Toolchains.
         no_claude = {} if NODES_DOWN else {i: i for i in claudecode.missing_nodes()}
     _t1 = time.monotonic()
     open_roadmap = roadmap.counts()
     # One batch spans the notebook, so the count the panel shows has to be
     # both halves added up; a banner reporting only the roadmap's would read
     # as "nothing much" while a dozen tracker changes sat unrecorded.
-    # Each from what its store's file is now (_derived, R228 step 5): a status
+    # Each from what its store's file is now (_derived): a status
     # read parsed roadmap.json and bugs.json twice each, under their locks.
     # The batches are copied, as the merge below adds into them.
     roadmap_batches = {k: dict(v) for k, v in _derived(STATE / "roadmap.json", "batches", roadmap.batches).items()}
@@ -1414,14 +1414,14 @@ def _project_columns(who, facts):
             sa["session_nodes"] = _session_nodes(d.name)
         with timing.timed("projects:memory"):
             mem_census = memory.census(d.name, home=home_for(users.uid_of(who)))
-        # Its project's (R138): the marks and the people are kept by project.
+        # Its project's: the marks and the people are kept by project.
         pk = d.name if f.get("work") else repos.key_of(d.name)
         out.append({"name": d.name, "project": pk, "git": branch, "git_ok": git_ok,
-                    # A project with no repository (R208): the row its card's
+                    # A project with no repository: the row its card's
                     # Start agent and its settings read, listed as no
                     # repository, with no notebook to open.
                     "work": bool(f.get("work")),
-                    # The name people see and the project's id (R154); `name`
+                    # The name people see and the project's id; `name`
                     # stays the directory, which every store keys by.
                     "label": str((reg.get(d.name) or {}).get("name") or d.name),
                     "pid": int((reg.get(d.name) or {}).get("id") or 0),
@@ -1464,7 +1464,7 @@ def _project_columns(who, facts):
                     # test run, the gates. NOT the model, the effort or the
                     # commit author, which are whoever is asking's.
                     # ...read on its own where the whole-list read has no
-                    # record for it or its project (R208 step 6: a dial set
+                    # record for it or its project (a dial set
                     # in a notebook leaves the project with none).
                     "prefs": project_prefs.get(d.name) or prefs.get(d.name),
                     # Who may move its version (version.py's policy), for the
@@ -1478,39 +1478,39 @@ def _project_columns(who, facts):
                     # may_work: whether the project is this account's to change.
                     "yours": mine_prefs.get(d.name, {"model": "", "effort": "", "reply": "", "asks": "",
                                                      "git_name": "", "git_email": ""}),
-                    # Any model through a router (R144): the models the
+                    # Any model through a router: the models the
                     # router allows this project, with their context and
                     # price, and what the project has spent through it.
                     "router": _tpart("projects:router", _router_row, d.name),
-                    # ...and which nodes' routers allow it (R294 step 10), so
+                    # ...and which nodes' routers allow it, so
                     # its settings say what it may reach: [{node, name}].
                     "router_on": _tpart("projects:router_on", _router_on, d.name),
                     # Whether a commit here would carry an author, asked WITH
                     # the override: somebody whose Profile has no email can
                     # still set one for this project, and then a session may
                     # start and push here even though the global flag is off.
-                    # ...and always on a project with no repository (R208):
+                    # ...and always on a project with no repository:
                     # nothing is committed there.
                     "git_ready": True if f.get("work") else _row_git_ready(base_git, mine_prefs.get(d.name))
                                  if users.uid_of(who) else True,
                     "push_how": _tpart("projects:push_how", projects.push_how, d.name),
-                    # Whether its settings are this account's to change (B19):
+                    # Whether its settings are this account's to change:
                     # the page locks them, with the reason, where not.
                     "may_settings": not _tpart("projects:may", users.may, who, "settings", d.name) if who else True,
                     # ...and the reason where not, which the Snapshots and
                     # Running sessions sections say without asking for what
-                    # they would only be refused (B89).
+                    # they would only be refused.
                     "settings_why": _tpart("projects:may", users.may, who, "settings", d.name) if who else "",
                     # ...and whether its git host access is this account's to
-                    # read and give its own token to (R275): the Repository
+                    # read and give its own token to: the Repository
                     # section asks for none of it where not, rather than being
                     # refused for every open.
                     "may_gitauth": not _tpart("projects:may", users.may, who, "git-auth", d.name) if who else True,
                     # ...and whether its Deploy section is this account's to
-                    # read (R281): not asked for where a role does not give it.
+                    # read: not asked for where a role does not give it.
                     "may_deploy": not _tpart("projects:may", users.may, who, "deploy-read", d.name) if who else True,
                     # ...and why its notebook, its tree and the project itself
-                    # are not this account's to change, or "" (B86): a role
+                    # are not this account's to change, or "": a role
                     # that gives Projects Read alone sees the page with every
                     # writing control dead and this said under it, rather
                     # than each refused only at the press.
@@ -1518,12 +1518,12 @@ def _project_columns(who, facts):
                     "trash_why": _tpart("projects:may", users.may, who, "trash", d.name) if who else "",
                     # ...and why its version is not this account's to move or
                     # release (Releases and versions Write), for the
-                    # Artifacts view's bumps, Release and Set (B101).
+                    # Artifacts view's bumps, Release and Set.
                     "release_why": _tpart("projects:may", users.may, who, "version", d.name) if who else "",
                     # Whether this project has a compose file, which is the
                     # same question as "could its tests run in a container of
                     # its own": the settings dialog offers that choice only
-                    # where there is something to run in (R68 step 6).
+                    # where there is something to run in.
                     "has_compose": _tpart("projects:compose", devapp.project_has_compose, d.name),
                     # The newest transcript, read through the home's link
                     # onto the projects share (lib/common.sh's
@@ -1531,7 +1531,7 @@ def _project_columns(who, facts):
                     # session had is offered here and continued there.
                     "last_claude": _tpart("projects:last_claude", last_claude, d, users.uid_of(who)),
                     # ...and each other coding agent's newest, for its own
-                    # Resume in the chooser (the operator, 23 Oct: a ChatGPT
+                    # Resume in the chooser (a ChatGPT
                     # conversation was there and nothing offered it back).
                     "last_agents": _tpart("projects:last_agents", last_agents, d, users.uid_of(who)),
                     # Where this project's sessions run (roadmap #24): the
@@ -1569,7 +1569,7 @@ def _project_columns(who, facts):
                     # keeps it, marked, and the row says why Claude is off.
                     "node_removed": (project_prefs.get(d.name, {}).get("node") or "") in removed_nodes,
                     # The phone on its node: whose, whether it is this
-                    # account's, and whom it is lent to (R120).
+                    # account's, and whom it is lent to.
                     "phone": phones.get(project_prefs.get(d.name, {}).get("node") or ""),
                     # Why no Claude session may run here right now, or "":
                     # its own node's agent is from another compatibility
@@ -1604,7 +1604,7 @@ def _projects_seen_by(who, rows):
     # who administers the box would only send them looking for it, and the
     # list they keep is a seatbelt against editing the wrong one rather than a
     # wall (users.may_work).
-    # By project (R138): an account's list names projects, and a repository
+    # By project: an account's list names projects, and a repository
     # is seen when its project is on it.
     if not users.sees_all(who):
         rows = [p for p in rows if users.may_see(who, p["name"])]
@@ -1644,7 +1644,7 @@ def _project_list(who):
 
 
 def _work_facts():
-    """A fact per project with no repository (R208), shaped as
+    """A fact per project with no repository, shaped as
     _projects_on_disk shapes a repository's: its folder (made when it is
     missing, so a session and a node's copy find it), no git and nothing
     wrong with it. `work` marks it for the row."""
@@ -1696,8 +1696,8 @@ SPINNER_GLYPHS = tuple("◐◓◑◒")
 
 
 def gpu_for(project, node_id=""):
-    """Whether a session on `project` may compute on its node's NVIDIA card
-    (R102): "on"; "node" when the node's switch is off; "project" when the
+    """Whether a session on `project` may compute on its node's NVIDIA card:
+    "on"; "node" when the node's switch is off; "project" when the
     project's own setting is. The project's says no first, being the
     narrower of the two. The node is the one the session was started on,
     else the project's own."""
@@ -1712,14 +1712,14 @@ def gpu_for(project, node_id=""):
     return "on"
 
 
-# What a Resume says to a session an outage held (R251): the gate told it to
+# What a Resume says to a session an outage held: the gate told it to
 # write where it was and stop, so this is where it picks up.
 RESUME_LINE = ("AerieOS is back after an update. Pick up where you stopped: read the note you "
                "left on where you were and what was next, and carry on.")
 
 
 def _resume_held(who, nid, session):
-    """The bell's Resume on a session an outage stopped (R251): the line typed
+    """The bell's Resume on a session an outage stopped: the line typed
     into that session (notify.tell, which presses Enter only if it echoed),
     for its own account or an administrator, and the row put away."""
     if NODES_DOWN:
@@ -1731,7 +1731,7 @@ def _resume_held(who, nid, session):
     said = notify.tell(row["claude"], RESUME_LINE, sessions_anywhere(), who=who)
     if said.get("error"):
         return said, 409
-    # Put away only once it went (B775): a line typed into a session busy in
+    # Put away only once it went: a line typed into a session busy in
     # a turn or its Stop hook sits unsent in the box, and the row put away
     # with it left nothing saying the session was still waiting.
     if said.get("sent"):
@@ -1848,13 +1848,13 @@ def _page_url():
 
 
 def _own_node_id():
-    """The controller's own machine's node (R90), or "": where a bare-metal
+    """The controller's own machine's node, or "": where a bare-metal
     install's update runs."""
     return next((n["id"] for n in nodes.node_list() if nodes.own_machine(n) and n.get("state") != "retired"), "")
 
 
 def _reach_loop():
-    """The minute loop (R149): each person's bell to the destinations they
+    """The minute loop: each person's bell to the destinations they
     keep, what is new, outside their quiet window."""
     while True:
         time.sleep(60)
@@ -1868,7 +1868,7 @@ def _reach_loop():
 
 
 def _two_factor_due(who):
-    """The bell's standing notice (R127 step 8), or None: an account with no
+    """The bell's standing notice, or None: an account with no
     second factor is told to add one, put away for a day at most (its key
     holds the day), gone the moment it has one."""
     uid = users.uid_of(who)
@@ -1883,7 +1883,7 @@ def _two_factor_due(who):
 
 def _token_rows():
     """nodes.token_attention, a token's read named with its account's name;
-    a reused token and a node turned away name no account (B752: one of
+    a reused token and a node turned away name no account (one of
     those took the bell's whole list down with a KeyError)."""
     rows = nodes.token_attention()
     if any(r.get("account") for r in rows):
@@ -1896,7 +1896,7 @@ def _token_rows():
 
 def _held_rows(who):
     """nodes.held_attention for this account, each row with the account's
-    name and its Claude session's name on that project (B773): the gate's
+    name and its Claude session's name on that project: the gate's
     mark names the ACCOUNT (bb-tty writes `bb-gate PROJECT ACCOUNT`), and
     Resume typed into a session called that, which there never is."""
     names = {u["uid"]: u["name"] for u in users.all_users()}
@@ -1905,14 +1905,14 @@ def _held_rows(who):
     for r in rows:
         r["who"] = names.get(r["uid"], "")
         # The agent's that is running, since the mark names the account and
-        # the project, not which agent was held (R95 step 16).
+        # the project, not which agent was held.
         r["claude"] = running_session(users.tmux_prefix({"uid": r["uid"]}), r["project"], running)
     return rows
 
 
 # A node is short of room under this much free on its root filesystem,
 # Docker's or a store, or with this much of its memory used over ten
-# minutes (R110): the bell says so before the machine stops. Controller
+# minutes: the bell says so before the machine stops. Controller
 # settings, Room.
 def room_floor_gb():
     return settings.get("room_floor_gb")
@@ -1927,7 +1927,7 @@ PHONE_SNAPSHOT_DAYS = 7   # a phone not started this long gives back its quick-b
 
 
 def schedule_queue(s, argv, by):
-    """One run of a schedule as a job on its node (R117): an exec job as the
+    """One run of a schedule as a job on its node: an exec job as the
     node's jobs account, or a system job as root on a node provisioned as a
     sandbox, as `aerie root run` is (nodes.root_wait's gate), never waited
     for. {job} or {error}."""
@@ -1938,7 +1938,7 @@ def schedule_queue(s, argv, by):
     t = int(s.get("timeout") or schedules.TIMEOUT_DEFAULT)
     principal = "schedule:" + str(s.get("id") or "")
     if s.get("system"):
-        # One of the root agent's table (R162 step 5), on the controller's
+        # One of the root agent's table, on the controller's
         # own machine alone, as the page that made it may queue it by hand.
         if not nodes.own_machine(n):
             return {"error": f"{n['name']} is not the controller's own machine, where the table's jobs run"}
@@ -1967,7 +1967,7 @@ def _job_state(jid):
 
 
 def _schedules_loop():
-    """The schedules' timer (R117): every half minute, what is due fires
+    """The schedules' timer: every half minute, what is due fires
     (schedules.tick: one run at a time, a missed one run once and said)."""
     while True:
         time.sleep(30)
@@ -1979,7 +1979,7 @@ def _schedules_loop():
 
 
 def _ci_log_text(got):
-    """A CI run as a log tab shows it (R133 step 12): the run, then each job
+    """A CI run as a log tab shows it: the run, then each job
     with how it ended and the end of its log, the lines above that a failure
     named, as aerie ci-log prints them."""
     r = got.get("run") or {}
@@ -1998,15 +1998,15 @@ def _ci_log_text(got):
 def _room_loop():
     """Every hour, a node whose Docker disk has fallen under twice the floor
     gets its build cache a week old and its images no container has used
-    for two weeks pruned (R110 step 3), before the bell's floor is reached;
+    for two weeks pruned, before the bell's floor is reached;
     what Docker said it freed goes to the controller's log (aerie logs), the
     prune itself to the audit log. Nothing a container
     uses is touched, and a node with room is left alone. A node whose cache
     store is as short gets the projects' build caches (Gradle's, npm's,
     pub's: whatever a build keeps under BUILDERBOT_CACHE) that no job has
-    used for two weeks cleared by a cache-clear job (R110 step 7), its log
+    used for two weeks cleared by a cache-clear job, its log
     on the Jobs page. A node whose homes' disk is past 90% gets its idle
-    phones' quick-boot snapshots removed by a phones-idle job (R129)."""
+    phones' quick-boot snapshots removed by a phones-idle job."""
     while True:
         time.sleep(3600)
         try:
@@ -2019,7 +2019,7 @@ def _room_loop():
                     print(f"[room] {n.get('name') or n['id']}: build caches unused for "
                           f"{CACHE_KEEP_DAYS} days: {r.get('error') or 'clearing'}", flush=True)
                 # The phones' quick-boot snapshots, where the homes' disk is
-                # past 90% (R129): every project's not started for a week, the
+                # past 90%: every project's not started for a week, the
                 # phones themselves and their data kept.
                 if nodes.homes_full(n["id"]):
                     r = nodes.job_add("operator", {"node": n["id"]}, "phones-idle",
@@ -2064,7 +2064,7 @@ def _tls_issue():
 
 
 def _tls_names(host=""):
-    """What the install's own certificate names (R158 step 2): the
+    """What the install's own certificate names: the
     Connection section's hostname, the tunnel's, the machine's own name and
     addresses, and the Host the request came to."""
     out = [str(settings.get("tls_host") or ""), str(settings.get("tunnel_host") or ""),
@@ -2081,7 +2081,7 @@ def _tls_names(host=""):
 
 
 def _givers_said(project, me):
-    """Who has given this project a token (R159): [{uid, name, login, host,
+    """Who has given this project a token: [{uid, name, login, host,
     mine, live}], never the token."""
     names = {u.get("uid"): u.get("name") for u in users.all_users() if u.get("uid")}
     out = []
@@ -2100,7 +2100,7 @@ _BRIEF_TOKENS = {}      # project -> (at, tokens): what the briefing takes, for 
 def _briefing_tokens(name):
     """About how many tokens the block a session is handed takes (bytes over
     four), assembled at most every two minutes per project: the chooser
-    says when a model's context cannot hold it (R144 step 3)."""
+    says when a model's context cannot hold it."""
     at, n = _BRIEF_TOKENS.get(name) or (0, 0)
     if time.time() - at > 120:
         try:
@@ -2149,16 +2149,16 @@ def _attention(who):
     toolchain behind what is out, Claude Code among them
     (toolchains.attention), for whoever may install toolchains on it."""
     # A release's APK the controller could not sign, or would not be able
-    # to (releasesign.attention, R106), for whoever sees the project: said
+    # to (releasesign.attention), for whoever sees the project: said
     # before the release, not after it went out without one.
     signs = releasesign.attention([p for p in releasesign.projects_fn() if users.may_see(who, p)])
-    # ...and a release short of a file its project says it carries (R190
-    # step 4), for whoever sees the project.
+    # ...and a release short of a file its project says it carries,
+    # for whoever sees the project.
     signs += releasefiles.attention([p for p in releasesign.projects_fn() if users.may_see(who, p)])
-    # ...and a project whose git access went with an account's key store
-    # (R154), for whoever sees it.
+    # ...and a project whose git access went with an account's key store,
+    # for whoever sees it.
     signs += gitcreds.gone_rows([p for p in gitcreds.gone_projects() if users.may_see(who, p)])
-    # ...and an empty project 0.8.0's B402 left beside its repository's,
+    # ...and an empty project an older release left beside its repository's,
     # for whoever may delete it.
     signs += [{"kind": "project-leftover", "id": key, "key": f"leftover:{key}", "project": key,
                "repo": d, "in": repos.project_of(d),
@@ -2169,47 +2169,47 @@ def _attention(who):
     if NODES_DOWN:
         return bellseen.filter_rows(users.uid_of(who), signs)
     where = {p: (pr.get("node") or "") for p, pr in prefs.all_projects().items()}
-    # The sessions an outage of this controller held come first (R251), for
+    # The sessions an outage of this controller held come first, for
     # their own account or an administrator: stopped work waiting on a
     # person, where the rest is an update that can wait (seen fourth, under
     # the fold of the bell, in the walk of 15 Oct).
-    # ...then a session working with no word from its hooks (B1009): nothing
+    # ...then a session working with no word from its hooks: nothing
     # AerieOS refuses is being refused there.
     rows = (_held_rows(who) + _unguarded_rows(who)
             + ([] if users.may(who, "node") else nodes.attention(where)
-               # ...and a node that refused this controller's bundle (R267 step 6).
+               # ...and a node that refused this controller's bundle.
                + nodes.bundle_attention() + _token_rows()
-               # ...and a newer release for a bare-metal install (R90 step 5).
+               # ...and a newer release for a bare-metal install.
                + releasecheck.attention(_own_node_id())
                # ...and the registry's image for this version not the one
-               # its signed release names, on the container edition (R290).
+               # its signed release names, on the container edition.
                + apps.image_attention(_own_node_id())
                # ...and a disk failing or hot, a pool not online, an array
-               # slot gone, on the controller's own machine (R164 step 3).
+               # slot gone, on the controller's own machine.
                + nodes.storage_attention()
-               # ...and its UPS on battery or its own packages' updates (R164 step 3).
+               # ...and its UPS on battery or its own packages' updates.
                + nodes.power_attention()
-               # ...and a backup that failed or went stale (R162 step 5).
+               # ...and a backup that failed or went stale.
                + nodes.backup_attention()
-               # ...and a move's landing cut midway (B622).
+               # ...and a move's landing cut midway.
                + move.cut_landing_rows())
-            # ...and a node short of disk or memory (R110), for whoever
+            # ...and a node short of disk or memory, for whoever
             # manages nodes: what is short, on the Storage page's terms.
             + ([] if users.may(who, "node") else nodes.room_attention(
                 room_floor_gb(), room_mem_pct(),
                 label=lambda r: {"root": "its root filesystem", "docker": "Docker's images and build cache"}.get(r, f"its {r} store")))
             + [a for a in toolchains.attention(where) + toolchains.agent_attention(where)
                if not users.may_node(who, "toolchains-write", a["id"])]
-            # ...and a pack the vetted catalog withdrew that this install holds (R169 step 2).
+            # ...and a pack the vetted catalog withdrew that this install holds.
             + ([] if users.may(who, "toolchains-write") else catalogindex.attention(list(toolpacks.packs())) + toolpacks.unfit())
-            # ...and a node's nginx behind the newest line (nginxproxy.attention,
-            # R192), for whoever may act on the Docker tab, which Update is.
+            # ...and a node's nginx behind the newest line (nginxproxy.attention),
+            # for whoever may act on the Docker tab, which Update is.
             + ([] if users.may(who, "docker-write")
                else nginxproxy.attention(lambda nid: nginxproxy.deployed(devapp, nid)) + nginxproxy.acme_rows()
                # ...and a scanner run that failed, or a node behind the
-               # newest scanner versions (scanners.attention, R145).
+               # newest scanner versions (scanners.attention).
                + scanners.attention()
-               # ...and a container whose registry image moved (imagecheck, R195).
+               # ...and a container whose registry image moved (imagecheck).
                # ...or whose entry names another image than it runs.
                + imagecheck.attention(lambda nid: (nodes.node(nid) or {}).get("name") or nid,
                                       allowed=lambda p: users.may(who, "docker-write", p) == ""
@@ -2217,14 +2217,14 @@ def _attention(who):
                                       entries=containers.entries_behind())
                # ...and a copy or move that did not happen (relocate.py).
                + relocate.attention(lambda nid: (nodes.node(nid) or {}).get("name") or nid))
-            # ...and a schedule whose last run failed or was skipped (R117),
+            # ...and a schedule whose last run failed or was skipped,
             # for whoever may read the Schedules page.
             + ([] if users.may(who, "schedules-read") else schedules.attention(_job_state))
-            # ...and an environment whose workloads are stuck or short
-            # (R281 step 7), for whoever reads its space's Deploy section.
+            # ...and an environment whose workloads are stuck or short,
+            # for whoever reads its space's Deploy section.
             + kubeview.attention(lambda space: not users.may(who, "deploy-read", space))
             + signs)
-    # ...less what this account has put away (bellseen.py, R144): an update
+    # ...less what this account has put away (bellseen.py): an update
     # to a version it dismissed, until a newer one is out.
     return bellseen.filter_rows(users.uid_of(who), rows)
 
@@ -2246,7 +2246,7 @@ def _claude_code_for(who, ps):
 
 def gpu_container_why(project, node_id):
     """Why a container of `project` on that node cannot be given its NVIDIA
-    card, or "" (R102): the project's setting and the node's switch, which
+    card, or "": the project's setting and the node's switch, which
     speak for containers as they do for sessions, then what the node's
     Installed page holds (the driver running the card, the container
     toolkit, Docker's runtime)."""
@@ -2259,7 +2259,7 @@ def gpu_container_why(project, node_id):
     return toolchains.container_why(n)
 
 
-# Sessions sitting on Claude Code's own permission prompt (B52), set by the
+# Sessions sitting on Claude Code's own permission prompt, set by the
 # session's Notification hook (hooks.py "asking") under its account and its
 # tmux name. The pane title cannot say it: a prompt reads as waiting, like a
 # session with nothing to do. Gone once it works again, its turn ends or it
@@ -2277,7 +2277,7 @@ def asking_clear(project, uid, agent="claude", slot=1):
     ASKING.pop((uid, tmux_name(agents.session_name(agent, project, slot))), None)
 
 
-# What another agent's session is doing (R95 step 7), as its hooks said it:
+# What another agent's session is doing, as its hooks said it:
 # working from the prompt its turn began on, waiting once the turn ended.
 # Claude's reads its pane title, which no other agent's carries.
 AGENT_STATE = {}
@@ -2287,7 +2287,7 @@ def agent_state_set(project, uid, agent, state, slot=1):
     AGENT_STATE[(uid, tmux_name(agents.session_name(agent, project, slot)))] = {"state": state, "at": time.time()}
 
 
-# Which conversation each agent session is in (R143), as its hooks said with
+# Which conversation each agent session is in, as its hooks said with
 # the prompt that began a turn: so one live in one slot is not resumed into
 # another, and the chooser shows it as running rather than offering it.
 AGENT_CONV = {}
@@ -2302,8 +2302,8 @@ def agent_conv_set(project, uid, agent, slot, conv):
 def session_state(uid, name, title):
     """(state, task) for a Claude session: claude_state's, or "asking" while
     it waits on its permission prompt, the prompt's words as the task.
-    Another agent's session says nothing yet (R95 step 7 reads its own
-    events): Claude Code's pane title is no other agent's, and a session
+    Another agent's session says nothing yet:
+    Claude Code's pane title is no other agent's, and a session
     read as waiting when it was working would call a person for nothing."""
     agent, _stem = agents.of_session(tmux_base(name))
     if agent and agent.id != "claude":
@@ -2339,7 +2339,7 @@ def claude_state(title):
 # a prefix off the front.
 _ARG_OWNER = re.compile(r"^u:[^:]*:")
 # `:n:NODE` on a claude: argument: which of the project's nodes the person
-# picked for this session (R82). Read here and taken off before the proxy,
+# picked for this session. Read here and taken off before the proxy,
 # since bb-tty on the node reads the argument's tail by suffix (:r:, :b:)
 # and would take the node for part of the project's name.
 _ARG_NODE = re.compile(r":n:([A-Za-z0-9_-]+)")
@@ -2351,27 +2351,27 @@ def _arg_node(arg):
 
 
 # `ctr:NAME:INSTANCE:CONTAINER`: a shell inside one container of a dev
-# instance (R218 step 4), NAME the project or the container written here
+# instance, NAME the project or the container written here
 # whose instance it is. Names in the shapes docker and the store allow and
 # nothing else, since each reaches docker exec on a node.
 _ARG_CTR = re.compile(r"^ctr:([A-Za-z0-9][A-Za-z0-9._-]*):([A-Za-z0-9][A-Za-z0-9._-]*):"
                       r"([A-Za-z0-9][A-Za-z0-9_.-]*)$")
 
 
-# `log:ctr:NAME:INSTANCE:CONTAINER`: a container's log in a dock tab (R133
-# step 12), followed on its node by docker logs as the docker account.
+# `log:ctr:NAME:INSTANCE:CONTAINER`: a container's log in a dock tab,
+# followed on its node by docker logs as the docker account.
 _ARG_LOGCTR = re.compile(r"^log:ctr:([A-Za-z0-9][A-Za-z0-9._-]*):([A-Za-z0-9][A-Za-z0-9._-]*):"
                          r"([A-Za-z0-9][A-Za-z0-9_.-]*)$")
 
 
 # `pod:REPOSITORY:ENVIRONMENT:POD[:CONTAINER]`: a shell in a pod of one of
-# a space's Kubernetes environments (R281), opened by the controller with the
+# a space's Kubernetes environments, opened by the controller with the
 # environment's deployer (kubeexec.py). Names in the shapes Kubernetes allows.
 _ARG_POD = re.compile(r"^pod:([A-Za-z0-9][A-Za-z0-9._-]*):([a-z0-9][a-z0-9-]{0,23}):([a-z0-9][-a-z0-9.]{0,252})"
                       r"(?::([a-z0-9][-a-z0-9]{0,62}))?$")
 
 
-# `vm:PROJECT:NAME`: a VM's serial console (R91), opened on its node's
+# `vm:PROJECT:NAME`: a VM's serial console, opened on its node's
 # container terminal server, as the jobs account, with virsh console.
 _ARG_VM = re.compile(r"^vm:([A-Za-z0-9][A-Za-z0-9._-]*):([a-z0-9][a-z0-9-]{0,30})$")
 
@@ -2441,7 +2441,7 @@ def _ask_hello(nid):
 
 
 def session_target(project, claude=False, node="", uid=""):
-    # `claude` is the question R47 added. A project's SHELL follows its node
+    # `claude` is a question of its own. A project's SHELL follows its node
     # (the tree is that machine's mount and its toolchains are what a build
     # there uses), and a project with NO node still gets a shell here, on the
     # same share. What it does not get is a Claude session: this container
@@ -2478,13 +2478,13 @@ def session_target(project, claude=False, node="", uid=""):
     """
     # The space by the name it is shown under, in every sentence a person
     # reads: after a move landed without its repositories a card named its
-    # space by its folder's name here and by its own everywhere else (B778).
+    # space by its folder's name here and by its own everywhere else.
     said = roles.shown(project)
     with timing.timed("session_target:prefs"):
         pf = prefs.get(project) if project else None
     nid = (pf or {}).get("node") or ""
-    # The node the person picked, when it is one the project works on
-    # (R82); any other name falls to the primary rather than to a refusal,
+    # The node the person picked, when it is one the project works on;
+    # any other name falls to the primary rather than to a refusal,
     # since the pick came off a list this side drew.
     if node and node in ((pf or {}).get("nodes") or []):
         nid = node
@@ -2514,7 +2514,7 @@ def session_target(project, claude=False, node="", uid=""):
         why = (f"{name} hosts containers only, so no session runs there: pick another node in "
                f"{said}'s settings")
     elif n.get("state") == "retired":
-        # Un-enrolled (the operator, 5 Oct): the fact first, then what to do
+        # Un-enrolled: the fact first, then what to do
         # about it, both on the row.
         why = (f"{name} was removed from the Nodes page. Pick another node in {said}'s settings, "
                "or enroll it again")
@@ -2527,7 +2527,7 @@ def session_target(project, claude=False, node="", uid=""):
         # The controller has just started and this node was here a moment
         # before: its agent dials in again on its own schedule (two minutes,
         # some days). Said quietly, as a wait, rather than in red as a node
-        # that is down (the operator, 7 Oct).
+        # that is down.
         why = f"{name} is reconnecting after the controller restarted"
         passing = waiting = True
     elif n.get("live") is False:
@@ -2550,7 +2550,7 @@ def session_target(project, claude=False, node="", uid=""):
                   "; provision it with --session-user"))
         _ask_hello(nid)
     elif (n.get("config") or {}).get("leaving") or ((n.get("config") or {}).get("workspace") or "sync") != "sync":
-        # Off its synced copy, or on the way off it (R164): nothing to open a
+        # Off its synced copy, or on the way off it: nothing to open a
         # session on, and its row on the Nodes tab is the way back.
         why = (f"{said}'s sessions run on {name}, which "
                + ("is leaving its synced copy: what is left there is going up to the controller"
@@ -2558,7 +2558,7 @@ def session_target(project, claude=False, node="", uid=""):
                + ". Its row on the Nodes page moves it to a synced copy again,"
                " or bind the space to another node")
     elif not ((rep.get("sync") or {}).get(project) or {}).get("ready"):
-        # A synced copy (R162) that is not there yet: a session started now
+        # A synced copy that is not there yet: a session started now
         # would open an empty or half-copied tree.
         got = (rep.get("sync") or {}).get(project) or {}
         why = (f"{project} is being copied to {name}"
@@ -2568,14 +2568,14 @@ def session_target(project, claude=False, node="", uid=""):
         passing = waiting = True
     elif uid and (wt := wssync.worktree_unit(project, uid)) \
             and not ((rep.get("sync") or {}).get(wt) or {}).get("ready"):
-        # ...and this account's own worktree of it (B615): a session that
+        # ...and this account's own worktree of it: a session that
         # opened before it arrived made none of its own there and worked in
         # the owner's tree instead.
         why = (f"your worktree of {project} is being copied to {name}; "
                "the session starts once it is there")
         passing = waiting = True
     elif nodes.own_machine(n) and not (rep.get("isolation") or {}).get("sessions"):
-        # The controller's own machine (R90): a session there runs inside
+        # The controller's own machine: a session there runs inside
         # the wall around the controller or not at all, and bb-session's
         # check, which its census carries, says what keeps the wall down.
         why = (f"{name} is this controller's own machine, and the wall between its sessions and the controller "
@@ -2597,7 +2597,7 @@ def session_target(project, claude=False, node="", uid=""):
                           "coming back, or another node in the space's settings.")}
 
 def ctr_target(name, instance):
-    """Where a container's Shell runs (R218 step 4): on the machine its
+    """Where a container's Shell runs: on the machine its
     instance is on, since docker exec reaches a daemon from its own host.
 
         {"where": "local"}                         (this container's daemon)
@@ -2605,11 +2605,10 @@ def ctr_target(name, instance):
         {"where": "refused", "name", "why"}
 
     A hosting-only node runs no terminal server, so a container there has no
-    Shell, said with the reason (the operator, 14 Oct). Otherwise the node
+    Shell, said with the reason. Otherwise the node
     has to be up with its session half running, as for a Claude session,
     and the shell is its container terminal kind (ctr): as the docker
-    account, which the session account is kept apart from (the operator,
-    14 Oct).
+    account, which the session account is kept apart from.
     """
     nid = devapp.instance_node(name, instance) or ""
     n = nodes.node(nid) if nid and not NODES_DOWN else None
@@ -2624,11 +2623,11 @@ def ctr_target(name, instance):
         return {"where": "node", "id": nid, "name": nm, "term": False,
                 "no_shell": f"{nm} is the controller's own machine, which opens no shell in a container"}
     # Its terminals still running the scripts from before this controller's
-    # update, which may not know what this one asks of them (B746): asked to
+    # update, which may not know what this one asks of them: asked to
     # check in now, it takes the new ones within a poll, waited for here
     # rather than refusing with "try again in a minute".
-    # A node that refused this controller's bundle is not waited for (R267
-    # step 6): its terminals stay on the bundle it has, the shell opens from
+    # A node that refused this controller's bundle is not waited for:
+    # its terminals stay on the bundle it has, the shell opens from
     # that one, and the bell says why it keeps it.
     n = nodes.session_bundle_wait(nid, _ask_hello) or n
     se = (n.get("reported") or {}).get("session")
@@ -2712,7 +2711,7 @@ def _runner_level(who, inst):
 
 def _runners_for(who):
     """The CI runners this account may read, each with `may`, read or write
-    (R260: a role holds the CI runner area runner by runner)."""
+    (a role holds the CI runner area runner by runner)."""
     who = who or {}
     if not (users.is_admin(who) or roles.level_of(who, "runner")):
         return []
@@ -2779,8 +2778,8 @@ def tmux_owner(name):
     return m.group(0)[:-1] if m else ""
 
 
-# This container's tmux listed at most every TMUX_LOOK_S for what only draws
-# (R228 step 2): the status read and the revisions poll each forked two
+# This container's tmux listed at most every TMUX_LOOK_S for what only draws:
+# the status read and the revisions poll each forked two
 # tmux processes, the poll every page makes every second and a half. What
 # acts on a session (ending one, the compatibility hold) lists afresh, and
 # an end here forgets the kept listing at once.
@@ -2821,7 +2820,7 @@ def tmux_sessions(kept=False):
             name, attached, created = (line.split("\t") + ["", ""])[:3]
             info = panes.get(name, {})
             # When it started, as a node's rows say, for the Sessions page's
-            # Started column, which was blank for every one here (B149).
+            # Started column, which was blank for every one here.
             row = {"name": name, "attached": attached.strip() not in ("", "0"),
                    "cwd": info.get("cwd", ""),
                    "created": int(created) if created.strip().isdigit() else 0}
@@ -2837,7 +2836,7 @@ def tmux_sessions(kept=False):
 
 def my_agent_sessions(project, uid):
     """[(agent, slot, session row)] for every agent session of this account
-    on this project, here and on the nodes (R143)."""
+    on this project, here and on the nodes."""
     owner = users.uid_of(users.get(users.owner_name() or "")) if users.owner_name() else ""
     stem = tmux_name(project)
     out = []
@@ -2855,7 +2854,7 @@ _ARG_RESUME = re.compile(r":r:([A-Za-z0-9-]+)")
 
 def slot_held(project, uid, arg):
     """A sentence when this account may not open the agent slot the argument
-    names (R143), "" when it may: a slot past the project's cap (unless it
+    names, "" when it may: a slot past the project's cap (unless it
     runs already, a cap lowered since), or a conversation that is running
     in another of its sessions, which two would write over each other."""
     a = agents.of_arg(arg)[0]
@@ -2884,7 +2883,7 @@ def slot_held(project, uid, arg):
 def claude_working(project, uid, agent="claude", slot=1):
     """Whether that account's session of one agent on this project is
     mid-prompt, here or on a node (session_state: Claude's pane title,
-    another agent's hooks), in its slot (R143). The owner's is the bare
+    another agent's hooks), in its slot. The owner's is the bare
     name, as everywhere else on the page."""
     want = agents.session_name(agent, project, slot)
     owner = users.uid_of(users.get(users.owner_name() or ""))
@@ -2910,7 +2909,7 @@ def session_tokens_for(nid, sessions):
     to slide it, and a dead token is deliberately never renewed: that refusal
     is what makes the life mean anything for a token that leaked. So the
     machine the session is running on is told a fresh one on its heartbeat,
-    and a token then lives exactly as long as its tmux session does (R27).
+    and a token then lives exactly as long as its tmux session does.
 
     Matched from the PROJECT towards the session name, never the other way:
     tmux rewrites `.` and `:` in a name, so `ep.silon` runs as
@@ -2918,7 +2917,7 @@ def session_tokens_for(nid, sessions):
 
     A session name is the node's own word, so it earns a token only for a
     space that works on THIS node, and for an account that may work on that
-    space (B762): a node that named another space's session, or another
+    space: a node that named another space's session, or another
     person's, was handed their token, and with it that account's agent
     sign-in. What the node is told is what a terminal opened there by that
     person would have been given, never more.
@@ -2943,14 +2942,14 @@ def session_tokens_for(nid, sessions):
         if not who or not users.may_work(who, project):
             continue
         # ...and only for a pair this controller opened a terminal of on
-        # this node (R288 step 7): what the node was given already.
+        # this node: what the node was given already.
         if not sessionsasked.asked(nid, uid, project):
             continue
         seen.add((uid, project))
         out.append({"project": project, "uid": uid,
                     "token": users.mint_session(project, uid=uid)})
         # ...and one for each other repository its project's session works
-        # in (R136), kept by the agent under that repository as this is.
+        # in, kept by the agent under that repository as this is.
         key = repos.project_of(project)
         for m in (repos.members(key) if key else []):
             if m != project and (uid, m) not in seen and users.may_work(who, m):
@@ -2990,7 +2989,7 @@ def node_tmux_sessions():
             if agent:
                 state, task = session_state(who, real, s.get("title", ""))
                 # What it was last asked over the title, which Claude names
-                # from the first turn and keeps (B59).
+                # from the first turn and keeps.
                 task = projsessions.latest_task(who, stem, row["created"], agent.id,
                                                 agents.slot_of(tmux_base(real))) or task
                 row["claude"] = {"state": state, "task": task, "conv": AGENT_CONV.get((who, tmux_base(real)), "")}
@@ -3020,7 +3019,7 @@ _IMAGE_SINCE = {}
 
 def session_behind(s):
     """What changed since this session started that it does not see until
-    it is started again (the operator, 12 Oct): a toolchain installed on its
+    it is started again: a toolchain installed on its
     node that puts something on its PATH, and AerieOS updated, whose
     briefing a session reads once, at its start."""
     started = int(s.get("created") or 0)
@@ -3071,7 +3070,7 @@ def project_busy(name, verb):
     operator's behalf is a bigger decision than the one being asked for.
     Here rather than in projects.py because these are the two that see
     outside the filesystem: tmux, and the daemon."""
-    # ...here and on every node, where sessions run now (B242): the lock
+    # ...here and on every node, where sessions run now: the lock
     # reads both the same way.
     live = {s["name"] for s in tmux_sessions()} | {s["name"] for s in node_tmux_sessions()}
     held = sorted(s for s in live
@@ -3099,14 +3098,14 @@ MAINT_BAND = ('<div class="banner maint" id="maintband" role="status" hidden>Mai
               'only you can use AerieOS. It is switched off under '
               '<a href="#/controller/settings" data-maintgo>Controller settings, Maintenance</a>.</div>')
 MAINTENANCE_SAID = "AerieOS is down for maintenance: only its owner can sign in until it is over."
-# A held start's band (R56 step 9): sent hidden on every page of a bare-metal
+# A held start's band: sent hidden on every page of a bare-metal
 # install and shown by the poll while the start is held.
-# What it holds said as it is (B949): the agent sessions; disks, shares,
+# What it holds said as it is: the agent sessions; disks, shares,
 # containers and VMs set up before come up as they were set.
 HELD_BAND = ('<div class="banner held" id="heldband" role="status" hidden>The start is held: no session starts until '
              '<a href="#/controller/machine" data-heldgo>Start on This controller</a>; what this machine already had set up comes up as it was. '
              '<span data-heldwhy></span></div>')
-# A moved controller's band (R90 step 12): read-only here, the new home named.
+# A moved controller's band: read-only here, the new home named.
 MOVED_BAND = ('<div class="banner moved" id="movedband" role="status" hidden>This controller moved to '
               '<a data-movedto href="#"></a>: what is here is read-only, for a look back. Should the new home be lost, '
               'its bundle still downloads from Controller settings and lands on a fresh install.</div>')
@@ -3143,7 +3142,7 @@ def node_heart(n):
             if not ag:
                 continue
             # Claude's by its pane title; another agent's by what its hooks
-            # said (R95 step 7): every agent's working session counts.
+            # said: every agent's working session counts.
             if ag.id == "claude":
                 busy = claude_state(str((r or {}).get("title") or ""))[0] == "working"
             else:
@@ -3184,7 +3183,7 @@ def guards_heard(project, uid, agent, slot):
 
 def _unguarded_rows(who):
     """The bell's rows for the sessions working with no word from their hooks
-    (turns.unguarded, B1009), for the session's own account or an
+    (turns.unguarded), for the session's own account or an
     administrator: keyed by the stretch it was seen in, so Dismiss puts away
     this one and not the next."""
     marks = turns.unguarded()
@@ -3206,8 +3205,8 @@ def _unguarded_rows(who):
     return out
 
 
-# The model router, nginx and the Scanners as services of the Library (R172,
-# R264): services.py's table says each one's entry, whether it is on a node,
+# The model router, nginx and the Scanners as services of the Library:
+# services.py's table says each one's entry, whether it is on a node,
 # and its Install and Remove, which are its own Deploy and Remove. What sets
 # nginx and the Scanners is their pages'; the router's is its card's.
 import services                                                  # noqa: E402
@@ -3241,7 +3240,7 @@ def newest_transcript(project_dir, uid=""):
     """The most recent Claude transcript on a working directory, as its file,
     or None: the asking ACCOUNT's own (its ~/.claude/projects on the share,
     transcripts.dirs), and the container account's where nobody is asking.
-    It read the container account's for everybody until B489: a new user's
+    Read as the container account's for everybody, a new user's
     Claude button offered the owner's conversation from five days before,
     which bb-tty then could not find under that user's home."""
     if uid:
@@ -3255,7 +3254,7 @@ def newest_transcript(project_dir, uid=""):
         except OSError:
             continue
     # The newest with a turn in it: one with nothing said was offered as
-    # Resume and refused by bb-tty (B276).
+    # Resume and refused by bb-tty.
     return next((f for _, f in sorted(files, key=lambda x: x[0], reverse=True) if transcripts.has_turn(f)), None)
 
 
@@ -3378,13 +3377,13 @@ def claude_model_now(project_dir, uid=""):
 
 
 def end_agents(project):
-    """End this project's coding-agent sessions, every agent's (R95 step 16:
-    Claude's alone was ended, and a ChatGPT or Copilot session kept what it
+    """End this project's coding-agent sessions, every agent's
+    (Claude's alone was ended, and a ChatGPT or Copilot session kept what it
     started with), so the next Start agent starts one on the setting just
     saved. {ended, on_node?} if any was, else {ended: False, why}."""
     out = {"ended": False, "why": "no session is running here"}
     # Every slot's name is asked of the lists once, not each of the lists
-    # once a name (R143: nine slots of each agent).
+    # once a name (nine slots of each agent).
     live = {s["name"] for s in tmux_sessions()} | {x["name"] for x in node_tmux_sessions()}
     for session in agent_sessions(project):
         if session not in live:
@@ -3404,7 +3403,7 @@ def _end_agent(session):
     It used to RESPAWN the pane in place, with `tmux respawn-pane -k` running
     the launcher again with `--respawn`, which kept the session, and the browser
     tab attached to it, and meant the change landed somewhere nobody was
-    looking. The operator's call (12 Sep): end it, and let the button start it
+    looking. The operator's call: end it, and let the button start it
     again. Simpler to say and simpler to trust, and it asks nothing of a
     node's agent that killing a session from the Sessions card has not asked
     for months, so the version gate that came with the respawn op is gone
@@ -3460,8 +3459,8 @@ def end_session(session, node="", wait=False):
 
 def others_sessions():
     """Every session and terminal open that is not the owner's, here and on
-    the nodes, as maintenance mode's question lists them (the operator, 27
-    Oct): whose, which project, which agent or a shell, what it is doing,
+    the nodes, as maintenance mode's question lists them:
+    whose, which project, which agent or a shell, what it is doing,
     and where. What turning maintenance on ends."""
     owner = users.get(users.owner_name() or "") or {}
     mine = owner.get("uid") or ""
@@ -3501,7 +3500,7 @@ def uptime():
     # PID 1 started when the container did, so its elapsed time is the
     # container's; /proc/uptime alone is the host's under a shared kernel.
     # Read from /proc in ps's own etime shape ([[dd-]hh:]mm:ss) rather than
-    # forking ps on every status poll (R94); ps where /proc does not say.
+    # forking ps on every status poll; ps where /proc does not say.
     try:
         start = int(open("/proc/1/stat").read().rsplit(")", 1)[1].split()[19])
         up = float(open("/proc/uptime").read().split()[0])
@@ -3523,9 +3522,9 @@ def uptime():
 # its own TARGET_API to say when it is behind. A change to a path or a
 # field listed there bumps all three together: the app, the file, this; a
 # field is removed only in the release after a released app stopped
-# reading it, with a changelog line (R79 step 8).
+# reading it, with a changelog line.
 APP_API = 9
-# How long the app's live connection is held before an empty answer (R125):
+# How long the app's live connection is held before an empty answer:
 # under the app's 60 s read timeout, and long enough to cost little.
 PHONE_WAIT_S = 45
 
@@ -3536,7 +3535,7 @@ SELF_REPO = re.compile(r"github\.com[:/]aquilaelabs/(?:aerieos|builderbot)(?:\.g
 
 def self_dist():
     """dist/ of the project whose origin is AerieOS's own repository, or
-    None. Found by the remote and not by the folder (B4), since a project
+    None. Found by the remote and not by the folder, since a project
     renamed on the dashboard keeps its folder. Each project's .git/config is
     read rather than git asked, since the app asks /api/meta on every start."""
     try:
@@ -3569,7 +3568,7 @@ def app_apk():
     # A signed build first: the app on a phone was installed signed, and
     # Android will not update it with anything signed otherwise. The newest
     # file was offered whatever it was, and on 5 Oct that was a debug build
-    # of uncommitted changes, which the operator's phone refused (B507).
+    # of uncommitted changes, which the operator's phone refused.
     # Without a signed one, a build of a commit; a dirty one never.
     pick = ([p for p in apks if "-signed" in p.name]
             or [p for p in apks if "-dirty" not in p.name and "dirty" not in p.stem.split("-")[-1]])
@@ -3578,7 +3577,7 @@ def app_apk():
 
 def app_apk_sha():
     """The newest companion APK's sha256, for the app to check a download
-    against before it installs (B273); "" when there is none."""
+    against before it installs; "" when there is none."""
     name = app_apk()
     d = self_dist()
     if not name or d is None:
@@ -3601,7 +3600,7 @@ def app_apk_sha():
 # the same thing its ETag is; the page's own tag covers them all, so a change
 # to one script alone is still a new page.
 _SCRIPT_TAG = re.compile(rb'<script src="((?:tab|nb|page)-[a-z-]+\.js)">')
-# ...and its stylesheet, a file a layer (R9 step 4), named and versioned the
+# ...and its stylesheet, a file a layer, named and versioned the
 # same way.
 _STYLE_TAG = re.compile(rb'<link rel="stylesheet" href="(page-[a-z-]+\.css)">')
 _page_scripts = {"mtime": None, "names": frozenset(), "styles": frozenset()}
@@ -3625,7 +3624,7 @@ def page_scripts():
     server serves them from, read off the page's own script tags so a new
     file is added in one place, the page, and nothing else is served. Read
     again when index.html changes. The page-*.js files were missing from the
-    versioning pattern above until this read it the same way (R77)."""
+    versioning pattern above until this read it the same way."""
     return _page_files()["names"]
 
 
@@ -3657,7 +3656,7 @@ def _integrity_of(name, version):
 
 def _lean(rel):
     """Whether a file is the page's own and is served without its comments
-    (leanpage, R228 step 15): the page, its scripts and its stylesheets.
+    (leanpage): the page, its scripts and its stylesheets.
     Not a vendor's file, whose comments carry its license."""
     return rel == "index.html" or rel in page_scripts() or rel in page_styles()
 
@@ -3672,7 +3671,7 @@ def _versioned_page(raw, tag):
             return m.group(0)
         v = f"{st.st_size:x}-{st.st_mtime_ns:x}"
         parts.append(v)
-        # Subresource Integrity (R158 step 4): the file's own digest, so a
+        # Subresource Integrity: the file's own digest, so a
         # script that arrives changed is not run.
         return (b'<script src="' + m.group(1) + b"?v=" + v.encode() + b'" integrity="'
                 + _integrity_of(m.group(1).decode(), v).encode() + b'">')
@@ -3688,11 +3687,11 @@ def _versioned_page(raw, tag):
         return (b'<link rel="stylesheet" href="' + m.group(1) + b"?v=" + v.encode() + b'" integrity="'
                 + _integrity_of(m.group(1).decode(), v).encode() + b'">')
     out = _STYLE_TAG.sub(styled, out)
-    # The install's banner (R88), at its place under the header; part of the
+    # The install's banner, at its place under the header; part of the
     # page's tag, so a banner changed at a restart is not served from a copy.
     # ...and maintenance mode's, shown to the owner by the page while it is on,
     # and sent showing while it is on, so it is there at the first paint and
-    # not only once the first status read lands (the operator, 26 Oct): with
+    # not only once the first status read lands: with
     # it on, the owner is the one account the page is for.
     band = featuresoff.banner_html() + (MAINT_BAND.replace(' hidden>', '>', 1)
                                         if settings.get("maintenance_mode") else MAINT_BAND) \
@@ -3702,12 +3701,12 @@ def _versioned_page(raw, tag):
     parts.append(hashlib.sha256(band.encode()).hexdigest()[:8])
     # Every script runs as written, in order: Cloudflare's Rocket Loader
     # defers the ones that do not say so, and the page then met its own
-    # names before they were defined (a ReferenceError, B138).
+    # names before they were defined (a ReferenceError).
     out = out.replace(b"<script", b'<script data-cfasync="false"')
     return out, 'W/"' + hashlib.sha256("|".join(parts).encode()).hexdigest()[:24] + '"'
 
 
-# ---- the request trace (R75 step 4) -----------------------------------------
+# ---- the request trace -----------------------------------------
 # Every request this server answered, lately: when, the method, the path with
 # its query keys, and who (a person, a session, an agent, the companion app)
 # by the user agent and the principal the handler proved. A ring, in memory,
@@ -3734,7 +3733,7 @@ def trace_note(handler, ms=0, cpu=0, parts=None):
     try:
         path, _, query = handler.path.partition("?")
         keys = "&".join(sorted(k for k in urllib.parse.parse_qs(query, keep_blank_values=True)))
-        # ...and what a handler chose to add (the devapp action, B717): a
+        # ...and what a handler chose to add (the devapp action): a
         # POST keyed by its path alone could not say which verb was slow.
         extra = getattr(handler, "trace_extra", "")
         if extra:
@@ -3777,7 +3776,7 @@ def trace_since(since):
         g["n"] += 1
         g["first"] = min(g["first"], t)
         g["last"] = max(g["last"], t)
-        # How long each took (B245): a tab that loads slowly is one request
+        # How long each took: a tab that loads slowly is one request
         # that took seconds, and a count alone cannot say which.
         g["ms_max"] = max(g["ms_max"], ms)
         g["ms_sum"] += ms
@@ -3806,7 +3805,7 @@ def trace_since(since):
                      for r in slow[:8] if r[0] >= 500]}
 
 
-# ---- a session told the controller moved (R83) -----------------------------
+# ---- a session told the controller moved -----------------------------
 # A session keeps the briefing it was handed at its start, and nothing
 # re-briefs it when the controller is rebuilt within a compatibility window.
 # So the build a session began on is kept, per session, and on its next
@@ -3817,7 +3816,7 @@ def trace_since(since):
 # runs on one.
 SESSION_SEEN = "session-seen.json"
 # What the operator can change on a project that a session should be told of
-# on its next prompt (the operator, 25 Sep), with the verb that reads it. The
+# on its next prompt, with the verb that reads it. The
 # roadmap is roadmap.catchup's, which says which item moved; these say the
 # half. A session's own writes through the API are marked seen as they land
 # (session_mark_own), so only somebody else's move is said.
@@ -3825,7 +3824,7 @@ SEEN_HALVES = (("bug", "bugs", "`aerie bug`"), ("rules", "rules", "`aerie rules`
                ("mem", "memories", "the notebook's Memory view"),
                ("prefs", "settings", "`aerie settings`"),
                # ...and the design, which the house rules' fingerprint does
-               # not cover (B218): a session styling a page went on with the
+               # not cover: a session styling a page went on with the
                # old one, and docs/design-language.md was never written again.
                ("design", "design", "`aerie design show`, and write docs/design-language.md again with "
                                     "`aerie design file` before committing it"))
@@ -3853,9 +3852,9 @@ def _seen_now(project, who):
     made through the notebook by somebody who is not a session. Not the
     memory files' mtimes, which the poll's token is: a session's own memory
     tool writes those files without passing through here, and read as
-    news to the session that wrote them (B269). The two store tokens are
-    read as the poll reads them, and not by asking the whole poll for them
-    (R228 step 2): every relayed verb and prompt hook asked."""
+    news to the session that wrote them. The two store tokens are
+    read as the poll reads them, and not by asking the whole poll for them:
+    every relayed verb and prompt hook asked."""
     r = {}
     if WORKSPACE.joinpath(project).is_dir() and not project.startswith(".") \
             and (who is None or who is users.ALL or users.may_see(who, project)):
@@ -3881,7 +3880,7 @@ def _memory_written(req, held):
     """Whether a POST to /api/memory wrote a memory: one of memory.verb's
     writes, answered without an error. A history read writes nothing, and
     counting it told a project's sessions its memories had changed when a
-    person had only read the log (B296); a refusal or a conflict writes
+    person had only read the log; a refusal or a conflict writes
     nothing either. `held` is the reply _post is holding."""
     if field(req, "action") not in memory.WRITES or not held:
         return False
@@ -3930,7 +3929,7 @@ def session_mark_own(project, uid, who, since=None):
 
 
 # The house rule that asks a project's sessions to watch the diagnostics
-# reports (the operator, 6 Oct: check for new ones after every prompt). A
+# reports (check for new ones after every prompt). A
 # rule is text read at a session's start; this is what makes it hold: a
 # project that carries the rule is told on its next prompt when a report
 # newer than any it was told of is open. Keyed by the rule rather than by
@@ -3944,7 +3943,7 @@ def _diag_watch(project, uid):
     and its session may read the diagnostics; else None. The same gate as
     _diag_refused (debug mode on, the project granted them, an account with
     the debug grant): the notice named report #68 and its project to a
-    session that was refused reading it (the operator, 6 Oct)."""
+    session that was refused reading it."""
     try:
         if not any(r.get("name") == WATCH_DIAG_RULE for r in rules.rules(project)):
             return None
@@ -4003,7 +4002,7 @@ def _reset_after(principal):
     threading.Timer(1.0, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
 
 
-# A controller installed bare metal (R90), by the marker its installer
+# A controller installed bare metal, by the marker its installer
 # writes into the env file it starts from (BB_INSTALL=bare-metal,
 # nodes/install-controller.sh), never by guessing from the machine: the
 # container install has no such line and is what it always was.
@@ -4012,9 +4011,9 @@ BARE_METAL = os.environ.get("BB_INSTALL", "") == "bare-metal"
 
 def setup_node():
     """The name of a node enrolled, answering and running sessions, for
-    Finish on the setup page (R199), or "": a hosting-only one holds no
+    Finish on the setup page, or "": a hosting-only one holds no
     code, so a project has nowhere to work or build. On a bare-metal
-    install it is this machine's own node (R90), which the installer
+    install it is this machine's own node, which the installer
     enrolled, and Finish waits for that one and not for another."""
     if nodes is None:
         return ""
@@ -4026,7 +4025,7 @@ def setup_node():
                  if n.get("kind") == "agent" and n.get("state") == "online" and n.get("live")
                  and not (n.get("config") or {}).get("host_only")
                  and (not own or nodes.own_machine(n))), "")
-# ...and the home tunnel's (R176), applied by tunnel.py when they change.
+# ...and the home tunnel's, applied by tunnel.py when they change.
 TUNNEL_SETTINGS = ("tunnel_host", "tunnel_token", "cf_api_token")
 
 
@@ -4051,7 +4050,7 @@ def _start_only(project):
 def session_seen_note(project, uid, node, who=None, begin=False):
     """`begin`: record the build and the notebook this session starts from.
     Otherwise what has moved since, in one line, and the record moved on:
-    the controller's build (R83) and any half of this project's notebook or
+    the controller's build and any half of this project's notebook or
     its settings that somebody else changed."""
     build = _build_now()
     key = f"{project}|{uid}|{node or ''}"
@@ -4150,7 +4149,7 @@ def claude_auth(home=""):
 
 def agent_auth(home=""):
     """{agent id: {"nodes": {node id: {email, plan}}}} for every coding agent
-    with a sign-in of its own but Claude's (R95 step 3): what each node
+    with a sign-in of its own but Claude's: what each node
     reported this account is signed in to it as, from the same record."""
     return {a.id: {"nodes": {nid: {"email": v["email"], "plan": v["plan"]}
                              for nid, v in claudegrant.nodes_of(home, a.id).items()}}
@@ -4163,7 +4162,7 @@ def agent_auth(home=""):
 # needs and otherwise knows nothing about this file.
 import toolchains                                                  # noqa: E402
 
-# The tool packs a person added (R77): rows of the same catalog, kept under
+# The tool packs a person added: rows of the same catalog, kept under
 # /config, and carried to the nodes in the bundle beside the shipped one.
 import toolpacks                                                   # noqa: E402
 import catalogindex                                              # noqa: E402
@@ -4184,8 +4183,8 @@ import notify                                                    # noqa: E402
 
 
 # ---- signing in ------------------------------------------------------------
-# The flow runs as a job on a NODE, the machine Claude Code is installed on
-# (R47), and the card here carries its link and takes the code back. See
+# The flow runs as a job on a NODE, the machine Claude Code is installed on,
+# and the card here carries its link and takes the code back. See
 # signin.py for why every part of doing it in a terminal turned out to be
 # somewhere it could go wrong.
 import signin                                                    # noqa: E402
@@ -4297,23 +4296,23 @@ WORKTREES = Path(os.environ.get("BB_WORKTREES") or str(WORKSPACE / ".worktrees")
 import hardening                                                 # noqa: E402
 import signing                                                   # noqa: E402
 
-# ...the projects' git tokens (R135): gitcreds, and git's helper git-credential-bb...
+# ...the projects' git tokens: gitcreds, and git's helper git-credential-bb...
 import gitcreds                                                  # noqa: E402
-# The dashboard's own TLS (R158 step 2): the mode the settings say, the
+# The dashboard's own TLS: the mode the settings say, the
 # certificate's key sealed under the install key.
 import tls                                                       # noqa: E402
 # The page's Content-Security-Policy and what the browser reports against
-# it (R158 step 4, csp.py).
+# it (csp.py).
 import csp                                                       # noqa: E402
 import leanpage                                                  # noqa: E402
-# Whose terminals were opened on which node (R288 step 7): a node is handed
+# Whose terminals were opened on which node: a node is handed
 # a fresh session token only for a pair this controller gave it.
 import sessionsasked                                             # noqa: E402
 import membership                                                # noqa: E402
 import roles                                                     # noqa: E402
 import registry                                                  # noqa: E402
 import busy                                                      # noqa: E402
-# A project of several repositories (R136): which repositories are in which,
+# A project of several repositories: which repositories are in which,
 # and prefs laying a project's settings over its repositories'.
 import repos                                                     # noqa: E402
 # Where what grows is kept, as the Settings tab sets it (paths.py): read at
@@ -4323,8 +4322,8 @@ import paths                                                     # noqa: E402
 
 
 def _catalog_rows_refresh(index):
-    """Take a shipped toolchain's newer recipe from the vetted catalog (R234
-    step 4), off the request that read the index: each pack is a fetch, and
+    """Take a shipped toolchain's newer recipe from the vetted catalog,
+    off the request that read the index: each pack is a fetch, and
     a page never waits on one. The table and the bundle carry what was
     taken from the next read on."""
     try:
@@ -4345,8 +4344,8 @@ def _catalog_rows_refresh(index):
         toolchains.refresh_packs()
     threading.Thread(target=run, name="catalog-rows", daemon=True).start()
 def _catalog_apps_refresh(index):
-    """Take a kept Docker app's newer definition from the vetted catalog
-    (R238), off the request that read the index, as a shipped toolchain's
+    """Take a kept Docker app's newer definition from the vetted catalog,
+    off the request that read the index, as a shipped toolchain's
     newer recipe is taken: an app is fixed or re-pinned by a catalog commit,
     and a container made from it is then offered the images it names."""
     if not nasapps.wanted(index):
@@ -4368,7 +4367,7 @@ def no_node_advice(name):
     everywhere: a session reads and edits regardless (that is what this
     box is for), and building happens on a node or on GitHub."""
     # Settings is the notebook's view now, and "can push" read as news
-    # about a remote beside a repository with no upstream (B456): it is the
+    # about a remote beside a repository with no upstream: it is the
     # project's push rights, so it says what to do with them.
     return ("Pick one on the space's notebook Settings"
             + (", or push a commit and let CI build it."
@@ -4395,7 +4394,7 @@ def build_state(name):
             # the node is updated, and the tab says so before the refusal.
             "gap": nodes.agent_stale(n) if n else "",
             # What its last build took there, so the next one's room is
-            # known before it is refused for it (R110 step 7).
+            # known before it is refused for it.
             "took": nodes.last_took(name)}
 
 
@@ -4426,7 +4425,7 @@ import roadmap                                                   # noqa: E402
 import preamble                                                  # noqa: E402
 def live_block():
     """The build this controller is running, for the briefing every session
-    starts with (R75 step 5): the fact a session otherwise assumes. Short,
+    starts with: the fact a session otherwise assumes. Short,
     and pointing at the verbs that answer the rest."""
     st = image_stamp()
     what = st.get("version") or (st.get("rev") or "")[:12] or "an unstamped image"
@@ -4449,14 +4448,14 @@ import brief                                                     # noqa: E402
 # session is pointed at and docs/design-language.md written from it: design.py.
 import design                                                    # noqa: E402
 
-# The notebook's wiki (R112): a repository of the controller's own per
+# The notebook's wiki: a repository of the controller's own per
 # project, pushed with the project's granted rights and nothing the tree says.
 import wiki                                                      # noqa: E402
 
-# A project's CI on GitHub's own runners (R115): its runs and a failed job's
+# A project's CI on GitHub's own runners: its runs and a failed job's
 # log, read with the controller's credential for a session that has none.
 import cilogs                                                    # noqa: E402
-# ...and watched (R117): once a day per project with workflows, and at once
+# ...and watched: once a day per project with workflows, and at once
 # when a project is linked; the Git view, aerie catchup and the bell read it.
 import ciwatch                                                   # noqa: E402
 
@@ -4536,19 +4535,19 @@ import jobs                                                      # noqa: E402
 # macros.py. A node's session is typed into through its agent.
 import macros                                                    # noqa: E402
 
-# A phone lent to a project (R113): its sessions drive the project's own app.
+# A phone lent to a project: its sessions drive the project's own app.
 import phonelease                                                # noqa: E402
 
 
 # ---- the Profile tab -------------------------------------------------------------
 # An account's own settings, read and saved: profiletab.py.
 import profiletab                                                # noqa: E402
-# Two-factor sign-in (R127): the authenticator, passkeys and recovery codes.
+# Two-factor sign-in: the authenticator, passkeys and recovery codes.
 import mfa                                                       # noqa: E402
 
 
 # The install key made by the install and changed from the page, and each
-# account's own key for its sign-ins on the nodes (R154): what the nodes
+# account's own key for its sign-ins on the nodes: what the nodes
 # report of their seals decides when a key before today's can go.
 import accountkeys                                               # noqa: E402
 import logins                                                    # noqa: E402
@@ -4560,14 +4559,14 @@ def _node_seals():
     return {n["id"]: (n.get("reported") or {}).get("tokseal") for n in nodes.node_list(all=True)}
 
 
-# The bell's rows sent elsewhere, per person (R149, reach.py): the
+# The bell's rows sent elsewhere, per person (reach.py): the
 # destinations each keeps on Profile, the mail server from the settings.
 import reach                                                     # noqa: E402
 
 
 def _smtp_settings():
     """The mail server, read as the bell sends: its password's use is a
-    use of a connection (Connected services, R294 step 9)."""
+    use of a connection (Connected services)."""
     pw = settings.secret("smtp_password")
     if pw:
         connections.used("setting", "smtp_password")
@@ -4576,10 +4575,10 @@ def _smtp_settings():
             "password": pw, "from": settings.get("smtp_from")}
 
 
-# A model router on a node (R144 step 1, router.py): LiteLLM with the
+# A model router on a node (router.py): LiteLLM with the
 # provider keys, Ollama beside it, a key per allowed project.
 import router                                                    # noqa: E402
-# Connected services (R294 step 9, the connections rule): every credential
+# Connected services (the connections rule): every credential
 # the install holds for an outside service but a person's own, each kind
 # saying what it holds and how one is forgotten, the ledger beside them who
 # added each and when, its last use and its expiry.
@@ -4627,8 +4626,8 @@ def _conn_router():
 
 
 def _router_keys_said(nid, providers, custom, by):
-    """Each router key a save gave or cleared, for Connected services (R294
-    step 9): the router's page and its node's Configure both save them."""
+    """Each router key a save gave or cleared, for Connected services:
+    the router's page and its node's Configure both save them."""
     for pid, v in providers.items() if isinstance(providers, dict) else ():
         if str(v or "").strip() == "clear":
             connections.gone("router", f"{nid}/{pid}")
@@ -4662,23 +4661,23 @@ def _conn_git_forget(ref, by):
     return {"ok": True}
 
 
-# The Kubernetes clusters (R281 step 2): each a connection shared by spaces,
+# The Kubernetes clusters: each a connection shared by spaces,
 # its credential sealed under the install key like the router's keys.
 import clusters                                                  # noqa: E402
 import kube                                                      # noqa: E402
-# A space's environments on those clusters (R281 step 3): each a namespace
+# A space's environments on those clusters: each a namespace
 # kube.py makes ready with the cluster's credential, labeled with the space's
 # id, which never changes, and this install's mark.
-# k3s on a node (R281 step 1): a service from the Library, added to
+# k3s on a node: a service from the Library, added to
 # Clusters with the bootstrap token it was made with.
 import k3s                                                       # noqa: E402
-# A repository's build sent to one of those environments (R281 step 4): an
+# A repository's build sent to one of those environments: an
 # exec job on a node of its own that runs Docker, its tokens in secret_env.
 import deploys                                                   # noqa: E402
 
 
 def _session_deploy(name, act, env, ref, principal, uid, asker, allowed_by=""):
-    """A session's deploy or rollback started (R281 step 6): on its own
+    """A session's deploy or rollback started: on its own
     where the dial says auto, or once a person allowed it on the bell. As
     the session's own job; its registry's token is its account's own."""
     said = (f"a session of {asker}" if asker else "a session") + (f", allowed by {allowed_by}" if allowed_by else "")
@@ -4692,7 +4691,7 @@ def _session_deploy(name, act, env, ref, principal, uid, asker, allowed_by=""):
 
 
 def _deploy_on(name, when, refs, uid, asker, by_session):
-    """What a push or a release starts (R281 step 6): each environment of
+    """What a push or a release starts: each environment of
     the space whose `when` is a push to one of `refs` ({branch: commit}),
     or a release (`refs` {tag: commit}), deployed at that commit. A
     person's push or release starts them; a session's is under the space's
@@ -4721,11 +4720,11 @@ def _deploy_on(name, when, refs, uid, asker, by_session):
             print(f"[deploy] {name} on {when}: {type(x).__name__}: {x}", flush=True)
     threading.Thread(target=run, name=f"deploy-on-{when}", daemon=True).start()
 
-# What runs in an environment, and Restart and Scale on it (R281 step 5),
+# What runs in an environment, and Restart and Scale on it,
 # always through the environment's own deployer.
 import kubeview                                                  # noqa: E402
 import kubeexec                                                  # noqa: E402
-# A space's Discord server (R293): its bot's token sealed here, the server
+# A space's Discord server: its bot's token sealed here, the server
 # built out from the space's layout file. BB_DISCORD_API is the suites' stand-in.
 import discord                                                   # noqa: E402
 
@@ -4740,21 +4739,21 @@ def _acting_name():
 # An account's conversations with Claude as a download: transcripts.py.
 import transcripts                                               # noqa: E402
 
-# The VM manager (R91): its records, the jobs it queues, and what becomes of
+# The VM manager: its records, the jobs it queues, and what becomes of
 # them; a session's ask through the same machinery a container's goes.
 import vms                                                       # noqa: E402
 
 
 def _catalog_pin(url, commit, sha256, path=""):
     """The kept index's pack entry pinning exactly this url, commit, sha256
-    and folder, withdrawn ones left out, or None (B440)."""
+    and folder, withdrawn ones left out, or None."""
     return catalogindex.pinning(catalogindex.index(settings.get("catalog_url") or None).get("index"), url, commit, sha256, path)
 
 
 def _catalog_official(name):
     """The signed index's official pack entry of this name, withdrawn ones
     left out, or None: where a shipped coding agent's install recipe is
-    read when the catalog's is newer than this release's (R169 step 13).
+    read when the catalog's is newer than this release's.
     From the index as last read, never asked for now: a press on Update
     reads this, and the Library's own read keeps the index fresh."""
     return catalogindex.official(catalogindex.known(settings.get("catalog_url") or None), name)
@@ -4762,9 +4761,9 @@ def _catalog_official(name):
 
 def _pack_from_catalog(entry, by, may_root=False):
     """A pack from the vetted catalog kept at the commit the signed index
-    pins, its sha256 checked (R169 step 5): what the Library's Install keeps,
+    pins, its sha256 checked: what the Library's Install keeps,
     for a session's ask allowed or its dial at auto."""
-    # One written in a format this build has not met is not fetched (R234).
+    # One written in a format this build has not met is not fetched.
     past = catalogindex.too_new(entry, catalogindex.known(settings.get("catalog_url") or None))
     if past:
         return {"error": f"{entry['name']} {past}"}
@@ -4782,7 +4781,7 @@ def _catalog_pack(name):
 
 def _with_vmnets(nid, own):
     """Each project's own reach on a node, with the network its VMs are on
-    there (R91 step 8): its sessions reach those and no other project's."""
+    there: its sessions reach those and no other project's."""
     own = dict(own or {})
     for project, net in vms.nets_on(nid).items():
         own[project] = dict(own.get(project) or {}, vmnets=[net])
@@ -4805,7 +4804,7 @@ def _vm_do(principal, project, req, session):
     return vms.act(principal, project, field(req, "name"), field(req, "action"), dict(req, _session=session))
 
 
-# AerieOS's own scanners on each node (R145, scanners.py): deployed and
+# AerieOS's own scanners on each node (scanners.py): deployed and
 # run as compose and scan jobs there, their reports sent up.
 import scanners                                                  # noqa: E402
 
@@ -4828,7 +4827,7 @@ def _changelog_relinked(d, olds, new):
 
 
 def _changelog_bugs(project, comp="", groups=None):
-    """What the changelog editor shows of the tracker (R255): the bugs each
+    """What the changelog editor shows of the tracker: the bugs each
     line answers, by its words, and, for a fixed bug tied to none, the lines
     naming a commit that fixed it (found); the fixed bugs a line can be tied
     to, newest first; and the ones the next release owes a line
@@ -4872,7 +4871,7 @@ import channel                                                   # noqa: E402
 def _releaser(project, comp, asker_name, principal, dev=False, pre=""):
     """A session's release, run as the Artifacts view's Release runs it
     (version.verb's release), under the asking account's commit identity
-    and with the project's own credentials (R138)."""
+    and with the project's own credentials."""
     # The asker's commit identity, else the project's owner's: a relayed bb
     # carries a token minted for the project and no account.
     who = (users.get(asker_name) if asker_name else None) or users.get(membership.owner_name(project) or "") \
@@ -4881,9 +4880,9 @@ def _releaser(project, comp, asker_name, principal, dev=False, pre=""):
 
 
 def _release_editor(project, plan, asker_name="", principal=""):
-    """An edit of a published release (R139), made here with the project's
+    """An edit of a published release, made here with the project's
     own token, which the session never holds: the notes replaced, the
-    files attached that edit_plan() checked."""
+    files attached that edit_plan checked."""
     r = forgerelease.edit(project, plan)
     if not NODES_DOWN:
         db.audit(principal, "version-release-edit", project,
@@ -4894,8 +4893,8 @@ def _release_editor(project, plan, asker_name="", principal=""):
 
 
 def _release_remover(project, plan, asker_name="", principal=""):
-    """Files taken off a published release, its own ask (the operator,
-    5 Oct), with the project's own token."""
+    """Files taken off a published release, its own ask,
+    with the project's own token."""
     r = forgerelease.remove(project, plan)
     if not NODES_DOWN:
         db.audit(principal, "version-release-remove", project,
@@ -4907,7 +4906,7 @@ def _release_remover(project, plan, asker_name="", principal=""):
 
 def _release_withdrawer(project, plan, asker_name="", principal=""):
     """A release and its tag deleted on the forge with the project's own
-    token (R190 step 3), and the tag taken out of the controller's copy
+    token, and the tag taken out of the controller's copy
     too, so the number can be released again from a fixed commit."""
     r = forgerelease.withdraw(project, plan["tag"])
     if r.get("tagged") or not r.get("error"):
@@ -4922,7 +4921,7 @@ def _release_withdrawer(project, plan, asker_name="", principal=""):
 
 def _keymaker(action, project, args, by=""):
     """A new generated key or a package's key, for a session's auto dial and
-    for Allow on its ask (R106 step 6)."""
+    for Allow on its ask."""
     if action == "generate":
         return signing.generate(project, str(args.get("route") or ""), str(args.get("key") or "default"), by=by)
     if action == "map":
@@ -4933,7 +4932,7 @@ def _keymaker(action, project, args, by=""):
 
 
 def _release_signer(project, tag=""):
-    """A release's APKs looked for and signed again now (R134 step 5): a
+    """A release's APKs looked for and signed again now: a
     session's auto dial, and Allow on its ask. `tag` is a release whose
     signed APK is to be replaced by its own run's, signed again, which only
     a person's answer starts."""
@@ -4955,7 +4954,7 @@ DIALS = {"release": ("release it", "Tag and publish a release"),
          "keys": ("manage its signing keys", "Manage signing keys")}
 # The grant each dial stands for, which the session's account must hold as
 # well: the dial says what a session may do on its own, the roles what its
-# person may do at all (R277, the audit of 24 Nov: a session released on a
+# person may do at all (a session released on a
 # dial set to auto for an account with no Releases Write).
 DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing", "kube": "deploy", "discord": "settings"}
 
@@ -4968,20 +4967,19 @@ DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing", "kube
 # whatever the dial.
 ReleaseChange = collections.namedtuple("ReleaseChange", "does newest instead plan do ask asks")
 RELEASE_CHANGES = {
-    # Files off a published release: its own ask, never part of an edit (the
-    # operator, 5 Oct).
+    # Files off a published release: its own ask, never part of an edit.
     "release-remove": ReleaseChange(
         "changes", True, ", which taking a file off its release is part of; a person removes it on the forge",
         lambda name, tag, req: forgerelease.remove_plan(name, tag, req.get("remove") if isinstance(req.get("remove"), list) else []),
         _release_remover, phone.ask_release_remove, False),
-    # A release and its tag taken back together (R190 step 3): always a
+    # A release and its tag taken back together: always a
     # person's answer, since nothing undoes it; a session asks, a person at
     # the panel does it.
     "release-withdraw": ReleaseChange(
         "withdraws", False, ", which withdrawing one is part of; a person deletes it on the forge",
         lambda name, tag, req: forgerelease.withdraw_plan(name, tag),
         _release_withdrawer, phone.ask_release_withdraw, True),
-    # aerie version release --edit (R139): the published release's notes and
+    # aerie version release --edit: the published release's notes and
     # files, every edit its own ask.
     "release-edit": ReleaseChange(
         "edits", True, ", which an edit of its release is part of; a person edits it on the forge",
@@ -4993,22 +4991,22 @@ RELEASE_CHANGES = {
 import version                                                   # noqa: E402
 import vmtemplate                                                # noqa: E402
 
-# Release's forge half (R123; Gitea and GitLab, R124): the release beside a pushed tag.
+# Release's forge half (Gitea and GitLab): the release beside a pushed tag.
 import forgerelease                                              # noqa: E402
 import featuresoff                                               # noqa: E402
 # A release's APK, built unsigned in CI and signed on the project's node with
-# its sideload key (R106): a release made from the panel is looked for at once.
+# its sideload key: a release made from the panel is looked for at once.
 import releasesign                                               # noqa: E402
 
 
-# The files a release must carry (R190 step 4), checked as its CI ends, a
+# The files a release must carry, checked as its CI ends, a
 # release short of one said on the bell and a complete one said once.
 import releasefiles                                              # noqa: E402
 
 
 def _release_complete(project, tag, files, draft):
     """A release with every file it must carry, said once to the space's
-    owner where what was said is kept (R206 step 6): the bell's latest and
+    owner where what was said is kept: the bell's latest and
     the Notifications page."""
     uid = membership.owner_of(project)
     if uid:
@@ -5020,12 +5018,12 @@ def _release_made(project, tag):
     """A release's tag pushed, dev or stable: its unsigned APK expected for
     signing (releasesign.expect) and its files checked later
     (releasefiles.expect). A dev release's page is CI's, so this is not the
-    forge's half, which a dev release never reached (B469)."""
+    forge's half, which a dev release never reached."""
     releasesign.expect(project, tag)
     releasefiles.expect(project, tag)
 
 
-# What an agent may do on a project's git host (R188): measured with the
+# What an agent may do on a project's git host: measured with the
 # project's own token here, and the aerie forge relay, which never hands the
 # token to a node.
 import forgeaccess                                               # noqa: E402
@@ -5033,7 +5031,7 @@ import forgeaccess                                               # noqa: E402
 # ---- a node's git, relayed --------------------------------------------------
 # Push, fetch, pull and ls-remote from a session on a node, done in a
 # repository of the controller's own rather than in the tree the session can
-# write: gitrelay.py (B148).
+# write: gitrelay.py.
 import gitrelay                                                  # noqa: E402
 
 
@@ -5046,12 +5044,12 @@ import pushscan                                                  # noqa: E402
 
 
 def _push_approved(rec, by):
-    """A held push approved on the bell (R219): the flagged lines okayed
+    """A held push approved on the bell: the flagged lines okayed
     for the project, then the push, unscanned, in the relay's own
     repository, as the session's bb would have run it."""
     pushscan.okay(rec.get("project") or "", rec.get("findings") or [], by)
     to = str(rec.get("to") or "")
-    # Approved for its flagged lines, not for its workflow files (B559).
+    # Approved for its flagged lines, not for its workflow files.
     project = rec.get("project") or ""
     return gitrelay.run(project, rec.get("cwd") or str(WORKSPACE / project),
                         "push", rec.get("args") or [], scan=False, uid=to if to.startswith("u_") else "",
@@ -5217,7 +5215,7 @@ def _ftp_node(nid):
             "has_ftp": ("ftp" in has) if has else None}
 
 
-# A project's file access over FTP (R151): the store and its checks are
+# A project's file access over FTP: the store and its checks are
 # ftp.py's, the server is the node's (bb-ftpd from the ftp toolchain), and a
 # login is relayed by the agent to channel's ftp-auth.
 import ftp                                                       # noqa: E402
@@ -5228,7 +5226,7 @@ import diag                                                      # noqa: E402
 
 import reports                                                   # noqa: E402
 import files                                                     # noqa: E402
-# A node's projects as a synced copy (R162): the nodes in sync mode a
+# A node's projects as a synced copy: the nodes in sync mode a
 # project is bound to, and VS Code's writes reaching them at once.
 import wssync                                                    # noqa: E402
 import claudesync                                                # noqa: E402
@@ -5242,40 +5240,40 @@ def _sync_bound(project):
     return [i for i in dict.fromkeys([pr.get("node") or "", *(pr.get("nodes") or [])]) if i and i in synced]
 
 
-# Each project's daily snapshots (R165): what a node gone wrong through its
+# Each project's daily snapshots: what a node gone wrong through its
 # synced copy is undone from, kept for the days its settings say.
 import snapshots                                                 # noqa: E402
-# A person's devices (R272): their tokens, and the door their apps sync a
+# A person's devices: their tokens, and the door their apps sync a
 # project through as a node does (wssync), as far as the editor's door lets
 # that person (ftp.access_for).
 import devices                                                   # noqa: E402
 
 # The apps a person installs, fetched from this controller's release and
-# served from /apps (R272 step 3); which of them are offered is the
+# served from /apps; which of them are offered is the
 # Settings page's, set first by the seed file (step 4).
 import apps                                                      # noqa: E402
-# A newer release for a bare-metal install (R90 step 5, releasecheck.py):
+# A newer release for a bare-metal install (releasecheck.py):
 # asked of GitHub a while after the start and daily, on the bell and under
 # Controller settings, applied as the own node's system job.
 import releasecheck                                              # noqa: E402
 
 
-# Update checks on one clock (R176, checks.py): each check's cadence a
+# Update checks on one clock (checks.py): each check's cadence a
 # setting, when it last ran read off its own module, and Check now.
 import checks                                                    # noqa: E402
 
 
 def _own_os():
-    """What the controller's own machine says of AerieOS (R160 step
-    4), or {} where it runs on another system or in a container."""
+    """What the controller's own machine says of AerieOS,
+    or {} where it runs on another system or in a container."""
     nid = _own_node_id()
     n = nodes.node(nid) if nid else None
     return dict(((n or {}).get("reported") or {}).get("os_image") or {})
 
 
 def _own_host():
-    """What the controller's own machine says of its own packages' updates
-    (R164 step 3): {pending, security, reboot, checked}, or {} where it
+    """What the controller's own machine says of its own packages' updates:
+    {pending, security, reboot, checked}, or {} where it
     runs on AerieOS or in a container."""
     nid = _own_node_id()
     n = nodes.node(nid) if nid else None
@@ -5285,7 +5283,7 @@ def _own_host():
 def _builderbot_repo_token():
     """In debug mode, the GitHub token Controller settings' Unpublished
     builds holds, with which the update check sees AerieOS's draft
-    releases (the operator, 1 Nov); "" otherwise."""
+    releases; "" otherwise."""
     return settings.secret("release_token") if settings.debug_available() else ""
 
 
@@ -5321,23 +5319,23 @@ def _update_in_window(version):
     tag = "v" + version
     r = nodes.node_os_update("system:update-window", nid, tag) if _own_os() else nodes.node_controller_update("system:update-window", nid, tag)
     print(f"[dashboard] update window: {tag}: {r.get('job') or r.get('error')}", flush=True)
-# A held start on a bare-metal install (R56 step 9, held.py): read at the
+# A held start on a bare-metal install (held.py): read at the
 # start, lifted by Start on This controller, armed for the next restart.
 import held                                                      # noqa: E402
-# A prepared configuration a stick's first boot handed over (R161 step 8,
-# firstboot.py): applied once, here, before anybody can sign in or claim.
+# A prepared configuration a stick's first boot handed over
+# (firstboot.py): applied once, here, before anybody can sign in or claim.
 import firstboot                                                 # noqa: E402
 import adoptapps                                                 # noqa: E402
 import backup                                                    # noqa: E402
-# Moving this controller to another home (R90 step 12, move.py): the bundle
+# Moving this controller to another home (move.py): the bundle
 # and its token, the nodes told, the knock answered once restored here.
-# The file explorer (R224, fileexplorer.py): a machine's roots through its agent.
+# The file explorer (fileexplorer.py): a machine's roots through its agent.
 import fileexplorer                                              # noqa: E402
 import move                                                      # noqa: E402
 
 
 def _move_loop():
-    """The minute loop (R175 step 4): an old controller armed for a move
+    """The minute loop: an old controller armed for a move
     asks the new address whether its bundle landed, and a controller a
     move landed on tells the old one, each until answered."""
     while True:
@@ -5349,7 +5347,7 @@ def _move_loop():
 
 
 def _own_pool_mounts():
-    """The mounts of the controller's own machine's pools (R162), as its
+    """The mounts of the controller's own machine's pools, as its
     census says them: where a backup copy goes, and where a fresh install
     looks for one."""
     nid = _own_node_id()
@@ -5359,8 +5357,8 @@ def _own_pool_mounts():
 
 def _backup_dirs():
     """Where the controller's backup copies go: its own pools, and the disks
-    and shares under Other disks and shares that Backup copies names (the
-    operator, 6 Nov: a copy off the machine), each one that is on and
+    and shares under Other disks and shares that Backup copies names
+    (a copy off the machine), each one that is on and
     writable, at its folder under /mnt/other."""
     ids = set(str(settings.get("backup_also") or "").split())
     other = [f"/mnt/other/{r['name']}" for r in extmounts.rows()
@@ -5368,7 +5366,7 @@ def _backup_dirs():
     return _own_pool_mounts() + other
 
 
-# The id this machine's system pool is marked with (B939), in the state so a
+# The id this machine's system pool is marked with, in the state so a
 # backup or a move carries it: a stick that died is restored onto a new one,
 # whose own id differs, and the old pool is this controller's all the same.
 def _install_id_kept():
@@ -5389,7 +5387,7 @@ def _install_id_seen(iid):
 
 def _place_deploy_keys(folder):
     """A moved controller's deploy keys kept by the root helper, which alone
-    writes where this home keeps its own (B966): what to say of it."""
+    writes where this home keeps its own: what to say of it."""
     out, why = projects._key_helper(["--take", folder])
     if why:
         return f"the old controller's deploy keys were not kept here ({why}): make each space's key again in its settings"
@@ -5400,7 +5398,7 @@ def _place_deploy_keys(folder):
             f"; {loaded} loaded now, the rest at the controller's next start (Restart under Controller settings)"))
 
 
-# A person's PC lent to a project (R270 step 6): the companion lends a
+# A person's PC lent to a project: the companion lends a
 # table of verbs, a session asks with aerie pc under Agents may: Use a lent PC.
 import pcwork                                                    # noqa: E402
 
@@ -5514,38 +5512,38 @@ def _revisions(who=None, projects=None):
         # In memory, free to read.
         "phone.asks": len(phone.requests_open()),
         "phone.dev": phone.device_rev(),
-        # A phone lent to a project (R113): the lease and its newest shot.
+        # A phone lent to a project: the lease and its newest shot.
         "phone.lease": phonelease.rev(),
         "toolchains": toolchains.job_rev(),
         # Google's image index read ending, landed or not; its start is not
-        # news to the tab that asked (B757). The images themselves ride the
+        # news to the tab that asked. The images themselves ride the
         # node and job tokens, which the Emulator tab watches as well.
         "emulator": str(emulator._choices["reads"]),
         # Node and job data never joins the status payload (docs/nodes.md
         # §13): the views that show it watch this and fetch their own.
         "nodes": 0 if NODES_DOWN else nodes.rev(),
         # ...and a heartbeat's numbers alone, which the Nodes page draws and
-        # nothing else does (R218 step 10).
+        # nothing else does.
         "nodes.sample": 0 if NODES_DOWN else nodes.sample_rev(),
         # ...and a node's containers changing by themselves or by a shell:
         # the Containers page re-reads on it.
         "containers": 0 if NODES_DOWN else nodes.ctr_rev(),
-        # The chat between accounts, bumped on every message (R218 step 10):
+        # The chat between accounts, bumped on every message:
         # an open chat re-reads on it rather than every four seconds.
         "chat": chat.rev(),
-        # The nginx tab's record and hostnames (B714): a route written from
+        # The nginx tab's record and hostnames: a route written from
         # a Docker row, bb or another browser.
         "nginx": nginxproxy.rev(),
-        # The VMs page (R91): a record written, or a node's census of them.
+        # The VMs page: a record written, or a node's census of them.
         "vms": vms.rev(),
-        # The spaces' Kubernetes environments and their deploys (R281): an
+        # The spaces' Kubernetes environments and their deploys: an
         # environment saved, a deploy started or ended. The Kubernetes view
         # re-reads its environments on it.
         "deploy": kube.rev(),
-        # A space's Discord server connected, forgotten, planned or applied
-        # (R293): its settings section and its view re-read on it.
+        # A space's Discord server connected, forgotten, planned or applied:
+        # its settings section and its view re-read on it.
         "discord": discord.rev(),
-        # A release's APK being looked for and signed (R106): the Signing
+        # A release's APK being looked for and signed: the Signing
         # view follows a look to its end, and the bell's row goes with it.
         "releasesign": releasesign.rev(),
         "jobs": 0 if NODES_DOWN else nodes.jobs_rev(),
@@ -5558,8 +5556,8 @@ def _revisions(who=None, projects=None):
     }
     # Per project, for the views that are per project.
     for n in names:
-        # ...and each account's worktree's, whose builds the tab lists too
-        # (B237): a stat per worktree, and a project has a handful.
+        # ...and each account's worktree's, whose builds the tab lists too:
+        # a stat per worktree, and a project has a handful.
         wts = WORKTREES / n
         revs[f"dist:{n}"] = max([_mtime(WORKSPACE / n / "dist")]
                                 + ([_mtime(d / "dist") for d in wts.iterdir()]
@@ -5601,7 +5599,7 @@ def _revisions(who=None, projects=None):
                 n, home=home_for(users.uid_of(who)))["rev"]
     revs["vpolicy"] = _mtime(STATE / "versions.json")
     revs["prefs"] = _mtime(STATE / "claude-prefs.json")
-    # The Settings tab's store (R29): a save has to reach the next poll, and
+    # The Settings tab's store: a save has to reach the next poll, and
     # the payload is rebuilt only when something in this list moves.
     revs["settings"] = _mtime(STATE / "settings.json")
     # The dev-instance job and its files. In-memory counter plus mtimes, so
@@ -5669,7 +5667,7 @@ def _snapshot(who):
         # The zone this controller's clock keeps (TZ, its environment's): the
         # hours a schedule's timetable and the update window are read in,
         # named where they are set, while every time shown is the person's
-        # own (R294 step 8).
+        # own.
         "clock_tz": os.environ.get("TZ") or time.strftime("%Z"),
         # How many phone requests are waiting on the operator. A count and not
         # the requests themselves: this rides on every poll, and it exists so
@@ -5680,18 +5678,18 @@ def _snapshot(who):
         # (membership.py): Accept and Decline are answered there.
         "invites": _tpart("status:invites", lambda: membership.mine(who)),
         # A project this account sees whose main branch's newest CI run
-        # failed (ciwatch.red, R117): a bell row while it is true.
+        # failed (ciwatch.red): a bell row while it is true.
         "ci_red": _tpart("status:ci_red", lambda: bellseen.filter_rows(
             users.uid_of(who), ciwatch.red([p["name"] for p in ps]))[0]),
-        # A file changed on two synced copies at once (R162, wssync.py): the
+        # A file changed on two synced copies at once (wssync.py): the
         # copy kept beside it, listed until it is deleted.
         "sync_conflicts": _tpart("status:sync_conflicts", lambda: wssync.conflicts(lambda p: users.may_see(who, p))),
         # What is pinned in the bell about nodes (an agent behind, or from
         # another window), computed here on every poll so an alert clears
         # the moment it stops being true; nothing is stored to dismiss.
         "attention": attention,
-        # ...and this account's own standing notice to add a second factor
-        # (R127), kept out of `attention`, whose rows are the nodes' and
+        # ...and this account's own standing notice to add a second factor,
+        # kept out of `attention`, whose rows are the nodes' and
         # carry what the companion app reads off them.
         "two_factor_due": _tpart("status:two_factor", lambda: _two_factor_due(who)),
         # How many of them this account has put away, for the drawer's
@@ -5717,29 +5715,29 @@ def _snapshot(who):
         # now from one a browser carried across a restart.
         "boot": layout.boot_id(),
         "image": _tpart("status:image", lambda: image_stamp()),
-        # A bare-metal install's release against the newest (R90 step 5),
+        # A bare-metal install's release against the newest,
         # with its own node for the Update press; {} on a container install.
         "release": _tpart("status:release", lambda: (dict(releasecheck.status(), node=_own_node_id(), os=_own_os(), host=_own_host())
                                                       if BARE_METAL else {})),
-        # ...and whether its start is held (R56 step 9), with why.
+        # ...and whether its start is held, with why.
         "held": held.status(),
-        # ...and what a stick's prepared configuration did (R161 step 8), an
+        # ...and what a stick's prepared configuration did, an
         # administrator's to read on the Nodes page.
         "firstboot": firstboot.view((nodes.node(_own_node_id() or "") or {}).get("reported")) if BARE_METAL and users.is_admin(who) else None,
-        # ...and each update check's cadence and last run (R176), for
+        # ...and each update check's cadence and last run, for
         # Controller settings' Update checks.
         "checks": _tpart("status:checks", checks.view) if users.is_admin(who) else None,
         "catalog_mirror": catalogmirror.held() if users.is_admin(who) else None,
         # When the catalog's index in use was made and read, said beside it.
         "catalog_index": catalogindex.said(settings.get("catalog_url") or None) if users.is_admin(who) else None,
-        # The coding agents installed packs bring (R169 step 9), which the
+        # The coding agents installed packs bring, which the
         # page adds to its own table of the shipped five.
         "pack_agents": agents.page_rows(),
-        # ...and where this controller went, when it moved (R90 step 12):
+        # ...and where this controller went, when it moved:
         # the page is read-only then and says so.
         "moved_to": move.moved_to(),
         "projects": ps,
-        # Every project this account sees (R138), one with no repository in
+        # Every project this account sees, one with no repository in
         # it too: the Projects page draws each as one card, from this.
         "repos": _tpart("status:repos", lambda: _project_cards(who, ps)),
         "sessions": sessions,
@@ -5765,16 +5763,16 @@ def _snapshot(who):
         # Which nodes report this account signed in to Claude, and the
         # sign-in of theirs that is running, if one is.
         "claude_auth": _tpart("status:claude_auth", lambda: claude_auth(home_for(users.uid_of(who)))),
-        # The asker's key store (R158 step 5, R157): whether it is under a
+        # The asker's key store: whether it is under a
         # key of their own and shut, so the page asks for it before a
         # terminal opens and the Git view says why a push would wait.
         "store": unlocks.status(users.uid_of(who)) if users.uid_of(who) else {},
-        # ...and the other coding agents' the same way (R95 step 3).
+        # ...and the other coding agents' the same way.
         "agent_auth": _tpart("status:agent_auth", lambda: agent_auth(home_for(users.uid_of(who)))),
         "signin": login,
         # A clone or a first push runs in the background now, so the card can
         # say what it is doing without the dialog being open.
-        # The clone or link in flight, for whoever may start one (B171): it
+        # The clone or link in flight, for whoever may start one: it
         # names a project the account may not have been given, and its
         # buttons are that account's.
         "project_job": _tpart("status:project_job", lambda: {} if users.may(who, "create") else projects.job()),
@@ -5784,7 +5782,7 @@ def _snapshot(who):
         "max_tabs": layout.max_tabs(),
         # Everything the Settings tab edits, with where each value came from.
         "settings": _tpart("status:settings", lambda: settings.payload() | {"tunnel": tunnel.status(), "tls": tls.status(settings.get)}),
-        # The features this install switched off (R81), {feature: why}: each
+        # The features this install switched off, {feature: why}: each
         # draws its controls dead with the sentence under them.
         "off": featuresoff.sentences(),
         # ...and where the controller keeps what grows, an administrator's.
@@ -5828,30 +5826,30 @@ def _snapshot(who):
         "can": {name: not users.may(who, name) for name in
                 ("terminal", "terminal-any", "docker-write", "vms-write", "deploy", "toolchains-write", "curate", "configure", "git-auth", "admin",
                  # The CI runner tab, a job run and a project's node, by
-                 # grant (R137 step 3): the Tools card hides CI runner on it.
+                 # grant: the Tools card hides CI runner on it.
                  "runner", "runner-read", "jobs", "node",
                  # ...and what a space's card and the dialogs offer (step 4):
                  # drawn from the same grants the server refuses on.
                  "lock", "rename", "trash", "version", "create", "command-pin",
                  # ...and the debug options, which a page without the grant
-                 # does not show at all (the operator, 6 Oct).
+                 # does not show at all.
                  "debug",
                  # ...and Controller settings' own writes (deleting a bug
                  # report among them), for a reader who may not.
                  "controller")}
                # ...and what other projects a session may read: the owner's
-               # alone (the operator, 6 Oct), whatever the grants say.
+               # alone, whatever the grants say.
                | {"reads": (who or {}).get("role") == "owner",
                   # ...and a new node or VM, Nodes Write on every node, which
-                  # the Machines header's two buttons are drawn on (R277).
+                  # the Machines header's two buttons are drawn on.
                   "nodes-new": bool(who) and not users.may_instance(who, "nodes-write", ""),
                   # ...and maintenance mode, the owner's alone, a session of
                   # theirs counting as them.
                   "maintenance": users.is_owner(who)},
         # ...and, for the page-wide ones a bar offers, the server's own
-        # refusal, which is said under the dead control (B87).
+        # refusal, which is said under the dead control.
         "can_why": {name: users.may(who, name) for name in ("create", "trash")},
-        # Each area's level anywhere (R152 step 3), so the page hides a tab
+        # Each area's level anywhere, so the page hides a tab
         # whose area this account may not read: "", read or write.
         "areas": {a: ("write" if users.is_admin(who or {}) or (who or {}).get("session")
                       else roles.level_of(who or {}, a)) for a in roles.AREA_KEYS},
@@ -5866,8 +5864,8 @@ def _snapshot(who):
         # rather than a refusal: the row says who is here and nothing is
         # grayed for it. The page decides how to word "you and alice".
         # claude_with; which of them are working on a prompt right now, for
-        # the dot beside each name (the operator, 24 Sep), claude_busy; which
-        # are on Claude Code's permission prompt, claude_asking (B104); and
+        # the dot beside each name, claude_busy; which
+        # are on Claude Code's permission prompt, claude_asking; and
         # one row per account per node, claude_where, for the project row's
         # list: which machine each session is on. Every account's sessions
         # on the projects this account sees, as /api/live gives them.
@@ -5879,10 +5877,10 @@ def _snapshot(who):
         # an empty Projects card for a user with nothing granted rather than
         # telling them the share is not mounted (16 Sep).
         "admin": bool(who) and users.is_admin(who),
-        # A controller installed bare metal (R90): its own machine is the
+        # A controller installed bare metal: its own machine is the
         # first node, which the setup page shows being set up.
         "bare_metal": BARE_METAL,
-        # ...and its own machine's node when it has one (R90 step 8), which
+        # ...and its own machine's node when it has one, which
         # the rail's This machine is drawn for.
         "own_node": _own_node_id() if BARE_METAL else "",
         # Whether this account's commits would carry an author: the Claude
@@ -5896,12 +5894,12 @@ def _snapshot(who):
         # This account's color scheme, for a browser that has none stored.
         # index.html's adoptTheme says why localStorage still outranks it.
         "theme": users.prefs(who).get("theme", ""),
-        # ...and its time zone (R294 step 8): its dates on every browser that
+        # ...and its time zone: its dates on every browser that
         # picked none of its own, and its quiet windows on the bell.
         "tz": users.prefs(who).get("tz", ""),
         "mode": users.prefs(who).get("mode", ""),
         "motion": users.prefs(who).get("motion", ""),
-        # ...and its terminals' look (R133 step 10), which the page applies.
+        # ...and its terminals' look, which the page applies.
         "term_look": users.prefs(who).get("term") or {},
         # Whether this account has read the getting-started guide, and
         # which image's changelog it acknowledged: the welcome panel opens
@@ -5909,7 +5907,7 @@ def _snapshot(who):
         # once per image update), and these are what make it once.
         "welcome": {"seen": bool(users.prefs(who).get("welcome_seen")),
                     "image_seen": str(users.prefs(who).get("image_seen") or "")},
-        # ...and the pages it has toured, and whether it skips the tour (R94).
+        # ...and the pages it has toured, and whether it skips the tour.
         "tour": {"seen": [str(k) for k in users.prefs(who).get("tour_seen") or []][:64],
                  "off": users.prefs(who).get("tour_off") is True},
     }
@@ -5924,22 +5922,22 @@ def _snapshot(who):
 # ("/api/artifacts" before "/api/artifact"); auth.mjs fails on one an
 # earlier route takes. The doors before these (setup, login, the agent,
 # health, the terminal proxy, the page and its scripts) stay in _get and
-# _post, in front of the credential check (R60).
+# _post, in front of the credential check.
 #
 # method, how, path, handler: how is "exact", "prefix" or "door", and the
-#   handler is the method that answers, which carries its own refusals
-#   (R60). A door is a POST that _post answers itself ahead of the matched
+#   handler is the method that answers, which carries its own refusals.
+#   A door is a POST that _post answers itself ahead of the matched
 #   routes: it is here for what is held about it, and none of the tables of
 #   routes, gates or sessions has it.
 #
 # gate: what the route asks of its caller, held by the dispatcher before the
-#   handler runs (R227). A route that names none is not served, and
+#   handler runs. A route that names none is not served, and
 #   test/auth.mjs fails on one, so a new route cannot be reached until
 #   somebody has said who may reach it. Past being signed in, which _get and
 #   _post hold for every route:
 #     ("owner", words)   the owner's alone, never a session's
 #     ("admin", words)   an administrator's (the owner among them), never a
-#                        session's: six handlers each wrote it out (R283)
+#                        session's: six handlers each wrote it out
 #     ("person", words)  anybody's own sign-in, never a session's token
 #     ("handler", NAME, ...)
 #                        the handler holds its own, as it reads the request
@@ -5956,7 +5954,7 @@ def _snapshot(who):
 #   The words are what the refusal says, as the handler said it.
 #
 # session: whether a session's token reaches the route, which it does where
-#   this says so and nowhere else (R227 step 4; the operator, 15 Nov: now,
+#   this says so and nowhere else (now,
 #   and whole). A coding agent's session is not a person with fewer rights:
 #   it is another kind of caller, refused by the dispatcher on every route
 #   but these, which are the ones its own verbs and hooks call (each was
@@ -6007,20 +6005,20 @@ def _snapshot(who):
 #   the write is recorded, and a session's own write is marked seen as it
 #   lands (session_mark_own). Asked of the request's path, as a prefix.
 #
-# needs_repo: a route that a project with no repository (R208) has nothing
+# needs_repo: a route that a project with no repository has nothing
 #   behind, its notebook's and its tree's: refused with why rather than read
 #   off a folder that holds neither (_work_refused). Asked by path, so a
 #   path's GET and POST say the same.
 #
-# quiet: a POST that changes nothing a person reads the audit for (R228
-#   step 7), and is left out of it: a notebook's presence beat every fifteen
+# quiet: a POST that changes nothing a person reads the audit for,
+#  and is left out of it: a notebook's presence beat every fifteen
 #   seconds, and a session's hooks keeping their own books on every edit,
 #   prompt and turn. They were most of the audit's rows, 5,760 a day for one
 #   open notebook, and pushed real history out of the 200,000 kept. True for
 #   the whole route, or the hook kinds or actions by name; a hook's asked and
 #   started are kept, since each says something to people, and so is an
 #   ask's asking and answering, where the outcome a waiting session reads
-#   every second is not (B998: an hour of waiting was 3,600 rows). Asked of
+#   every second is not (an hour of waiting was 3,600 rows). Asked of
 #   the request's path, whole.
 Route = collections.namedtuple(
     "Route", "method how path handler gate session instead streamed max_body own_write needs_repo quiet",
@@ -6165,7 +6163,7 @@ ROUTES = (
     Route("POST", "prefix", "/api/project-auth", "_project_auth", ("handler", "space", "git-auth")),
     Route("POST", "exact", "/api/project-ftp", "_project_ftp", ("handler", "space", "ftp")),
     Route("POST", "prefix", "/api/container", "_container", ("handler", "node:configure", "docker-write", "docker-any", "space")),
-    # A GPU's .rom given on the VMs page (R100).
+    # A GPU's .rom given on the VMs page.
     Route("POST", "exact", "/api/vms", "_vms", ("handler", "admin", "node:nodes-write", "vms-write", "space"), session=True, max_body=3 * 1024 * 1024),
     Route("POST", "prefix", "/api/dockerctl", "_docker_ctl", ("handler", "read", "docker-read", "docker-write", "node:read", "admin", "node", "space", "node:nodes-write", "instance:configure", "node:configure", "docker-any"), session=True),
     Route("POST", "prefix", "/api/rename", "_rename", ("handler", "space", "rename", "git-auth")),
@@ -6276,7 +6274,7 @@ ROUTES = (
     Route("POST", "prefix", "/api/nodelog", "_nodelog", ("handler", "space", "debug"), session=True),
     Route("POST", "exact", "/api/diag", "_diag", ("handler", "debug"), session=True),
     Route("POST", "exact", "/api/reports", "_reports", ("handler", "space", "controller", "controller-read", "debug"), session=True),
-    # A file saved from a person's editor (R159): files.MAX_READ as base64.
+    # A file saved from a person's editor: files.MAX_READ as base64.
     Route("POST", "exact", "/api/v1/files", "_files",
           ("person", "a session has its space's tree already: this is a person's editor's"), max_body=28 * 1024 * 1024),
     Route("POST", "prefix", "/api/phone", "_phone", ("handler", "admin", "node", "space"), session=("ask", "outcome", "use"),
@@ -6353,11 +6351,11 @@ def route_gate(name, me, action=None):
 
 # The mark a Finish of the setup leaves under the state, never taken off: a
 # move lands only on a controller never finished (Handler._move_land), and
-# the setup_done setting alone could be turned back (B720).
-# The first account is made by whoever reaches the setup page first (B1165),
+# the setup_done setting alone could be turned back.
+# The first account is made by whoever reaches the setup page first,
 # so the page takes one only for a while after a start: the person who just
 # started AerieOS is there, and somebody on the network who finds it later
-# is not let in first (Portainer's way; the operator, 25 Nov: no code to type).
+# is not let in first (Portainer's way: no code to type).
 SETUP_WINDOW_S = 15 * 60
 SETUP_SHUT_SAID = ("Setting up is open for 15 minutes after AerieOS starts, so nobody else on the network can claim "
                    "it first. Restart AerieOS (its container, or its machine) to open it again.")
@@ -6370,18 +6368,18 @@ def setup_finished():
 
 
 # One landing at a time, held from its upload through the restart it ends in
-# (Handler._receive_move, B720).
+# (Handler._receive_move).
 _landing_lock = threading.Lock()
 
 
-# How long a kept connection waits for its next request (R228 step 9).
+# How long a kept connection waits for its next request.
 KEEP_IDLE_S = 30
 
 
 # Where a sign-in goes on to: a path on this dashboard and nothing else. A
 # backslash reads as a slash to a browser (/\\evil.example is //evil.example),
 # and a control character in a Location header is a header of its own, so
-# only a plain local path is taken (R288: the review of 26 Nov).
+# only a plain local path is taken (the review of 26 Nov).
 _NEXT = re.compile(r"/(?![/\\])[^\x00-\x1f\x7f\\]*")
 
 
@@ -6392,7 +6390,7 @@ def _local_next(nxt):
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "builderbot-dashboard"
-    # Kept connections (R228 step 9): every poll and every file was a new
+    # Kept connections: every poll and every file was a new
     # connection and a thread, and over TLS a handshake. A reply whose end
     # the client cannot know (no Content-Length: a stream, a websocket, a
     # reply written by hand or none at all) ends its connection, and so does
@@ -6428,7 +6426,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_header(self, keyword, value):
         # A line break in a header is a header of the caller's making: none
-        # is ever meant, so none is sent (R288).
+        # is ever meant, so none is sent.
         if any(c in str(value) for c in "\r\n") or any(c in str(keyword) for c in "\r\n:"):
             raise ValueError(f"a header with a line break: {keyword}")
         sent = getattr(self, "_sent", None)
@@ -6445,7 +6443,7 @@ class Handler(BaseHTTPRequestHandler):
         elif sent is not None and not sent["connection"] and (
                 (not sent["length"] and sent["code"] not in (204, 304)) or self._had_body()):
             self.send_header("Connection", "close")
-        # HSTS to the Let's Encrypt name alone, over TLS (R290 step 2).
+        # HSTS to the Let's Encrypt name alone, over TLS.
         if sent is not None and tls.over_tls(self.connection) and \
                 (v := tls.hsts(settings.get, self.headers.get("Host", "") if self.headers else "")):
             self.send_header("Strict-Transport-Security", v)
@@ -6457,8 +6455,8 @@ class Handler(BaseHTTPRequestHandler):
                                        or (h.get("Content-Length") or "0").strip() not in ("", "0")))
 
     def _who(self):
-        """The account making this request, or None, proved once a request
-        (R228 step 1): the gates and the handler each asked, four to six
+        """The account making this request, or None, proved once a request:
+        the gates and the handler each asked, four to six
         times a request, and each proof read the accounts, the sign-ins and
         the second factors again. Kept on the handler for this request only
         (_begin forgets it, the instance outliving a request on a kept
@@ -6484,11 +6482,11 @@ class Handler(BaseHTTPRequestHandler):
         if self._maint:
             u = None
         _writing.who = u
-        # Whose work this request's git is (R159): the person, or the person
+        # Whose work this request's git is: the person, or the person
         # a session was started for; and their sign-in, seen.
         gitcreds.ACTING.set(users.whose(u) if u else "")
         if u and u.get("lid"):
-            # Bound to the browser it was made in (R158 step 8): from
+            # Bound to the browser it was made in: from
             # another, or once ended from Profile, the cookie is nobody's.
             if not logins.seen(users.uid_of(u), u["lid"], self.headers.get("User-Agent", ""), self._client_ip()):
                 db.audit(f"user:{u.get('name')}", "sign-in refused", "another browser, or a sign-in ended",
@@ -6529,7 +6527,7 @@ class Handler(BaseHTTPRequestHandler):
         return logins.mint(u.get("uid") or "", "", self.headers.get("User-Agent", ""), self._client_ip())
 
     def _who_raw(self):
-        """_who_raw_proved, once a request as _who is (R228 step 1): the
+        """_who_raw_proved, once a request as _who is: the
         gates ask it beside _who. The flags it sets (_basic_2fa, _renewed)
         stay as the first proof left them."""
         memo = getattr(self, "_who_raw_memo", None)
@@ -6557,7 +6555,7 @@ class Handler(BaseHTTPRequestHandler):
         self._basic_2fa = False
         hdr = self.headers.get("Authorization", "")
         if hdr.startswith("Bearer ") and hdr[7:].strip().startswith(devices.PREFIX):
-            # The phone app's device token (R290): what it traded the
+            # The phone app's device token: what it traded the
             # password for once, at sign-in, its second factor with it. It
             # is that person, as the password was, and Profile's Disconnect
             # ends it. A PC's or an editor's speaks only to its own door.
@@ -6591,8 +6589,8 @@ class Handler(BaseHTTPRequestHandler):
             # The whole "user:password" is checked at once, so a correct name
             # with a wrong password is indistinguishable from both being wrong.
             u = users.authenticate_pair(given, where=self._peer())
-            # A password alone does not open an account with a second factor
-            # (R127): bb from a dashboard terminal carries its token instead.
+            # A password alone does not open an account with a second factor:
+            # bb from a dashboard terminal carries its token instead.
             if u and mfa.enabled(u.get("uid", "")):
                 self._basic_2fa = True
                 return None
@@ -6617,7 +6615,7 @@ class Handler(BaseHTTPRequestHandler):
     def _space_write(self, area, req):
         """The space a write names, once this account may act in `area` on it
         and has taken it on, or "" with the refusal already written: the
-        three questions a space's own write asks, asked once (R283 step 3)."""
+        three questions a space's own write asks, asked once."""
         name = self._project_asked(req)
         if not name or self._refused(area, name) or self._readonly(name):
             return ""
@@ -6632,8 +6630,8 @@ class Handler(BaseHTTPRequestHandler):
         questions, so every write that names a project asks this too.
         """
         why = users.may(self._who(), "write", name)
-        # ...and a project its owner has locked is nobody else's to change
-        # (R119), whoever they are.
+        # ...and a project its owner has locked is nobody else's to change,
+        # whoever they are.
         if not why and (bad := projects.locked_out(name, users.whose(self._who()))):
             why = bad["error"]
         if not why:
@@ -6645,7 +6643,7 @@ class Handler(BaseHTTPRequestHandler):
         """True, with the 400 already written, when `name` is not a project
         this account sees. The same shape as _refused: a guard that returns
         a bool. Twenty-nine handlers each rebuilt the visible set and wrote
-        the same reply before this existed (R60)."""
+        the same reply before this existed."""
         if name and name in set(project_names(self._who())):
             return False
         self._json({"error": refusals.no_space(name)}, 400)
@@ -6658,8 +6656,8 @@ class Handler(BaseHTTPRequestHandler):
         query's otherwise (`query` when the handler has parsed it already).
         It is refused by _not_project when it is not a project this account
         sees, for a read by Spaces Read on it (its notebook and code, as the
-        area says: R277, the audit of 24 Nov, where being on the space's list
-        through any role read them) and for a `write` by _readonly, in that
+        area says: being on the space's list
+        through any role is not enough) and for a `write` by _readonly, in that
         order, which is the order a person hears them in. The files (the
         File access area's own gate) pass `files` and ask their own."""
         if req is not None:
@@ -6675,15 +6673,15 @@ class Handler(BaseHTTPRequestHandler):
         """True, with the 400 written, when `key` is not a space's key this
         account sees: what a whole space's verbs (rename, delete, a repository
         put into it) ask of the key they name. _not_card's question without
-        its fall back to a repository's name; five handlers wrote it out
-        (R283 step 3)."""
+        its fall back to a repository's name; five handlers wrote it out.
+        """
         if key and registry.is_repos(key) and users.may_see(self._who(), key):
             return False
         self._json({"error": refusals.no_space(key)}, 400)
         return True
 
     def _not_card(self, name):
-        """_not_project, for what is a whole project's (R138: its pin,
+        """_not_project, for what is a whole project's (its pin,
         group, color, lock, archive, name and its deletion): a project's key
         this account sees passes too, one with no repository in it as much
         as any."""
@@ -6712,7 +6710,7 @@ class Handler(BaseHTTPRequestHandler):
         """What this account may do with a node's services (nginx, the
         scanners, the model router) on `nid`: "write" with Configure Write on
         it, "read" with Configure Read or Nodes Read on it, "" with neither
-        (R277: the pages were drawn whole on Nodes Read, every control live,
+        (the pages were drawn whole on Nodes Read, every control live,
         and refused on the press)."""
         if not users.may_node(me, "configure", nid):
             return "write"
@@ -6730,8 +6728,8 @@ class Handler(BaseHTTPRequestHandler):
     def _refused_nodes(self, ids):
         """True, with the 403 written, unless this account may choose each of
         the nodes `ids` names for a space (Nodes Write on it; none named
-        reaches no node and asks nothing): R277, the audit of 24 Nov, where
-        the check named the space instead of a node and a role on one node
+        reaches no node and asks nothing): asked of the space instead of a
+        node, a role on one node
         set any."""
         ids = [str(n).strip() for n in ids or [] if str(n or "").strip()]
         for nid in ids:
@@ -6752,7 +6750,7 @@ class Handler(BaseHTTPRequestHandler):
         """True, with the 403 written, when what `method path` reaches is a
         feature this install switched off (FEATURES_OFF): the reason and
         off, which the page draws as a dead control with its reason. Four
-        doors wrote it out (R283 step 3)."""
+        doors wrote it out."""
         why = featuresoff.refused(method, path, req) if req is not None else featuresoff.refused(method, path)
         if not why:
             return False
@@ -6763,7 +6761,7 @@ class Handler(BaseHTTPRequestHandler):
         """(the caller, its account's uid), or (None, "") with the 403 written
         when it is no account. `behind` reads the account a session's token
         stands for (users.whose), else the caller's own (users.uid_of). Six
-        handlers each wrote this out (R283 step 3)."""
+        handlers each wrote this out."""
         me = self._who()
         uid = (users.whose(me) if behind else users.uid_of(me)) if me else ""
         if not me or not uid:
@@ -6776,7 +6774,7 @@ class Handler(BaseHTTPRequestHandler):
         than its own; `words` says what a session does here instead. Its own
         is any repository of its space, as users.may_work holds it: eight
         handlers each compared the raw name, so a session was refused on its
-        own space's second repository (R283 step 3)."""
+        own space's second repository."""
         sess = (self._who() or {}).get("session")
         if not sess or name == sess or users.key_of(name or "") == users.key_of(sess):
             return False
@@ -6787,8 +6785,8 @@ class Handler(BaseHTTPRequestHandler):
         """True, with the 403 written, when this account may not do `action`
         (an area of a node's: Configure, Install, Nodes) on the node `nid`,
         or, with no node, on every node: an action across all of them asks
-        for a role holding the area on every one (R277, the audit of 24 Nov:
-        a node's services were gated by Containers Write held on any space)."""
+        for a role holding the area on every one
+        (a node's services were gated by Containers Write held on any space)."""
         who = self._who()
         why = users.may_node(who, action, nid) if nid else users.may_instance(who, action, "")
         if not why:
@@ -6800,7 +6798,7 @@ class Handler(BaseHTTPRequestHandler):
         """True, with the 403 written, when this account may not do `action`
         on one instance of its area held instance by instance (a cluster:
         roles.INSTANCE_AREAS), or, with `inst` "", on a new one, which a role
-        holding the area on some alone does not reach (R281). `name` is how
+        holding the area on some alone does not reach. `name` is how
         the refusal names it."""
         why = users.may_instance(self._who(), action, inst, name)
         if not why:
@@ -6837,8 +6835,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _session_held(self, action, project):
         """True, with the 403 written, when the account a session works for
-        may not do `action` on `project` itself (R277, the audit of 24 Nov:
-        a session's own routes followed its space's dial and never asked its
+        may not do `action` on `project` itself
+        (a session's own routes followed its space's dial and never asked its
         account, so a session did what its person could not). A session no
         account was minted for (the controller's own) answers to the dials
         alone, as everywhere."""
@@ -6910,7 +6908,7 @@ class Handler(BaseHTTPRequestHandler):
         # the account has no password anybody chose (_setup_post).
         if not setup and users.owner_name() == move.SETUP_ACCOUNT and not settings.get("setup_done"):
             err += f'<p class="note">Setting up a move here? Sign in as <b>{move.SETUP_ACCOUNT}</b> with the move token.</p>'
-        # The first page asks (the operator, 4 Nov): moving here, or a new
+        # The first page asks: moving here, or a new
         # start. A stick's plan that names disks has answered it already, and
         # an install that takes a move with no account says that it can.
         moving = bool(setup and (walk == "move" or (firstboot.view() or {}).get("adopt")))
@@ -6926,7 +6924,7 @@ class Handler(BaseHTTPRequestHandler):
                 .replace("<!--MOVENOW-->", move_now)
                 .replace("<!--ERR-->", err)
                 # What was typed comes back with a refusal: a wrong password
-                # keeps the username and where it was going (B38).
+                # keeps the username and where it was going.
                 .replace("<!--NAME-->", html_escape(name, quote=True))
                 .replace("<!--NEXT-->", html_escape(nxt or "/", quote=True))
                 .replace("<!--BANNER-->", featuresoff.banner_html())).encode()
@@ -6965,7 +6963,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
 
     def _setup_shut(self):
-        """Why a first-run door takes nothing now, or "" (B1165): asked from
+        """Why a first-run door takes nothing now, or "": asked from
         another site's page, which could have made the owner for whoever
         built it, or past SETUP_WINDOW_S after this start."""
         if self._post_cross_site():
@@ -6992,7 +6990,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         name = form.get("username", [""])[0]
         pw, pw2 = form.get("password", [""])[0], form.get("password2", [""])[0]
-        # Moving here (the operator, 9 Nov): the accounts arrive with the
+        # Moving here: the accounts arrive with the
         # move, so nobody invents one to set the disks up with. The walk's
         # steps still need somebody signed in, so the token the person has
         # with them anyway is that account's password, and the way back in
@@ -7007,7 +7005,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page("Those two passwords are not the same.",
                                     setup=True)
         # A /config the account cannot write is said on the page with what to
-        # do, not answered as a raw error the browser shows as text (B122).
+        # do, not answered as a raw error the browser shows as text.
         try:
             r = users.claim(name, pw)
         except OSError as e:
@@ -7020,9 +7018,9 @@ class Handler(BaseHTTPRequestHandler):
         print(f"dashboard: {name} claimed this container as the owner",
               flush=True)
         # ...and the people a stick's plan named, where it came with no
-        # owner's password (B946).
+        # owner's password.
         firstboot.people_after_claim()
-        # Then the rest of the setup page, which ends with a node (R199).
+        # Then the rest of the setup page, which ends with a node.
         settings.set_many({"setup_done": False})
         # Straight in, rather than back to a sign-in they just proved: they
         # typed the password twice thirty seconds ago. What they answered goes
@@ -7062,7 +7060,7 @@ class Handler(BaseHTTPRequestHandler):
                                     nxt=form.get("next", ["/"])[0][:2000])
         nxt = form.get("next", ["/"])[0]
         nxt = _local_next(nxt)
-        # A second factor where the account has one (R127), unless this
+        # A second factor where the account has one, unless this
         # browser was remembered for it; the password alone opens nothing.
         if mfa.enabled(u["uid"]) and not self._trusted_browser(u):
             return self._mfa_page(u, nxt)
@@ -7077,7 +7075,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _trusted_browser(self, u):
         """Whether this browser was remembered for this account's second
-        factor (R127): its cookie verifies and its id is still on the list."""
+        factor: its cookie verifies and its id is still on the list."""
         who, tid = purpose_user(self._cookie("bb_trust"), "trust")
         return bool(who and who["name"] == u["name"] and tid and mfa.trusted(u["uid"], tid))
 
@@ -7110,7 +7108,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _mfa_page(self, u, nxt, error="", status=200):
-        """The second step of signing in (R127), with the cookie that says
+        """The second step of signing in, with the cookie that says
         whose it is for ten minutes."""
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "sign in")
@@ -7132,7 +7130,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _two_factor_gate(self, path):
         """True, with the answer written, when a role of this account
-        requires a second factor it has not set up (R127): it reaches the
+        requires a second factor it has not set up: it reaches the
         setup page, its Profile's read and actions, and nothing else."""
         who = self._who() or {}
         uid = users.uid_of(who)
@@ -7154,7 +7152,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _setup_2fa_page(self):
         """GET /login/setup: an account whose role requires a second factor
-        sets one up here before anything else (R127). The page's script
+        sets one up here before anything else. The page's script
         speaks to /api/profile's two-factor actions, as Profile does."""
         who = self._who() or {}
         body = (LOGIN_HTML
@@ -7179,12 +7177,12 @@ class Handler(BaseHTTPRequestHandler):
         """What wrong codes are counted against: the account and the address,
         the one a trusted proxy passes on as wrong passwords are counted
         (_peer): behind a tunnel every visitor shared one socket address, so
-        ten wrong codes on any account held everyone's second step (R288)."""
+        ten wrong codes on any account held everyone's second step."""
         return (f"acct:{u['uid']}", f"addr:{self._peer()}")
 
     def _mfa_post(self):
         """POST /login/2fa: a code or a recovery code for the account the
-        bb_mfa cookie names (R127)."""
+        bb_mfa cookie names."""
         form = self._read_form()
         if form is None:
             return None
@@ -7209,7 +7207,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _mfa_passkey(self):
         """POST /login/passkey: the passkey's challenge, then its answer, for
-        the account the bb_mfa cookie names (R127)."""
+        the account the bb_mfa cookie names."""
         req = self._read_json()
         if req is None:
             return None
@@ -7269,7 +7267,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post_cross_site(self):
         """Why a POST signed in by the browser's cookie is refused as sent by
-        a page of another origin, or "" (B721). SameSite=Strict keeps the
+        a page of another origin, or "". SameSite=Strict keeps the
         cookie from other sites, not from another origin of the same site
         (an app this install routes, another of its hostnames), whose page
         could post a form here as whoever is signed in. The browser's own
@@ -7278,7 +7276,7 @@ class Handler(BaseHTTPRequestHandler):
         a terminal's socket is. A client with a token of its own (an
         Authorization header) is not a page."""
         # ...one the header itself signs in, that is: any other scheme falls
-        # through to the cookie, and is a page's request like any (R288).
+        # through to the cookie, and is a page's request like any.
         if self.headers.get("Authorization", "").startswith(("Bearer ", "Basic ")):
             return ""
         site = self.headers.get("Sec-Fetch-Site", "")
@@ -7289,14 +7287,14 @@ class Handler(BaseHTTPRequestHandler):
         return ""
 
     def _get_cross_site(self):
-        """The same for a read of /api/ (R227): some reads do things (a
+        """The same for a read of /api/: some reads do things (a
         bundle packed, a key marked backed up, a probe queued on a node),
         and another origin of the same site, which the cookie is sent to,
         could have a signed-in browser ask for one. A page of this origin
         says same-origin, an address typed or a bookmark says none, and a
         client with its own token is not a page."""
         # ...one the header itself signs in, that is: any other scheme falls
-        # through to the cookie, and is a page's request like any (R288).
+        # through to the cookie, and is a page's request like any.
         if self.headers.get("Authorization", "").startswith(("Bearer ", "Basic ")):
             return ""
         if self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
@@ -7304,7 +7302,7 @@ class Handler(BaseHTTPRequestHandler):
         return ""
 
     def _logout(self):
-        # The browser's sign-in is over (R159): its row goes, so its
+        # The browser's sign-in is over: its row goes, so its
         # person's tokens are used no more unless they are signed in
         # elsewhere.
         for part in self.headers.get("Cookie", "").split(";"):
@@ -7334,13 +7332,13 @@ class Handler(BaseHTTPRequestHandler):
         other projects' names (roadmap #27).
         """
         me = self._who()
-        # Read on every node is the registry too (R260), and Read on named
+        # Read on every node is the registry too, and Read on named
         # nodes those besides its projects'; an administrator's or a
         # session's answer is as it was. `areas` are the ones the read is
         # about: the Nodes listing is the Nodes page's alone, and a node's
         # contents (its toolchains, its Library) are Install's and
         # Configure's as well, so a role holding either reaches the nodes it
-        # holds them on there (R277, the audit of 24 Nov: an Install role on
+        # holds them on there (an Install role on
         # every node with no space of its own was shown none).
         if users.is_admin(me or {}) or (me or {}).get("session"):
             return None
@@ -7391,7 +7389,7 @@ class Handler(BaseHTTPRequestHandler):
         for n in rows:
             if n.get("kind") == "agent":
                 n["runner_tokens"] = sorted(tokens.get(n["id"], set()))
-            # What this account may do to it (R260), so the page leaves a
+            # What this account may do to it, so the page leaves a
             # node it may only read without its controls.
             n["may"] = "read" if users.may_instance(me, "nodes-write", n["id"]) else "write"
             n["areas_may"] = {a: "write" if users.is_admin(me) or me.get("session")
@@ -7409,7 +7407,7 @@ class Handler(BaseHTTPRequestHandler):
         return rows
 
     def _area_read_why(self, area, project=None, me=None):
-        """Why this person may not READ `area` (R152 step 3: an area without
+        """Why this person may not READ `area` (an area without
         Read is not shown, and its views are refused), or "". A session sees
         its own project's through its own routes, and the account behind it
         is held by users.may; an administrator reads everything."""
@@ -7454,12 +7452,12 @@ class Handler(BaseHTTPRequestHandler):
         if agents.of_arg(arg)[0]:
             project = agents.project_of_arg(arg)
             # An agent the project's settings switched off starts nothing
-            # there (R95), whoever asks.
+            # there, whoever asks.
             ag = agents.of_arg(arg)[0]
             if ag.id in ((prefs.get(project) or {}).get("agents_off") or []):
                 return f"{project}'s settings do not allow {ag.name} sessions: its Agents may section says which agents may run"
             # A project of several repositories has one session, on its
-            # first repository, working in all of them (R136): a second on
+            # first repository, working in all of them: a second on
             # another would share its worktrees.
             key = repos.project_of(project)
             first = (repos.members(key) or [""])[0] if key else ""
@@ -7467,11 +7465,11 @@ class Handler(BaseHTTPRequestHandler):
                 return (f"{registry.label(project)} is a repository of {registry.label(key)}, whose sessions "
                         f"start on {registry.label(first)} and work in every repository of it")
             # Terminal Read is the shielded Claude console; without it there
-            # is no terminal on the project at all (R152 (e)).
+            # is no terminal on the project at all.
             return users.may(me, "claude", project) or self._area_read_why("terminal", project, me)
         # A shell in a space's tree asks Terminal on that space; one on no
-        # space reaches every space's trees, Terminal Everywhere (R277, the
-        # audit of 24 Nov: asked of no space, a grant on one opened shells in
+        # space reaches every space's trees, Terminal Everywhere
+        # (asked of no space, a grant on one opened shells in
         # every other).
         project = _arg_project(arg)
         return users.may(me, "terminal", project) if project else users.may(me, "terminal-any")
@@ -7479,14 +7477,14 @@ class Handler(BaseHTTPRequestHandler):
     def _term_ro(self, me, arg):
         """Whether the terminal `arg` names opens read-only for `me`: no
         Terminal Write on the space it is about, or Everywhere for one about
-        none (R277: it was asked of no space, so a grant on one made every
+        none (it was asked of no space, so a grant on one made every
         space's agent sessions writable)."""
         project = _arg_project(arg)
         return bool(users.may(me, "terminal", project) if project else users.may(me, "terminal-any"))
 
     def _vm_con_refused(self, arg, me):
         """A sentence when this account may not open the console of the VM a
-        vm: argument names, "" when it may (R91): a person with a shell and
+        vm: argument names, "" when it may: a person with a shell and
         VMs Write on its project, or an administrator; an administrator alone
         when the project's Make VMs is deny; the VM running now."""
         m = _ARG_VM.match(arg)
@@ -7507,8 +7505,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _ctr_refused(self, arg, me):
         """A sentence when this account may not open a shell in the container
-        a ctr: argument names, and "" when it may (R218 step 4, the operator,
-        14 Oct): a person with a shell who may run that container, which is
+        a ctr: argument names, and "" when it may:
+        a person with a shell who may run that container, which is
         its project's account or an administrator, as for Start and Stop on
         the Containers page; an administrator alone when the project's Agents may:
         Run its container is Deny; and the container one of the instance's
@@ -7532,7 +7530,7 @@ class Handler(BaseHTTPRequestHandler):
     def _pod_refused(self, arg, me):
         """A sentence when this account may not open a shell in the pod a
         pod: argument names, and "" when it may: a container's Shell's rule
-        (R218 step 4) on the pod's repository, a person who may deploy and
+        on the pod's repository, a person who may deploy and
         work there, and an administrator alone where its Agents may: Run its
         container is Deny. A session never; it has aerie k8s."""
         m = _ARG_POD.match(arg)
@@ -7549,7 +7547,7 @@ class Handler(BaseHTTPRequestHandler):
         return ""
 
     def _pod_shell(self, arg, dims):
-        """/termws?arg=pod:... (R281): a shell in a pod, the dock's socket
+        """/termws?arg=pod:...: a shell in a pod, the dock's socket
         spliced to the API's exec by kubeexec, signed in as the
         environment's deployer; asked again every few seconds and ended
         when it is no longer allowed. Audited."""
@@ -7589,7 +7587,7 @@ class Handler(BaseHTTPRequestHandler):
     def _ctr_may(self, me, action, owner):
         """Whether `me` may do `action` (docker-read for a log, terminal for a
         shell, docker-write) on a container of the space `owner`, asked of
-        that space (R277, the audit of 24 Nov: asked of none, a grant on any
+        that space (asked of none, a grant on any
         space reached every container): one of AerieOS's own is a service,
         Configure on every node; one of no space asks the area Everywhere."""
         if owner == devapp.SYSTEM:
@@ -7648,7 +7646,7 @@ class Handler(BaseHTTPRequestHandler):
         arg = _term_arg(rest)
         me = me or self._who()
         uid = users.uid_of(me)
-        # A held start (R56 step 9): no agent session runs until Start is
+        # A held start: no agent session runs until Start is
         # pressed on This controller; a shell is a person's and still opens.
         if held.is_held() and agents.of_arg(arg)[0]:
             return held.said()
@@ -7729,7 +7727,7 @@ class Handler(BaseHTTPRequestHandler):
                 project = _arg_project(want)
                 if node and uid and project:
                     # ...and that node is one this pair's token was given to,
-                    # whose heartbeat may then be handed a fresh one (R288).
+                    # whose heartbeat may then be handed a fresh one.
                     sessionsasked.note(nid, uid, project)
                     out.append("arg=" + urllib.parse.quote(
                         f"tok:{users.mint_session(project, uid=uid)}", safe=""))
@@ -7748,7 +7746,7 @@ class Handler(BaseHTTPRequestHandler):
               "xterm.css": "text/css; charset=utf-8"}
 
     def _vendor(self, name):
-        """The page's vendored libraries (R133), by name from a fixed list,
+        """The page's vendored libraries, by name from a fixed list,
         never a general file server."""
         if name not in self.VENDOR:
             return self._json({"error": "not found"}, 404)
@@ -7772,7 +7770,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         # Framed by the dashboard alone, and its client's socket to this
         # dashboard alone: a link naming another host showed somebody's VNC
-        # server inside this origin (R288).
+        # server inside this origin.
         if target.suffix == ".html":
             self.send_header("Content-Security-Policy", "frame-ancestors 'self'; connect-src 'self'; base-uri 'self'; "
                                                         "form-action 'self'; object-src 'none'")
@@ -7781,7 +7779,7 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _screen_proxy(self):
-        """/screen/ws?vm=PROJECT/NAME (R99): the browser's noVNC relayed to
+        """/screen/ws?vm=PROJECT/NAME: the browser's noVNC relayed to
         the VM's node, whose agent opens the VM's VNC on its loopback. Seeing
         a screen is driving the machine, so it takes VMs Write on the VM's
         project; the request upstream carries this controller's signature for
@@ -7804,7 +7802,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": f"{rec.get('node_name')} cannot be reached for a screen"}, 503)
         t = int(time.time())
         # Over TLS to the certificate the node reported, and signed with a
-        # value of this request's own where the node takes one once (R243).
+        # value of this request's own where the node takes one once.
         relay, rt = nodes.relay_of(rec["node"]), termws.relaytls()
         nonce = os.urandom(12).hex() if relay["once"] else ""
         sig = hmac.new(key.encode(), f"{rt.subject(rec['domain'], nonce)}.{t}".encode(), hashlib.sha256).hexdigest()
@@ -7823,7 +7821,7 @@ class Handler(BaseHTTPRequestHandler):
                 lines.append(f"{k}: {v}")
         self.close_connection = True
         down = self.connection
-        # On its row while it lasts: who else has the Screen (the operator, 21 Oct).
+        # On its row while it lasts: who else has the Screen.
         here = vms.present(f"{project}/{name}", "screen", (self._who() or {}).get("name") or self._principal(),
                            users.uid_of(self._who() or {}) or "")
         try:
@@ -7845,7 +7843,7 @@ class Handler(BaseHTTPRequestHandler):
             up.close()
 
     def _term_decide(self, rest0):
-        """Whether this terminal may open and where it runs (R133):
+        """Whether this terminal may open and where it runs:
         (target, vm match, None), or (None, None,
         (why, status)). `rest0` is the path after the prefix, ?arg= and all."""
         refused = self._term_refused(rest0)
@@ -7867,7 +7865,7 @@ class Handler(BaseHTTPRequestHandler):
         # only Claude is the thing this container does not carry, so the
         # question is asked about a claude: argument and about nothing else.
         arg0 = _term_arg(rest0)
-        # ...and a container's shell is where its container is (R218 step 4).
+        # ...and a container's shell is where its container is.
         ctr = _ARG_CTR.match(arg0)
         vmm = _ARG_VM.match(arg0)
         target = ctr_target(ctr.group(1), ctr.group(2)) if ctr else vm_target(*vmm.groups()) if vmm else \
@@ -7877,7 +7875,7 @@ class Handler(BaseHTTPRequestHandler):
                            uid=users.uid_of(self._who() or {}) or "")
         if target["where"] == "refused":
             return None, None, (target["why"], 503)
-        # A VM's Console is one person's at a time (the operator, 21 Oct):
+        # A VM's Console is one person's at a time:
         # anybody else is refused while it is held, unless the project's
         # owner or an administrator took it over a moment ago.
         if vmm:
@@ -7887,12 +7885,12 @@ class Handler(BaseHTTPRequestHandler):
                 return None, None, (f"{', '.join(w for _, w in held)} has {vmm.group(2)}'s Console open, and it is "
                                     "one person's at a time. Its Screen can be shared, or ask them; the "
                                     "space's owner or an administrator can take it over.", 409)
-        # A terminal on the controller itself, switched off for this install
-        # (R81): what a node runs is the node's, and stays.
+        # A terminal on the controller itself, switched off for this install:
+        # what a node runs is the node's, and stays.
         if target["where"] != "node" and (why := featuresoff.sentences().get("shell")):
             return None, None, (why, 403)
-        # A shell on this controller is an administrator's (B1166, the operator,
-        # 25 Nov): it runs as the dashboard's own account, which reads every
+        # A shell on this controller is an administrator's:
+        # it runs as the dashboard's own account, which reads every
         # space's tree and what unseals the install's secrets, and could write
         # what a start runs as root. Anyone else's shell opens on a node; a
         # read-only view runs nothing and is not held to it.
@@ -7906,7 +7904,7 @@ class Handler(BaseHTTPRequestHandler):
         return target, vmm, None
 
     def _term_own(self):
-        """/termws?arg=...&cols=&rows= (R133): AerieOS's own terminal, a
+        """/termws?arg=...&cols=&rows=: AerieOS's own terminal, a
         websocket the page, the Android app and the VS Code extension open
         directly. Decided by _term_decide and _scoped_arg; a refusal is the
         socket closing with why. On this controller bb-tty runs in a pty
@@ -7919,10 +7917,10 @@ class Handler(BaseHTTPRequestHandler):
         dims = {k: termws.term()._dim((q.get(k) or [""])[0], d) for k, d in (("cols", 80), ("rows", 24))}
         if self._ws_refused():
             return None
-        # A log, read-only and followed (R133 step 12): no program runs.
+        # A log, read-only and followed: no program runs.
         if _term_arg(args).startswith("log:"):
             return self._log_own(_term_arg(args), args, dims)
-        # A shell in a pod (R281): the controller is the cluster's client.
+        # A shell in a pod: the controller is the cluster's client.
         if _term_arg(args).startswith("pod:"):
             return self._pod_shell(_term_arg(args), dims)
         target, vmm, no = self._term_decide(args)
@@ -7952,7 +7950,7 @@ class Handler(BaseHTTPRequestHandler):
                 ro = self._term_ro(self._who(), _term_arg(args)) and not (_ARG_CTR.match(_term_arg(args)) or vmm)
                 kind = "ctr" if (_ARG_CTR.match(_term_arg(args)) or vmm) else "ro" if ro else "rw"
                 # A person's own terminal carries what opens their sealed
-                # sign-ins there (R126), wrapped to the agent; a container's
+                # sign-ins there, wrapped to the agent; a container's
                 # or a VM's never does, nor anybody else's.
                 tk = None
                 if kind != "ctr" and nodes.token_seal_on(target["id"]):
@@ -8007,7 +8005,7 @@ class Handler(BaseHTTPRequestHandler):
                 return data.decode("utf-8", "replace"), ""
             return read, None
         if kind == "node":
-            # A machine's own log (R133 step 12), as a person with the debug
+            # A machine's own log, as a person with the debug
             # grant reads it from the node's row: the stream's last lines,
             # read again every ten seconds (each read is a job on the node,
             # so not every second), the screen drawn afresh when they move.
@@ -8029,7 +8027,7 @@ class Handler(BaseHTTPRequestHandler):
                 return held["text"], ""
             return read, None
         if kind == "ci":
-            # A CI run's jobs and their logs (R133 step 12), as /api/ci-runs
+            # A CI run's jobs and their logs, as /api/ci-runs
             # reads one for an account that sees the project: fetched from
             # the git host once, since a finished run's log does not move,
             # and the project's visibility asked again as the tab is kept.
@@ -8051,7 +8049,7 @@ class Handler(BaseHTTPRequestHandler):
         if kind == "dm":
             return self._dm_log_reader(rest)
         if kind == "pod":
-            # A pod's log in one of a space's environments (R281 step 5):
+            # A pod's log in one of a space's environments:
             # log:pod:REPO:ENV:POD[:CONTAINER], read with the environment's
             # deployer, its end read again every five seconds, as Deploy
             # Read on the space allows, asked again with each read.
@@ -8113,7 +8111,7 @@ class Handler(BaseHTTPRequestHandler):
         return read, None
 
     def _log_own(self, arg, args, dims):
-        """/termws?arg=log:... (R133 step 12): a log in a dock tab, followed
+        """/termws?arg=log:...: a log in a dock tab, followed
         as it is written and read-only, its reader asked again every few
         seconds and the tab ended when it may no longer read it. A
         container's is followed on its node (bb-tty's log:ctr:, docker logs
@@ -8215,7 +8213,7 @@ class Handler(BaseHTTPRequestHandler):
                 raw = (raw.replace(b"<title>AerieOS</title>", b"<title>" + PRODUCT.encode() + b"</title>", 1)
                        .replace(b"<h1>AerieOS</h1>", b"<h1>" + PRODUCT.encode() + b"</h1>", 1))
             body, zipped = self._gzip(raw)
-            # The page's policy (R158 step 4): its own scripts and styles,
+            # The page's policy: its own scripts and styles,
             # the inline blocks it ships by their hash.
             policy = csp.header(raw) if ctype.startswith("text/html") else ""
             # What was sent, kept while the file is as it was: one entry a
@@ -8250,7 +8248,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, obj, code=200, cookie=None):
         # Held while _post records what a write means for the sessions: it
-        # sends the reply itself once that is done (B290).
+        # sends the reply itself once that is done.
         if getattr(self, "_held", None) is not None:
             self._held.append((obj, code, cookie))
             return None
@@ -8298,8 +8296,7 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             # The other end went away mid-answer: a download canceled, a tab
             # closed. Nothing failed here and nobody is left to answer, so it
-            # is one quiet line, not a traceback that aerie diag lists as a fault
-            # (B429).
+            # is one quiet line, not a traceback that aerie diag lists as a fault.
             print(f"[dashboard] {self.command} {self.path.partition('?')[0]}: the client left "
                   "before the answer was sent", flush=True)
         except Exception as e:                          # noqa: BLE001 (last resort)
@@ -8315,9 +8312,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _begin(self):
         """A request begins: what the last one on this connection proved and
-        set is forgotten (a kept connection serves several, R228 step 9, on
+        set is forgotten (a kept connection serves several, on
         one thread), and each state file is looked at once in this one
-        (statefile.begin_request, R228 step 1)."""
+        (statefile.begin_request)."""
         self._who_memo = self._who_raw_memo = self._sent = None
         self._maint = self._basic_2fa = False
         self._renewed = ""
@@ -8351,8 +8348,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _tunnel_refused(self):
         """A node's tunnel address asks for the agent's API or nothing
-        (nodes.tunnel_refuses, R161): by the socket's own address, and
-        through a tunnel from home (R170) by the hostname the node was
+        (nodes.tunnel_refuses): by the socket's own address, and
+        through a tunnel from home by the hostname the node was
         enrolled at, or an edge's own headers, which only narrow their writer."""
         if NODES_DOWN:
             return False
@@ -8365,10 +8362,10 @@ class Handler(BaseHTTPRequestHandler):
                                    # machine's loopback: every request Cloudflare proxies
                                    # carries Cf-Ray, so a dashboard simply put behind
                                    # Cloudflare under its own name was refused everything
-                                   # but the agents' API (B137). Other tunnels are known by
+                                   # but the agents' API. Other tunnels are known by
                                    # the hostname, and the controller's own public hostname
-                                   # (R176) is one whatever rule the tunnel carries, so a rule
-                                   # left wide reaches no page (bb.neat.fish, 11 Oct).
+                                   # is one whatever rule the tunnel carries, so a rule
+                                   # left wide reaches no page (bb.neat.fish).
                                    edge=nodes.own_tunnel_edge("Cf-Ray" in self.headers, peer)
                                         or bool(own and host.lower().rsplit(":", 1)[0] == own))
         if why:
@@ -8403,15 +8400,15 @@ class Handler(BaseHTTPRequestHandler):
         # has to happen rather than on a sign-in with nothing to sign in to.
         # The agents' API is not a page and carries its own token: a
         # controller installed bare metal enrolls its own machine as a node
-        # before anybody has made the first account (B323), and its agent's
+        # before anybody has made the first account, and its agent's
         # download met the first-run card.
         if path.startswith("/api/v1/agent/"):
             return self._agent()
         if path.startswith("/api/v1/move/"):
-            # The other controller's door (R175): a proof under the move
+            # The other controller's door: a proof under the move
             # key, never a credential of either side.
             return self._move_peer()
-        # An accounts file that cannot be read is not a fresh install (B763).
+        # An accounts file that cannot be read is not a fresh install.
         if users.unreadable() and path not in ("/favicon.ico", "/favicon.svg"):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if not users.all_users() and path not in ("/favicon.ico", "/favicon.svg"):
@@ -8426,7 +8423,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._setup_2fa_page()
         if path == "/logout":
             # Asked by a page of another site or origin, it signs nobody out:
-            # any page could link a visitor here (R288). Typed, bookmarked or
+            # any page could link a visitor here. Typed, bookmarked or
             # pressed on this dashboard's own page, it does.
             if self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
                 self.send_response(302)
@@ -8448,7 +8445,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._deny()
         if self._two_factor_gate(path):
             return None
-        # The page is a person's (R227 step 4): a session's token opens the
+        # The page is a person's: a session's token opens the
         # routes SESSION_ROUTES names, all of them under /api/, and none of
         # the page, its scripts, a terminal, a VM's screen, a companion
         # app's file or the metrics.
@@ -8457,8 +8454,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/metrics":
             if NODES_DOWN:
                 return self._json({"error": NODES_DOWN}, 503)
-            # Every node's figures: the Nodes page's, Nodes Read (R277, the
-            # audit of 24 Nov: anybody signed in read them).
+            # Every node's figures: the Nodes page's, Nodes Read
+            # (anybody signed in read them).
             if self._refused("nodes-read"):
                 return None
             body = jobs.metrics_text().encode()
@@ -8468,11 +8465,11 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return None
-        # A VM's screen (R99): noVNC's page and client, and the relay to the
+        # A VM's screen: noVNC's page and client, and the relay to the
         # VM's node.
         if path.startswith("/novnc/"):
             return self._novnc(path[len("/novnc/"):])
-        # xterm.js and its fit addon (R133), vendored beside the page.
+        # xterm.js and its fit addon, vendored beside the page.
         if path.startswith("/vendor/"):
             return self._vendor(path[len("/vendor/"):])
         if path == "/screen/ws":
@@ -8480,7 +8477,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/termws":
             return self._term_own()
         # One terminal on a page of its own: a tab popped out of the dock,
-        # and the Android app's session screen (R133).
+        # and the Android app's session screen.
         if path == "/terminal":
             return self._static("terminal.html", "text/html; charset=utf-8")
         if path.startswith("/apps/"):
@@ -8517,10 +8514,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "public, max-age=86400")
             self.end_headers()
             return self.wfile.write(body)
-        # A feature this install switched off (R81) answers its sentence.
+        # A feature this install switched off answers its sentence.
         if self._feature_off("GET", path):
             return None
-        # An exact route is the path without its query (B409): /api/audit?n=50
+        # An exact route is the path without its query: /api/audit?n=50
         # and /api/router?node=N are the exact routes' own reads.
         if path.startswith("/api/") and (why := self._get_cross_site()):
             return self._json({"error": why}, 403)
@@ -8536,7 +8533,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _work_refused(self, route, project):
         """Why a route that reads or writes a repository's notebook or tree
-        is refused for a project with no repository (R208): it has no git
+        is refused for a project with no repository: it has no git
         and no notebook, and a read of its folder as one would make one.
         "" for every other route and project."""
         if route not in WORK_REFUSED or not project or not repos.is_work(project):
@@ -8549,7 +8546,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_trace(self):
         """GET /api/trace?since=T: what this server was asked since T,
-        grouped by endpoint (R75 step 4). For an admin or a session: the
+        grouped by endpoint. For an admin or a session: the
         page's own behavior is what it describes, and a session diagnosing
         a tab that asks too much is the reader it exists for. Paths and
         query KEYS only, never values: a project's name in a query is the
@@ -8595,7 +8592,7 @@ class Handler(BaseHTTPRequestHandler):
         the status payload also carries (projsessions.maps), alone and
         cheap. Fetched when the revs token `live` moves."""
         who = self._who()
-        # ...each project on its list as its repositories (R138), which the
+        # ...each project on its list as its repositories, which the
         # sessions are named for.
         seen = None if users.sees_all(who) else [r for p in (who or {}).get("projects") or []
                                                   for r in (repos.members(p) or [p])]
@@ -8621,13 +8618,13 @@ class Handler(BaseHTTPRequestHandler):
                             path=q.get("path", [""])[0], n=n,
                             branch=q.get("branch", [""])[0])
         if isinstance(body, dict) and not body.get("error") and q.get("what", [""])[0] in ("", "all", "status"):
-            # Whose token a press would use (R159), by name.
+            # Whose token a press would use, by name.
             body["token"] = _token_said(name, users.uid_of(self._who()))
         return self._result(body)
 
     def _get_forge_access(self):
         """GET /api/forge-access: what an agent may do on this project's git
-        host (R188), each ability with what its token says and the project's
+        host, each ability with what its token says and the project's
         own override, from the kept measure; for a project this account
         sees."""
         if not (name := self._project_asked()):
@@ -8668,7 +8665,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _csp_report(self):
         """POST /api/csp-report: what a browser refused under the page's
-        policy (R158 step 4), kept for the Doctor (csp.report). The browser
+        policy, kept for the Doctor (csp.report). The browser
         sends it on its own, from the login page too, so it is taken before
         the credential check, from anyone, and kept small."""
         n = self._content_length()
@@ -8694,11 +8691,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_audit(self):
         """GET /api/audit: who did what to this install (db.audit_page) for
-        the Audit page (R158 step 8), newest first, a page at a time
+        the Audit page, newest first, a page at a time
         (before=TIME), by one person (person=NAME) or one machine
         (machine=NODE_ID); with the people and the machines to pick from.
         For an account that reads the controller's area: Controller Read, as
-        it says and as the page is drawn (R277: it asked for Write)."""
+        it says and as the page is drawn (it asked for Write)."""
         if self._refused("controller-read"):
             return
         q = self._q()
@@ -8720,7 +8717,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/version."""
         if not (name := self._project_asked()):
             return
-        # What would keep a release's APK from being signed (R134 step 4),
+        # What would keep a release's APK from being signed,
         # said by Release's confirm before the tag is made.
         rs = releasesign.readiness(name)
         return self._json(version_payload(name) | {"release_sign": rs["why"] if rs["wanted"] else ""})
@@ -8792,13 +8789,13 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/meta."""
         # What the companion app asks first: the surface number this
         # dashboard serves, the image it is, and where a newer app is: the
-        # one this controller fetched from its release (R272 step 5), else
+        # one this controller fetched from its release, else
         # the newest in AerieOS's own dist/ as before.
         held = next((a["files"][0] for a in apps.view()["apps"] if a["name"] == "android" and a["files"]), None)
         apk = {"apk": held["file"], "apk_sha256": held["sha256"], "apk_url": held["url"]} if held else \
             {"apk": app_apk(), "apk_sha256": app_apk_sha(), "apk_url": ""}
         # ...and, for a session that names its node, the agent there and when
-        # it was built (R131): what aerie status says beside the controller's.
+        # it was built: what aerie status says beside the controller's.
         agent = {}
         nid = self._q().get("node", [""])[0]
         if nid and (self._who() or {}).get("session") and not NODES_DOWN:
@@ -8841,7 +8838,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /logs/download: the container's own log, every project's
         traffic in it, or the diagnostics whole (logs.download): Controller
         settings' to read, the diagnostics with them, since they hold the bug
-        reports a person reads there (the operator, 26 Oct)."""
+        reports a person reads there."""
         if self._refused("controller-read"):
             return None
         q = self._q()
@@ -8863,8 +8860,8 @@ class Handler(BaseHTTPRequestHandler):
                                               probe=bool(q.get("probe")) and not (self._who() or {}).get("session")))
 
     def _get_phone_wait(self):
-        """GET /api/phone/wait?since=T: the companion app's live connection
-        (R125). Answers {token} at once when this account's phone asks,
+        """GET /api/phone/wait?since=T: the companion app's live connection.
+        Answers {token} at once when this account's phone asks,
         lease or grants differ from T, else holds the request until they
         do or about 45 s pass, so an ask reaches the app in a second rather
         than on Android's alarm. A person's, not a session's."""
@@ -8884,7 +8881,7 @@ class Handler(BaseHTTPRequestHandler):
         # ?node= asks about another node's toolchain store: what its
         # census says it has, and the toolchain job in flight there. The
         # catalog is the same; the state is the node's (docs/nodes.md §6).
-        # Without Toolchains Read the tab is not offered (R152 step 3), and
+        # Without Toolchains Read the tab is not offered, and
         # this answers only for the nodes of the person's own projects,
         # which _node_asked keeps it to: what their projects build with.
         q = self._q()
@@ -8896,7 +8893,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(toolchains.payload())
 
     def _get_agents(self):
-        """GET /api/agents?node=ID: the coding agents on one node (R95, the
+        """GET /api/agents?node=ID: the coding agents on one node (the
         Library's): each agent's row, the version against the latest and
         any job of its own, and the asking account's own plugins and MCP
         servers there. Answered for the nodes this account may look at."""
@@ -8916,8 +8913,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _agents(self, req):
         """POST /api/agents: install (or update), remove or check one coding
-        agent on one node (agentcode.verb), the one way an agent is managed
-        (R95, the operator 22 Oct): whoever may install toolchains there."""
+        agent on one node (agentcode.verb), the one way an agent is managed:
+        whoever may install toolchains there."""
         if self._refused_on_node("toolchains-write", field(req, "node")):
             return
         if req.get("action") in ("install", "update") and (why := nodes.builds_elsewhere(field(req, "node"))):
@@ -8935,7 +8932,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why or "no node named"})
         got = emulator.payload(nid)
         # ...and each project's phones there, of the projects this account
-        # sees (R123): the Emulator page is where a phone is removed.
+        # sees: the Emulator page is where a phone is removed.
         if not got.get("error"):
             who = self._who()
             st = ((nodes.node(nid) or {}).get("reported") or {}).get("storage") or {}
@@ -8945,17 +8942,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_users(self):
         """GET /api/users."""
-        # The listing never carries a hash; all_users() drops it. Projects
+        # The listing never carries a hash; all_users drops it. Projects
         # come from the same filtered list everything else reads, so an
         # admin cannot hand out what they cannot see themselves. Accounts
-        # and roles Read lets one see it (R152 step 3).
+        # and roles Read lets one see it.
         if (why := self._area_read_why("accounts")):
             return self._json({"error": why}, 403)
         with timing.timed("users:tab_view"):
             got = users.tab_view(self._who(), project_names(self._who()),
                                  claudegrant.logins_of)
-        # Each account's devices, for an administrator to see and cut off
-        # (R272 step 8); seeing and revoking only, never driving one.
+        # Each account's devices, for an administrator to see and cut off;
+        # seeing and revoking only, never driving one.
         if users.is_admin(self._who() or {}):
             accts = users.load().get("users") or {}
             for u in got.get("users") or []:
@@ -8963,7 +8960,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(got)
 
     def _get_roles(self):
-        """GET /api/roles: the Roles page (R152): the areas, every role, and
+        """GET /api/roles: the Roles page: the areas, every role, and
         each account with its Global roles, the roles it holds on each
         project and the projects it is on. An administrator's whole; a
         project's owner sees the people and roles of the projects they own,
@@ -8971,12 +8968,12 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         can = users.assignable(me)
         # Accounts and roles Read with nothing to give sees the whole of it,
-        # to read: the page draws it without a control (B34).
+        # to read: the page draws it without a control.
         readonly = not can["admin"] and not can["projects"] and not self._area_read_why("accounts", me=me)
         if not can["admin"] and not can["projects"] and not readonly:
             return self._json({"error": "the Roles page is an administrator's, a space owner's "
                                         "for their own spaces, or for reading, Accounts and roles Read's"}, 403)
-        # By project (R138): an entry kept under a repository's name counts
+        # By project: an entry kept under a repository's name counts
         # for the project it is in, as everywhere roles are read.
         scope = None if can["admin"] or readonly else {repos.key_of(p) for p in can["projects"]}
         people = []
@@ -9000,19 +8997,19 @@ class Handler(BaseHTTPRequestHandler):
         if scope is not None:
             rs = {n: r for n, r in rs.items() if r.get("scope") == "projects"}
         # A project's owner role is named after its directory; the tab says
-        # whose it is by the name the project is shown under (R154).
+        # whose it is by the name the project is shown under.
         owners_of = {roles.owner_role_name(d): d for d in registry.labels()}
         # One whose project is not live (in the trash) is not listed: it is
         # kept for Put back, and listed it was counted as a project's owner
-        # and could share a label with the live one shown under that name
-        # (B95). A role of the same cut name a live project holds wins.
-        # ...and named by the project it is for (R138), which is what the
+        # and could share a label with the live one shown under that name.
+        # A role of the same cut name a live project holds wins.
+        # ...and named by the project it is for, which is what the
         # page's projects are: a live repository's project's key.
         live_owned = set()
         for d in registry.live_dirs():
             owners_of[roles.owner_role_name(d)] = repos.key_of(d)
             live_owned.add(roles.owner_role_name(d))
-        # ...and a project's own (R138): its owner role is named for the
+        # ...and a project's own: its owner role is named for the
         # project as it is shown, which a repository's name need not match,
         # and unmatched it was offered under every project.
         for k in registry.repos_keys():
@@ -9036,21 +9033,21 @@ class Handler(BaseHTTPRequestHandler):
                 gone.add(n)
         rs = {n: r for n, r in rs.items() if n not in gone and (n not in owners_of or n in live_owned)}
         # ...and which project it is for, so the People section offers it
-        # under that project alone (B726).
+        # under that project alone.
         rs = {n: (dict(r, label=f"Owner of {registry.label(owners_of[n])}", project=owners_of[n]) if n in owners_of else r)
               for n, r in rs.items()}
         return self._json({"roles": rs, "areas": [list(a) for a in roles.AREAS], "people": people,
                            "projects": all_projects, "admin": can["admin"], "readonly": readonly,
                            "me": me.get("name") or "",
                            "owner": users.owner_name() or "", "node_areas": sorted(roles.NODE_AREAS),
-                           # What an area's row opens on (R260): the nodes for
+                           # What an area's row opens on: the nodes for
                            # a node area, each runner (NODE_ID/SLOT) for the
                            # CI runner's.
                            "instance_areas": sorted(roles.INSTANCE_AREAS),
                            "nodes": [] if NODES_DOWN or not can["admin"] else
                            [{"id": n["id"], "name": n["name"]} for n in nodes.node_list()
                             if n.get("kind") != "local" and n.get("state") != "retired"],
-                           # ...and each cluster for Clusters (R281).
+                           # ...and each cluster for Clusters.
                            "clusters": [] if not can["admin"] else
                            [{"id": c["id"], "name": c["name"]} for c in clusters.listing()["clusters"]],
                            "runners": [] if NODES_DOWN or not can["admin"] else
@@ -9068,7 +9065,7 @@ class Handler(BaseHTTPRequestHandler):
         # the unversioned paths above migrate later, never both at once.
         if NODES_DOWN:
             return self._nodes_down()
-        # Without Nodes Read the tab is not offered (R152 step 3), and this
+        # Without Nodes Read the tab is not offered, and this
         # answers with the nodes of the person's own projects alone, which a
         # Claude sign-in on them needs, as below.
         # Scoped for an account that may not change a node: it sees the
@@ -9078,7 +9075,7 @@ class Handler(BaseHTTPRequestHandler):
         admin = users.may(self._who(), "admin") == ""
         v = nodes.tab_view(self._nodes_for(nodes.node_list()), admin)
         if admin:
-            # After a move landed here (R175 step 3): the nodes the bundle
+            # After a move landed here: the nodes the bundle
             # named that have not said hello since, each with its line.
             v["move"] = {"arrived": move.restored(), "not_here": move.not_yet_here()}
         return self._json(v)
@@ -9101,7 +9098,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._attachment(*got, "application/zip")
 
     def _get_home(self):
-        """GET /api/home: home.read, the overview's numbers (R218 step 5).
+        """GET /api/home: home.read, the overview's numbers.
         The jobs are the ones this account sees on the Jobs page, scoped the
         same way; the machines and their containers only for an account
         that reads the Nodes area."""
@@ -9119,7 +9116,7 @@ class Handler(BaseHTTPRequestHandler):
         light = self._q().get("light", [""])[0] == "1"
         with timing.timed("home:read"):
             got = home.read(rows, names, machines, light)
-        # Clusters ready of those kept (R281 step 7), once one is, for an
+        # Clusters ready of those kept, once one is, for an
         # account whose roles read the Clusters page: ready is every node
         # ready at its last read, which the Clusters page's Test asks again.
         if got[1] == 200 and not users.may(self._who(), "clusters-read"):
@@ -9141,7 +9138,7 @@ class Handler(BaseHTTPRequestHandler):
         mine, system = self._jobs_scope()
         body, code = nodes.jobs_view(q.get("id", [""])[0], q, mine, system, self._jobs_hidden())
         # Whether each live job's Cancel is this reader's, so the page draws
-        # it only where the press would be taken (R277).
+        # it only where the press would be taken.
         me = self._who()
         for j in body.get("jobs") or []:
             if j.get("state") not in ("succeeded", "failed", "canceled"):
@@ -9151,29 +9148,29 @@ class Handler(BaseHTTPRequestHandler):
     def _jobs_scope(self):
         """(the projects whose jobs this account reads, None for all; the
         redaction its read of the node's own jobs goes through, or None):
-        what the Jobs page and a job's log in the dock (R133 step 12) both
+        what the Jobs page and a job's log in the dock both
         read by."""
         me = self._who()
         # Every job for an administrator or for Jobs Read held on every node
-        # (R277: it was Accounts Write's, which is not about jobs).
+        # (it was Accounts Write's, which is not about jobs).
         mine = None if users.is_admin(me or {}) or (not (me or {}).get("session")
                                                      and roles.level_of(me or {}, "jobs")
                                                      and roles.nodes_for(me or {}, "jobs") is None) \
             else set(project_names(me))
         # Without Jobs Read a person sees their projects' jobs alone, those
-        # they may read (R152 step 3); the Jobs tab is hidden for them.
+        # they may read; the Jobs tab is hidden for them.
         if mine is not None and not (me or {}).get("session") and self._area_read_why("jobs"):
             mine = {p for p in mine if roles.level_of(me, "projects", p, users.may_work)}
         # The node's own jobs (a toolchain install, an update) for whoever may
         # read the controller's diagnostics, which list them: a job named
-        # there that could not be opened was a dead end (the operator, 7 Oct).
+        # there that could not be opened was a dead end.
         # Through diag's redaction, as the diagnostics themselves are.
         system = diag.redact if mine is not None and not self._diag_why() else None
         return mine, system
 
     def _jobs_hidden(self):
         """What of the jobs this reader does not see at all: a schedule's runs
-        to a session (the operator, 26 Oct: sessions neither see nor touch
+        to a session (sessions neither see nor touch
         the schedules), whose scripts and logs are an administrator's."""
         if not (self._who() or {}).get("session"):
             return None
@@ -9209,17 +9206,17 @@ class Handler(BaseHTTPRequestHandler):
         elif sess or (not asked and proj):
             # A named project reads its own node's daemon, allowed by the
             # project being the account's to see rather than by the node
-            # scope (B258); the filter below still keeps the answer to the
+            # scope; the filter below still keeps the answer to the
             # account's projects. A project with no node has no daemon and
             # no containers anywhere: there is no primary docker manager for
-            # it to fall to (the operator, 25 Sep), so that is said.
+            # it to fall to, so that is said.
             if not sess and self._not_project(proj):
                 return None
             # A session reads its own project's containers, and those of a
-            # project it reads (bb -p NAME devapp, B551/B552): reading them
+            # project it reads (bb -p NAME devapp): reading them
             # is what reads means. Acting on them stays its own project's.
             name = proj if sess and proj and proj != sess and self._reads(proj) else sess or proj
-            # Every node its containers may be on, its own first (B338).
+            # Every node its containers may be on, its own first.
             where = devapp.container_nodes(name)
             nid, why = (where[0] if where else ""), None
             if not nid:
@@ -9233,10 +9230,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why, "blind": True,
                                "instances": [], "containers": []})
         # What an account that is not an administrator sees is what belongs
-        # to its projects, a session's to its own one (the operator, 24 Sep).
+        # to its projects, a session's to its own one.
         # Every space's at once is Containers Read held Everywhere
         # (containers-read); anything less sees the spaces it reads the
-        # Containers of (R152 step 3; R277, the audit of 24 Nov: Nodes Read on
+        # Containers of (Nodes Read on
         # every node was taken for every space's containers).
         seen = None
         if sess:
@@ -9244,14 +9241,14 @@ class Handler(BaseHTTPRequestHandler):
         elif not users.is_admin(me) and users.may(me, "containers-read"):
             seen = {p for p in project_names(me) if roles.level_of(me, "containers", p, users.may_work)}
         # /api/docker/stats: what the containers are using now, asked
-        # beside the list once it has landed (R216), so the list never
+        # beside the list once it has landed, so the list never
         # waits on a sample of the daemon. A path of its own rather than a
         # query, since the page's open-once rule counts endpoints by path.
         sub = self.path.partition("?")[0].rstrip("/").rsplit("/", 1)[-1]
         if sub == "stats" or q.get("stats", [""])[0]:
             return self._json(containers.stats_view(nid, seen))
         # /api/docker/images: the daemon's images and volumes, an
-        # administrator's like every daemon-wide thing here (R216).
+        # administrator's like every daemon-wide thing here.
         if sub == "images" or q.get("images", [""])[0]:
             if sess or not users.is_admin(me):
                 return self._json({"error": "an administrator reads the daemon's images and volumes",
@@ -9261,7 +9258,7 @@ class Handler(BaseHTTPRequestHandler):
             got = containers.manager_view(nid, seen)
             # A project's view across every node its containers are on, each
             # row saying which: an instance put on a hosting node is listed
-            # where the session that made it can find it (B338).
+            # where the session that made it can find it.
             if where and len(where) > 1:
                 for row in (got.get("instances") or []) + (got.get("containers") or []):
                     row.setdefault("node_name", devapp.node_name(nid))
@@ -9288,12 +9285,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _node_files_admin(self):
         """Whether the asker may use the file explorer: an administrator,
-        signed in as themselves (R224)."""
+        signed in as themselves."""
         me = self._who() or {}
         return bool(users.is_admin(me)) and not me.get("session")
 
     def _get_node_files(self):
-        """GET /api/node-files?node=&root=&path= (R224): the node's roots, and
+        """GET /api/node-files?node=&root=&path=: the node's roots, and
         with a root the folder's listing; an administrator's."""
         q = self._q()
         if not self._node_files_admin():
@@ -9316,7 +9313,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(out)
 
     def _get_node_files_read(self):
-        """GET /api/node-files/read?node=&root=&path=[&dl=1] (R224): a file's
+        """GET /api/node-files/read?node=&root=&path=[&dl=1]: a file's
         bytes streamed from its node, a download or shown in the page;
         nothing it holds runs here (a page or a script is sent as text)."""
         q = self._q()
@@ -9371,7 +9368,7 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _node_files_upload(self):
-        """POST /api/node-files/upload?node=&root=&path=&name= (R224): the
+        """POST /api/node-files/upload?node=&root=&path=&name=: the
         request's body, the file itself, streamed to its node a megabyte
         at a time; an administrator's, audited."""
         q = self._q()
@@ -9413,7 +9410,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(got, status)
 
     def _node_files(self, req):
-        """POST /api/node-files (R224): mkdir, rename or delete (into the root's
+        """POST /api/node-files: mkdir, rename or delete (into the root's
         trash) on a node's root; an administrator's, audited."""
         got, status = fileexplorer.act(self._principal(), self._node_files_admin(), field(req, "node"), field(req, "root"),
                                        field(req, "action"), path=str(req.get("path") or ""), name=str(req.get("name") or ""),
@@ -9421,7 +9418,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(got, status)
 
     def _get_vms(self):
-        """GET /api/vms (R91): the VMs of the projects this account may read
+        """GET /api/vms: the VMs of the projects this account may read
         them on (a session: its own), the OS catalog and the VM hosts."""
         me = self._who() or {}
         sess = me.get("session") or ""
@@ -9436,24 +9433,24 @@ class Handler(BaseHTTPRequestHandler):
             gone = {v.get("project") or "" for v in vms.view()} - {""}
             gone = {p for p in gone if not registry.is_project(p) and p != vms.MACHINE}
             seen |= gone
-            # ...and the machine's own VMs (R165 step 3), always offered to
+            # ...and the machine's own VMs, always offered to
             # an administrator, with or without one yet.
             seen.add(vms.MACHINE)
         # Which of them it may change, for the page's buttons: the server
         # refuses the rest whatever is pressed.
         can = {p: "write" if sess or p in gone or p == vms.MACHINE or roles.level_of(me, "vms", p) == "write" else "read" for p in seen}
         # ...and on which it may take a Console from whoever has it: the
-        # project's owner's and the administrators' (the operator, 21 Oct).
+        # project's owner's and the administrators'.
         uid = users.uid_of(me) or ""
         take = {p: not sess and can[p] == "write" and (users.is_admin(me) or (uid and membership.owner_of(p) == uid))
                 for p in seen}
         return self._json(vms.payload(seen) | {"can": can, "take": take, "me": uid, "unowned": sorted(gone),
-                                               # The domains libvirt has that AerieOS did not make
-                                               # (R165 step 1): an administrator's to read, nobody's to act on.
+                                               # The domains libvirt has that AerieOS did not make:
+                                               # an administrator's to read, nobody's to act on.
                                                "others": vms.others() if not sess and users.is_admin(me) else []})
 
     def _vms(self, req):
-        """POST /api/vms (R91): new, start, stop, restart, remove, snapshot,
+        """POST /api/vms: new, start, stop, restart, remove, snapshot,
         revert, snapshot-rm. A person needs VMs Write on the project; a
         session acts on its own project alone, under its Make VMs dial
         (deny refuses, ask holds it for the administrators, auto does it)."""
@@ -9463,10 +9460,10 @@ class Handler(BaseHTTPRequestHandler):
         action = field(req, "action")
         if action not in ("new", "iso-add", "iso-rm", "console-take", "vbios") + vms.ACTIONS:
             return self._json({"error": f"no such VM action: {action}"}, 400)
-        # An installer's ISO onto a node, or off it (R99): a person's, since
+        # An installer's ISO onto a node, or off it: a person's, since
         # what it fetches is a whole system to install by hand.
-        # Whether the asker administers, which a passthrough and a vBIOS need
-        # (R100): the server's word, never what the request says of itself.
+        # Whether the asker administers, which a passthrough and a vBIOS need:
+        # the server's word, never what the request says of itself.
         req = dict(req, _admin=bool(users.is_admin(me)) and not sess)
         if action in ("iso-add", "iso-rm", "vbios") and sess:
             return self._json({"error": "fetching an installer ISO onto a node is a person's, on the VMs page"}, 403)
@@ -9475,16 +9472,16 @@ class Handler(BaseHTTPRequestHandler):
         orphan = (bool(project) and not registry.is_project(project) and not sess and users.is_admin(me)
                   and action not in ("new", "iso-add", "iso-rm")
                   and any(v.get("project") == project for v in vms.view([project])))
-        # The machine's own (R165 step 3): an administrator's, with or without one yet.
+        # The machine's own: an administrator's, with or without one yet.
         machine = project == vms.MACHINE and not sess and users.is_admin(me)
         if not project or not (registry.is_project(project) or orphan or machine):
             return self._json({"error": "which space's VM? name one"}, 400)
         # The address this controller was reached at, which a VM made a node
-        # dials (R91 step 14): the asker's own, as Enroll node's script uses.
+        # dials: the asker's own, as Enroll node's script uses.
         req = dict(req, ctl=f"{'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'}://"
                             f"{self.headers.get('Host') or ''}")
         # A VM made a node is a new node: Nodes Write on every node, as
-        # Enroll node asks (R277: Nodes Write on any one node passed).
+        # Enroll node asks (Nodes Write on any one node passed).
         if req.get("node_agent") is True and not sess and self._refused_on_node("nodes-write", ""):
             return
         if sess:
@@ -9502,7 +9499,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": f"{sess}'s settings say an agent may not make or change VMs "
                                             "(Make VMs is deny): a person changes that in the space's settings"}, 403)
             # A USB device to a VM is held for a person whatever the dial
-            # says (R116 step 6): a device can be a disk or a key.
+            # says: a device can be a disk or a key.
             if mode == "ask" or action in ("usb-give", "usb-take"):
                 r = phone.ask_vm(field(req, "why") or f"{action} {field(req, 'name')}", sess, req,
                                  asker_name=(me.get("name") or ""))
@@ -9542,7 +9539,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_trash(self):
         """GET /api/trash: what in the bin this account may manage, each item
-        asked of the space it was in (R277, the audit of 24 Nov: Space
+        asked of the space it was in (Space
         settings Write on any space listed, restored and purged every
         space's)."""
         if self._refused("trash"):
@@ -9573,7 +9570,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/rules."""
         if not (name := self._project_asked()):
             return
-        # With the number a Save is checked against (B195): read in the same
+        # With the number a Save is checked against: read in the same
         # answer as the rules, so the two cannot describe different moments.
         who = self._who() or {}
         # Whether this person may change the global rules themselves, which
@@ -9602,7 +9599,7 @@ class Handler(BaseHTTPRequestHandler):
         # session bb-tty starts for them.
         mine = prefs.all_for_user(users.uid_of(self._who())).get(name) or {}
         if q.get("topic"):
-            # One topic of the briefing (R202), what aerie help TOPIC prints.
+            # One topic of the briefing, what aerie help TOPIC prints.
             t = preamble.topic(name, q["topic"][0].strip().lower()[:40])
             if t is None:
                 return self._json({"error": "no such topic"}, 404)
@@ -9791,7 +9788,7 @@ class Handler(BaseHTTPRequestHandler):
         # what the operator has already said their own servers run, so the
         # clone form knows not to ask a question it has the answer to.
         # ...and the directories a new project may not have, so the name
-        # field can say before Create when its folder will be numbered (B63).
+        # field can say before Create when its folder will be numbered.
         return self._json({"keys": agent_keys(), "pat": gh_authed(),
                            "forges": forges.catalog(),
                            "hosts": forges.known(),
@@ -9832,14 +9829,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._setup_restore_pool()
         if self.path.split("?")[0].startswith("/api/v1/move/"):
             return self._move_peer()
-        # Moved (R90 step 12): read-only from here on, the move's own verbs aside.
+        # Moved: read-only from here on, the move's own verbs aside.
         if move.moved_to() and self.path.split("?")[0].startswith("/api/") and not self.path.split("?")[0].startswith("/api/v1/agent/") \
                 and self.path.split("?")[0] not in ("/api/move", "/api/profile"):
             return self._json({"error": f"this controller moved to {move.moved_to()}: it is read-only now; should the new home be lost, "
                                         "its bundle still downloads from Controller settings and lands on a fresh install", "moved": True}, 409)
         # A sign-in posted by another site's page would sign this browser
         # into that site's own account here, where what the visitor then
-        # saves lands with it (R288): only this dashboard's own pages post one.
+        # saves lands with it: only this dashboard's own pages post one.
         if self.path.split("?")[0] in ("/login", "/login/2fa", "/login/passkey") \
                 and self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
             return self._json({"error": "a sign-in is made on this dashboard's own page"}, 403)
@@ -9858,7 +9855,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.split("?")[0].startswith("/api/v1/device/"):
             # A person's device has a door of its own as an agent does: its
             # token never opens the dashboard, and the dashboard's credential
-            # is not what an app carries (R272).
+            # is not what an app carries.
             return self._device()
         if self.path.split("?")[0] == "/api/csp-report":
             return self._csp_report()
@@ -9890,7 +9887,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
 
         path = self.path.split("?")[0]
-        # A feature this install switched off (R81): refused here, whatever
+        # A feature this install switched off: refused here, whatever
         # drew the button, with the install's own sentence.
         if self._feature_off("POST", path, req):
             return None
@@ -9918,7 +9915,7 @@ class Handler(BaseHTTPRequestHandler):
                 # sessions is recorded before its reply goes, not after: the
                 # reply is what lets a session send its next prompt, and one
                 # that overtook the record was told about its own write as
-                # somebody else's (B290). So the reply is held until then.
+                # somebody else's. So the reply is held until then.
                 # A design rendered from a record (aerie design file --from)
                 # writes nothing, so it marks nothing seen.
                 own = (any(path.startswith(r) for r in OWN_WRITE_ROUTES)
@@ -9953,7 +9950,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if str(req.get("confirm") or "") != "reset":
             return self._json({"error": "type reset to confirm; nothing was changed"}, 400)
-        # The nodes to un-enroll first (the operator, 12 Oct): each uninstalled
+        # The nodes to un-enroll first: each uninstalled
         # and retired before anything is moved, since the record of them is
         # what moves, and the reset follows once every one has reported.
         ids = [str(x) for x in (req.get("unenroll") or []) if isinstance(x, str)]
@@ -9980,7 +9977,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _checks_post(self, req):
         """POST /api/checks {kind}: Check for updates, for one of the update checks
-        under Controller settings (R176, checks.py). An administrator's."""
+        under Controller settings (checks.py). An administrator's."""
         if self._refused("controller"):
             return
         r = checks.run_now(str(req.get("kind") or ""))
@@ -9988,8 +9985,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _catalog_mirror_post(self, req):
         """POST /api/catalog-mirror {action: import, archive} or {action:
-        forget}: the vetted catalog's mirror under Controller settings (R169
-        step 6), its archive taken through /api/upload-archive. An
+        forget}: the vetted catalog's mirror under Controller settings,
+        its archive taken through /api/upload-archive. An
         administrator's."""
         if self._refused("controller"):
             return
@@ -10004,24 +10001,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def _settings_post(self, req):
         """POST /api/settings."""
-        # The Settings tab's fields (R29): an administrator's, validated
+        # The Settings tab's fields: an administrator's, validated
         # and applied by the store; the answer is the tab's next drawing.
         if self._refused("controller"):
             return
         # The Debugging group (debug mode and what it opens) is the debug
-        # grant's, named only (the operator, 6 Oct); only a change is asked.
+        # grant's, named only; only a change is asked.
         want = req.get("set") if isinstance(req.get("set"), dict) else {}
         if any(k in DEBUG_SETTINGS and want[k] != settings.get(k) for k in want) and self._refused("debug"):
             return
-        # Finish on the setup page (R199): the first node is the one step
+        # Finish on the setup page: the first node is the one step
         # that cannot wait, so it is checked here and not only on the page.
         # Maintenance mode is the owner's alone: an administrator who switched
         # it on would be kept out by it.
         if ("maintenance_mode" in want and want["maintenance_mode"] != settings.get("maintenance_mode")
                 and not users.is_owner(self._who())):
             return self._json({"error": "only the owner switches maintenance mode"}, 403)
-        # Turning it on ends everybody else's sessions and terminals (the
-        # operator, 27 Oct): asked first, with each listed and what it is
+        # Turning it on ends everybody else's sessions and terminals:
+        # asked first, with each listed and what it is
         # doing, and ended once the owner says yes.
         ending = []
         if want.get("maintenance_mode") is True and not settings.get("maintenance_mode"):
@@ -10040,13 +10037,13 @@ class Handler(BaseHTTPRequestHandler):
         r = settings.set_many(req.get("set") or {})
         if r.get("error"):
             return self._json(r, 400)
-        # A service's token given or cleared, for Connected services (R294 step 9).
+        # A service's token given or cleared, for Connected services.
         for k in CONNECTED_SETTINGS:
             if isinstance(req.get("set"), dict) and k in req["set"]:
                 (connections.added("setting", k, by=self._principal()) if req["set"][k]
                  else connections.gone("setting", k))
         if finishing:
-            # Finished once is finished for a landing (B720): the setting
+            # Finished once is finished for a landing: the setting
             # may be turned back, the mark of the Finish is not.
             with contextlib.suppress(OSError):
                 (Path(STATE) / SETUP_FINISHED).write_text(str(int(time.time())))
@@ -10054,11 +10051,11 @@ class Handler(BaseHTTPRequestHandler):
         if ending and settings.get("maintenance_mode"):
             end_others_sessions(ending)
             r["ended"] = len(ending)
-        # The home tunnel follows its settings at once (R176): the process
+        # The home tunnel follows its settings at once: the process
         # started, restarted or stopped, and with an API token the hostname's
         # record and the tunnel's rules written; what happened rides back.
         # An app switched on is fetched, and one switched off dropped, now
-        # rather than at the next daily look (R272 step 3).
+        # rather than at the next daily look.
         if any(k.startswith("apps_") for k in want):
             apps.check_now()
         # Sideloaded agents offered or no longer: the nodes' bundle carries
@@ -10066,7 +10063,7 @@ class Handler(BaseHTTPRequestHandler):
         if "sideload_agents" in want:
             toolchains.refresh_packs()
         if any(k in ("tls_mode", "tls_host", "tls_email") for k in want):
-            # The connection as set now (R158 step 2): the install's own
+            # The connection as set now: the install's own
             # certificate made for the hostname and the addresses the page
             # is reached at, or TLS off.
             r["tls"] = tls.apply(settings.get, names=_tls_names(self.headers.get("Host", "")))
@@ -10085,14 +10082,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         # The Debug page's grants alone ask the debug grant, below, never
         # Spaces Write: an administrator grants a space's sessions its
-        # diagnostics without working on it (R277, the audit of 24 Nov).
+        # diagnostics without working on it.
         debug_only = set(req) <= {"project", "diag", "log_from"}
         if not debug_only and self._readonly(name):
             return None
         # Everything else in this dialog is the project's own; the node is
         # not, because a node is shared and moving a project onto one
-        # reaches every other project there. Only a CHANGE is asked about
-        # (B488): the dialog sends every field on every save.
+        # reaches every other project there. Only a CHANGE is asked about:
+        # the dialog sends every field on every save.
         if ("node" in req or "nodes" in req) and prefs.node_changed(name, req) \
                 and self._refused_nodes([req.get("node") or ""] + (req.get("nodes") if isinstance(req.get("nodes"), list) else [])):
             return
@@ -10105,7 +10102,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": f"{', '.join(host)} hosts containers only: no space's code "
                                             "or sessions go there. Send a container to it from the "
                                             "Containers page instead"}, 400)
-            # A disabled node is kept but not offered (the operator, 11 Oct).
+            # A disabled node is kept but not offered.
             off = [(nodes.node(n) or {}).get("name") or n for n in want
                    if n and (nodes.node(n) or {}).get("state") == "disabled"]
             if off:
@@ -10125,7 +10122,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": f"{', '.join(bad)} is not a hosting-only node: a node the "
                                                 "space works on takes its containers already, from Nodes in its settings"}, 400)
         # Which other projects a session here may read is AerieOS's
-        # owner's alone (the operator, 6 Oct): it hands one project's sessions
+        # owner's alone: it hands one project's sessions
         # another's code and notebook, which no administrator or user grants
         # on their own say. Only a change is asked about.
         if req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")) \
@@ -10139,7 +10136,7 @@ class Handler(BaseHTTPRequestHandler):
                 and self._refused_nodes([(prefs.get(name) or {}).get("node") or ""] + list((prefs.get(name) or {}).get("nodes") or [])):
             return
         # ...and the addresses its sessions may still reach where the node
-        # filters their network (the operator, 7 Oct): a hole in a shared
+        # filters their network: a hole in a shared
         # node's firewall that reaches past the project, so an
         # administrator's. The node hears it at once, since the sets it
         # fills are rebuilt live.
@@ -10162,7 +10159,7 @@ class Handler(BaseHTTPRequestHandler):
                                                 "node's containers as its own, and nothing else on its node"}, 400)
         # ...and what its sessions may read for debugging (the machine logs
         # of named nodes, the controller's diagnostics): the debug grant's,
-        # per project rather than per node (the operator, 6 Oct).
+        # per project rather than per node.
         # Granted only where debug mode can be on at all (DEBUG_MODE=1); a
         # grant taken off is always allowed.
         if prefs.debug_changed(name, req) and not settings.debug_available() \
@@ -10178,23 +10175,23 @@ class Handler(BaseHTTPRequestHandler):
                 and str(req.get("devbuild")) != prefs.get(name)["devbuild"] \
                 and self._refused("docker-write"):
             return
-        # ...and the tool pack dial (R169 step 5): adding to the catalog every
+        # ...and the tool pack dial: adding to the catalog every
         # node shares is Curate's to hand a session.
         if req.get("installpacks") is not None and str(req.get("installpacks")) != prefs.get(name)["installpacks"] \
                 and self._refused("curate"):
             return
-        # ...and the same of the VM dial and the VMs' limits (R91): a VM is a
+        # ...and the same of the VM dial and the VMs' limits: a VM is a
         # machine on a node, the VMs area's to hand a session or to raise.
         if ((req.get("makevms") is not None and str(req.get("makevms")) != prefs.get(name)["makevms"])
                 or (req.get("vm_caps") is not None and req.get("vm_caps") != prefs.get(name)["vm_caps"])) \
                 and self._refused("vms-write", name):
             return
-        # ...and Deploy to Kubernetes (R281 step 6): handing a session the
+        # ...and Deploy to Kubernetes: handing a session the
         # space's deploys is Deploy Write's.
         if req.get("kube") is not None and str(req.get("kube")) != prefs.get(name)["kube"] \
                 and self._refused("deploy", name):
             return
-        # Handing a session the space's Discord server (R293) is Space
+        # Handing a session the space's Discord server is Space
         # settings Write, the connection's own.
         if req.get("discord") is not None and str(req.get("discord")) != prefs.get(name)["discord"] \
                 and self._refused("settings", name):
@@ -10202,7 +10199,7 @@ class Handler(BaseHTTPRequestHandler):
         held = (("node" in req or "nodes" in req) and prefs.node_changed(name, req)) \
             or (req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")))
         # Then the rest: the project's own settings are the Project settings area's to
-        # write (B19, the operator: Settings Write only); what is the asker's
+        # write (the operator: Settings Write only); what is the asker's
         # own here (prefs.YOURS) is anybody's on the project, and a field
         # sent with the value it has is no change.
         if prefs.project_changes(name, req) and self._refused("settings", name):
@@ -10220,7 +10217,7 @@ class Handler(BaseHTTPRequestHandler):
         """The Nodes page's verbs. Thin on purpose: an administrator's, and
         nodes.verb says what each one means and writes its audit row.
 
-        Each held to the instance it touches (R260): a node's verbs to Nodes
+        Each held to the instance it touches: a node's verbs to Nodes
         Write on that node, and making one (add, the VM's XML) to Nodes
         Write on every node; a runner's to CI runner Write on that runner,
         a new one to it on every runner. A runner is a person's to change,
@@ -10235,19 +10232,19 @@ class Handler(BaseHTTPRequestHandler):
         else:
             why = users.may_instance(me, "nodes-write", "" if act in ("add", "vm-xml") else nid, nname)
         # Enrolling one again acts on the node it names, whose tokens it
-        # revokes and mints anew: asked of that node too (R277, the audit of
-        # 24 Nov: asked of `id` alone, a role on one node re-enrolled another).
+        # revokes and mints anew: asked of that node too
+        # (asked of `id` alone, a role on one node re-enrolled another).
         if not why and act == "enroll" and (again := field(req, "node")):
             why = users.may_instance(me, "nodes-write", again, ((nodes.node(again) or {}).get("name") or again) if not NODES_DOWN else again)
         if why:
             return self._json({"error": why}, 403)
         if NODES_DOWN:
             return self._nodes_down()
-        # The release check, now (R90 step 5): the newest published release
+        # The release check, now: the newest published release
         # read again, for the Updates section's Check now.
         if act == "release-check":
             return self._json({"ok": True, **releasecheck.check()})
-        # A held start lifted, or the next one armed (R56 step 9).
+        # A held start lifted, or the next one armed.
         if act == "start-held":
             r = held.start(self._principal())
             if r.get("ok") and not r.get("note"):
@@ -10268,7 +10265,7 @@ class Handler(BaseHTTPRequestHandler):
         got = nodes.verb(self._principal(), req)
         # A node that left is a node the Doctor's cached verdict may still
         # name, for up to its half hour: the next run starts now, on its own
-        # thread, so the card stops saying a daemon nobody can reach (B710).
+        # thread, so the card stops saying a daemon nobody can reach.
         if req.get("action") in ("retire", "discard", "uninstall") and isinstance(got[0], dict) and got[0].get("ok"):
             threading.Thread(target=doctor.refresh, name="doctor-after-node", daemon=True).start()
             # ...and its scanners' record and the reports it sent up go with
@@ -10287,7 +10284,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._nodes_down()
         act = field(req, "action")
         if act in ("run", "emu"):
-            # Never from a session (R35), which SESSION_ACTIONS holds at the
+            # Never from a session, which SESSION_ACTIONS holds at the
             # gate: a session is on its project's node and runs these verbs
             # where it is, inside its view; a job runs as the node's enrolled
             # account, outside every view and in the docker group, so a
@@ -10302,8 +10299,8 @@ class Handler(BaseHTTPRequestHandler):
             name = field(req, "project")
             if self._not_project(name):
                 return None
-            # ...and by grant on the node the job would run on (R137 step
-            # 3): the one named, else the project's primary, as run_job
+            # ...and by grant on the node the job would run on:
+            # the one named, else the project's primary, as run_job
             # picks it.
             pf = prefs.get(name) or {}
             on = field(req, "node") or pf.get("node") or (pf.get("nodes") or [""])[0]
@@ -10323,8 +10320,8 @@ class Handler(BaseHTTPRequestHandler):
         """Why this account may not cancel the job `j`, "" when it may:
         an administrator any; a session its own space's; a person one on a
         node they hold Jobs Write on, or one of a space they hold Spaces
-        Write on, whose builds and tests these are (R277, the audit of 24
-        Nov: Accounts Write canceled every job and a reader of a space any
+        Write on, whose builds and tests these are
+        (Accounts Write canceled every job and a reader of a space any
         of its own). "unseen" for a job this account does not read."""
         if users.is_admin(me or {}):
             return ""
@@ -10343,7 +10340,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _claude_login(self, req):
         """A node saying what this account is signed in to Claude, or another
-        coding agent, AS there (R47), or that it is not: never the login itself, which stays on the
+        coding agent, AS there, or that it is not: never the login itself, which stays on the
         machine that made it (claudegrant.py says why).
 
         Only a session token minted FOR an account speaks here (the one the
@@ -10367,7 +10364,7 @@ class Handler(BaseHTTPRequestHandler):
             nid = proj[5:] if nodes.node(proj[5:]) else ""
         else:
             # The node this session was started on, which the project's
-            # other nodes make a question (R82): named by the session, and
+            # other nodes make a question: named by the session, and
             # believed only when it is one of the project's own.
             p = prefs.get(proj) or {} if proj else {}
             asked = field(req, "node")
@@ -10375,7 +10372,7 @@ class Handler(BaseHTTPRequestHandler):
         if not nid:
             return self._json({"error": "a sign-in is reported by a session on the "
                                         "node it happened on"}, 400)
-        # ...and the other coding agents' beside Claude's (R95 step 3): the
+        # ...and the other coding agents' beside Claude's: the
         # same report, said from the same check, kept in their own record.
         agent = str(req.get("agent") or "claude")
         if agent != "claude" and not any(a.id == agent and a.login_job for a in agents.rows()):
@@ -10385,11 +10382,11 @@ class Handler(BaseHTTPRequestHandler):
             # The node holds this account's sealed sign-in (its census says
             # so), which its next terminal there opens again: a check that
             # could not see it, its copy closed, is not a sign-out, and the
-            # page offered a sign-in to a person signed in (the operator,
-            # 24 Nov). Sign out takes the seal away, and writes its own.
+            # page offered a sign-in to a person signed in.
+            # Sign out takes the seal away, and writes its own.
             return self._json({"ok": True, "sealed": True})
         if not signed_in and claudegrant.on(home_for(uid), nid, agent):
-            # Said in the log, as the heartbeat's sign-out is (B236): which
+            # Said in the log, as the heartbeat's sign-out is: which
             # session's check took a login away is not on the page.
             print(f"[dashboard] {nid} reports {agent} signed out for {uid}, "
                   f"from a check in {proj or 'no space'}", flush=True)
@@ -10398,8 +10395,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _tty_grant(self, req):
-        """Whose terminal a node's bb-tty is about to start, answered here
-        (B166).
+        """Whose terminal a node's bb-tty is about to start, answered here.
 
         On this container /termws is the one way in, so the account
         _scoped_arg stamps is the account that proved itself. On a node,
@@ -10439,13 +10435,13 @@ class Handler(BaseHTTPRequestHandler):
         refused = self._term_refused(rest, me) or self._claude_held(rest, me)
         if refused:
             return self._json({"error": refused}, 403)
-        # A log (R133 step 12) runs nothing anybody types into: reading it
+        # A log runs nothing anybody types into: reading it
         # wants the log's own grant, decided above, not a shell.
         if not req.get("ro") and not arg.startswith("log:") and self._term_ro(me, arg):
             return self._json({"error": f"{me['name']} has no shell, so this terminal is the "
                                         "read-only one"}, 403)
         # A coding agent's session on a repository of a project of several
-        # (R136 step 4) works in every repository of it: the others, each
+        # works in every repository of it: the others, each
         # with a token of its own for the account, so bb in that tree
         # answers for that repository as it would in a session of its own.
         works, tokens = [], {}
@@ -10462,13 +10458,13 @@ class Handler(BaseHTTPRequestHandler):
                            "sees": (prefs.get(project) or {}).get("sees") or [],
                            # The repository its CI logs are filed under, from
                            # this side's tree, which the view binds that
-                           # folder by (B886).
+                           # folder by.
                            "repo": projects.ci_repo_name(project),
-                           # Whether it may compute on its node's NVIDIA card
-                           # (R102): "on", or who said no, the node or the
+                           # Whether it may compute on its node's NVIDIA card:
+                           # "on", or who said no, the node or the
                            # project, which aerie gpu then says to the session.
                            "gpu": gpu_for(project, _arg_node(arg)),
-                           # Whether its Gradle builds on the node's disk (B439).
+                           # Whether its Gradle builds on the node's disk.
                            "build_local": (prefs.get(project) or {}).get("build_local", True),
                            # Which node this terminal is on, by id: what a
                            # session there names when it reports its Claude
@@ -10479,7 +10475,7 @@ class Handler(BaseHTTPRequestHandler):
                            # bb-tty execs into, never the URL's word for it.
                            "ctr": (_ARG_CTR.match(arg).group(3) if _ARG_CTR.match(arg)
                                    else _ARG_LOGCTR.match(arg).group(3) if _ARG_LOGCTR.match(arg) else ""),
-                           # ...and the VM a vm: console opens (R91): its libvirt
+                           # ...and the VM a vm: console opens: its libvirt
                            # name from the record, never the URL's word for it.
                            "vm": (vm_target(*_ARG_VM.match(arg).groups()).get("domain", "")
                                   if _ARG_VM.match(arg) else "")})
@@ -10515,13 +10511,13 @@ class Handler(BaseHTTPRequestHandler):
             return None
         # A session's aerie bug add, aerie rules add or aerie settings set is its own
         # write like one through the notebook's routes, and was told to it
-        # on its next prompt as somebody else's (B375): what moved across
+        # on its next prompt as somebody else's: what moved across
         # the verb is marked seen for the session that ran it.
         before = _seen_now(project, me) if me.get("session") else None
         out = bbrelay.run(me, req, project)
         # What a relayed verb changed in the controller's copy reaches the
         # project's synced nodes now, and the session's bb waits for its own
-        # copy to reach this revision before it goes on (R163, syncwait.py).
+        # copy to reach this revision before it goes on (syncwait.py).
         argv0 = (req.get("argv") or [""])[0] if isinstance(req.get("argv"), list) else ""
         if argv0 in ("git", "version", "changelog") and out[1] == 200 and isinstance(out[0], dict) \
                 and _sync_bound(project):
@@ -10541,9 +10537,9 @@ class Handler(BaseHTTPRequestHandler):
         verb = self.path.split("?")[0][len("/api/v1/agent/"):]
         hdr = self.headers.get("Authorization", "")
         bearer = hdr[7:] if hdr.startswith("Bearer ") else ""
-        # Moved (R90 step 12): every node is told where, and knocks there;
+        # Moved: every node is told where, and knocks there;
         # a node that never heard the move while it was armed is handed its
-        # own challenge here (R175 step 2), so it knocks too.
+        # own challenge here, so it knocks too.
         if move.moved_to():
             late = nodes.authenticate(bearer) if bearer else {}
             return self._json(move.moved_answer(late.get("node") or "", tls.key_pin()), 410)
@@ -10563,7 +10559,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": why}, 403)
             if nodes.host_only(auth["node"]):
                 # A public box's request that stalls is let go rather than
-                # holding a thread, and its hellos are counted (R92).
+                # holding a thread, and its hellos are counted.
                 self.connection.settimeout(120)
                 if verb == "hello" and not nodes.host_hello_allowed(auth["node"], time.monotonic()):
                     return self._json({"error": "too many hellos: one in a while is enough"}, 429)
@@ -10584,11 +10580,11 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if auth.get("error"):
             # A hello naming its node, with a token nobody here issued: the
-            # row says it is turned away (B652), when it is quiet anyway.
+            # row says it is turned away, when it is quiet anyway.
             if verb == "hello" and auth["error"] == "unknown token":
                 nodes.refused_unknown(req.get("node"))
             # ...and a node taken back by a token from before its newest,
-            # as a restored record holds (the operator, 6 Nov).
+            # as a restored record holds.
             if verb == "recover" and auth["error"] == "unknown token":
                 got = nodes.recover_token(req.get("node"), req.get("tokens"),
                                           peer=self.client_address[0] if self.client_address else "")
@@ -10613,7 +10609,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*channel.verb(verb, auth, req, addr))
 
     def _device(self):
-        """A person's device's door (R272, devices.py says what each verb
+        """A person's device's door (devices.py says what each verb
         means): its token from the Authorization header, or for sign-in the
         person's name and password once, which mints that token. What stays
         here is the HTTP, as for the agent's door."""
@@ -10641,7 +10637,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "wrong username or password"}, 401)
             if kept_out(u):
                 return self._json({"error": MAINTENANCE_SAID, "maintenance": True}, 503)
-            # An app is signed in past the second factor too (R127): a code
+            # An app is signed in past the second factor too: a code
             # from the authenticator or a recovery code beside the password.
             if mfa.enabled(u["uid"]):
                 keys = self._mfa_keys(u)
@@ -10680,7 +10676,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if verb == "web":
             # The phone app's terminal is the dashboard's page in a WebView,
-            # which signs in with the cookie a browser gets (R290): minted
+            # which signs in with the cookie a browser gets: minted
             # here for the phone's person from its token, as the password
             # did at /login, and bound to the WebView's User-Agent the app
             # names, the browser that will carry it.
@@ -10704,7 +10700,7 @@ class Handler(BaseHTTPRequestHandler):
         if "stream" in got:
             # Written as it is made, ended by closing the connection: this
             # server speaks HTTP/1.0, one request a connection (a synced
-            # project's first copy, R163).
+            # project's first copy).
             self.end_headers()
             got["stream"](self.wfile)
         elif "path" in got:
@@ -10712,7 +10708,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(size))
             self.end_headers()
             # Exactly what was promised: a transcript may grow while it is
-            # sent (B613), and bytes past the length would be the next
+            # sent, and bytes past the length would be the next
             # response's to a client that reuses nothing but reads them.
             with open(got["path"], "rb") as f:
                 while size > 0:
@@ -10728,7 +10724,7 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _signin_agent(self, req):
-        """The coding agent a sign-in or a sign-out is for (R95 step 3):
+        """The coding agent a sign-in or a sign-out is for:
         Claude when none is named, and only one with a sign-in of its own."""
         a = agents.get(field(req, "agent") or "claude")
         return a if a and a.login_job else None
@@ -10829,10 +10825,10 @@ class Handler(BaseHTTPRequestHandler):
         # "send" is a write to the roadmap (it marks a step sent) and starts a
         # session's turn, so it goes with the rest. The lock refuses writes
         # alone: the history and the finished items are read through it
-        # (B1036: a member held out of a locked space could not read them).
+        # (a member held out of a locked space could not read them).
         if act not in ("history", "finished") and (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
-        # Closing a batch its session will never close (B198) is an
+        # Closing a batch its session will never close is an
         # administrator's, like the other decisions about other people's work.
         if act == "batch-close" and self._refused("settings", name):
             return
@@ -10864,14 +10860,14 @@ class Handler(BaseHTTPRequestHandler):
         for a manager rather than a list of what AerieOS made, and what
         makes that acceptable is the same thing that makes the rest of this
         acceptable, namely that the daemon belongs to a machine whose only job
-        is running containers (R68 steps 1 and 2).
+        is running containers.
 
         An administrator's, like every other docker write here, and the log
         with them: a container's log is whatever it decided to print, which
         on somebody else's container is not a thing to hand out by role.
 
         The one exception is a SESSION, on a container that belongs to its
-        project (the operator, 24 Sep): containers.session_verb says what it
+        project: containers.session_verb says what it
         may do with one.
         """
         me = self._who() or {}
@@ -10879,7 +10875,7 @@ class Handler(BaseHTTPRequestHandler):
         act, name = field(req, "action"), field(req, "container")
         if sess:
             # The log of a container that belongs to a project this session
-            # reads is a read (B551); everything else is its own project's.
+            # reads is a read; everything else is its own project's.
             proj = field(req, "project")
             if act == "logs" and proj and proj != sess and self._reads(proj):
                 return self._json(*containers.session_verb(proj, me, act, name, req, read_only=True))
@@ -10893,16 +10889,16 @@ class Handler(BaseHTTPRequestHandler):
         under = field(req, "owner")
         if act == "owner" and under and under not in set(project_names(me)):
             return self._json({"error": f"no space called {under}"}, 400)
-        # Onto the LAN (R178) opens a way out of the wall around a project's
+        # Onto the LAN opens a way out of the wall around a project's
         # containers: an administrator's, as the node's own switches are.
         if act in containers.LAN_CTL and not users.is_admin(me):
             return self._json({"error": "letting a container reach the network around its node is an administrator's"}, 403)
         # A project's container is worked on by the people on that project,
-        # an administrator as much as anyone (R274): one not on it adds it to
+        # an administrator as much as anyone: one not on it adds it to
         # their own list first. System's and nobody's stay an administrator's.
         # The owner's check and the act read the daemon's list once between
         # them (devapp.one_listing): Start on boot read it twice first.
-        # Each asks what the container is (R277, the audit of 24 Nov: Containers
+        # Each asks what the container is (Containers
         # Write on any space started, stopped and pruned every container on a
         # node): a prune reaches the node's whole store, Nodes Write on it; a
         # System container is a service, Configure on its node; a space's,
@@ -10932,7 +10928,7 @@ class Handler(BaseHTTPRequestHandler):
     def _devapp_refused(self, me, name, act, req):
         """True, with the 403 written, when a person may not do `act` to the
         instance or written container `name` names, asked of the space it
-        belongs to (R277, the audit of 24 Nov: the write gate named no space,
+        belongs to (the write gate named no space,
         so Containers Write on one space changed another's): Containers Read
         there to read its state, Containers Write to change it, and a rebuild,
         an abort or a test either that or Spaces Write, whose sentence is
@@ -10956,7 +10952,7 @@ class Handler(BaseHTTPRequestHandler):
     def _not_on_list(self, me, owner):
         """Why `me` may not act on a container of project `owner`, or "":
         the project list's seatbelt (users.may_work), which an administrator
-        wears too (R274). A container of no project, of System, or of a
+        wears too. A container of no project, of System, or of a
         project gone to the trash asks nothing of it."""
         if not owner or owner == devapp.SYSTEM or not registry.is_project(owner) or users.may_work(me, owner):
             return ""
@@ -10977,7 +10973,7 @@ class Handler(BaseHTTPRequestHandler):
         writing a compose file and building from it is root-shaped power on
         the node, so the endpoint says no itself.
         """
-        # Asked of what the container is (R277, the audit of 24 Nov: Containers
+        # Asked of what the container is (Containers
         # Write on any space read and wrote every written container, its
         # environment's secrets among it): a space's, on that space; one of
         # AerieOS's own, Configure on every node, as its page asks; one for no
@@ -11041,25 +11037,25 @@ class Handler(BaseHTTPRequestHandler):
                 and name not in containers.overview_names():
             return self._json({"error": f"not a space or container: {name}"}, 400)
         act = field(req, "action")
-        # The verb onto this request's trace row (B717): a POST keyed by its
+        # The verb onto this request's trace row: a POST keyed by its
         # path alone could not say which devapp action was the slow one.
         self.trace_extra = f"action={act}" if isinstance(act, str) and act.replace("-", "").isalnum() else ""
         # WHOSE IT IS, before anything else is asked: an account that is not
         # an administrator reaches what belongs to its projects, and a
-        # session what belongs to its own one (the operator, 24 Sep). The
+        # session what belongs to its own one. The
         # same answer a stranger's container gets, whatever the verb, so a
         # session cannot learn by asking what another project runs.
         if not users.is_admin(me):
             want = field(req, "instance") or (devapp.send_name(name, field(req, "compose")) if act == "new"
                                               else devapp.only_instance(name))
             owner = devapp.owner_of(name, want)
-            # ...and a session reads what belongs to a project its own reads
-            # (B551): the state and the starter env, never a change.
+            # ...and a session reads what belongs to a project its own reads:
+            # the state and the starter env, never a change.
             reads = {owner} if sess and act in ("state", "starter", "probe") and owner and self._reads(owner) else set()
             if owner not in ({sess} | reads if sess else set(project_names(me))):
                 return self._json({"error": containers.not_ours(devapp.pname(name, want), sess)}, 403)
         # ...and an administrator sees every project's and changes those on
-        # their own list (R274); reading one is everybody's.
+        # their own list; reading one is everybody's.
         elif act not in ("starter", "state", "probe"):
             want = field(req, "instance") or (devapp.send_name(name, field(req, "compose")) if act == "new"
                                               else devapp.only_instance(name))
@@ -11070,7 +11066,7 @@ class Handler(BaseHTTPRequestHandler):
         # restricted and is not on this list is a decision somebody has to
         # make, which is the same rule MACROS follows.
         #
-        #   probe: a read too (R248), whether the instance answers on its
+        #   probe: a read too, whether the instance answers on its
         #     node's loopback, from its own published ports only.
         #   starter, state: reads, returning the project's .env.example and
         #     the row.
@@ -11104,7 +11100,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         # Sending, copying or moving a container, or putting it under another
         # project, names only projects on the asker's own list, for an
-        # administrator and the owner as for a user (the operator, 10 Oct):
+        # administrator and the owner as for a user:
         # they could add any project to their list first, and this is the
         # seatbelt against a container landing under the wrong one.
         if not session and act in ("new", "relocate", "owner", "move"):
@@ -11131,8 +11127,7 @@ class Handler(BaseHTTPRequestHandler):
         # container, and NOTHING else: remove and route are docker-write
         # above, which a session's principal never has. A test run is not on
         # it: it runs the project's own test command inside a container that
-        # is already up, which a session could run on the node anyway
-        # (roadmap R48).
+        # is already up, which a session could run on the node anyway.
         # ...and before the dial, a session may only touch the instance on its
         # OWN node. A session runs on the project's node; an instance pinned
         # to another one is a container on a machine this session is not on,
@@ -11141,7 +11136,7 @@ class Handler(BaseHTTPRequestHandler):
         # row that happens to carry this project's name, and a rebuild would
         # bounce a service still being used. The operator keeps both, through
         # the Docker manager, which is where an instance is removed.
-        # The exception is one SENT there on purpose (R166): its image is
+        # The exception is one SENT there on purpose: its image is
         # built on the project's own node and shipped, and the project's
         # sessions are the ones meant to rebuild it.
         # A node named by its name (aerie devapp new --node NAME) is its id here.
@@ -11168,7 +11163,7 @@ class Handler(BaseHTTPRequestHandler):
             # project's Hosts its containers on; taken off, the container stays
             # the project's and the session loses it like any other left behind.
             # The repository's own setting, the one the instance belongs to: a
-            # space's session works on each of its repositories (B709).
+            # space's session works on each of its repositories.
             shipped_there = devapp._read_rec(name, devapp.instance_key(name, field(req, "instance") or devapp.MAIN)).get("ship") \
                 and on in ((prefs.get(name).get("hosts") or []) + (prefs.get(sess).get("hosts") or []))
             # ...and one on a node its repository or its space works on or
@@ -11187,7 +11182,7 @@ class Handler(BaseHTTPRequestHandler):
             # The dial is the project's (Agents may: Run its container, in its
             # settings) and covers rebuilding its containers, changing their
             # env and sending the project to Docker, its own container or
-            # another beside it: the operator's widenings of 24 and 26 Sep, so
+            # another beside it, so
             # a session can bring a container up by request. What a container
             # IS stays out of reach: `new` from a session is the project's own
             # compose file on its own node, never another project's and never
@@ -11207,7 +11202,7 @@ class Handler(BaseHTTPRequestHandler):
                 # except for one it ships to, which the hosts gate above has
                 # already held to the project's Hosts its containers on.
                 # Dropped whole, a shipped new passed that gate and then
-                # landed, unshipped, on the project's own node (B645).
+                # landed, unshipped, on the project's own node.
                 if req.get("ship") is not True:
                     req["node"] = ""
         if act not in ("starter", "state") and name in project_names(me) \
@@ -11271,21 +11266,21 @@ class Handler(BaseHTTPRequestHandler):
         if not (name := self._project_asked(req)):
             return
         act = field(req, "action")
-        # B173: this is the panel's, and `by="operator"` is only true of an
+        # This is the panel's, and `by="operator"` is only true of an
         # administrator at it. A session moves its version with aerie version
         # bump, under the project's policy, and never here, where it could
         # also have loosened that policy; a plain account may ask a session
         # to bump and no more.
         who = self._who() or {}
         if act == "release" and (who.get("session") or req.get("dry") is True):
-            # aerie version release (R138): its own project only, under its
+            # aerie version release: its own project only, under its
             # dial. The tag and the forge's release are made here, with the
             # project's own credentials, which the session never holds.
             if self._session_elsewhere(name, "a session releases its own space and no other"):
                 return None
             if not who.get("session") and self._refused("version", name):
                 return None
-            # dry (aerie version rehearse, B1156): every refusal the release
+            # dry (aerie version rehearse): every refusal the release
             # would meet, asked before a rehearsal is spent on it; it does
             # nothing, so it is under no dial.
             dry = req.get("dry") is True
@@ -11299,7 +11294,7 @@ class Handler(BaseHTTPRequestHandler):
             if plan.get("error"):
                 return self._json(plan, 400)
             dev = plan["dev"]
-            # Said before the tag, not after it (R134 step 4): 0.7.0 was
+            # Said before the tag, not after it: 0.7.0 was
             # tagged with no sideload key and its APK never attached.
             rs = releasesign.readiness(name, fresh=True)
             if rs["wanted"] and rs["why"] and not req.get("unsigned") and not dry:
@@ -11329,8 +11324,8 @@ class Handler(BaseHTTPRequestHandler):
         if act in RELEASE_CHANGES:
             return self._release_change(act, name, req, who)
         if act == "release-drafts":
-            # The drafts waiting to be read and published (the operator,
-            # 1 Nov), each with the files it still lacks.
+            # The drafts waiting to be read and published,
+            # each with the files it still lacks.
             if self._session_elsewhere(name, "a session reads its own space's drafts and no other"):
                 return None
             d = forgerelease.drafts(name)
@@ -11415,12 +11410,12 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return self._json(*membership.verb(me, req))
 
-    # The settings' secrets as the Keys page names them (R154).
+    # The settings' secrets as the Keys page names them.
     KEPT_SETTINGS = {"tunnel_token": ("Cloudflare tunnel token", "the tunnel that serves this controller"),
                      "cf_api_token": ("Cloudflare API token", "the tunnel's hostnames and DNS records")}
 
     def _keys(self, req):
-        """POST /api/keys (R154): the install key and everything kept under
+        """POST /api/keys: the install key and everything kept under
         it for an administrator (status, show, saved, change), and the
         account's own key for its sign-ins on the nodes (mine, change-mine).
         A session's token does not reach this route (SESSION_ROUTES)."""
@@ -11428,7 +11423,7 @@ class Handler(BaseHTTPRequestHandler):
         act = field(req, "action")
         uid = users.uid_of(who) or ""
         if act == "mine":
-            # The account's key store as Profile lists it (R154): its key and
+            # The account's key store as Profile lists it: its key and
             # each forge it linked, with the projects linked to it; never a
             # value, and nothing here hands one out.
             # Each token with the projects linked to it, by their shown names.
@@ -11463,7 +11458,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*installkey.saved(field(req, "fingerprint")))
         if act == "purge-for":
             # An administrator's, for an account that cannot sign in to purge
-            # its own (the operator, 27 Oct).
+            # its own.
             acct = users.get(field(req, "account")) or {}
             if not acct.get("uid"):
                 return self._json({"error": refusals.NO_ACCOUNT}, 404)
@@ -11498,7 +11493,7 @@ class Handler(BaseHTTPRequestHandler):
         return None, "a passkey's answer or the key you keep (64 hex characters) opens it", ""
 
     def _store_verb(self, act, uid, who, req):
-        """Profile's Your key store presses (R158 step 5, R157): unlock for
+        """Profile's Your key store presses: unlock for
         the window picked, lock, the window alone, the uses, and the move
         under a key of the person's own and back."""
         if not uid:
@@ -11572,7 +11567,7 @@ class Handler(BaseHTTPRequestHandler):
         return {"error": f"unknown action {act!r}"}, 400
 
     def _keys_purge(self, uid, name):
-        """An account's key store emptied (R154): its key and what it linked
+        """An account's key store emptied: its key and what it linked
         gone, and the projects linked to it unlinked; its sign-ins on the
         nodes open no more, and a new key is made the next time one is
         sealed."""
@@ -11586,12 +11581,12 @@ class Handler(BaseHTTPRequestHandler):
         what uses it and where it is changed; no value, sealed or not."""
         rows = []
         names = {u.get("uid"): u.get("name") for u in users.all_users() if u.get("uid")}
-        # Where the bell reaches each person (R149): a destination's token
+        # Where the bell reaches each person: a destination's token
         # or address, sealed, used by nothing but the send.
         for r in reach.at_rest():
             rows.append({"kind": "reach", "name": f"{names.get(r['uid'], r['uid'])}: {r['name']}",
                          "uses": "the bell sent there", "sealed": r["sealed"], "go": ["profile", ""]})
-        # A node's model router (R144): the provider keys and its master key.
+        # A node's model router: the provider keys and its master key.
         for r in router.at_rest():
             rows.append({"kind": "router", "name": f"{(nodes.node(r['node']) or {}).get('name') or r['node']}: {r['name']}",
                          "uses": "the model router there", "sealed": r["sealed"], "go": ["nodes", r["node"]]})
@@ -11599,7 +11594,7 @@ class Handler(BaseHTTPRequestHandler):
             raw = f.read_text(errors="replace").strip() if f.is_file() else ""
             gv = gitcreds.givers(f.name)
             if gv:
-                # Each person's own token (R159): kept in their store, not
+                # Each person's own token: kept in their store, not
                 # this one, and used for their own work while signed in.
                 who = ", ".join(f"{names.get(u) or 'an account'}'s"
                                 + (f" {accountkeys.forge_of(u, fid)['host']}" if accountkeys.forge_of(u, fid) else "")
@@ -11609,7 +11604,7 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             rows.append({"kind": "git", "name": f.name, "sealed": raw.startswith(gitcreds.SEALED),
                          "uses": "git push and pull for the space's repositories", "go": ["project", f.name]})
-        # The dashboard's own TLS key (R158 step 2), sealed under the install key.
+        # The dashboard's own TLS key, sealed under the install key.
         if tls.certificate_pem():
             rows.append({"kind": "tls", "name": "the dashboard's certificate", "sealed": tls._key_sealed(),
                          "uses": "https on the dashboard's own port: a node's channel, and the page where Connection says so", "go": ["settings", "connection"]})
@@ -11646,7 +11641,7 @@ class Handler(BaseHTTPRequestHandler):
         return rows
 
     def _signing(self, req):
-        """A project's Android signing keys (signing.verb, R106). A session
+        """A project's Android signing keys (signing.verb). A session
         is refused whatever it asks: it signs with aerie sign, which never hands
         it the key, and has no reason to learn which keys exist from here.
         Listing is for whoever sees the project (no secret is in it); adding,
@@ -11664,13 +11659,13 @@ class Handler(BaseHTTPRequestHandler):
             owner = membership.owner_of(name)
             acct = users.account_of(who) or {}
             if act == "release":
-                # aerie sign status (R134): whether its release APKs can be
+                # aerie sign status: whether its release APKs can be
                 # signed and how the newest went, in the bell's words. Read
                 # only, and no secret is in it.
                 return self._json({"release": releasesign.status(name),
                                    "attention": releasesign.attention([name])})
             if act == "release-sign":
-                # aerie sign release (R134 step 5): the Signing view's retry,
+                # aerie sign release: the Signing view's retry,
                 # under the Sign a build dial.
                 if not releasesign.wants(name):
                     return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
@@ -11690,7 +11685,7 @@ class Handler(BaseHTTPRequestHandler):
                                            asker_name=str(acct.get("name") or ""), tag=tag)
                 return self._result(r)
             if act in ("keys", "generate", "map", "rotate"):
-                # Manage signing keys (R106 step 6): which keys there are
+                # Manage signing keys: which keys there are
                 # (names and fingerprints, never a secret), and a new key or
                 # a package's key proposed, under its own dial.
                 kmode = self._dialed(name, "keys")
@@ -11746,7 +11741,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if field(req, "action") == "release-sign":
             # Look for the project's unsigned release APKs now, and sign a
-            # failed one again (releasesign.check, R106), on its own thread.
+            # failed one again (releasesign.check), on its own thread.
             if not releasesign.wants(name):
                 return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
                                             f"(an artifact named {releasesign.MARK}TAG)"}, 400)
@@ -11766,13 +11761,13 @@ class Handler(BaseHTTPRequestHandler):
             got["why"] = users.may(who, "signing", name)
             got["may_backup"] = not got["why"]
             got["may_lock"] = users.uid_of(who) == membership.owner_of(name)
-            # Which key signs the releases, and how the last ones went (R106).
+            # Which key signs the releases, and how the last ones went.
             got["release"] = releasesign.status(name)
         return self._json(got, status)
 
     def _get_node_busy(self):
         """GET /api/node-busy: whether one of a project's nodes is quiet
-        enough to time anything on (busy.report, R108). For a session, its
+        enough to time anything on (busy.report). For a session, its
         own project's nodes; for a person, any project they see. Another
         project's work there is counted, never named."""
         q = self._q()
@@ -11815,10 +11810,10 @@ class Handler(BaseHTTPRequestHandler):
     def _signing_backup(self, name, route, key, password):
         if (self._who() or {}).get("session"):
             return self._json({"error": "a session never receives a signing key"}, 403)
-        # The signing area on the project itself (R255 step 3), which asks
+        # The signing area on the project itself, which asks
         # for the project on the account's own list too: an administrator
         # sees every project, and a key should not leave with somebody who
-        # only sees it (the operator, 1 Oct).
+        # only sees it.
         if self._not_project(name) or self._refused("signing", name):
             return None
         if password is None and signing.backup_locked(name):
@@ -11913,7 +11908,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*rules.verb(name, field(req, "action"), req))
 
     def _global_rules(self, req):
-        """The rules that apply to EVERY project (R63): rules.global_verb.
+        """The rules that apply to EVERY project: rules.global_verb.
         An administrator's.
 
         Per-project rules are the operator's for that project; a global one
@@ -11975,7 +11970,7 @@ class Handler(BaseHTTPRequestHandler):
         # so an action added later is a write until somebody says otherwise.
         if field(req, "action") not in ("history", "finished") and self._readonly(name):
             return None
-        # The lock refuses writes alone, as the roadmap's does (B1036).
+        # The lock refuses writes alone, as the roadmap's does.
         if field(req, "action") not in ("history", "finished") \
                 and (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
@@ -11991,7 +11986,7 @@ class Handler(BaseHTTPRequestHandler):
         # read had no project check at all (the audit of 26 Sep).
         if not (proj := self._project_asked(req)):
             return None
-        # The lock refuses writes alone (B1036): the history is read through it.
+        # The lock refuses writes alone: the history is read through it.
         if act != "history" and (bad := projects.locked_out(proj, users.whose(self._who()))):
             return self._json(bad, 409)
         # Seeing a project and being able to change it are different
@@ -12000,7 +11995,7 @@ class Handler(BaseHTTPRequestHandler):
         # so an action added later is a write until somebody says otherwise.
         if act != "history" and self._readonly(proj):
             return None
-        # Whose memories: the reader's own home, never the owner's (B67).
+        # Whose memories: the reader's own home, never the owner's.
         # A session's are the account's that started it.
         return self._json(*memory.verb(proj, act, req, home_for(users.whose(self._who()))))
 
@@ -12008,8 +12003,8 @@ class Handler(BaseHTTPRequestHandler):
         """Save or delete one of the operator's own command lists:
         macros.custom_edit."""
         # They run in everybody's terminals, one set for the controller, so
-        # they are the pinned commands' to change: Controller Write (R277,
-        # the audit of 24 Nov: Terminal Write on any one space rewrote the
+        # they are the pinned commands' to change: Controller Write
+        # (Terminal Write on any one space rewrote the
         # lists every account's terminals run).
         if self._refused("command-pin"):
             return None
@@ -12025,7 +12020,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._refused("create"):
             return None
         me = self._who()
-        # Into a project (R138: Add a repository on its card): one this
+        # Into a project (Add a repository on its card): one this
         # account sees and works on, which is not locked against it; the
         # repository then lives on the project's node.
         into = field(req, "project")
@@ -12036,8 +12031,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": f"{registry.label(into)} is not on your list of spaces: "
                                             "add it to your own list on the Users page first"}, 403)
             # What repositories a space holds is its owner's or an
-            # administrator's, as the card draws Add repository (R277, the
-            # audit of 24 Nov: New spaces Write and a place on the space
+            # administrator's, as the card draws Add repository
+            # (New spaces Write and a place on the space
             # added one to somebody else's space).
             if not users.is_admin(me) and not membership.may_manage(me, into):
                 return self._json({"error": f"a repository is added to {registry.label(into)} by its owner "
@@ -12048,7 +12043,7 @@ class Handler(BaseHTTPRequestHandler):
                 {**req, "_uid": users.uid_of(me)}, env=users.git_env(me, projects.sanitize_name(field(req, "name"))),
                 account=me["name"] if me and users.uid_of(me) else "", may_node=lambda name: False))
         # On the nodes the account's New projects role names, when it names
-        # any (R152, the operator, 7 Oct): a project made elsewhere, or on no
+        # any: a project made elsewhere, or on no
         # node, is refused by name. Its node is then the account's to set at
         # making it, though setting a node later is the Nodes area's.
         nid = field(req, "node")
@@ -12057,8 +12052,8 @@ class Handler(BaseHTTPRequestHandler):
             names = [n["name"] for n in ([] if NODES_DOWN else nodes.node_list()) if n["id"] in limited] or limited
             return self._json({"error": f"a space you make goes on {', '.join(names)}: pick "
                                         + ("that node" if len(names) == 1 else "one of those nodes")}, 403)
-        # The token a person gives is kept in their own key store (the
-        # operator, 27 Oct): who gave it is the server's to say (`_uid`).
+        # The token a person gives is kept in their own key store:
+        # who gave it is the server's to say (`_uid`).
         return self._json(*projects.create_from_dialog(
             {**req, "_uid": users.uid_of(me)}, env=users.git_env(me, projects.sanitize_name(field(req, "name"))),
             account=me["name"] if me and users.uid_of(me) else "",
@@ -12123,7 +12118,7 @@ class Handler(BaseHTTPRequestHandler):
         if not (name := self._project_asked(query=q)):
             return
         if q.get("audit"):
-            # `aerie rules audit` (R200 step 6): the same conversations,
+            # `aerie rules audit`: the same conversations,
             # counted against the guards in effect on the project.
             try:
                 days = max(1, min(90, int(q["audit"][0])))
@@ -12146,7 +12141,7 @@ class Handler(BaseHTTPRequestHandler):
         person's own conversations deleted, or made visible to every session
         on the project (share) or private again (unshare): a person's, from
         the notebook's Sessions view, never a session's, which reads them.
-        Or said something of (R236): label and note {text}, keep and unkeep,
+        Or said something of: label and note {text}, keep and unkeep,
         which that person's own session may do too (aerie transcripts
         label), since it changes nothing but what its person reads of their
         own conversations."""
@@ -12195,7 +12190,7 @@ class Handler(BaseHTTPRequestHandler):
         uid = transcripts.owner_of(uid, name, q.get("id", [""])[0]) or uid
         if q.get("as", [""])[0] == "raw":
             # The file as Claude Code wrote it, for aerie transcripts fetch: a
-            # synced node resuming a conversation it does not have (B613).
+            # synced node resuming a conversation it does not have.
             # Nothing when it is no longer than the copy the node has.
             f = transcripts.raw(uid, name, q.get("id", [""])[0])
             if f is None:
@@ -12213,7 +12208,7 @@ class Handler(BaseHTTPRequestHandler):
             tail = max(0, int(q.get("tail", ["0"])[0])) * 1024 * 1024
         except ValueError:
             tail = 0
-        # The dashboard's reader (R83): turns, the newest part of a long one.
+        # The dashboard's reader: turns, the newest part of a long one.
         if q.get("as", [""])[0] == "turns":
             return self._json(*transcripts.turns(uid, name, q.get("id", [""])[0],
                                                  transcripts.zone(q.get("tz", [""])[0]), tail=tail or 32 * 1024 * 1024))
@@ -12236,7 +12231,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(forgeaccess.view(name, measure_now=True))
 
     def _forge(self, req):
-        """POST /api/forge {project, verb, args}: one aerie forge verb (R188),
+        """POST /api/forge {project, verb, args}: one aerie forge verb,
         run here with the project's own token under what the token allows
         and the project's override, for a session on its own project or an
         account that may change it. Every call is audited."""
@@ -12257,7 +12252,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(body, code)
 
     def _git_act(self, req):
-        """The Git view's actions (roadmap R36 step 2): fixed git commands on
+        """The Git view's actions: fixed git commands on
         the project's tree on the controller, under the acting account's
         author and the project's own credentials (gitview.verb). An
         account's, never a session's (a session has aerie git), on a project it
@@ -12286,14 +12281,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": mine_["confirm"].split("\n\n")[-1], "confirm": mine_["confirm"]}, 409)
         if (busy := gitview.in_use(name, action, req.get("args") or {}, users.uid_of(me))):
             return self._json({"error": busy}, 409)
-        # A person's press is their own work: their own token first (R154).
+        # A person's press is their own work: their own token first.
         acting = gitview.ACTING.set(users.uid_of(me))
         try:
             r = gitview.verb(name, action, req, me, prefix=users.tmux_prefix(me), principal=self._principal())
         finally:
             gitview.ACTING.reset(acting)
-        # A person's Push lands what its environments deploy on a push
-        # (R281 step 6), as the branch stands now.
+        # A person's Push lands what its environments deploy on a push,
+        # as the branch stands now.
         if action == "push" and r.get("ok"):
             head = gitview._git(WORKSPACE / name, "rev-parse", "HEAD") or ""
             branch = (gitview._git(WORKSPACE / name, "symbolic-ref", "--short", "HEAD") or "").strip()
@@ -12340,15 +12335,15 @@ class Handler(BaseHTTPRequestHandler):
         dialog is only drawn for an administrator, so nothing offered it, and
         nothing refused a request that arrived anyway.
         """
-        # Git authentication Write on the space it links (R277, the audit of
-        # 24 Nov: New spaces Write, kept from the create dialog, refused a
+        # Git authentication Write on the space it links
+        # (New spaces Write, kept from the create dialog, refused a
         # space's own owner), and its owner's alone (_not_link_owner).
         name = field(req, "name").strip()
         if (registry.is_project(name) and self._refused("git-auth", name)) or self._not_link_owner(name):
             return None
         body, code = projects.link({**req, "_uid": users.uid_of(self._who())})
         # A project linked is a project whose CI is worth a first look now,
-        # not at the next round (R117).
+        # not at the next round.
         if code == 200:
             ciwatch.look_soon(field(req, "name").strip())
         return self._json(body, code)
@@ -12366,7 +12361,7 @@ class Handler(BaseHTTPRequestHandler):
     def _project_job(self, req):
         """Stop the running project job, or clear the last one's outcome.
 
-        The create gate, as for starting one (B171): a clone or a link is the
+        The create gate, as for starting one: a clone or a link is the
         create dialog's, and without it any account could stop an
         administrator's clone halfway or clear a failure before they read it.
         """
@@ -12396,7 +12391,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._refused("admin"):
             return None
         me = self._who() or {}
-        # An account's device signed out by an administrator (R272 step 8).
+        # An account's device signed out by an administrator.
         if act == "device-signout":
             target = (users.load().get("users") or {}).get(field(req, "name"))
             if not target:
@@ -12409,7 +12404,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _roles(self, req):
         """POST /api/roles: assign (an account's Everywhere roles and its
-        roles on each project, as far as the asker may, R152 and R155), set
+        roles on each project, as far as the asker may), set
         (make or change a role: its scope, its areas and note) or remove
         one; owner and admin are built in and refuse both. Roles themselves
         are an administrator's."""
@@ -12427,7 +12422,7 @@ class Handler(BaseHTTPRequestHandler):
             # A role held by somebody keeps its kind: an Everywhere role is
             # given to the account and a project role on a project, so a
             # change of kind would leave every holder holding it in the
-            # wrong place and silently without it (R155).
+            # wrong place and silently without it.
             was = roles.get(field(req, "name"))
             want = field(req, "scope") or "projects"
             if was and not was.get("builtin") and was.get("scope") != want:
@@ -12444,7 +12439,7 @@ class Handler(BaseHTTPRequestHandler):
                                                field(req, "note"),
                                                only=req.get("only") if isinstance(req.get("only"), dict) else {}))
         if act == "two-factor":
-            # Require a second factor of everybody holding this role (R127).
+            # Require a second factor of everybody holding this role.
             r = roles.set_two_factor(field(req, "name"), req.get("on") is True)
             if r.get("ok"):
                 db.audit(self._principal(), "role-two-factor", r["name"], {"on": r["two_factor"]})
@@ -12452,7 +12447,7 @@ class Handler(BaseHTTPRequestHandler):
         if act == "remove":
             r = roles.remove(field(req, "name"))
             if r.get("ok"):
-                # ...and off every account that held it (B20).
+                # ...and off every account that held it.
                 r["held_by"] = users.forget_role(r["name"])
             return self._result(r)
         return self._json({"error": "unknown action"}, 400)
@@ -12461,12 +12456,12 @@ class Handler(BaseHTTPRequestHandler):
         """Queue installs or removals of the toolchains the Tools card
         offers: an administrator's, and toolchains.verb says what each
         action does with which names."""
-        # By grant, on the node named (R137 step 3): an administrator's
+        # By grant, on the node named: an administrator's
         # everywhere, a role of your own where it says.
         if self._refused_on_node("toolchains-write", field(req, "node")):
             return
         # A hosting-only node is offered none, and one asked for is refused
-        # in a sentence rather than queued for its agent to refuse (R291).
+        # in a sentence rather than queued for its agent to refuse.
         if req.get("action") in ("install", "update") and (why := nodes.builds_elsewhere(field(req, "node"))):
             return self._json({"error": why}, 409)
         # An agreement (Google's Android SDK terms, NVIDIA's CUDA license) is
@@ -12488,9 +12483,9 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/toolpacks: look at a tool pack by its repository's
         address, or at one made here from a pasted manifest or an uploaded
         archive (/api/upload-archive's id); add it as it was shown; read a
-        pack made here's manifest back for Edit; or remove it (R77).
-        Curate's (R174), since a pack joins every node's catalog. A session
-        asks for a tool by name (aerie tool install, R169 step 5), a
+        pack made here's manifest back for Edit; or remove it.
+        Curate's, since a pack joins every node's catalog. A session
+        asks for a tool by name (aerie tool install), a
         toolchain AerieOS ships or a pack of the vetted catalog, to be
         installed on the node it runs on, as its project's Install a tool
         pack dial says."""
@@ -12517,13 +12512,13 @@ class Handler(BaseHTTPRequestHandler):
             r = toolpacks.stage(req.get("text") if isinstance(req.get("text"), str) else None,
                                 field(req, "archive"), shipped)
         elif action == "preview":
-            # From the catalog (R169 step 4): at the commit it pins, the
+            # From the catalog: at the commit it pins, the
             # archive's sha256 checked too.
             r = toolpacks.fetch(field(req, "url"), field(req, "commit"), shipped=shipped, sha256=field(req, "sha256"), path=field(req, "path"))
         elif action == "add" and field(req, "staged"):
             r = toolpacks.add_staged(field(req, "staged"), by, shipped, may_root=users.is_admin(me))
         elif action == "add" and field(req, "sha256"):
-            # The tier is the signed index's, never the request's (B440): a
+            # The tier is the signed index's, never the request's: a
             # sha256 is taken only for the pin the index names.
             pin = _catalog_pin(field(req, "url"), field(req, "commit"), field(req, "sha256"), field(req, "path"))
             if not pin:
@@ -12535,7 +12530,7 @@ class Handler(BaseHTTPRequestHandler):
             r = toolpacks.source(field(req, "name"))
         elif action == "where":
             # Asked before Remove's confirm: refused here, saying where, while
-            # a node's store holds it (B84).
+            # a node's store holds it.
             w = toolchains.installed_where(field(req, "name"))
             r = toolpacks.where_said(field(req, "name"), w) if w else {"installed": []}
         elif action == "remove":
@@ -12546,7 +12541,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(r, 400)
         if action not in ("preview", "source"):
             toolchains.refresh_packs()
-        # The icon's own bytes are the kept file's (R182), never an answer's:
+        # The icon's own bytes are the kept file's, never an answer's:
         # what Look says of it is its type and its size.
         if isinstance(r, dict) and r.get("icon_bytes"):
             raw, ext = r.pop("icon_bytes")
@@ -12563,10 +12558,10 @@ class Handler(BaseHTTPRequestHandler):
         if NODES_DOWN:
             return self._nodes_down()
         action, nid = req.get("action"), field(req, "node")
-        # ...on that node (R260): a role holding Toolchains on named nodes.
+        # ...on that node: a role holding Toolchains on named nodes.
         if self._refused_on_node("toolchains-write", nid):
             return
-        # A project's phone off the node (R123), one this account sees.
+        # A project's phone off the node, one this account sees.
         if action == "phone-remove":
             project = field(req, "project")
             if not project or not (users.is_admin(self._who()) or users.may_see(self._who(), project)):
@@ -12590,11 +12585,11 @@ class Handler(BaseHTTPRequestHandler):
         """
         name = field(req, "project")
         # A role that reads the project does not rearrange its changelog
-        # either (B101): the Save was live for it, and went through.
+        # either: the Save was live for it, and went through.
         if self._not_project(name) or self._readonly(name):
             return
         out, code = changelog.editor_verb(name, req)
-        # A line written for fixed bugs (R255) is tied to them in the
+        # A line written for fixed bugs is tied to them in the
         # notebook, by the words it was written with.
         if code == 200 and req.get("action") == "line" and out.get("words"):
             for b in (req.get("bugs") or [])[:20]:
@@ -12617,7 +12612,7 @@ class Handler(BaseHTTPRequestHandler):
         if proj and not who.get("session") and not users.may_see(who, proj):
             return self._json({"error": refusals.NO_SPACE}, 400)
         asking = prefs.get(proj)["node"] if proj else ""
-        # The debug grant's, named only (the operator, 6 Oct): the session's
+        # The debug grant's, named only: the session's
         # account, or the person asking, must hold it as well as the project
         # its grant for the node.
         if who.get("session"):
@@ -12685,7 +12680,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._refused("debug")
 
     def _files(self, req):
-        """A project's files for a person's own editor (files.py, R159): the
+        """A project's files for a person's own editor (files.py): the
         account this request proved, a project it sees, and the file access
         its settings give it through the editor's door, asked on this request
         (ftp.access_for), so the extension can do nothing the account cannot.
@@ -12715,8 +12710,8 @@ class Handler(BaseHTTPRequestHandler):
         """Problems with AerieOS itself, reported by any project's session
         (reports.py, aerie report). Anybody signed in adds one for a project they
         may see, and a session only for its own. A person reads, deletes and
-        clears them on Controller settings, so its gate is that page's (the
-        operator, 26 Oct: not a debug feature); a session reads them behind
+        clears them on Controller settings, so its gate is that page's
+        (not a debug feature); a session reads them behind
         the diagnostics' own gate, since that is where it reads them (aerie diag
         reports)."""
         me = self._who() or {}
@@ -12728,14 +12723,14 @@ class Handler(BaseHTTPRequestHandler):
             req.pop("_conversation", None)
             proj = sess or field(req, "project")
             # A person's report about no project in particular (the header's
-            # Report a bug, the operator, 2 Oct): heard from any account, with
+            # Report a bug): heard from any account, with
             # no project to check.
             if not sess and not proj:
                 return self._json(*reports.own_verb(act, "", req, by=f"{name} (from the dashboard)"))
             if not sess and self._not_project(proj):
                 return None
-            # A person reports from a project they work on (the operator,
-            # 2 Oct): an administrator shown every project but not on this
+            # A person reports from a project they work on:
+            # an administrator shown every project but not on this
             # one cannot start a session here, so has nothing of its to report.
             if not sess and not users.may_work(me, proj):
                 return self._json({"error": f"you are not on {proj}, so a bug from there is not yours to "
@@ -12747,7 +12742,7 @@ class Handler(BaseHTTPRequestHandler):
                                             "settings, Agents may: Report AerieOS bugs. A "
                                             "problem goes into this space's tracker"}, 403)
             # The person's latest conversation on the project, when they
-            # ticked Include it (the operator, 2 Oct): theirs only, found and
+            # ticked Include it: theirs only, found and
             # rendered here, never named by the page.
             if not sess and req.get("include_conversation"):
                 uid = users.whose(me)
@@ -12765,8 +12760,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "deleting reports is a person's, from "
                                         "Controller settings"}, 403)
         # A person's are Controller settings' (reading them its read, deleting
-        # its write); only a session reading them is debug's (the operator,
-        # 26 Oct): debug mode, the debug grant and its project's grant.
+        # its write); only a session reading them is debug's:
+        # debug mode, the debug grant and its project's grant.
         if not sess:
             if self._refused("controller" if act in ("clear", "delete") else "controller-read"):
                 return None
@@ -12795,7 +12790,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*macros.pin(req.get("name", ""), bool(req.get("pinned"))))
 
     def _get_schedules(self):
-        """GET /api/schedules (R117): every schedule, its words, its next run
+        """GET /api/schedules: every schedule, its words, its next run
         and its last run's state, and the nodes it may run on. Read on
         Schedules; never a session's, whatever its token holds."""
         who = self._who() or {}
@@ -12815,7 +12810,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"schedules": rows, "nodes": ns, "may": not users.may(who, "schedules")})
 
     def _schedules(self, req):
-        """POST /api/schedules (R117): save (add or change, turning one on or
+        """POST /api/schedules: save (add or change, turning one on or
         off among them), remove, or run now. Write on Schedules; never a
         session's."""
         if self._refused("schedules"):
@@ -12842,7 +12837,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _get_root_hooks(self):
-        """GET /api/root-hooks (B1166): every root startup hook in the state's
+        """GET /api/root-hooks: every root startup hook in the state's
         startup.d, what it says, and whether the start runs it (approved,
         changed since, new). Read on Controller Read."""
         if self._refused("controller-read"):
@@ -12850,7 +12845,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(roothooks.listing())
 
     def _get_clusters(self):
-        """GET /api/clusters (R281 step 2): the Kubernetes clusters this
+        """GET /api/clusters: the Kubernetes clusters this
         install may deploy to, each with its facts as last asked; never a
         credential. Read on Clusters Read, cluster by cluster where a role
         holds it on some (roles.INSTANCE_AREAS): the ones it reads, each
@@ -12875,8 +12870,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _clusters(self, req):
         """POST /api/clusters {action: add, name, kubeconfig} | {action:
-        from-k3s, node, name} | {action: test|rename|forget, id} (R281 step
-        2): a cluster added once its API answers (from a kubeconfig, or the
+        from-k3s, node, name} | {action: test|rename|forget, id}:
+        a cluster added once its API answers (from a kubeconfig, or the
         k3s a node runs, which is Configure on that node too), asked again,
         renamed or forgotten here (nothing on the cluster changes). Clusters Write, an administrator's unless a role
         gives it; a session never reaches it (SESSION_ROUTES)."""
@@ -12911,7 +12906,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"error": "action is add, from-k3s, test, rename or forget"}, 400)
 
     def _get_deploy(self):
-        """GET /api/deploy?project= (R281 step 3): the space's environments,
+        """GET /api/deploy?project=: the space's environments,
         each with its cluster's name, and the clusters this account may pick
         one from (Clusters Read; none, with why, otherwise). Deploy Read on
         the space."""
@@ -12941,7 +12936,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _deploy(self, req):
         """POST /api/deploy {project, action: save, env, was} | {project,
-        action: remove, name} (R281 step 3): an environment added or changed
+        action: remove, name}: an environment added or changed
         once its namespace is ready on its cluster, or taken off the space's
         list (its namespace stays on the cluster). Space settings Write on
         the space, and Clusters Read to name a cluster; a session never
@@ -12992,7 +12987,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"error": "action is save, remove, deploy or rollback"}, 400)
 
     def _get_kubernetes(self):
-        """GET /api/kubernetes?project=&env= (R281 step 5): what runs in one
+        """GET /api/kubernetes?project=&env=: what runs in one
         of the space's environments, read with its own deployer, so nothing
         outside its namespace: each workload with ready of desired, its
         version, its pods and where it answers. Deploy Read on the space."""
@@ -13004,7 +12999,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _kubernetes(self, req):
         """POST /api/kubernetes {project, env, action: restart|scale, kind,
-        name, replicas} (R281 step 5): a workload in one of the space's
+        name, replicas}: a workload in one of the space's
         environments restarted or scaled, with its own deployer. Deploy
         Write on the space; audited."""
         name = self._space_write("deploy", req)
@@ -13025,7 +13020,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _k8s(self, req):
         """POST /api/k8s {project, action: status|logs|deploy|rollback, env,
-        ref, pod, container, tail, why} (R281 step 6): aerie k8s, from a
+        ref, pod, container, tail, why}: aerie k8s, from a
         session as from a person, relayed by the controller, which holds
         every credential; a session never holds a kubeconfig. status and logs
         read with the environment's deployer on Deploy Read. A session's
@@ -13086,7 +13081,7 @@ class Handler(BaseHTTPRequestHandler):
             return "", f"{registry.label(name) or name} has no {discord.LAYOUT} yet: Pull writes the server into it"
 
     def _get_discord(self):
-        """GET /api/discord?project= (R293): the space's Discord connection
+        """GET /api/discord?project=: the space's Discord connection
         (never its token), its last plans, and whether this account changes
         it: whoever sees the space looks, Space settings Write connects and applies."""
         name = self._project_asked()
@@ -13100,7 +13095,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _discord(self, req):
         """POST /api/discord {project, action: connect|forget|pull|plan|apply,
-        token, guild, text, write, why} (R293). A person connects, forgets
+        token, guild, text, write, why}. A person connects, forgets
         and applies on Space settings Write, and pulls and plans where they see the space;
         Pull with write lays deploy/discord.yml into the repository's tree,
         uncommitted, a write to its tree. A session reads (pull, plan) on its
@@ -13204,7 +13199,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(r, 200 if r.get("ok") else 400)
 
     def _get_connections(self):
-        """GET /api/connections (R294 step 9): Connected services, every
+        """GET /api/connections: Connected services, every
         credential the install holds for an outside service with who added
         it, its last use and its expiry, and how many people keep connections
         of their own, which are theirs alone. Read on Controller Read."""
@@ -13217,7 +13212,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(connections.listing() | {"people": len(mine)})
 
     def _connections(self, req):
-        """POST /api/connections {action: forget, kind, ref} (R294 step 9):
+        """POST /api/connections {action: forget, kind, ref}:
         a credential forgotten at once (a leak, a person gone), where its kind
         keeps it. An administrator's alone, as the connections rule says;
         adding one and changing one happen where it lives."""
@@ -13229,7 +13224,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _root_hooks(self, req):
         """POST /api/root-hooks {action: approve, name, sha} or {action:
-        revoke, name} (B1166): a root hook approved as it was shown, or its
+        revoke, name}: a root hook approved as it was shown, or its
         approval taken back, through the root-only helper. Controller Write."""
         if self._refused("controller"):
             return None
@@ -13240,12 +13235,12 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(r, status)
 
     def _get_storebackups(self):
-        """GET /api/storebackups (R162 step 5): the backups the controller's
+        """GET /api/storebackups: the backups the controller's
         own machine copies, as recorded. An administrator's."""
         return self._json({"backups": storebackups.rows()})
 
     def _storebackups(self, req):
-        """POST /api/storebackups (R162 step 5): set (add or change) or
+        """POST /api/storebackups: set (add or change) or
         remove a backup's record; Run now is the nodes verb storage-backup.
         An administrator's."""
         act, by = field(req, "action"), self._principal()
@@ -13260,7 +13255,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _get_pack_icon(self):
-        """GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an
+        """GET /api/pack-icon?name=PACK or ?app=ID: a pack's or an
         app's own icon, as the image its file is and nothing else: its type
         set here and never sniffed, and a policy that runs no script and
         sandboxes it, so an SVG opened by its address is still only a
@@ -13286,7 +13281,7 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _get_library(self):
-        """GET /api/library?node=ID (R170): everything an AerieOS installs
+        """GET /api/library?node=ID: everything an AerieOS installs
         or runs as one list for one node (library.rows): the toolchains and
         packs with what the node's store holds, the coding agents, the apps
         a NAS runs, the vetted catalog's offers and the companions a person
@@ -13311,7 +13306,7 @@ class Handler(BaseHTTPRequestHandler):
             _catalog_rows_refresh(cat["index"])
             _catalog_apps_refresh(cat["index"])
         # A newer install recipe the catalog pins for a coding agent is read
-        # now, behind the page, so a press on Update finds it (R169 step 13).
+        # now, behind the page, so a press on Update finds it.
         if may_install and not NODES_DOWN:
             agentcode.warm()
         # An app's row opens on its compose file (step 2), so it rides along.
@@ -13319,27 +13314,27 @@ class Handler(BaseHTTPRequestHandler):
         # ...and an agent's on what this person added to it there (the Installed page's Yours).
         uid = users.uid_of(who)
         mine = next((x for x in plugins.of(uid) if x["node"] == nid), {}) if uid and n else {}
-        # The services (R172): the model router on this node, its status as
+        # The services: the model router on this node, its status as
         # the Node settings section read it; a person who may write
         # containers may deploy it, as the nginx page's. The added packs'
         # answers here, for Configure on their cards.
-        # ...and nginx and the Scanners (R264), for whoever may write
+        # ...and nginx and the Scanners, for whoever may write
         # containers there, as their own pages ask: each deployed or not,
         # its page what Open on Installed leads to. Each one's grant is
         # services.py's table's, asked of this node.
         own = services.rows(nid, lambda grant: not users.may_node(who, grant, nid)) if n else []
         pack_values = {name: packconfig.get(nid, name, fields) for name, fields in toolpacks.configs().items()} if n and not users.may_node(who, "configure", nid) else {}
-        # ...and this person's own (R172 step 5), where they work on the node.
+        # ...and this person's own, where they work on the node.
         yours_ok = bool(n) and self._works_on_node(who, nid) and bool(users.uid_of(who))
         pack_mine = {name: packconfig.get_mine(nid, name, fields, users.uid_of(who)) for name, fields in toolpacks.configs().items()
                      if packconfig.person_fields(fields)} if yours_ok else {}
         rows = library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), own, pack_values, pack_mine)
-        # A hosting-only node runs services and apps alone (R291): what a
+        # A hosting-only node runs services and apps alone: what a
         # space builds with is not offered there, its counts and chips with it.
         host = bool(n) and nodes.host_only(n)
         if host:
             rows = [r for r in rows if r.get("kind") in nodes.HOST_KINDS]
-        # The page asks for one look at it (R256): the rows narrowed, counted
+        # The page asks for one look at it: the rows narrowed, counted
         # and paged here, so it never holds the whole catalog; an entry's
         # page asks for its one row by kind:name. Asked with neither, the
         # whole list, as before.
@@ -13363,11 +13358,11 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"node": nid, "name": tc.get("name") or (n or {}).get("name") or "", "live": bool(tc.get("live", (n or {}).get("live"))),
                            "rows": rows, **look, **({"host_only": True} if host else {}),
                            "job": tc.get("job") or {"running": False}, "catalog_error": cat.get("error", ""),
-                           # With no app kept and no index read, the Apps say so in a line (R238).
+                           # With no app kept and no index read, the Apps say so in a line.
                            "apps_note": library.apps_note(napps, cat.get("index")) if may_apps else "",
-                           # Whether this node runs Docker, for an app's card (R170 step 7).
+                           # Whether this node runs Docker, for an app's card.
                            "docker": bool(((n or {}).get("reported") or {}).get("docker")),
-                           # Install on the node shown (R277, the audit of 24 Nov: asked
+                           # Install on the node shown (asked
                            # anywhere, it was drawn on a node the install was refused on).
                            "may": {"install": not users.may_node(who, "toolchains-write", nid), "apps": may_apps,
                                    "packs": not users.may(who, "curate"),
@@ -13380,7 +13375,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _works_on_node(self, who, nid):
         """Whether this account works on a project whose node is `nid`
-        (R172 step 5: a person-scoped setting asks nothing more)."""
+        (a person-scoped setting asks nothing more)."""
         if users.is_admin(who):
             return True
         for p in wssync.bound_projects(nid) or []:
@@ -13389,7 +13384,7 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def _library(self, req):
-        """POST /api/library (R172): a card's Configure, Install and Remove
+        """POST /api/library: a card's Configure, Install and Remove
         for a service (the model router, router.py's own verbs, docker-write
         as the nginx page), the router's models, spend and Ollama's pulls,
         and Configure for an added pack with a config block (packconfig,
@@ -13406,9 +13401,9 @@ class Handler(BaseHTTPRequestHandler):
         kind = services.of_pack(pack)
         if kind and kind != "router":
             # Every service but the router is installed and removed here and
-            # no more: nginx's and the Scanners' (R264), what their pages'
-            # Deploy and Remove do, and k3s's, which has nothing to set
-            # (R281); a service's, so Configure on the node, as the router's
+            # no more: nginx's and the Scanners', what their pages'
+            # Deploy and Remove do, and k3s's, which has nothing to set;
+            # a service's, so Configure on the node, as the router's
             # branch below asks.
             if self._refused_on_node("configure", nid):
                 return None
@@ -13419,7 +13414,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.audit(f"user:{by}", f"{pack}-{act}", nid, {})
             return self._result(r)
         if kind == "router":
-            # Configure on this node (R174): its settings, its deploy and
+            # Configure on this node: its settings, its deploy and
             # removal; the router's containers are this node's.
             if self._refused_on_node("configure", nid):
                 return
@@ -13463,7 +13458,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.audit(f"user:{by}", f"router-{act}", nid, {})
             return self._result(r)
         fields = toolpacks.configs().get(pack)
-        # A person's own answers (R172 step 5): theirs on a node whose
+        # A person's own answers: theirs on a node whose
         # projects they work on, no Configure grant asked.
         if field(req, "scope") == "person":
             if not fields or act != "configure":
@@ -13484,14 +13479,14 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _get_catalog(self):
-        """GET /api/catalog[?fresh=1] (R169 step 2): the vetted catalog's
+        """GET /api/catalog[?fresh=1]: the vetted catalog's
         index as kept (fetched again when older than an hour, or on fresh),
         verified against the key this install ships; with the reason when
         the newest could not be taken. For whoever may install toolchains;
         never a session's."""
         who = self._who() or {}
         q = self._q()
-        # A search of it (R169 step 5): what aerie tool search answers a
+        # A search of it: what aerie tool search answers a
         # session with, and anyone signed in: names, what each is, tier and
         # platforms, never an address or a commit; each word must be found.
         if self.path.split("?")[0].rstrip("/") == "/api/catalog/search":
@@ -13517,38 +13512,38 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"index": idx, "error": r.get("error", ""), "url": settings.get("catalog_url")})
 
     def _get_nasapps(self):
-        """GET /api/nasapps (R164 step 2): the catalog of ready apps the New
+        """GET /api/nasapps: the catalog of ready apps the New
         container dialog offers, each with what it is and the blanks it
         takes. For whoever may make a container; never a session's."""
         if self._refused("docker-write"):
             return
-        # ...and the folders a folder field suggests on the node picked (R238):
+        # ...and the folders a folder field suggests on the node picked:
         # its pools, shares and disks under /mnt or /srv, as the Files page
         # lists its places.
         q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0]) if q.get("node") else ("", "")
         n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_DOWN else None
         roots = [r for r in fileexplorer.roots(n) if nasapps.PATH_RE.fullmatch(r["path"])] if n else []
-        # ...and the model routers a router field can be given a key at (R238
-        # step 7), and the names and the node's ports the containers already
+        # ...and the model routers a router field can be given a key at,
+        # and the names and the node's ports the containers already
         # made hold, so another of the same app is offered its own.
         return self._json({"apps": nasapps.catalog(), "roots": roots, "routers": router.routers(),
                            "taken": containers.apps_held(nid if nid and not why else "")})
 
     def _nasapps(self, req):
-        """POST /api/nasapps (R164 step 2): one app's compose and environment
+        """POST /api/nasapps: one app's compose and environment
         with its blanks filled (its data folder, its media folder, the user
         it runs as, the time zone, its port), for the dialog to show before
         Create makes it as any container."""
         who = self._who() or {}
         if self._refused("docker-write"):
             return
-        # An app of a person's own (R170 step 3): looked at (preview), kept
+        # An app of a person's own: looked at (preview), kept
         # (add), read back for Edit (source) and dropped (remove); an
         # administrator's, as a tool pack is, since every person's New
         # container then offers it.
         action = field(req, "action")
-        # An app the vetted catalog offers (R170 step 7): kept from its pin
+        # An app the vetted catalog offers: kept from its pin
         # in the signed index, never from what the page sends, so whoever
         # may make containers takes it; New container then offers it.
         if action == "add-catalog":
@@ -13571,18 +13566,18 @@ class Handler(BaseHTTPRequestHandler):
             # catalog again on their next open, and the page that added
             # it reads at once.
             return self._result(r)
-        # An app's environment is made as its container is (R238 step 3:
-        # /api/container's create, from its panel's values), never here.
+        # An app's environment is made as its container is
+        # (/api/container's create, from its panel's values), never here.
         return self._json({"error": f"unknown action: {action or 'none'}"}, 400)
 
     def _get_extmounts(self):
-        """GET /api/extmounts (R162 step 4): the other disks and shares the
+        """GET /api/extmounts: the other disks and shares the
         controller's own machine mounts, as recorded, never a password.
         An administrator's."""
         return self._json({"mounts": extmounts.rows()})
 
     def _extmounts(self, req):
-        """POST /api/extmounts (R162 step 4): set (add or change), remove,
+        """POST /api/extmounts: set (add or change), remove,
         or on and off (Eject is off: the agent unmounts within a minute).
         An administrator's; the own machine's agent follows at its hello."""
         act, by = field(req, "action"), self._principal()
@@ -13599,7 +13594,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _get_storage(self):
-        """The Storage page (storage.view, R169): every node this account
+        """The Storage page (storage.view): every node this account
         holds the Storage area on, what its disks hold, by project where
         the account sees the project and as one line otherwise. Never a
         session's: a session reads its node with aerie node busy."""
@@ -13609,21 +13604,21 @@ class Handler(BaseHTTPRequestHandler):
         payload, status = storage.view(nodes.node_list(), who, is_admin=users.is_admin,
                                        nodes_for=roles.nodes_for, may_see=users.may_see,
                                        level_of=roles.level_of)
-        # The own machine's snapshot schedules (R162 step 5), the Schedules
+        # The own machine's snapshot schedules, the Schedules
         # page's rows the Storage page makes and lists beside its pools.
         names = users.smb_names()
         have = None
         for row in payload.get("nodes") or []:
             if row.get("own"):
                 row["snapshot_schedules"] = schedules.snapshot_schedules(row["node"])
-                # A share's users as people (R164 step 1), and who may be named.
+                # A share's users as people, and who may be named.
                 if have is None:
                     have = {x["user"] for x in users.smb_users()}
                 for sh in row.get("shares") or []:
                     sm = sh.get("smb") or {}
                     sh["accounts"] = [names.get(u, u) for u in sm.get("users") or []]
                     sh["readers"] = [names.get(u, u) for u in sm.get("readers") or []]
-                    # ...and who is named with no share password yet (R243):
+                    # ...and who is named with no share password yet:
                     # it is made from their password as they next sign in.
                     sh["waiting"] = [names[u] for u in [*(sm.get("users") or []), *(sm.get("readers") or [])] if u in names and u not in have]
                 if users.is_admin(who):
@@ -13635,12 +13630,12 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(payload, status)
 
     def _get_history(self):
-        """GET /api/history?node=ID&span=6h|day|week|month (R164 step 4): the
+        """GET /api/history?node=ID&span=6h|day|week|month: the
         controller's own machine's CPU, memory, network, disk I/O and
         temperatures over the span, at the resolution kept for it (five
         minutes for a day, an hour for a month). Read on the Nodes area;
         never a session's. A read of the Nodes page's, Nodes Read on that
-        node (R277: it asked to choose a space's node, Nodes Write)."""
+        node (it asked to choose a space's node, Nodes Write)."""
         q = self._q()
         nid, span = (q.get("node") or [""])[0], (q.get("span") or ["day"])[0]
         if nid and self._refused_on_node("nodes-read", nid):
@@ -13669,7 +13664,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why}, 403)
         view = nginxproxy.view(devapp, devactions.state)
         # The nodes this account reads a service on, each saying whether its
-        # controls are this account's (R277).
+        # controls are this account's.
         rows = []
         for row in view.get("nodes") or []:
             if (lvl := self._service_may(who, row.get("node") or "")):
@@ -13680,8 +13675,8 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/router?node=ID: a node's model router (router.status)
         and the projects it may be offered to, for an account that reads the
         Nodes page, on that node; never a session's. The spaces it may be
-        offered to are the ones the asker sees (R277, the audit of 24 Nov:
-        an unnamed action let any space's owner read every space's name)."""
+        offered to are the ones the asker sees
+        (an unnamed action let any space's owner read every space's name)."""
         q = self._q()
         nid = q.get("node", [""])[0]
         if not nid or not nodes.node(nid):
@@ -13703,8 +13698,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self._session_elsewhere(name, "a session is handed its own space's key"):
             return None
-        # ...and only to one who may work on it, as said (R277, the audit of 24
-        # Nov: seeing the space was enough), a session's account included.
+        # ...and only to one who may work on it, as said
+        # (seeing the space was enough), a session's account included.
         if self._refused("work", name):
             return
         got = router.for_project(name)
@@ -13758,7 +13753,7 @@ class Handler(BaseHTTPRequestHandler):
         schedule, the versions and what nothing covers, for an account that
         reads a node's services (_service_may); never a session's. Each
         node's row says whether its controls are this account's, and
-        may_all whether the page-wide ones are (every node's: R277)."""
+        may_all whether the page-wide ones are (every node's)."""
         who = self._who() or {}
         if (why := self._services_read_why(who)):
             return self._json({"error": why}, 403)
@@ -13805,7 +13800,7 @@ class Handler(BaseHTTPRequestHandler):
         node, a service's, so Configure on that node, and on every node
         for the hostname list every node's routes pick from; never a
         session's. Check reads the registry now; update pins the newest
-        line on the node and rebuilds (R192)."""
+        line on the node and rebuilds."""
         act, nid = field(req, "action"), field(req, "node")
         if self._refused_on_node("configure", "" if act in ("host-add", "host-remove") else nid):
             return
@@ -13819,20 +13814,20 @@ class Handler(BaseHTTPRequestHandler):
         if act == "deploy":
             r = nginxproxy.deploy(nid, containers, devactions, devapp)
         elif act == "route-add":
-            # From a container's row on the Docker tab (R209): a port of the
+            # From a container's row on the Docker tab: a port of the
             # container and the certificate the route serves under.
             r = nginxproxy.add_route(nid, req.get("port"), field(req, "cert"), containers, devactions, devapp,
                                      host=field(req, "host"))
         elif act == "save":
             r = nginxproxy.save_routes(nid, req.get("routes"))
             # The routes as kept go back with the answer, so the row says
-            # the saved port at once rather than after a read (B99).
+            # the saved port at once rather than after a read.
             kept = {"routes": r["routes"]} if isinstance(r.get("routes"), list) else {}
             # The certificate pasted is the node's default, or one
-            # hostname's own when cert_for names it (R175).
+            # hostname's own when cert_for names it.
             saved = {}
             # A pair pasted is kept under the key its names say, or the one
-            # cert_for names (R188); drop_cert names the key to take off.
+            # cert_for names; drop_cert names the key to take off.
             if not r.get("error") and isinstance(req.get("cert"), str) and req.get("cert").strip():
                 r = nginxproxy.set_cert(nid, req.get("cert"), req.get("key"), field(req, "cert_for"))
                 if not r.get("error"):
@@ -13847,7 +13842,7 @@ class Handler(BaseHTTPRequestHandler):
         elif act == "update":
             r = nginxproxy.update(nid, containers, devactions, devapp)
         elif act == "acme":
-            # A certificate from Let's Encrypt (R150), asked for in the
+            # A certificate from Let's Encrypt, asked for in the
             # background; the page follows it on the node's row.
             r = nginxproxy.acme_request(nid, field(req, "host"), field(req, "method"), field(req, "email"),
                                         containers, devactions, devapp)
@@ -13856,7 +13851,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _images(self, req):
-        """Check for updates on the Containers page (imagecheck.py, R195): every
+        """Check for updates on the Containers page (imagecheck.py): every
         container's registry images on one node, or all, asked now. A
         person's, under docker-write, since what it leads to is an Update."""
         if self._refused("docker-write"):
@@ -13869,7 +13864,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(imagecheck.check(nid or None))
 
     def _get_help(self):
-        """GET /api/help: the docs on the Help page (helpdocs.py, R258): the
+        """GET /api/help: the docs on the Help page (helpdocs.py): the
         listing, ?doc=NAME one of them, ?q=WORDS a search across them. Any
         account and any session: they are the docs the image ships."""
         q = self._q()
@@ -13880,7 +13875,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*helpdocs.listing())
 
     def _get_notices(self):
-        """GET /api/notices: notices.listing, this account's own (R218 step 6).
+        """GET /api/notices: notices.listing, this account's own.
         A session has none: what a page said is a person's."""
         who = self._who() or {}
         return self._json(*notices.listing(users.uid_of(who)))
@@ -13893,7 +13888,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _bell(self, req):
         """Put a bell note away for this account, bring every one back
-        (bellseen.py), or resume a session an outage held (R251). The
+        (bellseen.py), or resume a session an outage held. The
         account's own, so no grant; a session has no bell."""
         who = self._who() or {}
         uid = users.uid_of(who)
@@ -13908,7 +13903,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*layout.save_tabs(users.uid_of(self._who()), req))
 
     def _lock(self, req):
-        """Lock or unlock a project (R119), never a session's. Its owner's
+        """Lock or unlock a project, never a session's. Its owner's
         lock holds everybody else; an administrator's holds its owner too
         (projects.locked_out, bb-tty's is_locked). Locking ends every
         session it holds out, here and on every node: all of them under an
@@ -13933,15 +13928,15 @@ class Handler(BaseHTTPRequestHandler):
                                         else "the space's owner or an administrator locks it, and "
                                              "the one who locked it unlocks it"}, 403)
         # An administrator who is not its owner locks it against its owner
-        # too (the operator, 23 Oct); its owner's lock leaves the owner in.
+        # too; its owner's lock leaves the owner in.
         held = admin and uid != owner
         body, code = projects.lock_verb(name, on, by=uid, admin=held)
         if on and code == 200:
-            # Every session it holds out ends (the operator, 23 Oct): under
+            # Every session it holds out ends: under
             # an administrator's lock all of them, under its owner's all but
             # the owner's.
             bb_owner = users.uid_of(users.get(users.owner_name() or "")) if users.owner_name() else ""
-            # Every repository's in the project (R138).
+            # Every repository's in the project.
             want = set()
             for m in repos.expand([name]) or [name]:
                 want |= set(agent_sessions(m))
@@ -13980,7 +13975,7 @@ class Handler(BaseHTTPRequestHandler):
         return [x["name"] for x in tmux_sessions() + node_tmux_sessions() if tmux_base(x["name"]) in want]
 
     def _repos(self, req):
-        """Projects and their repositories (R138): create (a project with a
+        """Projects and their repositories: create (a project with a
         name and nothing in it), rename, move (a repository into another
         project) with move-check (what it changes, asked first: the nodes,
         containers and VMs it touches and who loses it), delete (a project
@@ -14020,8 +14015,7 @@ class Handler(BaseHTTPRequestHandler):
             if got.get("ok"):
                 membership.forget_project(key)
                 prefs.forget(key)
-                # What was given to it keeps running, given to no project
-                # (the operator, 26 Oct).
+                # What was given to it keeps running, given to no project.
                 got = dict(got, unassigned=devapp.unassign(key))
             return self._result(got, 409)
         # What a delete would leave with no project, for its dialog to say:
@@ -14045,11 +14039,11 @@ class Handler(BaseHTTPRequestHandler):
             for k in (to, was or name):
                 if (bad := projects.locked_out(k, users.uid_of(me))):
                     return self._json(bad, 403)
-            # The check before the move (the operator, 26 Oct): what it changes,
+            # The check before the move: what it changes,
             # asked before it is done, with the nodes to bring along.
             if act == "move-check":
                 return self._json(self._move_plan(me, name, to, was))
-            # Not from under a session (the operator, 25 Oct): one working
+            # Not from under a session: one working
             # across the project would lose a tree, one in the other gain one.
             busy = self._running_on([k for k in (was, to) if k])
             if busy:
@@ -14061,7 +14055,7 @@ class Handler(BaseHTTPRequestHandler):
             plan = self._move_plan(me, name, to, was)
             offered = {n["id"]: n["as"] for n in plan["nodes"] if not n["have"]}
             add = [str(x) for x in (req.get("add_nodes") or []) if str(x) in offered]
-            # ...each one asked of (R277: Nodes Write on any node passed).
+            # ...each one asked of (Nodes Write on any node passed).
             if self._refused_nodes(add):
                 return
             got = repos.move(name, to)
@@ -14098,7 +14092,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _move_plan(self, me, name, to, was):
         """What moving the repository `name` from its project `was` into `to`
-        changes (the operator, 26 Oct): the nodes `was` has that `to` has not,
+        changes: the nodes `was` has that `to` has not,
         each with what it is to the project (works on it, or hosts its
         containers) and the repository's dev instances running there, and the
         accounts that reach the repository through `was` alone. A session
@@ -14107,8 +14101,8 @@ class Handler(BaseHTTPRequestHandler):
         have = {dst.get("node") or ""} | set(dst.get("nodes") or []) | set(dst.get("hosts") or [])
         runs = devapp.instance_nodes(name)
         out = []
-        # Every node the project it leaves has, dev and hosting (the operator,
-        # 26 Oct): the ones `to` has already said so, the rest offered.
+        # Every node the project it leaves has, dev and hosting:
+        # the ones `to` has already said so, the rest offered.
         for nid, kind in ([(src.get("node") or "", "nodes")] + [(n, "nodes") for n in src.get("nodes") or []]
                           + [(n, "hosts") for n in src.get("hosts") or []]):
             if nid and nid not in {x["id"] for x in out}:
@@ -14130,8 +14124,8 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _move_things(name, was, have):
-        """The containers and VMs moving `name` out of `was` touches (the
-        operator, 26 Oct). A container is the repository's unless it was given
+        """The containers and VMs moving `name` out of `was` touches.
+        A container is the repository's unless it was given
         to a project: the repository's go with it, and stay with `was` only
         when asked; `was`'s own stay, and go to the project it moves to only
         when asked. A VM is its repository's and always goes with it. Each
@@ -14174,11 +14168,11 @@ class Handler(BaseHTTPRequestHandler):
         if (busy := project_busy(name, "trash")):
             return self._json({"error": busy}, 409)
         body, code = projects.trash(req)
-        # Out of its project, which its record keeps (R138): the trash says
+        # Out of its project, which its record keeps: the trash says
         # where it was, and a restore puts it back there.
         if code == 200 and not body.get("error"):
             # Its containers keep running, given to no project until it is
-            # put back (the operator, 26 Oct).
+            # put back.
             body = dict(body, project=registry.label(repos.detach(name)), unassigned=devapp.unassign(name))
         return self._json(body, code)
 
@@ -14190,7 +14184,7 @@ class Handler(BaseHTTPRequestHandler):
     def _trash_refused(self, name):
         """True, with the 403 already written, when this account may not act
         on the bin, or on this repository in it (_trash_why): restore and
-        purge ask the one question (R283 step 3)."""
+        purge ask the one question."""
         if self._refused("trash"):
             return True
         if why := self._trash_why(name):
@@ -14201,7 +14195,7 @@ class Handler(BaseHTTPRequestHandler):
     def _trash_restore(self, req):
         """A repository out of the bin, back into the project it was in, or
         into the one named (`project`) where that one is gone or another is
-        wanted (R138); one from before projects into a project of its own.
+        wanted; one from before projects into a project of its own.
         It is never put back into none."""
         if self._trash_refused(field(req, "name")):
             return None
@@ -14244,12 +14238,12 @@ class Handler(BaseHTTPRequestHandler):
         name = field(req, "name")
         # Whether it is a project first, then whether this account may: a
         # name that is nothing answered "not taken on" to the owner once
-        # their list was explicit (R135), where it is simply not a project.
+        # their list was explicit, where it is simply not a project.
         if self._not_project(name):
             return
         # A person's own token, given, replaced or taken back, is theirs on
         # any space they may hold git credentials on (git-auth): renaming
-        # is Space settings' (the operator, 23 Nov: everybody pushes with
+        # is Space settings' (everybody pushes with
         # their own token, which a read-only Settings view had refused).
         shown = registry.clean_name(field(req, "to"))
         if shown and shown != registry.label(name):
@@ -14263,13 +14257,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         # Nothing on disk moves: the name shown is the registry's, so
         # a session, a terminal or a container holding the project is not
-        # in the way of it. The account a link names is the asker (R154).
+        # in the way of it. The account a link names is the asker.
         return self._json(*projects.rename({**req, "_uid": users.uid_of(self._who())}))
 
     def _not_link_owner(self, name):
         """Where a repository's remote is, how it pushes, its deploy key and
-        whether it is linked at all are its owner's (the operator, 23 Nov:
-        one git host link, which only the owner changes): the space's owner
+        whether it is linked at all are its owner's
+        (one git host link, which only the owner changes): the space's owner
         or AerieOS's (membership.may_manage). True, with the refusal sent,
         for anybody else; each person's own token stays theirs to give."""
         if membership.may_manage(self._who(), name):
@@ -14283,20 +14277,20 @@ class Handler(BaseHTTPRequestHandler):
         could: projects.auth_answer."""
         name = field(req, "name")
         # The Repository section's question, about a project this account
-        # sees (B175): it says how the project's remote authenticates, to
+        # sees: it says how the project's remote authenticates, to
         # anybody who may hold git credentials there, since each gives their
-        # own token (R275); its owner's controls are gated where they write.
+        # own token; its owner's controls are gated where they write.
         if self._not_project(name) or self._refused("git-auth", name):
             return None
-        # Test (the operator, 7 Oct): a read and a dry-run push with what it
+        # Test: a read and a dry-run push with what it
         # authenticates with, or with a token typed and not saved yet.
         if req.get("action") == "test":
-            # ...and the stored token measured on the host again (R188).
+            # ...and the stored token measured on the host again.
             if not req.get("token"):
                 forgeaccess.token_changed(name)
             return self._json(*projects.auth_test(name, str(req.get("token") or ""), uid=users.uid_of(self._who())))
-        # Its own deploy key, made or pasted beside the token (the operator,
-        # 12 Oct): the private half goes to the root-only helper and no
+        # Its own deploy key, made or pasted beside the token:
+        # the private half goes to the root-only helper and no
         # further.
         if str(req.get("action") or "").startswith("key-"):
             if self._not_link_owner(name):
@@ -14304,15 +14298,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*projects.deploy_key(name, str(req["action"]), str(req.get("key") or "")))
         body, code = projects.auth_answer(name)
         if code == 200:
-            # What the asker's own key store keeps, to link the project to
-            # (R154), and whose account the project is linked to now.
+            # What the asker's own key store keeps, to link the project to,
+            # and whose account the project is linked to now.
             body["store"] = accountkeys.forges_of(users.uid_of(self._who()))
-            # Who has given the project a token (R159), by name, and
+            # Who has given the project a token, by name, and
             # whether each is signed in now; what the asker's own press
             # would run with.
             body["givers"] = _givers_said(name, users.uid_of(self._who()))
-            # Whether the asker may change the link, and whose it is (the
-            # operator, 23 Nov): the page draws the owner's controls dead
+            # Whether the asker may change the link, and whose it is:
+            # the page draws the owner's controls dead
             # for anybody else, under one line naming them.
             body["owner"] = {"me": membership.may_manage(self._who(), name), "name": membership.owner_name(name)}
             body["runs_as"] = _token_said(name, users.uid_of(self._who()))
@@ -14327,7 +14321,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(body, code)
 
     def _project_ftp(self, req):
-        """A project's file access over FTP (ftp.py, R151): what it is, for
+        """A project's file access over FTP (ftp.py): what it is, for
         whoever sees the project, and a change, for an account with File
         access Write on it (users.may's ftp)."""
         if not (name := self._project_asked(req, files=True)):
@@ -14350,7 +14344,7 @@ class Handler(BaseHTTPRequestHandler):
         pin: whether Home shows it and the Spaces page's Favorites chip finds
         it (projects.pin). No session is touched and nothing is blocked: this
         is the one control of the three that is purely about the view."""
-        # A person's own set (the operator, 27 Sep): any signed-in account
+        # A person's own set: any signed-in account
         # may pin for itself.
         me = self._who() or {}
         return self._json(*projects.pin(users.uid_of(me), req.get("name", ""), bool(req.get("pinned"))))
@@ -14404,7 +14398,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(end_session(session, str(req.get("node") or ""), wait=req.get("wait") is True))
 
     def _get_move(self):
-        """GET /api/move (R90 step 12): a move armed here (and, asked with
+        """GET /api/move: a move armed here (and, asked with
         ?pieces=1, what a bundle may carry with each piece's size), or this
         controller moved, or this state arrived by a move with the nodes
         not yet here; an administrator's. An armed move asks the new
@@ -14421,8 +14415,8 @@ class Handler(BaseHTTPRequestHandler):
             out["far"] = move.far_said(far, out.get("to", "")) if far else ""
         # Whether a move may land here (_move_land): a fresh controller's,
         # and on a stick only once the projects have a place on the disks.
-        # A move lands only while this controller is first set up (the
-        # operator, 6 Nov: never a merge into one in use).
+        # A move lands only while this controller is first set up
+        # (never a merge into one in use).
         # A landing cut midway is finished by landing again, whatever it
         # carried in before it stopped (its accounts, its nodes, its record).
         cut = bool(move.cut_landing())
@@ -14438,10 +14432,10 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(out)
 
     def _move(self, req):
-        """POST /api/move (R90 step 12): prepare (the move armed, the token
+        """POST /api/move: prepare (the move armed, the token
         answered once, a bundle packed), forget (withdrawn), moved (this
         controller marked moved to the new one, read-only from here on),
-        ask (the new address asked now whether the bundle landed, R175).
+        ask (the new address asked now whether the bundle landed).
         The owner's."""
         act = field(req, "action")
         if act == "prepare":
@@ -14456,8 +14450,8 @@ class Handler(BaseHTTPRequestHandler):
                     r["said"] = [move.far_said(far, r["to"])]
             return self._result(r)
         if act == "backup":
-            # A copy to keep under a token of its own, no move armed (the
-            # operator, 6 Nov); the token is answered once, as a move's is.
+            # A copy to keep under a token of its own, no move armed;
+            # the token is answered once, as a move's is.
             stores = req.get("stores")
             r = move.backup_bundle(self._principal(), repos=req.get("repos") is True, carry_key=req.get("carry_key") is True,
                                    stores=[str(k) for k in stores if isinstance(k, str)] if isinstance(stores, list) else None)
@@ -14466,7 +14460,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._result(r)
         if act == "pack":
             # The bundle packed now, the page waiting on it with its button
-            # saying so (the operator, 8 Nov: a download link said nothing
+            # saying so (a download link said nothing
             # for as long as the packing took); then fetched by name.
             r = move.pack_bundle()
             return self._result(r)
@@ -14485,7 +14479,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"error": "action is prepare, pack, backup, forget, moved or ask"}, 400)
 
     def _move_peer(self):
-        """/api/v1/move/* (R175): what the two controllers say to each
+        """/api/v1/move/*: what the two controllers say to each
         other, each a proof under the move key. GET landed: the old
         controller asking the new whether its bundle landed. POST landed:
         the new controller telling the old it did. GET bundle: the new
@@ -14518,7 +14512,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_move_bundle(self):
         """GET /api/move-bundle[?name=]: the bundle as a download, packed
-        fresh under the armed move's key at this moment (R175 step 1), or the
+        fresh under the armed move's key at this moment, or the
         one just packed by name; the owner's."""
         # ?name= is the bundle the page just packed (action pack), served as
         # it is; with no name, packed fresh here as before.
@@ -14557,7 +14551,7 @@ class Handler(BaseHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile)
 
     def _get_backup(self):
-        """GET /api/backup (R161 step 4): the password set or not, the last
+        """GET /api/backup: the password set or not, the last
         copy, where the copies go and the copies found; an administrator's."""
         me = self._who() or {}
         # ...with whether this account is the owner, whose Back up now and
@@ -14597,7 +14591,7 @@ class Handler(BaseHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile)
 
     def _restore_page(self, error=""):
-        """GET /login/restore (R161 step 4): the first run's third way in, a
+        """GET /login/restore: the first run's third way in, a
         saved configuration found on this machine's disks or uploaded, and
         its backup password."""
         found = backup.found(_own_pool_mounts())
@@ -14605,7 +14599,7 @@ class Handler(BaseHTTPRequestHandler):
                        f'{html_escape(c["name"])} · {html_escape(c["host"] or "this machine")} · {time.strftime("%d %b %Y %H:%M", time.gmtime(c["made_at"]))}'
                        f'{"" if c.get("carries_key") else " · without the install key: its sign-ins and tokens stay locked until the key is given under Controller, Keys"}</label>'
                        for i, c in enumerate(found))
-        # This machine's own pools from before (B938): a stick that died
+        # This machine's own pools from before: a stick that died
         # left them never exported, under another host id, so a new stick
         # imports them only when asked; the copies they hold are listed then.
         nid = _own_node_id()
@@ -14638,7 +14632,7 @@ class Handler(BaseHTTPRequestHandler):
     def _setup_restore_pool(self):
         """POST /setup/restore-pool: one of this machine's own pools from
         before brought back, before an owner exists, so the copies it holds
-        are found (B938); its name typed again, as Storage's Import anyway."""
+        are found; its name typed again, as Storage's Import anyway."""
         if users.unreadable():
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
@@ -14681,7 +14675,7 @@ class Handler(BaseHTTPRequestHandler):
         n = self._content_length()
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
-        # Room for it said before a byte is taken, as a landing's is (B720).
+        # Room for it said before a byte is taken, as a landing's is.
         no_room = move.room_for(n, Path(STATE))
         if no_room:
             return self._restore_page(no_room)
@@ -14710,7 +14704,7 @@ class Handler(BaseHTTPRequestHandler):
                     f.write(chunk)
                     left -= len(chunk)
             # The form read a megabyte at a time, its file part to a file of
-            # its own (B558: never whole in memory).
+            # its own (never whole in memory).
             fields, uploaded = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
             password, found = fields.get("password", ""), fields.get("found", "")
             if not password:
@@ -14749,7 +14743,7 @@ class Handler(BaseHTTPRequestHandler):
         threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
 
     def _move_page(self, error=""):
-        """GET /login/move: the first run's other way in (R90 step 12): a
+        """GET /login/move: the first run's other way in: a
         controller's bundle and its token, before anybody owns this one."""
         # On a stick the form is not offered: the disks come first, under a
         # setup account (STICK_MOVE_FIRST).
@@ -14775,7 +14769,7 @@ class Handler(BaseHTTPRequestHandler):
         """POST /setup/move: the bundle and the token, taken before an owner
         exists (closed the moment there is one), held to the version gate,
         restored, and the dashboard re-executed on the restored state. Not on
-        a stick (the operator, 1 Nov): there the machine's disks are set up
+        a stick: there the machine's disks are set up
         first, under an account, and the move lands from Controller settings."""
         if users.unreadable():
             return self._login_page(ACCOUNTS_UNREADABLE)
@@ -14811,7 +14805,7 @@ class Handler(BaseHTTPRequestHandler):
         set up (before Finish), by the owner of a fresh controller, the form as the first run's (the token
         with the bundle file or the old controller's address). Its state
         replaces this one's, the setup account's with it, which is set aside
-        as a reset's is. On a stick (the operator, 1 Nov) only once the
+        as a reset's is. On a stick only once the
         projects have a place on the machine's disks, and spooled and
         unpacked there, never on the stick."""
         me = self._who() or {}
@@ -14848,7 +14842,7 @@ class Handler(BaseHTTPRequestHandler):
         n = self._content_length()
         if not 0 < n <= 16 << 30:
             return None, "the upload is empty or past 16 GB"
-        # One landing at a time (B720): two at once shared a spool, one's
+        # One landing at a time: two at once shared a spool, one's
         # sweep deleted the other's, and the first one's restart came in the
         # middle of the second's swap. Held through the restart a landing
         # ends in; let go when it fails.
@@ -14864,16 +14858,15 @@ class Handler(BaseHTTPRequestHandler):
         return r, why
 
     def _receive_move_held(self, where, n, work_root):
-        # What a power loss left of a landing before this one (B601): its
+        # What a power loss left of a landing before this one: its
         # spool and working folders, never the mark of a landing cut midway
-        # nor the backup a landing keeps, which say what is where (B720).
+        # nor the backup a landing keeps, which say what is where.
         for old in Path(where).glob(".move-*"):
             if old.name in (move.LANDING_MARK, move.BACKUP_DIR):
                 continue
             shutil.rmtree(old, ignore_errors=True) if old.is_dir() else old.unlink(missing_ok=True)
         spool = Path(where) / f".move-upload-{os.getpid()}"
-        # Room for it and what it unpacks to, said before a byte is taken
-        # (B588).
+        # Room for it and what it unpacks to, said before a byte is taken.
         no_room = move.room_for(n, spool.parent)
         if no_room:
             return None, no_room
@@ -14888,7 +14881,7 @@ class Handler(BaseHTTPRequestHandler):
                     f.write(chunk)
                     left -= len(chunk)
             # The form read a megabyte at a time, its file part to a file of
-            # its own (B558: never whole in memory).
+            # its own (never whole in memory).
             fields, bundle = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
             token, frm = fields.get("token", "") or move.setup_token(), fields.get("from", "")
             if not token or not (bundle or frm):
@@ -14896,7 +14889,7 @@ class Handler(BaseHTTPRequestHandler):
             if bundle:
                 os.replace(file_part, spool)
             else:
-                # The pull (R175 step 5): the bundle fetched from the old
+                # The pull: the bundle fetched from the old
                 # controller under a proof the token derives.
                 why = move.fetch_bundle(frm, token, str(spool))
                 if why:
@@ -14942,7 +14935,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _not_theirs(self, session):
         """True, with the 403 written, when this account may not act on that
-        session: end it or type a macro into it (B172).
+        session: end it or type a macro into it.
 
         A session is its owner's. Its name says whose (u_<uid>~...), and the
         owner's own on this container keep bare names, so a bare name is the
@@ -14950,8 +14943,8 @@ class Handler(BaseHTTPRequestHandler):
         key in another person's Claude session is an answer to a question
         it asked them. A session's token is held to its own project as well,
         the way everything else it does is. The one exception is ending one,
-        an administrator's, from a project's settings (projsessions.py, the
-        operator's call of 24 Sep); keys and typing stay the account's.
+        an administrator's, from a project's settings (projsessions.py);
+        keys and typing stay the account's.
         """
         who = self._who() or {}
         mine = users.uid_of(who)
@@ -15088,8 +15081,8 @@ class Server(tls.WrapOnItsThread, ThreadingHTTPServer):
     default is 5 connections waiting to be accepted: at 129 arriving together
     the kernel reset the rest, and the ones it kept retried on a backoff that
     turned seconds into a minute. Threads are daemons so a stop is not held
-    up by a request still being answered. One port, both ways (R158 step 2,
-    tls.py): a connection that opens a TLS handshake is wrapped in the
+    up by a request still being answered. One port, both ways
+    (tls.py): a connection that opens a TLS handshake is wrapped in the
     certificate loaded, the rest served as plain http, so whoever speaks
     http is answered as before while a node's pinned channel and a browser
     at https are answered over TLS; the look is on the request's own thread
@@ -15098,7 +15091,7 @@ class Server(tls.WrapOnItsThread, ThreadingHTTPServer):
     daemon_threads = True
 
 
-# ---- function coverage (roadmap R76) ----------------------------------------
+# ---- function coverage ----------------------------------------
 # Under `aerie tests coverage` the harness names a file, and every function of
 # this dashboard's own python that any thread enters is counted and written
 # there, every few seconds and on the way out. A profile hook, not a trace
@@ -15193,7 +15186,7 @@ def wire():
     # remember, because the failure looks like the dashboard refusing to obey the
     # operator and quoting its own name as the workaround.
     os.environ.pop("CLAUDECODE", None)
-    os.environ.pop("BB_AGENT", None)     # ...and any coding agent's mark (R95)
+    os.environ.pop("BB_AGENT", None)     # ...and any coding agent's mark
     toolchains.configure(run=run, write_json=write_json, state=STATE,
                          project_nodes=lambda: {p: (pr.get("node") or "") for p, pr in prefs.all_projects().items()},
                          workspace=WORKSPACE)
@@ -15201,13 +15194,13 @@ def wire():
     catalogrows.configure(state=STATE, write_json=write_json, audit=lambda *a: db.audit(*a))   # db is imported below
     toolpacks.configure(state=STATE, write_json=write_json,
                         unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
-    # The catalog's mirror (R169 step 6): its index when the catalog does not
+    # The catalog's mirror: its index when the catalog does not
     # answer, and its bundles for the fetches of what it pins.
     catalogmirror.configure(state=STATE, unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
     give(catalogindex, mirror_index=catalogmirror.index)
     give(toolpacks,
          mirror_bundle=catalogmirror.bundle,
-         # This build's version, for a pack's works_with (R169 step 6).
+         # This build's version, for a pack's works_with.
          running_version=lambda: image_stamp().get("version") or "")
     # ...and for a catalog entry that says the lines it works with: one for
     # another line is not listed.
@@ -15236,13 +15229,13 @@ def wire():
     # The three stores above configure this one too; done here as well so the
     # endpoint works even if none of them has been touched yet this process.
     pending.configure(write_json=write_json, state=STATE)
-    # The Settings tab's own store (roadmap R29): the knobs the operator sets from
+    # The Settings tab's own store: the knobs the operator sets from
     # the page rather than the environment. The builder home is where the commit
     # identity lands.
     settings.configure(write_json=write_json, state=STATE)
     give(settings, forget_runners=lambda: runners.reset())
     # What may be offered: the catalogs gate their unvetted entries on this
-    # one switch (roadmap R54, step 6), read live so a save takes at once.
+    # one switch, read live so a save takes at once.
     give(forges, unvetted_ok=lambda: bool(settings.get("offer_unvetted")))
     bugs.configure(write_json=write_json, state=STATE, tell=notify.tell,
                    tmux_name=tmux_name, workspace=WORKSPACE, actor=writer_name,
@@ -15257,7 +15250,7 @@ def wire():
     hardening.apply()
     signing.configure(state=STATE, project_name=PROJECT_NAME)
     # Keys kept open before the install had an install key, sealed now that it
-    # has one (R111 step 2); a key that cannot be opened is left as it is and
+    # has one; a key that cannot be opened is left as it is and
     # said on its project's Signing view.
     try:
         if (_sealed := signing.seal_all()):
@@ -15275,7 +15268,7 @@ def wire():
             print(f"dashboard: sealed {_sealed} git token(s) under the install's key", flush=True)
     except OSError as e:
         print(f"dashboard: git tokens left as they were, not sealed: {e}", flush=True)
-    # ...and the settings' secrets, the tunnel's and Cloudflare's tokens (R135).
+    # ...and the settings' secrets, the tunnel's and Cloudflare's tokens.
     give(settings, seal=signing.seal, unseal=signing.unseal, sealing=lambda: signing.MASTER is not None)
     try:
         if (_sealed := settings.seal_all()):
@@ -15305,7 +15298,7 @@ def wire():
     give(workspace,
          packs_json=toolpacks.catalog_json,
          toolchains_json=catalogrows.text)
-    # The coding agents installed packs bring, beside the table's (R169 step 9).
+    # The coding agents installed packs bring, beside the table's.
     give(agents, pack_source=toolpacks.offered_agents)
     give(workspace, packs_files=toolpacks.hosted_files)
     memory.configure(run=run, workspace=WORKSPACE,
@@ -15324,9 +15317,9 @@ def wire():
                                 if u.get("uid")},
          readers=roadmap.readers)
     preamble.configure(rules_mod=rules, roadmap_mod=roadmap, bugs_mod=bugs, live=live_block)
-    # ...and a project of several repositories' (R136): its name, id and
+    # ...and a project of several repositories': its name, id and
     # repositories, for the part that briefs a session on all of them.
-    # Only one of several: since R138 every repository is in a project, and one
+    # Only one of several: every repository is in a project, and one
     # alone was told it was "a project of 1 repositories".
     give(preamble,
          repos_fn=lambda p: ((registry.label(k), registry.pid(k), [(m, registry.label(m)) for m in repos.members(k)])
@@ -15358,7 +15351,7 @@ def wire():
     logs.prune()
     # Debug and dev options only on a controller started with DEBUG_MODE=1; at a
     # start without it every one of them is put back off, so turning it on
-    # again starts from nothing granted (the operator, 12 Oct).
+    # again starts from nothing granted.
     if not settings.debug_available():
         try:
             if settings.reset_debug() | bool(prefs.reset_debug()):
@@ -15376,7 +15369,7 @@ def wire():
     # after preamble is configured, so it is handed over here.
     give(preamble,
          prefs_mod=prefs,
-         # A project with no repository (R208): its briefing says so, its parts
+         # A project with no repository: its briefing says so, its parts
          # that need a notebook are left out, and its guard refuses git.
          work_of=repos.is_work)
     give(rules, work_of=repos.is_work)
@@ -15397,18 +15390,18 @@ def wire():
     # configured after users because the login path must not depend on it.
     users.configure(state=STATE, write_json=write_json, project_prefs=prefs.for_user,
                     # The nodes of an account's projects: what a node grant's
-                    # scope "mine" means (R137 step 3).
-                    # Its list names projects (R138): each read through its
+                    # scope "mine" means.
+                    # Its list names projects: each read through its
                     # repositories, whose settings carry the project's node.
                     nodes_of=lambda u: {n for p in (u.get("projects") or []) for r in (repos.members(p) or [p])
                                         for n in prefs._nodes_of(prefs.get(r) or {})})
     give(devapp, label_of=registry.label)
     # ...and whether a port an app would publish answers on its node already,
-    # asked from here as the node's address (R238 step 3).
+    # asked from here as the node's address.
     nasapps.configure(state=STATE, write_json=write_json, answers=lambda nid, port: _port_answers(nid, port))
     termws.configure(agent_dir=nodes.AGENT_DIR)
     tokenkeys.configure(agent_dir=nodes.AGENT_DIR)
-    # Each account's public key on a node, to seal its sign-ins with (R126).
+    # Each account's public key on a node, to seal its sign-ins with.
     give(nodes,
          token_pubs=lambda nid: tokenkeys.pubs(nid, [u["uid"] for u in users.all_users() if u.get("uid")]),
          token_stale=tokenkeys.under_previous,
@@ -15430,35 +15423,35 @@ def wire():
     give(nodes,
          layout_of=toolchains.layout_for_node,
          # ...and the pin of this controller's own TLS key, which a hello names
-         # and an enrollment carries (R267 step 15).
+         # and an enrollment carries.
          tls_pin=tls.key_pin,
          tls_reach=tls.node_reach,
          # ...and a toolchain or image job pressed while another writes the
          # store waits behind it rather than being refused.
          store_gate=toolchains.store_gate,
-         # The accounts' SMB passwords and a share's names (R164 step 1).
+         # The accounts' SMB passwords and a share's names.
          smb_users=users.smb_users,
          smb_resolve=users.smb_resolve)
-    # ...and who a share names, which is whose share password is kept (R243).
+    # ...and who a share names, which is whose share password is kept.
     give(users, share_named=nodes.smb_named)
-    # ...and whether setup has ended, which closes a screen's open login
-    # (R194). A landing cut midway is not an end: its setting came with the
+    # ...and whether setup has ended, which closes a screen's open login.
+    # A landing cut midway is not an end: its setting came with the
     # bundle, and the way in is wanted most then.
     give(nodes, setup_over=lambda: bool(users.owner_name() and settings.get("setup_done") and not move.cut_landing()))
-    # ...and the weeks-long record of the own machine's samples (R164 step 4).
+    # ...and the weeks-long record of the own machine's samples.
     history.configure(state=STATE)
     give(nodes, history_add=history.add)
-    # ...and the other disks and shares it mounts (R162 step 4).
+    # ...and the other disks and shares it mounts.
     extmounts.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
                         sealing=lambda: signing.MASTER is not None)
     give(nodes, ext_mounts=extmounts.wanted)
-    # ...and the backups it copies (R162 step 5), the bell and Home reading their last runs.
+    # ...and the backups it copies, the bell and Home reading their last runs.
     storebackups.configure(state=STATE, write_json=write_json)
     roothooks.configure(state=STATE)
     give(nodes,
          store_backups=storebackups.wanted,
          backup_summary=lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or "")))
-    # ...and its encrypted pools' passphrases (R162 step 3), none in Safe mode.
+    # ...and its encrypted pools' passphrases, none in Safe mode.
     poolkeys.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
                        sealing=lambda: signing.MASTER is not None)
     give(nodes,
@@ -15468,11 +15461,11 @@ def wire():
          pool_keys_forget=poolkeys.forget)
     if (_sealed := poolkeys.seal_all()):
         print(f"dashboard: sealed {_sealed} pool passphrase(s) under the install's key", flush=True)
-    # What each added pack is configured with per node (R172): kept sealed,
+    # What each added pack is configured with per node: kept sealed,
     # handed in the hello with the node's store root.
     packconfig.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
                          sealing=lambda: signing.MASTER is not None,
-                         # A person's own answers (R172 step 5), under their own key.
+                         # A person's own answers, under their own key.
                          account_key=lambda uid: accountkeys.key_of(uid), open_with=signing.open_with,
                          store_root=lambda nid: (lambda st: (st.get("path") or "") + ("/" + st["scope"] if st.get("scope") else ""))(
                              (((nodes.node(nid) or {}).get("reported") or {}).get("stores") or {}).get("toolchains") or {}))
@@ -15493,21 +15486,21 @@ def wire():
     # A project born with a starting version commits it the way the
     # Artifacts tab gives a first version (projects._init).
     give(projects, first_version=lambda name, value, env: version.init(name, value, by="operator", env=env))
-    # Each session kept to its own project's network (R79): the setting is
+    # Each session kept to its own project's network: the setting is
     # the node's, what each project owns there is devapp's.
-    # ...and the containers' (R178): whether each project's are kept apart
+    # ...and the containers': whether each project's are kept apart
     # here, and what each compose project may reach, whatever the sessions'
     # switch says.
     give(nodes,
          session_net_for=lambda nid: (({"on": True, "own": router.with_peers(_with_vmnets(nid, devapp.session_net_own(nid)))}
                                        if nodes.session_net_on(nid) else {"on": False, "own": {}})
-                                      # Containers kept apart on every node (R178); the agents
+                                      # Containers kept apart on every node; the agents
                                       # read ctr_on, so it is still said.
                                       | {"ctr_on": True, "ctr": devapp.container_net_own(nid),
-                                         # Whether this node's VMs may reach its LAN (R91 step 8).
+                                         # Whether this node's VMs may reach its LAN.
                                          "vm_lan": bool(((nodes.node(nid) or {}).get("config") or {}).get("vm_lan"))}),
-         # The job logs are the only copy of what a node's job wrote and had no
-         # retention at all until R17 step 1. Swept once here for whatever ended
+         # The job logs are the only copy of what a node's job wrote, and are kept
+         # no longer than the log policy says. Swept once here for whatever ended
          # while this controller was down; a running one sweeps a project as its
          # own jobs end, which is when it gains a log.
          # The one log policy (the Logs section's days) reaches the job logs,
@@ -15540,7 +15533,7 @@ def wire():
          container_free=containers.name_free,
          container_builds=containers.build_refusal,
          instance_maker=devactions.make_instance)
-    # What a renamed project is called now, for the name Send offers (R154).
+    # What a renamed project is called now, for the name Send offers.
     give(devapp, label_of=registry.label)
     give(phone,
          env_writer=lambda project, text, instance: devapp.write_env(project, text, instance or devapp.MAIN),
@@ -15552,7 +15545,7 @@ def wire():
          remover=devactions.remove_instance,
          # ...and what the tab's verbs and the asking need about who is asking
          # (phone.verb): the projects an account sees, a project's node and its Run
-         # its container dial, a container held to its project's node (R79).
+         # its container dial, a container held to its project's node.
          users=users,
          project_names=lambda who: set(project_names(who)),
          project_node=lambda p: prefs.get(p)["node"],
@@ -15589,15 +15582,15 @@ def wire():
     except OSError as e:
         print(f"dashboard: authenticator secrets left as they were, not sealed: {e}", flush=True)
     accountkeys.configure(state=STATE, nodes_under=lambda uid, k: tokenkeys.sealed_under(_node_seals(), k, uid))
-    # An unlock that gives up less (R158 step 5): a person's tokens opened per
+    # An unlock that gives up less: a person's tokens opened per
     # use for the window they pick, each use logged for them, and a store under
-    # a key of their own (R157) opened only while they have unlocked it.
+    # a key of their own opened only while they have unlocked it.
     unlocks.configure(state=STATE, key_under_install=accountkeys.key_under_install, open_entry=accountkeys.open_entry_with,
                       entry_of=accountkeys._entry, own_of=accountkeys.own_of, set_for=accountkeys.set_unlock_for,
                       live=logins.live, ts=tokenkeys.ts, wipe=hardening.wipe,
                       run_dir=os.environ.get("BB_HANDOUT_DIR") or "")
     unlocks.clear_all_handouts()
-    # Who is signed in now (R159): the rows the cookies name, and a device
+    # Who is signed in now: the rows the cookies name, and a device
     # signed in as the account counts the same way.
     logins.configure(state=STATE, days=SESSION_DAYS,
                      devices_of=lambda uid: devices.listed({"uid": uid}))
@@ -15637,7 +15630,7 @@ def wire():
     nodes.on_done("exec:deploy", deploys.done)
     give(phone,
          deployer=_session_deploy,
-         # A session's Discord apply a person allowed (R293): every change, the ones
+         # A session's Discord apply a person allowed: every change, the ones
          # that ask a person included, since the person read each before Allow.
          discorder=lambda project, text, principal, allowed_by: discord.apply(
              repos.key_of(project), text, by=principal, allowed=True))
@@ -15660,7 +15653,7 @@ def wire():
          on_gone=lambda p: connections.gone("git", p),
          on_used=lambda p: connections.used("git", p))
     # Every module that seals under the install key: one left out kept its
-    # secrets under the key before, and lost them when that went (B567).
+    # secrets under the key before, and lost them when that went.
     installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
                                  accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
                                  poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
@@ -15672,7 +15665,7 @@ def wire():
     installkey.settle()
     # Every account's own key made at the start that can seal it, a fresh
     # install's first and an upgraded one's first alike, rather than when it is
-    # first needed (the operator, 27 Oct); one added later has its own made then.
+    # first needed; one added later has its own made then.
     for _u in users.all_users():
         if _u.get("uid"):
             accountkeys.key_of(_u["uid"])
@@ -15701,7 +15694,7 @@ def wire():
                      # holds no key to a VPS, and every `docker compose config` and
                      # data-directory mkdir addressed at it waited out a 30s ssh
                      # timeout, twice per nginx Save on a hosting node, holding the server
-                     # with it (R85 step 1, the operator, 11 Oct). With no address
+                     # with it. With no address
                      # the config check runs the compose plugin here, which parses
                      # without a daemon, and the directory is the agent's to make.
                      node_addr=(lambda nid: "" if nodes.host_only(nid) else nodes.ssh_addr_of(nid)) if not NODES_DOWN else None,
@@ -15720,7 +15713,7 @@ def wire():
          gpu_why=gpu_container_why,
          room_why=lambda nid: nodes.room_short(nid, nodes.room_floor_for(nid)) if nid else "")
     give(nodes, room_floor_gb=room_floor_gb)
-    # ...each node's own where its page sets one (R294 step 7).
+    # ...each node's own where its page sets one.
     give(devapp, container_mem_gb=lambda nid="": nodes.room_of(nid, "container_mem_gb", settings.get("container_mem_gb")))
     # ...and what its request() needs about who is asking, and who hears.
     give(devactions,
@@ -15736,7 +15729,7 @@ def wire():
          net_nudge=net_nudge,
          ports_local=nodes.ports_local_on,
          ctr_spark=nodes.ctr_spark)
-    # One nginx per node, from the nginx tab (R171): its records here, the
+    # One nginx per node, from the nginx tab: its records here, the
     # container through containers.py, and the node's own view of its ports.
     imagecheck.configure(state=STATE, write_json=write_json, devapp_module=devapp)
     vms.configure(state=STATE, write_json=write_json, node=nodes.node, node_list=nodes.node_list,
@@ -15746,7 +15739,7 @@ def wire():
                   node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail, job_get=nodes.job)
     nodes.on_done("vm", vms.vm_done)
     # ...run as an administrator's, since the asks go to the administrators
-    # alone and Allow is theirs (R116): a device passed through lands.
+    # alone and Allow is theirs: a device passed through lands.
     give(phone, vm_runner=lambda project, req, by: _vm_do(f"session:{project} (allowed by {by})", project, dict(req, _admin=True), True))
     # A session's aerie tool install (toolchains.session_install): the catalog's
     # entry for a name, the packs kept here, the add at the index's pin and the
@@ -15775,11 +15768,11 @@ def wire():
                        next_after=schedules.next_after, cron_words=schedules.words)
     give(findings, STATE_REPORTS=scanners.report_files)
     # A DNS-01 challenge's record goes through the Cloudflare API token Settings
-    # holds (R150).
+    # holds.
     give(nginxproxy, cf_token=lambda: settings.secret("cf_api_token"))
     # ...and put on a node the moment it enrolls when the Enroll dialog asked
     # for it (config.nginx), so a box runs the script and nginx appears.
-    # The home tunnel the controller runs itself (R176, tunnel.py): from the
+    # The home tunnel the controller runs itself (tunnel.py): from the
     # settings, started at boot below when they say so.
     tunnel.configure(settings_mod=settings, dash_port=PORT)
     nodes.ON_ENROLL.append(lambda nid: nginxproxy.deploy(nid, containers, devactions, devapp)
@@ -15795,7 +15788,7 @@ def wire():
     give(channel,
          sessions_seen=guards_watch,
          unvetted_ok=lambda: bool(settings.get("offer_unvetted")))   # a Mac's provisioner is a dev feature
-    # A signing is a job on the project's node, of a build in its dist/ (R106).
+    # A signing is a job on the project's node, of a build in its dist/.
     give(signing,
          node_of=lambda name: prefs.get(name)["node"],
          node_refuses=lambda nid: nodes.agent_stale(nodes.node(nid)) if nid and not NODES_DOWN else "",
@@ -15816,7 +15809,7 @@ def wire():
          keymaker=_keymaker,
          release_signer=_release_signer)
     give(artifacts, sign_routes=signing.routes_held)
-    give(vmtemplate, unvetted_ok=forges.unvetted_ok)   # the same switch (R54, step 6)
+    give(vmtemplate, unvetted_ok=forges.unvetted_ok)   # the same switch
     # The Nodes tab's verbs are nodes.verb's, and these are what they compose
     # with (a runner's forge and token, a daemon probe, Claude Code's update).
     nodes.configure_verbs(vmtemplate=vmtemplate, forges=forges, devapp=devapp,
@@ -15831,7 +15824,7 @@ def wire():
                       )
     give(changelog, component_dir=version._sub)
     # Whether what the changelog owes refuses a release or goes out with it said:
-    # the repository's Releases setting (R255).
+    # the repository's Releases setting.
     give(version,
          release_gate=lambda p: prefs.get(p).get("release_gate", "refuse"),
          # The catalog's newest signed index this controller holds, read fresh where
@@ -15840,7 +15833,7 @@ def wire():
          catalog_made=lambda: str((catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("generated") or ""),
          rehearsed=lambda project, sha: forgeaccess.rehearsed(project, sha),   # imported below
          owes=lambda project, wants: forgeaccess.owed(project, wants))
-    # What each of a release's files is for, over its notes (R255).
+    # What each of a release's files is for, over its notes.
     give(forgerelease, files_setting=lambda p: (prefs.get(p).get("files_table", True), prefs.get(p).get("files") or []))
     forgerelease.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
     releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
@@ -15888,7 +15881,7 @@ def wire():
     # The session network reaches the containers of the projects a project reads.
     give(devapp, reads_of=prefs.reads_trees)
     forgeaccess.configure(state=STATE, write_json=write_json, target=projects.forge_target, prefs_get=prefs.get)
-    # A space's own token's expiry, as its host says when measured (R294 step 9).
+    # A space's own token's expiry, as its host says when measured.
     give(forgeaccess,
          on_measured=lambda p, when: connections.expires("git", p, when) if gitcreds.own_line(p) else None,
          wants_of=version.host_wants)
@@ -15905,7 +15898,7 @@ def wire():
          set_prefs=lambda name, **kw: prefs.set_prefs(name, workspace=WORKSPACE, **kw),
          brief_writer=brief.write,
          # A create that never took, and a project deleted for good, leave no owner,
-         # owner role or account entry behind (B93, B95); the first its settings too.
+         # owner role or account entry behind; the first its settings too.
          purged=lambda name: membership.forget_project(name, live=registry.live_dirs()),
          unmade=lambda name: (prefs.forget(name), projects.purged(name), repos.forget(name)))
     gitrelay.configure(state=STATE, workspace=WORKSPACE,
@@ -15915,7 +15908,7 @@ def wire():
     # The modules that keep something that grows read where from paths.py.
     for keeper in (workspace, gitview, logs, gitrelay):
         give(keeper, paths=paths)
-    # What a space's environments deploy on a push and on a release (R281 step 6).
+    # What a space's environments deploy on a push and on a release.
     give(gitrelay, after_push=lambda project, refs, uid: _deploy_on(project, "push", refs, uid, _name_of_uid(uid) if uid else "", True))
     give(version, RELEASED=lambda project, tag, sha: _deploy_on(project, "release", {tag: sha}, "", "", False))
     pushscan.configure(state=STATE, write_json=write_json)
@@ -15932,7 +15925,7 @@ def wire():
                     agent_state=agent_state_set, agent_conv=agent_conv_set, behind=session_behind_of,
                     heard_from=guards_heard)
     # The Doctor asks each Kubernetes cluster kept again, and says one that does
-    # not answer or whose certificate ends soon (R281 step 2).
+    # not answer or whose certificate ends soon.
     give(doctor,
          extra=lambda: [*clusters.doctor(), *tls.doctor_lines(settings.get),
                         *catalogindex.doctor_lines(settings.get("catalog_url") or None)])
@@ -15943,12 +15936,12 @@ def wire():
                                 ((nodes.runners_of(nodes.node(nid) or {}).get(slot) or {}).get("url") or ""))))
     # A node dialing in after silence re-asks the doctor now rather than in up
     # to half an hour: after a reboot the card kept saying no node could run a
-    # session long after they were all back (the operator, 25 Sep).
+    # session long after they were all back.
     give(nodes,
          came_back=lambda nid: threading.Thread(target=doctor.refresh, name="doctor-after-hello",
                                                 daemon=True).start(),
          # The Docker tab's first pick is derived from where the projects are bound.
-         # A job of a container written for a project is that project's (B321).
+         # A job of a container written for a project is that project's.
          job_owner=lambda j: devapp.owner_of(j.get("project") or "",
                                             (j.get("spec") or {}).get("instance") or devapp.MAIN),
          project_nodes=lambda: {p: (v or {}).get("node") or ""
@@ -15961,10 +15954,10 @@ def wire():
                   project_node=lambda p: prefs.get(p)["node"] or "",
                   ask_hello=lambda nid: None if NODES_DOWN else nodes.ask_hello(nid),
                   node_info=lambda nid: None if NODES_DOWN else _ftp_node(nid), mfa=mfa)
-    give(ftp, locked_out=projects.locked_out)   # a lock makes the files read-only through every door (B263)
+    give(ftp, locked_out=projects.locked_out)   # a lock makes the files read-only through every door
     give(nodes,
          ftp_for=ftp.for_node,
-         # The node's nginx container, for its log stream (R182): named only where the nginx tab put one.
+         # The node's nginx container, for its log stream: named only where the nginx tab put one.
          nginx_for=lambda nid: nginxproxy.container_name(nid) if nginxproxy.deployed(devapp, nid) else "")
     give(devapp, redact=diag.redact)   # docker.log carries argvs and output tails
     files.configure(workspace=WORKSPACE, audit=db.audit)
@@ -15977,7 +15970,7 @@ def wire():
                         audit_fn=lambda *row: None if NODES_DOWN else db.audit(*row))
     give(files, on_change=wssync.changed)
     # A synced node writes the transcripts of the projects it holds and nothing
-    # else: bound to it, never one it only reads (B613).
+    # else: bound to it, never one it only reads.
     claudesync.configure(workspace=WORKSPACE, held=lambda nid: wssync.bound_projects(nid))
     reports.configure(write_json=write_json, state=STATE, redact=diag.redact,
                       build=lambda: image_stamp().get("version") or image_stamp().get("rev") or "")
@@ -16001,7 +15994,7 @@ def wire():
     releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_metal=lambda: BARE_METAL,
                            window=lambda: (str(settings.get("update_window") or ""), int(settings.get("update_hour") or 4)),
                            apply=lambda v: _update_in_window(v),
-                           # The release channel (R179, R193): the one picked, else a dev build
+                           # The release channel: the one picked, else a dev build
                            # follows the dev builds; debug mode alone picks a version, and
                            # sees the drafts with AerieOS's own repository's token.
                            channel=lambda: settings.channel_picked() or ("dev" if "-dev." in (image_stamp().get("version") or "") else "normal"),
@@ -16028,7 +16021,7 @@ def wire():
                       f"{len(_fb['waiting'])} waiting, {len(_fb['failed'])} not applied (the Nodes page says which)", flush=True)
         except Exception as e:                                # noqa: BLE001 (a start must not fail on this)
             print(f"dashboard: the stick's prepared configuration was not applied: {e}", flush=True)
-        # The catalog's mirror the stick carries (R169 step 6), handed over by
+        # The catalog's mirror the stick carries, handed over by
         # the boot: imported once per mirror, as Import under Controller settings.
         _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot", "catalog-mirror.tar.gz")
         if os.path.isfile(_cm):
@@ -16055,7 +16048,7 @@ def wire():
                    node_name_fn=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
                    audit_fn=lambda who, what, detail: db.audit(who, what, "", detail))
     # The configuration backed up onto the machine's pools and found again at a
-    # first run (R161 step 4, backup.py): the move's bundle under a password's key.
+    # first run (backup.py): the move's bundle under a password's key.
     backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
                      password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_backup_dirs,
                      version_fn=lambda: image_stamp().get("version") or "", state_version_fn=stateversion.current, write_json_fn=write_json,
@@ -16071,7 +16064,7 @@ def wire():
     # pin (the hostname's certificate is the tunnel's): the tunnel's settings
     # came with the bundle, so the hostname reaches this controller now. Any
     # other node keeps the address it knocked at, which reached this controller,
-    # and pins the certificate it met there (B936): the page's public name may
+    # and pins the certificate it met there: the page's public name may
     # be the tunnel's, whose edge never serves this controller's certificate.
     give(move, tunnel_host=lambda nid: nodes.tunnel_host(nodes.node(nid) or {}))
     give(channel,
@@ -16101,10 +16094,10 @@ def main():
     # It is the first-run screen instead, and until somebody claims the
     # container that is the only page it serves. Nothing else is reachable
     # unauthenticated, which is the property the old refusal was protecting.
-    # State files that are there and cannot be read (B763): each is read as
+    # State files that are there and cannot be read: each is read as
     # empty by its loader and written over by the next save, so a copy of
     # each is kept beside it first and the log names them.
-    # The same keeper as a file that goes bad while this runs (B1082), so a
+    # The same keeper as a file that goes bad while this runs, so a
     # loader reading it next keeps no second copy.
     for _name, _why in statefile.unreadable(STATE):
         statefile.keep_unreadable(os.path.join(STATE, _name), _why)
@@ -16122,9 +16115,9 @@ def main():
         _dropped = projects.dropped_at_restart()
         if _dropped:
             print(f"dashboard: not started before the restart, and to press again: {', '.join(_dropped)}", flush=True)
-    # The JSON stores' numbered migrations past /config's stamp (R79), here,
+    # The JSON stores' numbered migrations past /config's stamp, here,
     # once every module is configured: one needs project_list to answer,
-    # which at import it could not (B496). The gate at the top took the copy.
+    # which at import it could not. The gate at the top took the copy.
     stateversion.migrate(STATE, {"state": STATE, "workspace": WORKSPACE, "project_names": lambda: project_names(users.ALL),
                                  "sql": db.script})
     # ...and what one of them asked to be sealed once more under today's
@@ -16132,7 +16125,7 @@ def main():
     if _sealed := installkey.settle(asked_only=True):
         print(f"dashboard: sealed {_sealed} secret(s) again, as a migration asked", flush=True)
     # ...and, on every start, the owner roles of projects that are gone for
-    # good or never were (a clone that failed before B95, a folder purged by
+    # good or never were (a clone that failed, a folder purged by
     # hand), once the migrations have given the ones they give.
     try:
         membership.prune_gone(registry)
@@ -16142,8 +16135,8 @@ def main():
     doctor.start()
     idle.start()
     if not NODES_DOWN:
-        agentcode.start()         # each coding agent's first check soon after the start (R95 step 2), then on the toolchains' clock
-    # The seed file once, before the first look at the release (R272 step 4).
+        agentcode.start()         # each coding agent's first check soon after the start, then on the toolchains' clock
+    # The seed file once, before the first look at the release.
     try:
         if seeded := apps.seed(settings.set_many):
             print(f"dashboard: seed.json applied: {seeded}", flush=True)
@@ -16156,30 +16149,30 @@ def main():
     threading.Thread(target=_kube_watch_loop, name="kube-watch", daemon=True).start()
     if BARE_METAL and "internet" not in featuresoff.off():
         releasecheck.start()      # a newer release, asked of GitHub a while after the start, then daily
-        backup.start()            # a copy of the state onto the pools after every change (R161 step 4)
+        backup.start()            # a copy of the state onto the pools after every change
     artifacts.start()         # every project's dist/ to its newest builds, every few minutes
     if not NODES_DOWN:
         threading.Thread(target=_room_loop, name="room", daemon=True).start()
         threading.Thread(target=_schedules_loop, name="schedules", daemon=True).start()
         threading.Thread(target=_reach_loop, name="reach", daemon=True).start()
     threading.Thread(target=_move_loop, name="move", daemon=True).start()
-    db.start_folding()        # the write-ahead log folded into the database every minute (B654)
+    db.start_folding()        # the write-ahead log folded into the database every minute
     if not NODES_DOWN:
         with contextlib.suppress(Exception):   # noqa: BLE001 (a sign-in found again is a kindness, never a start that fails)
-            signin.resume()       # a sign-in still going on a node is its account's flow again (R227 step 13)
-    ciwatch.start()           # a project's CI, once a day (R117)
-    releasesign.start()       # a release's unsigned APK, signed on its node (R106)
-    releasefiles.start()      # a release's files checked against its list (R190)
+            signin.resume()       # a sign-in still going on a node is its account's flow again
+    ciwatch.start()           # a project's CI, once a day
+    releasesign.start()       # a release's unsigned APK, signed on its node
+    releasefiles.start()      # a release's files checked against its list
     if "tunnel" not in featuresoff.off():
-        tunnel.apply()        # the home tunnel, where the settings say so (R176)
-    # The dashboard's own TLS as the settings say (R158 step 2), and the
+        tunnel.apply()        # the home tunnel, where the settings say so
+    # The dashboard's own TLS as the settings say, and the
     # install's own certificate in every mode, which a node's channel is
-    # pinned to (R267 step 15): made at the first start, loaded here, and
+    # pinned to: made at the first start, loaded here, and
     # remade over the same key a month before it ends by this loop, which
     # asks Let's Encrypt again for the name's as well.
     with contextlib.suppress(Exception):                 # noqa: BLE001 (http is the fallback, said on the Doctor)
         tls.apply(settings.get, names=_tls_names())
-    # ...and its key's pin on the console at every start (R290 step 2), the
+    # ...and its key's pin on the console at every start, the
     # same the Enroll dialog's command carries, so a person enrolling a node
     # can see the page they copied it from is this controller's.
     if (_pin := tls.key_pin()):
@@ -16200,17 +16193,17 @@ def main():
     if toolchains.AUTOCHECK:
         threading.Thread(target=toolchains.versions_loop, daemon=True).start()
     # The copies the nodes hold, looked at here on a timer and announced when
-    # they moved, so a node need not keep asking (B643).
+    # they moved, so a node need not keep asking.
     threading.Thread(target=wssync.look_loop, name="sync-look", daemon=True).start()
-    if imagecheck.AUTOCHECK and "image-updates" not in featuresoff.off():  # every container's registry images, weekly (R195)
+    if imagecheck.AUTOCHECK and "image-updates" not in featuresoff.off():  # every container's registry images, weekly
         threading.Thread(target=imagecheck.check_loop, name="image-check", daemon=True).start()
-    # The ACME renewals of the nginx page's certificates (R150), thirty days
+    # The ACME renewals of the nginx page's certificates, thirty days
     # before a pair ends, whatever the image checks are set to: started under
     # their switch, turning image updates off stopped every renewal without a
     # word and the certificates ran out some ninety days later.
     threading.Thread(target=nginxproxy.renew_loop, args=(containers, devactions, devapp),
                      name="nginx-acme", daemon=True).start()
-    # A bare-metal install's start held or not (R56 step 9), read now, and
+    # A bare-metal install's start held or not, read now, and
     # the clean-shutdown marker written when the service stops it cleanly.
     if BARE_METAL:
         h = held.boot()
@@ -16219,7 +16212,7 @@ def main():
 
         def _on_term(signum, frame):
             del signum, frame
-            # The log folded first (B654): a stop leaves the database file
+            # The log folded first: a stop leaves the database file
             # whole, with nothing for the next start to recover.
             with contextlib.suppress(Exception):
                 db.fold()

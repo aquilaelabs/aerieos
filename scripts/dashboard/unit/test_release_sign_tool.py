@@ -1,4 +1,4 @@
-"""tools/release-sign.py (R199): the list of a release's files is made from
+"""tools/release-sign.py: the list of a release's files is made from
 the files themselves and signed in the namespace of who holds the key. The
 audit of 20 Nov found `sign` wrote SHA256SUMS from the .sha256 files the
 release carries, so whoever replaced a file and its sha256 got the

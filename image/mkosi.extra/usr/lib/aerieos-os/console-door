@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The way in at the screen while a machine is first set up (R194, the
-# operator, 8 Nov): admin logs in with no password until setup ends, so
+# The way in at the screen while a machine is first set up:
+# admin logs in with no password until setup ends, so
 # there is a way in when the agent or the dashboard is what stopped, without
 # the reboot Rescue takes, which on a stick loses the journal of the boot
 # being looked at. Made here at boot rather than by the agent for the same

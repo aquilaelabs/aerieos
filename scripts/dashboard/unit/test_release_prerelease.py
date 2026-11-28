@@ -1,4 +1,4 @@
-"""Releases of any name and what they owe the changelog (R217), in a scratch
+"""Releases of any name and what they owe the changelog, in a scratch
 repository: a pre-release (dev, rc, any word) takes Unreleased as its own
 section in a commit of its own and is tagged on it; a stable release gathers
 the pre-releases since the last stable one; and a release is refused while a
@@ -78,7 +78,7 @@ class PreRelease(unittest.TestCase):
         self.assertEqual(self.git("rev-list", "-n", "1", "--abbrev-commit", "--abbrev=7", r["tag"]), r["sha"])
 
     def test_a_lines_own_stamp_is_kept_and_heads_is_resolved(self):
-        # B702: the cut cited the commit that introduced every line, over
+        # The cut cited the commit that introduced every line, over
         # the change a line named by hand; HEAD's stamp is still resolved.
         change = self.commit_file("a.py", "a = 1\n", "the change")
         self.git("commit", "-q", "--allow-empty", "-m", "between")
@@ -92,7 +92,7 @@ class PreRelease(unittest.TestCase):
         self.assertIn(f"- Stamped with HEAD ({intro})", text)
 
     def test_a_line_committed_after_its_change_keeps_naming_the_change(self):
-        # B710: the change, then its line in a commit of the changelog's
+        # The change, then its line in a commit of the changelog's
         # alone, stamped with the change: the cut kept naming the line's
         # commit, the one after.
         change = self.commit_file("b.py", "b = 1\n", "the change")
@@ -107,7 +107,7 @@ class PreRelease(unittest.TestCase):
         self.assertIn(f"- Said with its change ({together})", text)
 
     def test_a_line_carried_by_the_next_change_keeps_naming_its_own(self):
-        # B735: the change, its line logged after it, then another change
+        # The change, its line logged after it, then another change
         # that carried the changelog with it: the cut renamed the line to
         # that next change, taking it for the line's own.
         first = self.commit_file("d.py", "d = 1\n", "the change")
@@ -172,7 +172,7 @@ class PreRelease(unittest.TestCase):
     def test_the_plan_asks_what_the_git_host_owes(self):
         """What the host owes a tag's workflows is asked by the plan, which
         aerie version rehearse and a person's Allow both stand on, not met
-        only at the tag (B1156)."""
+        only at the tag."""
         wf = self.app / ".github" / "workflows"
         wf.mkdir(parents=True)
         (wf / "build.yml").write_text("on:\n  push:\n    tags: ['v*']\njobs:\n  b:\n    runs-on: x\n")
@@ -201,7 +201,7 @@ class PreRelease(unittest.TestCase):
         self.assertEqual(releasegaps.gaps("app")["owed"], [])
 
     def test_a_stamp_on_no_branch_reads_by_its_date(self):
-        # B700: a commit a history rewrite left on no branch resolves and is
+        # A commit a history rewrite left on no branch resolves and is
         # in no tag's history; the bug closed weeks before is not owed.
         self.git("checkout", "-q", "-b", "gone")
         (self.app / "x.py").write_text("x = 1\n")
@@ -261,7 +261,7 @@ class PreRelease(unittest.TestCase):
 
 
 class Rehearsed(unittest.TestCase):
-    """A rehearsal is of the commit the release tags (R190 step 2): the
+    """A rehearsal is of the commit the release tags: the
     changelog's section is rolled before it, in a commit of its own, and the
     release then tags that commit with nothing left to roll. PreRelease's
     scratch repository, without its tests."""
@@ -311,7 +311,7 @@ class Rehearsed(unittest.TestCase):
         self.assertIn("## Unreleased", (self.app / "CHANGELOG.md").read_text())
 
     def test_a_tree_that_rehearses_tags_only_a_commit_a_rehearsal_passed_on(self):
-        # R190 step 6: the release asks the forge whether a run of the
+        # The release asks the forge whether a run of the
         # rehearsal passed on the very commit it would tag.
         (self.app / ".github" / "workflows").mkdir(parents=True)
         self.commit_file(".github/workflows/release-rehearsal.yml", "name: release rehearsal\n", "the rehearsal")

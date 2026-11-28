@@ -1,6 +1,6 @@
-"""The dashboard served over TLS where it can be had, http where it cannot
-(R158 step 2; the operator, 27 Oct), and a node's channel over TLS under a
-key it pinned, whatever a browser is served (R267 step 15).
+"""The dashboard served over TLS where it can be had, http where it cannot,
+and a node's channel over TLS under a
+key it pinned, whatever a browser is served.
 
 One port, both ways: the listening socket peeks at a connection's first
 byte and wraps the ones that open a TLS handshake (0x16) in a certificate
@@ -395,8 +395,8 @@ def self_signed(names, key_pem=""):
 DEFAULT_NAME = "aerieos"
 
 
-# Strict-Transport-Security, in the acme mode alone (R290 step 2; the
-# operator, 26 Nov): a browser that keeps it refuses to click past a
+# Strict-Transport-Security, in the acme mode alone:
+# a browser that keeps it refuses to click past a
 # certificate's warning, which the install's own certificate always brings.
 HSTS_S = 180 * 86400
 
@@ -413,8 +413,8 @@ def hsts(settings_get, host):
     return f"max-age={HSTS_S}" if name and h == name else ""
 
 
-# The last sign-in over plain http from an address outside the network
-# (R290 step 2): {at, addr}, said by the Doctor for a week.
+# The last sign-in over plain http from an address outside the network:
+# {at, addr}, said by the Doctor for a week.
 _plain = {}
 PLAIN_SAID_S = 7 * 86400
 
@@ -692,7 +692,7 @@ def wrap(sock, peek_timeout=5.0):
 
 class WrapOnItsThread:
     """A threading server's mixin: each connection is wrapped (wrap) on the
-    thread that serves it (R228 step 3). wrap waits up to its peek_timeout
+    thread that serves it. wrap waits up to its peek_timeout
     for a first byte, and in get_request, on the one accept thread, a
     connection that sent nothing held every other behind it that long."""
 
@@ -702,8 +702,8 @@ class WrapOnItsThread:
     def handle_error(self, request, client_address):
         """A connection its peer dropped (a tab closed or reloaded, a browser
         retrying across a restart) is not the server's error and says
-        nothing: each wrote a whole traceback, burying a start's own lines
-        (B1191). Anything else is socketserver's traceback as before."""
+        nothing: each wrote a whole traceback, burying a start's own lines.
+        Anything else is socketserver's traceback as before."""
         if isinstance(sys.exc_info()[1], ConnectionError):
             return
         super().handle_error(request, client_address)

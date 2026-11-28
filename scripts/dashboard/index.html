@@ -108,7 +108,7 @@
      the parser waits for the script. Without it a browser that paints
      before slow stylesheets (Firefox, after an update, on a phone) showed
      the page bare for a moment, the header's mark with no size of its own
-     filling the screen (the operator, 19 Nov). -->
+     filling the screen. -->
 <script>document.documentElement.dataset.styled = "1";</script>
 </head>
 <body class="booting">
@@ -134,15 +134,15 @@
          #27). Above the strip like the batch note, because it is about the
          notebook and not one tab of it: the modal it opens lists every tab's. -->
     <div class="field mdrift" id="nbPending" hidden></div>
-    <!-- Five groups in the order a project is worked (the operator, 16 Oct:
-         eleven tabs were too many): what to know (Overview), what to do
+    <!-- Five groups in the order a project is worked
+         (eleven tabs were too many): what to know (Overview), what to do
          (Plan: Roadmap, Bugs), the code and whether it holds (Code: Git,
          Tests, Analysis), what it produced and where it runs (Ship:
          Artifacts, Docker, VMs, Signing), and what is written about it (Docs: Wiki,
          Design). A group's views are the row under it, the way a rail
          group's page carries its tools, one button where the group is one
          view, so every view's head sits at one height. Settings is beside
-         Overview in its group (the operator, 16 Oct), and the header's ...
+         Overview in its group, and the header's ...
          menu opens it too. Every view keeps its data-v and its address.
          The list of them is NB_VIEWS (nb-core.js): this markup is held to
          it by test/surface.mjs, so a view added here is added there. -->
@@ -183,7 +183,7 @@
          panel: everything else here is one-way. Its open items are appended
          to every Claude session the dashboard starts, so an item added on
          Tuesday is read on Thursday without anybody remembering to say so. -->
-    <!-- Every view's top is the Containers page's (R109, a-notebook/views):
+    <!-- Every view's top is the Containers page's (a-notebook/views):
          the control row (a search over the items, their steps and their
          details at the left, which reaches the Finished section too; then
          History, Reorder and Add to roadmap, the primary, at the right), the
@@ -217,7 +217,7 @@
     <!-- The glance: to send, shelved and finished as tiles (viewGlance)... -->
     <div class="nbglance" id="roadmapHint" data-tiles="3"></div>
     <!-- ...and the status line, which is the list's own Save and Revert
-         (the operator, 5 Oct: each section saves its own changes, and the
+         (each section saves its own changes, and the
          list's are the reorders, edits and steps staged on its rows): what
          is staged first, then the session's state and when one last read the
          list, Save and Revert at the right while something is staged. -->
@@ -226,7 +226,7 @@
       <button id="roadmapSaveQuiet" type="button" data-ssave="roadmap" disabled hidden>Save</button>
       <button id="roadmapRevert" class="caution" type="button" data-srevert="roadmap" disabled hidden>Revert</button>
     </div></div>
-    <!-- Narrowing the list (R254 step 1): chips for All, Open and Shelved and
+    <!-- Narrowing the list: chips for All, Open and Shelved and
          the release an item is meant for, every group in this one band. A
          view, never a setting. -->
     <div class="field lfilter" id="roadmapFilter" hidden>
@@ -257,13 +257,13 @@
          are on screen at once now, one of them in the sheet. -->
     <div class="field" id="roadmapHist" hidden></div>
     <div class="field" id="roadmapField"><div id="roadmapList" data-skel="rows"></div>
-      <!-- The finished ones (R78), a section of their own under the list
-           (R254 step 1), shut until opened and fetched when it is. -->
+      <!-- The finished ones, a section of their own under the list,
+           shut until opened and fetched when it is. -->
       <details class="sect" data-sect="roadmap:finished" id="roadmapDoneSect" data-fold hidden>
         <summary><span class="t">Finished</span><span class="sst" id="roadmapDoneN"></span></summary>
         <div class="body"><div id="roadmapDoneList"></div></div>
       </details></div>
-    <!-- A project of several repositories' other ones (R136, reposAlso). -->
+    <!-- A project of several repositories' other ones (reposAlso). -->
     <div class="field" id="roadmapRepos" hidden></div>
     </div>
     <!-- What Claude remembers, on its own tab: a handful of files nobody
@@ -284,7 +284,7 @@
         <span class="actbar"><button type="button" id="memLog"
           title="every change to this notebook, with when">History</button></span>
       </div>
-      <!-- The glance (R109): the rules and the memories, counted. -->
+      <!-- The glance: the rules and the memories, counted. -->
       <div class="nbglance" id="memWhere" data-tiles="2"></div>
       <div id="rulesBox" data-skel="briefing"></div>
       <div class="field histbar ctlrow" id="memHistBar" hidden>
@@ -302,7 +302,7 @@
     <!-- Above the list, and outside it: the list is hidden when there is
          nothing in it, and a project with no memories is exactly where
          writing the first one by hand is worth offering. -->
-    <!-- The memories, folded (the operator, 29 Sep): what a session
+    <!-- The memories, folded: what a session
          happened to notice is read rarely and pushes the rules and the
          code base off the first screen. The count is on the heading. -->
     <details class="sect" id="memSect" data-sect="briefing:memories">
@@ -312,7 +312,7 @@
         <div class="field" id="memListField">
           <div id="memList" data-skel="rows"></div>
         </div>
-        <!-- The memories' own Save and Revert (the operator, 5 Oct). -->
+        <!-- The memories' own Save and Revert. -->
         <div class="field"><div class="actbar sectbar" data-bar="briefing:memories">
           <span class="state"></span><span class="sp"></span>
           <button type="button" data-ssave="briefing:memories" disabled>Save</button>
@@ -325,7 +325,7 @@
          a bug report is a form submitted once, not a list curated in place,
          so staging it behind Save would only delay the record. -->
     <div class="nbview" data-view="bugs" hidden>
-      <!-- The control row (R109): a search over a report's words at the
+      <!-- The control row: a search over a report's words at the
            left, then History and Report a bug, the primary, at the right; its
            form unrolls under the row. -->
       <div class="field nbhead vbar docbarrow">
@@ -338,7 +338,7 @@
       <div class="field nbaddf" id="bugAdd" hidden></div>
       <!-- The glance: open by severity, and closed, as tiles. -->
       <div class="nbglance" id="bugHint" data-tiles="3"></div>
-      <!-- The band that narrows the list (R254 step 1): chips for All, Open
+      <!-- The band that narrows the list: chips for All, Open
            and Closed and the release a report was seen in, and the order.
            Open before closed is not one of the orders: a tracker is read to
            find what is outstanding, so that stays the primary key and this
@@ -366,7 +366,7 @@
       </div>
       <div class="field" id="bugHist" hidden></div>
       <div class="field" id="bugList" data-skel="rows"></div>
-      <!-- A project of several repositories' other ones (R136, reposAlso). -->
+      <!-- A project of several repositories' other ones (reposAlso). -->
       <div class="field" id="bugRepos" hidden></div>
     </div>
     <!-- The scanner's findings for this project, read-only: the scan runs on
@@ -389,7 +389,7 @@
     <div class="nbview" data-view="tests" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="tstOut" hidden title="the last run's output in this space's shell, following it while it runs">Open the run's output</button></span></div>
-      <!-- The glance (R109): passing, failing, the time in tests, what is
+      <!-- The glance: passing, failing, the time in tests, what is
            flagged and undescribed, and a run going on the line under them. -->
       <div class="nbglance" id="tstHint" data-tiles="3"></div>
       <div class="field" id="tstStats" hidden></div>
@@ -405,7 +405,7 @@
     <div class="nbview" data-view="artifacts" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="artSource" title="the code base as a zip, without build output">Download source</button></span></div>
-      <!-- The glance (R109): what is in dist/ and its size, what was built
+      <!-- The glance: what is in dist/ and its size, what was built
            on a branch, the captures kept. -->
       <div class="nbglance" id="artHint" data-tiles="3" data-said></div>
       <!-- Where this project's compiling happens, or that it has nowhere.
@@ -419,30 +419,30 @@
       <div id="verBox" data-skel="version"></div>
       <div id="verDrafts"></div>
       <div id="artList" data-skel="artifacts"></div>
-      <!-- What a session looked with (R96): reels and emulator shots, in one
+      <!-- What a session looked with: reels and emulator shots, in one
            fold apart from what ships, each saying whose it is, and swept
            after the project's "captures kept" days. -->
       <div id="artCaptures" hidden></div>
-      <!-- Builds made on a branch, in each account's own worktree (B237):
+      <!-- Builds made on a branch, in each account's own worktree:
            listed apart from dist/, which is what the project ships. -->
       <div id="artBranches" hidden></div>
     </div>
     <!-- This project's containers as the Containers page draws them, scoped
-         to it (the operator, 19 Oct): its tiles, when the images were
+         to it: its tiles, when the images were
          checked, and its card, read from the project's node, which is where
          its work runs. -->
-    <!-- This project's VMs as the VMs page draws them, scoped to it (R96, the
-         operator, 21 Oct): its card, with New VM and the VMs page in its head. -->
+    <!-- This project's VMs as the VMs page draws them, scoped to it:
+         its card, with New VM and the VMs page in its head. -->
     <div class="nbview vmtab" data-view="vms" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="nvOpen">VMs<span class="lng"> page</span></button><button type="button" id="nvNew" class="primary" hidden>New VM</button></span></div>
-      <!-- The glance (R109): what runs of the project's VMs. -->
+      <!-- The glance: what runs of the project's VMs. -->
       <div class="nbglance" id="nvHint" data-tiles="1" data-said></div>
       <!-- Narrowing it to one node, where its VMs are on more than one. -->
       <div class="field lfilter" hidden><div class="chips" id="nvChips"></div></div>
       <div id="nvList" data-skel="rows"></div>
     </div>
-    <!-- What runs in the space's Kubernetes environments (R281 step 5),
+    <!-- What runs in the space's Kubernetes environments,
          drawn by nb-kubernetes.js: an environment a section, Deploy and Roll
          back on its bar, its workloads as rows with Restart and Scale, each
          workload's pods under it with their Logs in the dock, and its last
@@ -450,11 +450,11 @@
     <div class="nbview kubetab" data-view="kubernetes" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="kbSettings">Deploy<span class="lng"> settings</span></button></span></div>
-      <!-- The glance (R109): the workloads ready of all. -->
+      <!-- The glance: the workloads ready of all. -->
       <div class="nbglance" id="kbHint" data-tiles="1" data-said></div>
       <div id="kbList" data-skel="rows"></div>
     </div>
-    <!-- The space's Discord server (R293), drawn by nb-discord.js: the
+    <!-- The space's Discord server, drawn by nb-discord.js: the
          server it is connected to, what applying deploy/discord.yml would
          change (each change a person allows marked), Pull, Plan and Apply on
          its bar, and its last plans. -->
@@ -464,21 +464,21 @@
       <div class="nbglance" id="dcHint" data-tiles="1" data-said></div>
       <div id="dcList" data-skel="rows"></div>
     </div>
-    <!-- This project's Android signing keys (R106), a view of their own in
-         Ship (R103, the operator, 22 Oct), drawn by nb-signing.js: a section
+    <!-- This project's Android signing keys, a view of their own in
+         Ship, drawn by nb-signing.js: a section
          per key and the apps mapped to them, Import a backup and New key the
          control row's actions, the form either opens unrolling under it. -->
     <div class="nbview sgview" data-view="signing" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span><span class="actbar" id="sgActs"><button type="button" id="sgImp" data-add="import" aria-expanded="false"><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="false">New key</button></span></div>
       <div id="sgAdd"></div>
-      <!-- The glance (R109): the keys held and the apps mapped to them. -->
+      <!-- The glance: the keys held and the apps mapped to them. -->
       <div class="nbglance" id="sgHint" data-tiles="0" data-said></div>
       <div id="sgBox" data-skel="signing"></div>
     </div>
     <div class="nbview dkview" data-view="docker" hidden>
       <div class="field nbhead vbar docbarrow"><span id="dkSeg"></span><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="dkCheck" hidden>Check<span class="lng"> for updates</span></button><button type="button" id="dkOpen">Containers<span class="lng"> page</span></button></span></div>
-      <!-- The glance (R109): the Containers page's tiles for the project; its
+      <!-- The glance: the Containers page's tiles for the project; its
            node and when the images were checked are said in the control
            row's slot above (viewGlance). -->
       <div class="nbglance" id="dkHint" data-tiles="2" data-said></div>
@@ -487,11 +487,11 @@
       <div id="dkList" data-skel="rows"></div>
     </div>
     <div class="nbview" data-view="git" hidden>
-      <!-- The repository, read out (roadmap R36): what is changed and not
+      <!-- The repository, read out: what is changed and not
            committed, the history as a graph, and the branches with whose
            worktree sits on which. Reads only in this step; every action a
            later one adds is a fixed git command on the controller. -->
-      <!-- The control row (R109): the branch the tree is on at the left, a
+      <!-- The control row: the branch the tree is on at the left, a
            picker where the search would be, and the network half at the
            right: fetch and pull bring the remote's commits down, push sends
            this branch up through the controller's own credentials, the same
@@ -509,7 +509,7 @@
            pull as tiles, and the remote's state under them. -->
       <div class="nbglance" id="gitHint" data-tiles="4" data-said></div>
       <div id="gitBody" data-skel="git"></div>
-      <!-- A branch against main, its own page (R269 step 2): drawn in
+      <!-- A branch against main, its own page: drawn in
            place of the sections above while the address names it. -->
       <div id="gitCmp"></div>
     </div>
@@ -523,10 +523,10 @@
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="dsWrite"
           title="write docs/design-language.md into the space from what is saved here; a session commits it with the work">Write the file</button></span></div>
-      <!-- The glance (R109): its pages and themes, and the file's state. -->
+      <!-- The glance: its pages and themes, and the file's state. -->
       <div class="nbglance" id="dsHint" data-tiles="2" data-said></div>
-      <!-- Why Write the file and every control below are dead (B101). -->
-      <!-- Add page is the Pages section's own (the operator, 29 Sep):
+      <!-- Why Write the file and every control below are dead. -->
+      <!-- Add page is the Pages section's own:
            nb-design.js draws it at the top of that section. -->
       <div id="dsBody" data-skel="design"></div>
     </div>
@@ -535,10 +535,10 @@
            to be read, written through like Bugs, kept by the controller as a
            forge-shaped repository so Export is a zip of Markdown and Push is
            the repository's own wiki. -->
-      <!-- The control row (R109), one row as every view's: where the wiki
+      <!-- The control row, one row as every view's: where the wiki
            goes at its left, then Export for every project, Pull and Push
            where there is a forge, History, and New page, the primary, whose
-           form unrolls under the row, as every view adds (B457). It was two
+           form unrolls under the row, as every view adds. It was two
            rows, History and New page alone on the first. Why Push is dead
            when it is, said under the row rather than in a tooltip. -->
       <div class="field nbhead vbar docbarrow">
@@ -557,7 +557,7 @@
         <span class="actbar"><button type="button" id="anaLog"
           title="what changed between the last two scans">History</button></span>
       </div>
-      <!-- The glance (R109): the findings by level. -->
+      <!-- The glance: the findings by level. -->
       <div class="nbglance" id="anaHint" data-tiles="3"></div>
       <div class="field histbar ctlrow" id="anaHistBar" hidden>
         <input maxlength="80" autocomplete="off" placeholder="search the findings log" data-ph-short="search">
@@ -569,7 +569,7 @@
       <div class="field" id="anaHist" hidden></div>
       <div id="anaList" data-skel="rows"></div>
     </div>
-    <!-- The project's settings (R119 step 3, the operator 4 Oct): the same
+    <!-- The project's settings: the same
          form the settings dialog shows, moved into this view while it is the
          one on screen (page-projsettings.js settingsInto), so there is one
          form and one set of handlers. .modal.inline lets every dialog rule
@@ -577,14 +577,14 @@
     <div class="nbview" data-view="settings" hidden>
       <div class="modal inline nbsettings"></div>
     </div>
-    <!-- Your own conversations on this project (the operator, 22 Oct: out
+    <!-- Your own conversations on this project (out
          of Profile), each to resume, read or download (nb-sessions.js). -->
     <div class="nbview" data-view="sessions" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span></div>
       <div class="nbglance" id="sessHint" data-tiles="2" data-said></div>
       <div class="sesslist"></div>
     </div>
-    <!-- What a session may do here, in one place (the operator, 22 Oct):
+    <!-- What a session may do here, in one place:
          the settings form's Agents may section, lent while this view is on
          screen (nb-permissions.js), and what it may push. -->
     <div class="nbview" data-view="permissions" hidden>
@@ -644,7 +644,7 @@
     </div>
   </div>
 </div>
-<!-- Sign out, asked first (the operator, 16 Oct): a press on the header's
+<!-- Sign out, asked first: a press on the header's
      button or the gear's is not a sign-out by itself, and the sessions an
      account has running go on without it unless this ends them too. -->
 <div id="outModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="outTitle">
@@ -658,7 +658,7 @@
       <button type="button" id="outCancel">Cancel</button></div>
   </div>
 </div>
-<!-- A conversation with Claude, read here rather than downloaded (R83): its
+<!-- A conversation with Claude, read here rather than downloaded: its
      turns, and under each of Claude's the commands it ran, folded, with what
      each answered. -->
 <!-- The agent chooser: Start agent and Manage agent open it; each of its
@@ -717,7 +717,7 @@
 <div id="rnmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="rnTitle">
   <div class="box" data-sects>
     <h3 id="rnTitle">Space settings</h3>
-    <!-- A card's door (R208): the space's id under its name, and a work
+    <!-- A card's door: the space's id under its name, and a work
          space's folder. A line of the door's own, not a section: General
          held nothing else there, its name being the card's back's to change. -->
     <div class="field" id="rnProjectHead" hidden><div class="hint"></div></div>
@@ -725,12 +725,12 @@
          fields is shown (the chain's door shows the remote alone): what
          the project is and who it belongs to, where it runs, what a
          session sees, how it builds, what an agent may
-         do, what is yours, and who is in it now (the operator, 1 Oct). -->
+         do, what is yours, and who is in it now. -->
     <!-- General, Just for you, Repository, Nodes, Build and test and Releases are forms,
          each drawn into its body at load by rnDrawForms (page-projsettings.js)
          so its Save is the form's foot. -->
     <details class="sect rngroup" data-sect="rn:project"><summary><span class="t">General</span></summary><div class="body" data-rnform="project"></div></details>
-    <!-- People, a section of its own (R255 step 7): who the project is for
+    <!-- People, a section of its own: who the project is for
          is not what it is called, and the dialog reads People (who) apart
          from Agents may (what its sessions do). -->
     <details class="sect rngroup" data-sect="rn:people" hidden><summary><span class="t">People</span></summary><div class="body" data-rnform="people"></div></details>
@@ -739,10 +739,10 @@
     <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body" data-rnform="repo"></div></details>
     <details class="sect rngroup" data-sect="rn:runs"><summary><span class="t">Nodes</span></summary><div class="body" data-rnform="runs"></div></details>
     <details class="sect rngroup" data-sect="rn:build"><summary><span class="t">Build and test</span></summary><div class="body" data-rnform="build"></div></details>
-    <!-- Releases (R255): what a release waits for, and what each of its
+    <!-- Releases: what a release waits for, and what each of its
          files is for, put over its notes. The repository's own. -->
     <details class="sect rngroup" data-sect="rn:releases"><summary><span class="t">Releases</span></summary><div class="body" data-rnform="releases"></div></details>
-    <!-- Where the space's software goes (R281 step 3, page-deploy.js): its
+    <!-- Where the space's software goes (page-deploy.js): its
          Kubernetes environments as records, each saved on its own press,
          its namespace made ready on its cluster first. The space's; drawn
          once a cluster is kept or the space has an environment. -->
@@ -758,7 +758,7 @@
       <div id="rnShipRows" role="group" aria-labelledby="rnShipLabel"></div>
     </div>
     </div></details>
-    <!-- The space's Discord server (R293, nb-discord.js): its bot's token
+    <!-- The space's Discord server (nb-discord.js): its bot's token
          given once and sealed, never shown again; the server built out from
          the repository's deploy/discord.yml in the Discord view. The
          space's; drawn for a space with a repository. -->
@@ -769,7 +769,7 @@
     <details class="sect rngroup" data-sect="rn:tools"><summary><span class="t">Toolchains</span></summary><div class="body" data-rnform="tools"></div></details>
     <details class="sect rngroup" data-sect="rn:files"><summary><span class="t">File access</span></summary><div class="body" data-rnform="files"></div></details>
     <details class="sect rngroup" data-sect="rn:snapshots"><summary><span class="t">Snapshots</span></summary><div class="body">
-    <!-- The days kept of the project's tree (R165), an administrator's:
+    <!-- The days kept of the project's tree, an administrator's:
          restoring the whole tree or one file acts on the press, after a
          confirmation, and snapshots the tree first so it can be undone. -->
     <div class="field" id="rnSnapField" hidden>
@@ -787,7 +787,7 @@
     </div>
     </div></details>
     <div class="field" id="rnErrWrap" hidden><div class="hint bad" id="rnErr"></div></div>
-    <!-- A card's door (R208): where the rest of the settings are. -->
+    <!-- A card's door: where the rest of the settings are. -->
     <div class="field" id="rnProjectNote" hidden><div class="hint"></div></div>
     <div class="foot">
       <!-- Each section saves itself (page-projsettings.js rnBars); the foot
@@ -798,12 +798,12 @@
       <button id="rnCancel">Close</button>
       <!-- ...and the gear's own: the bin. It is also on the All projects
            tab's rows, behind the fold on a phone, which is where it was
-           not being found (the operator, 15 Sep). Same confirm, same
+           not being found. Same confirm, same
            /api/trash: every file kept under /workspace/.trash. -->
       <button id="rnDelete" class="danger" hidden
         title="move it to .trash; everything is kept">Delete space…</button>
     </div>
-    <!-- Why Delete project is dead for this account (B86), under it. -->
+    <!-- Why Delete project is dead for this account, under it. -->
   </div>
 </div>
 
@@ -818,14 +818,14 @@
 <div id="cmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="cTitle">
   <div class="box wide">
     <h3 id="cTitle">New container</h3>
-    <!-- Apps a NAS runs (R164 step 2, R238): an app's New container on the
+    <!-- Apps a NAS runs: an app's New container on the
          Library opens this on it, as Configure on a container made from one
          does. The app's part is a panel of its own (the design's app-panel
          rule): its head as its Library card's, then the fields its manifest
          declares and AerieOS's own its compose reads, drawn by cAppDraw.
          The panel owns those values: the Compose tab is the app's file,
          read-only, and the Environment tab holds only the other variables.
-         Apps are picked on the Library alone (the operator, 10 Nov): opened
+         Apps are picked on the Library alone: opened
          anywhere else, this part is hidden and the dialog is the
          image-or-compose one. -->
     <div class="field" id="cAppField" hidden>
@@ -865,8 +865,8 @@
   </div>
 </div>
 
-<!-- Copy or move a container to another node, its data with it (the
-     operator, 10 Oct): Send makes a fresh one, this carries what the old one
+<!-- Copy or move a container to another node, its data with it:
+     Send makes a fresh one, this carries what the old one
      had. Its env is shown on the way, to change for the new node. -->
 <div id="rlmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="rlTitle">
   <div class="box wide">
@@ -903,7 +903,7 @@
     </div>
     <div class="field" id="pendListF"><div id="pendList"></div></div>
     <div class="field"><div id="pendEmpty" hidden>Nothing is waiting here.</div></div>
-    <!-- Why Approve and Deny are dead for this account (B101). -->
+    <!-- Why Approve and Deny are dead for this account. -->
     <div class="foot">
       <span class="sp"></span>
       <button id="pendApprove" class="primary">Approve</button>
@@ -946,9 +946,9 @@
      anybody chose, and its fields shared the group's Apply, so ticking one
      saved the group. -->
 <!-- One container's log, read on demand: the thing a person opens a docker
-     list to do (R68 step 2). A dialog because it is a detour you read and
+     list to do. A dialog because it is a detour you read and
      dismiss, and because a tail belongs nowhere near a row that repaints. -->
-<!-- Reset AerieOS (the operator, 12 Oct): which nodes to un-enroll first,
+<!-- Reset AerieOS: which nodes to un-enroll first,
      so each can be enrolled again afterwards, then the word that confirms.
      tab-settings.js draws it and follows the un-enrolling to the reset. -->
 <div id="resetmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="resetTitle">
@@ -960,7 +960,7 @@
 <!-- Report a bug in AerieOS, from a project's row (page-report.js): a
      category, what happened and how to make it happen, sent to the
      diagnostics with the project and the build attached. -->
-<!-- Lending your phone to a project, from its row's Phone button (R120):
+<!-- Lending your phone to a project, from its row's Phone button:
      how long, and Lend. Only the phone's owner is offered it. -->
 <div id="phoneLendModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="phoneLendTitle">
   <div class="box">
@@ -1035,7 +1035,7 @@
   <h1>AerieOS</h1>
   <span class="meta host" id="host"></span>
   <span class="pill" id="devtag" title="unvetted features are offered here" hidden>dev</span>
-  <!-- Search (R218 step 2, the top-bar rule): a field that jumps to a page,
+  <!-- Search (the top-bar rule): a field that jumps to a page,
        a project, a container or a node; the rows under it as you type, the
        first on Enter. It does not search inside notebooks. -->
   <div class="jump" role="search">
@@ -1067,7 +1067,7 @@
   </button>
   <div id="bellPanel" class="bellpanel" hidden role="dialog"
        aria-label="notifications"></div>
-  <!-- aerie doctor's verdict (R218 step 3): a dot in the bell's manners, its
+  <!-- aerie doctor's verdict: a dot in the bell's manners, its
        color the worst check's, and its panel the checks; page-doctor.js. -->
   <button id="bDocDot" aria-haspopup="dialog" aria-expanded="false"
           aria-label="aerie doctor: the controller's own checks"><span class="st" id="docDot"></span></button>
@@ -1077,8 +1077,8 @@
     <div id="doctor"><div class="empty">first run pending…</div></div>
     <div class="docfoot"><button type="button" id="docSettings" hidden>Controller settings</button></div>
   </div>
-  <!-- Report a bug in AerieOS about no project in particular (the
-       operator, 2 Oct); a project's own is on its row. The same dialog,
+  <!-- Report a bug in AerieOS about no project in particular;
+       a project's own is on its row. The same dialog,
        page-report.js, with no project. -->
   <button id="bReport" aria-label="report a bug"
           title="report a bug in AerieOS: it goes to the diagnostics">
@@ -1122,7 +1122,7 @@
     </svg>
   </button>
 </header>
-<!-- The install's banner (R88), when its environment sets one: the server
+<!-- The install's banner, when its environment sets one: the server
      writes it here, a band in the page's column under the header. -->
 <!--BANNER-->
 <div id="pollWhy" class="pollwhy" role="status" hidden></div>
@@ -1138,12 +1138,12 @@
 <div id="newBuild" class="newbuild" role="status" hidden><span class="grow" id="newBuildSay"></span><button type="button" id="newBuildGo">Reload</button></div>
 
 <main>
-  <!-- The rail (R218 step 2): one column of groups down the left edge, each
+  <!-- The rail: one column of groups down the left edge, each
        a page with an address; page-shell.js draws it. On a phone it is the
        bar at the foot of the page, and this column is not drawn. -->
   <nav id="rail" class="rail" aria-label="pages"></nav>
   <div class="col term">
-    <!-- First run (R199, R267): the setup page, in the panes' place, until
+    <!-- First run: the setup page, in the panes' place, until
          Finish. page-setup.js draws it. -->
     <div class="setup" id="setupPanel" hidden></div>
     <div class="panes" id="panes">
@@ -1155,8 +1155,8 @@
       <div class="pane" id="pane0"><div class="loading" data-skel="page">loading…</div></div>
       <div class="pane hidden" id="pane1"></div>
     </div>
-    <!-- The band at a terminal's foot, a phone's alone: its hot bar (the
-         operator, 12 Nov), the keys of the terminal in front in a line that
+    <!-- The band at a terminal's foot, a phone's alone: its hot bar,
+         the keys of the terminal in front in a line that
          scrolls as the dock's line does, then Links standing still at its
          end. At a desk the keys float over the terminal (page-term.js) and
          there is no band. -->
@@ -1167,7 +1167,7 @@
     </div>
   </div>
 </main>
-<!-- The rail on a phone (R218 step 2): five across the foot, More a sheet
+<!-- The rail on a phone: five across the foot, More a sheet
      of the rest; drawn by page-shell.js. -->
 <div id="railmore" class="railmore" role="menu" aria-label="more pages" hidden></div>
 <nav id="railbar" class="railbar" aria-label="pages"></nav>
@@ -1211,7 +1211,7 @@
 <script src="page-welcome.js"></script>  <!-- a part of the page that is no tab: same rule -->
 <script src="page-chat.js"></script>
 <script src="page-motion.js"></script>
-<script src="page-ask.js"></script>     <!-- the page's questions as modals (R121) -->
+<script src="page-ask.js"></script>     <!-- the page's questions as modals -->
 <script src="page-pull.js"></script>
 <script src="page-report.js"></script>
 <script src="page-lists.js"></script>

@@ -11,11 +11,11 @@ as plain text: a turn a line, the tool calls with their command and the
 whole of what the tool answered, so `aerie roadmap` and its reply are in it
 as they were. Claude's private reasoning is not conversation and is left
 out. A notebook's Sessions view offers each to resume, read, download,
-delete, or make visible to every session on the project (shared(); the
-operator, 22 Oct); otherwise only the account's own.
+delete, or make visible to every session on the project (shared);
+otherwise only the account's own.
 
-A person gives a conversation a label and a note (R236, the operator, 12
-Nov), kept here and not in the agent's file, and marks one Kept: a second
+A person gives a conversation a label and a note,
+kept here and not in the agent's file, and marks one Kept: a second
 name for its file where no agent's own cleanup looks, so it is still there
 to read and resume when the original has gone.
 """
@@ -57,7 +57,7 @@ _shared_lock = threading.Lock()
 BUSY_S = 120
 
 
-# What a person says of their own conversations (R236): {uid: {project:
+# What a person says of their own conversations: {uid: {project:
 # {session id: {"label", "note", "kept", "at"}}}}, in the state directory
 # (a file absent is none said). A label is a line, a note a few.
 NOTES = None
@@ -270,7 +270,7 @@ def visible(uid, project, name_of=lambda u: u):
             st = f.stat()
         except OSError:
             continue
-        # ...each marked with its agent, as the account's own rows are (R95).
+        # ...each marked with its agent, as the account's own rows are.
         # ...and under the label its person gave it, where they gave one.
         rows.append({"project": project, "id": sid, "at": int(st.st_mtime), "bytes": st.st_size,
                      "first": _first_prompt(f), "by": name_of(o), "agent": agent_of(f),
@@ -283,8 +283,8 @@ def _slug(path):
     return str(path).replace("/", "-")
 
 
-# The coding agents beside Claude whose conversations are kept here too
-# (R95 step 8): each session's own log, copied at the end of every turn by
+# The coding agents beside Claude whose conversations are kept here too:
+# each session's own log, copied at the end of every turn by
 # its Stop hook (bb-agent-hook) into an <agent>/ folder of the transcripts
 # folder of the tree it works in, so the share and claudesync carry it
 # exactly as they carry Claude Code's.
@@ -295,11 +295,11 @@ OTHER_AGENTS = tuple(a.id for a in agents.TABLE if a.id != "claude" and a.live)
 def _dirs(uid, project):
     """Where this account's sessions on the project wrote: the project's
     own tree, the account's worktree of it, and each other agent's worktree
-    of the account's (R95), each also under the name Claude Code itself
+    of the account's, each also under the name Claude Code itself
     gives a tree's folder (every character not a letter or a digit a dash),
     which is the one another agent's log is kept under."""
     base = Path(root_for(uid))
-    # Worked out once an account, space and root (R228 step 26): a status
+    # Worked out once an account, space and root: a status
     # read asked it a dozen times, and the list's own membership test
     # compared every path with every other, some five thousand a call.
     key = (str(base), str(WORKSPACE), uid, project)
@@ -307,7 +307,7 @@ def _dirs(uid, project):
     if got is not None:
         return list(got)
     out, seen = [], set()
-    # ...and each slot's past the first (R143): u_x-2, u_x-codex-2.
+    # ...and each slot's past the first: u_x-2, u_x-codex-2.
     trees = [f"{uid}-{a}" for a in OTHER_AGENTS]
     trees += [f"{t}-{n}" for t in [uid, *trees] for n in range(2, agents.MAX_SLOTS + 1)]
     for p in (WORKSPACE / project, WORKTREES / project / uid,
@@ -343,7 +343,7 @@ def agent_of(f):
 
 
 def dirs(uid, project):
-    """The same, for the server's resume offer (B489): an account is offered
+    """The same, for the server's resume offer: an account is offered
     its own newest conversation, never another account's."""
     return _dirs(uid, project)
 
@@ -376,7 +376,7 @@ def _first_prompt(path):
 def has_turn(path):
     """Whether a conversation holds anything the person typed: one that
     does not (a 1 KB file of a session's start and nothing said) is not
-    one Claude Code resumes, so it is never offered as Resume (B276)."""
+    one Claude Code resumes, so it is never offered as Resume."""
     return bool(_first_prompt(path))
 
 
@@ -412,7 +412,7 @@ def mine(uid, projects):
             mark = said.get(f.stem) or {}
             if mark.get("kept"):
                 _kept_current(f, _kept_dir(uid, project) / agent / f"{f.stem}.jsonl")
-            # Which coding agent's (R95): Claude Code's at the top of the
+            # Which coding agent's: Claude Code's at the top of the
             # folder, another agent's in its own folder beside them. Only
             # ever this account's own, whichever agent it used.
             rows.append({"project": project, "id": f.stem, "at": int(st.st_mtime),
@@ -455,12 +455,12 @@ def _find(uid, project, sid):
             if f.is_file():
                 return f
     # ...or its kept copy, where the conversation itself has gone: read,
-    # downloaded and fetched for a resume from there (R236).
+    # downloaded and fetched for a resume from there.
     return _kept_find(uid, project, sid)
 
 
 def raw(uid, project, sid):
-    """The transcript file itself, for a synced node resuming it (B613):
+    """The transcript file itself, for a synced node resuming it:
     its path, or None."""
     return _find(uid, project, sid)
 
@@ -596,10 +596,10 @@ TURN_RESULT_MAX = 4000
 
 
 def turns(uid, project, sid, tz=None, tail=0):
-    """(payload, status) for the dashboard's reader (R83): the conversation as
+    """(payload, status) for the dashboard's reader: the conversation as
     turns, {who: "you" | "claude" | "system", at, text, tools: [{call, result,
     error}]}, each tool's answer attached to the call it answers, from the
-    same records render() writes the text download from."""
+    same records render writes the text download from."""
     f = _find(uid, project, sid)
     if f is None:
         return {"error": "no such conversation of yours on this space"}, 404
@@ -659,7 +659,7 @@ def turns(uid, project, sid, tz=None, tail=0):
     return {"project": project, "id": sid, "partial": partial, "turns": out}, 200
 
 
-# ---- another agent's conversation (R95 step 8) -------------------------------
+# ---- another agent's conversation -------------------------------
 # Codex CLI writes a rollout, a line per record ({timestamp, type, payload}:
 # a response_item a message, a function call or its output); Copilot CLI an
 # events log ({type, data, timestamp}: user.message, assistant.message,
@@ -668,7 +668,7 @@ def turns(uid, project, sid, tz=None, tail=0):
 # message streamed in pieces; tool_call and tool_call_update, by toolCallId).
 # Each read here into the same turns Claude Code's are, the reader's and the
 # download's. Read against the shapes Codex CLI 0.163.0 and Copilot CLI
-# 1.0.102 write and Grok Build's user guide names (25 Oct); a record of any
+# 1.0.102 write and Grok Build's user guide names; a record of any
 # other shape is passed over, never a failure.
 
 # What Codex puts in front of a conversation as the person's words, which
@@ -793,7 +793,7 @@ def _agent_turns(f, agent, tz, tail, first=False):
                                _acp_text(u.get("content")) if r is None else r if isinstance(r, str)
                                else json.dumps(r, ensure_ascii=False)[:TURN_RESULT_MAX])
                 elif agent == "open":
-                    # OpenCode's export (R144 step 2), one JSON document a
+                    # OpenCode's export, one JSON document a
                     # line: its messages, each a role and its parts (text,
                     # a tool with its input and its output).
                     for m in d.get("messages") or []:
@@ -882,13 +882,13 @@ def _agent_render(f, agent, project, sid, tz, tail):
     return "\n".join(out).rstrip() + "\n", fname
 
 
-# ---- what the conversations did, against the house rules (R200 step 6) -----
+# ---- what the conversations did, against the house rules -----
 
 AUDIT_DAYS = 7
 _EXAMPLES = 3
 # How much of one transcript the audit reads, from its end: a day-long
 # conversation is hundreds of megabytes (the block rides on every turn), on
-# the share, and reading all of it timed out the verb (B689). The newest
+# the share, and reading all of it timed out the verb. The newest
 # part is what the number is about; a file cut is said as `partial`.
 AUDIT_MAX_BYTES = 48 * 1024 * 1024
 

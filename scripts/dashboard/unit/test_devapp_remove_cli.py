@@ -1,4 +1,4 @@
-"""aerie devapp remove (B755, report #111): the controller answers a remove by
+"""aerie devapp remove (report #111): the controller answers a remove by
 queueing the down as a job, and the verb follows that job to its end. A
 down that failed (the compose file gone from the tree: "empty compose
 file") left the container running while the verb printed "removed"."""
@@ -94,7 +94,7 @@ class RemoveFollowsItsJob(unittest.TestCase):
         self.assertGreaterEqual(Fake.polls, 2)
 
     def test_an_allowed_remove_follows_its_job_too(self):
-        # B15: after Allow, the job the approval queued is followed as well,
+        # After Allow, the job the approval queued is followed as well,
         # so a down that failed is not reported as removed.
         Fake.ask, Fake.outcome = True, "failed"
         r = self.run_remove()

@@ -1,4 +1,4 @@
-// The coding agents a session may run (R95), as the app reads them: the
+// The coding agents a session may run, as the app reads them: the
 // live rows of the dashboard's table (scripts/dashboard/agents.py, whose
 // page copy is page-agents.js), and the names their sessions and terminals
 // go by. A session used to be Claude's by construction, so the app found
@@ -14,7 +14,7 @@ package org.aerieos.app
  *  and the models and efforts Start's step offers for it. Claude's are the
  *  project settings' own (prefs.MODELS, prefs.EFFORTS) and are saved as
  *  `model` and `effort`; another agent's ride its terminal argument and are
- *  saved as `ID_model` and `ID_effort` (R95 step 9). */
+ *  saved as `ID_model` and `ID_effort`. */
 data class Agent(val id: String, val name: String, val product: String,
                  val models: List<String> = emptyList(), val efforts: List<String> = emptyList()) {
     /** The /api/prefs keys its model and effort are kept under. */
@@ -37,10 +37,10 @@ object Agents {
               listOf("auto", "claude-sonnet-5.5", "claude-opus-5.5", "claude-haiku-5.5", "gpt-6.1-sol",
                      "gpt-6-sol", "gpt-5.6-sol", "gpt-5-mini", "gemini-4-argon", "gemini-3.8-flash",
                      "grok-4.7"), EFFORTS),
-        // Grok Build (R95 step 21): its own default model until a list is
+        // Grok Build: its own default model until a list is
         // read off it, as agents.py has none for it yet.
         Agent("grok", "Grok", "Grok Build", emptyList(), emptyList()),
-        // Any model (R144): OpenCode through a node's router; its models are
+        // Any model: OpenCode through a node's router; its models are
         // the router's, read per project, so none are listed here.
         Agent("open", "Any model", "OpenCode", emptyList(), emptyList()),
     )
@@ -58,7 +58,7 @@ object Agents {
 
     /** (agent, stem) for a session name with its account prefix off, or
      *  null for a shell or anything else (agents.of_session). A second
-     *  slot's `~2` is not part of the stem (R143): it is the same project. */
+     *  slot's `~2` is not part of the stem: it is the same project. */
     fun ofSession(base: String): Pair<Agent, String>? = LIVE.firstNotNullOfOrNull { a ->
         if (base.startsWith(a.id + "-") && base.length > a.id.length + 1)
             base.substring(a.id.length + 1).replace(Regex("~[2-9]$"), "").takeIf { it.isNotEmpty() }?.let { a to it }

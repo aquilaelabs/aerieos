@@ -1,4 +1,4 @@
-"""The page's content security policy (R158 step 4): the header allows the
+"""The page's content security policy: the header allows the
 page's own origin and the inline blocks it ships by their hash, a page
 script carries its integrity, and what a browser refuses is kept for the
 Doctor."""
@@ -38,8 +38,8 @@ class Header(unittest.TestCase):
         raw = pathlib.Path(HERE, "index.html").read_bytes()
         scripts, _styles = csp.hashes(raw)
         self.assertGreaterEqual(len(scripts), 1, "the page's head script and its boot() are inline")
-        # The stylesheet is the page's own files, a cascade layer each (R9
-        # step 4), which 'self' allows.
+        # The stylesheet is the page's own files, a cascade layer each,
+        # which 'self' allows.
         self.assertRegex(raw, rb'<link rel="stylesheet" href="page-[a-z-]+\.css">', "the stylesheet is linked from the page's own files")
         # Nothing in the page runs by an inline handler or sets a style
         # attribute, which the policy would refuse.
@@ -80,7 +80,7 @@ class Reports(unittest.TestCase):
 
     def test_at_most_a_share_a_minute_is_written(self):
         # Taken from anyone, so a flood writes no more than a page's own
-        # refusals would (R288).
+        # refusals would.
         csp._recent.clear()
         body = json.dumps({"csp-report": {"blocked-uri": "inline"}}).encode()
         kept = [csp.report(body) for _ in range(csp.PER_MINUTE + 10)]

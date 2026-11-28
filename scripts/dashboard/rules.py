@@ -22,7 +22,7 @@ fix for the right worry. What makes the roadmap safe to share is not a lock,
 it is that every change carries who made it and lands in a history nobody can
 quietly edit. So that is what this has now.
 
-Two things still hold the line. bb-tty's claude_scope() denies Edit, Write and
+Two things still hold the line. bb-tty's claude_scope denies Edit, Write and
 NotebookEdit on the file, so the only way in is a verb that checks ownership;
 and the whole-list replace behind the tab is a person's, because a session
 rewriting every rule at once is the thing the per-rule check exists to stop.
@@ -53,7 +53,7 @@ because two ways to say the same thing is two things to keep in step.
 The honest limit, which the tab states rather than implying otherwise: this is
 not the sibling-project deny list. That one is a refusal from the file tools.
 A rule is a request the model can still fumble, except where it names the
-commands it refuses (R200): those a hook stops on a session's shell call,
+commands it refuses: those a hook stops on a session's shell call,
 with the rule as the reason (bb-rule-hook, scripts/lib/cmdmatch.py).
 
 Same arrangement as roadmap.py and bugs.py: the server or the bb CLI hands over
@@ -146,11 +146,11 @@ MAX_TEXT = 8000
 MAX_RULES = 40
 MAX_NAMED = 2000
 MAX_TRIGGERS = 100
-# What a rule may refuse outright (R200 step 3): commands as typed, the start
+# What a rule may refuse outright: commands as typed, the start
 # of each one a session's Bash call may not run while the rule is on.
 MAX_REFUSE = 200
 
-# Global rules (R63) live under a key no project can be called: a project is a
+# Global rules live under a key no project can be called: a project is a
 # directory on the projects share, and `*` is not a name one can have. So the
 # same store, the same shapes, the same history and the same triggers serve
 # both, and only the reading differs.
@@ -160,7 +160,7 @@ GLOBAL = "*"
 # image would bring an edited one back, and a change nobody can see reverted
 # is worse than no change, so the operator turns one off instead.
 #
-# THE LINE BETWEEN THESE AND THE BRIEFING (the operator, 2 Oct): a rule is a
+# THE LINE BETWEEN THESE AND THE BRIEFING: a rule is a
 # global rule when there is value in turning it off, and otherwise it is said
 # in the briefing. So each of these is a way of working an operator might
 # reasonably not want (let a session install with root asks, keep the tracker
@@ -177,7 +177,7 @@ BUILTIN = [
              " to `aerie toolchains` and gone when the node is rebuilt. Say what is"
              " missing and which toolchain carries it (`aerie toolchains`); installing is"
              " the operator's, from the Library.",
-     # Refused, not only said (R200): the one rule here a command shows
+     # Refused, not only said: the one rule here a command shows
      # being broken, so the guard stops it with this text as the reason.
      "refuse": ["apt install", "apt-get install", "apt-get -y install", "aptitude install",
                 "dnf install", "yum install", "zypper install", "apk add",
@@ -206,8 +206,8 @@ BUILTIN = [
              " to see it), and say what you saw."},
 ]
 
-# What the briefing says a session never does, refused by the guard as well
-# (R200 step 3). Not rules, and not switchable, for the reason BUILTIN gives:
+# What the briefing says a session never does, refused by the guard as well.
+# Not rules, and not switchable, for the reason BUILTIN gives:
 # each is a mistake that only ever costs something (a shell killing itself,
 # an emulator nobody can stop or save, a commit identity written over the
 # one the account carries), so the line in config/templates/briefing.md and
@@ -228,8 +228,8 @@ ALWAYS = [
              " state on stop.",
      "refuse": ["emulator -avd", "emulator @*"]},
     # Only a call that is not in the background (`foreground`): a run started
-    # with run_in_background is what the line asks for (the operator, 12 Oct:
-    # a run held every reply, so a new ask could never cut into it).
+    # with run_in_background is what the line asks for
+    # (a run held every reply, so a new ask could never cut into it).
     {"name": "tests-in-the-background",
      "text": "Start a build, a test run, a probe or a dev instance's rebuild in the background,"
              " the way your tool runs one detached (Claude Code's run_in_background), and wait on its"
@@ -237,21 +237,21 @@ ALWAYS = [
              " ends, so a new ask cannot cut into it the way the space's While a test runs setting"
              " says. The unit tier (aerie tests unit) is quick enough to run either way.",
      # A probe is a run against the kept fixture, a rebuild is minutes of a
-     # job, and a build can be longer than either (the operator, 16 Oct:
-     # messages queued behind them, on every project as on this one).
+     # job, and a build can be longer than either
+     # (messages queued behind them, on every project as on this one).
      "refuse": [f"{cli} {verb}" for cli in ("aerie",)
                 for verb in ("build", "test", "tests run", "tests preflight", "tests lab", "tests coverage",
                              "tests probe", "devapp rebuild", "dashboard test")]
                + ["*/dashboard/test/run.sh"]
-               # the plan only: nothing runs (B698), and a verb's usage, which runs nothing either (B278).
+               # the plan only: nothing runs, and a verb's usage, which runs nothing either.
                + [f"!{cli} {tail}" for cli in ("aerie",)
                   for tail in ("tests preflight* --dry*", "* --help*", "* -h", "*help")],
      "foreground": True},
-    # ...and the wait for one is not a foreground loop either (the operator,
-    # 16 Oct: a session went unresponsive while it watched a gate's log).
+    # ...and the wait for one is not a foreground loop either
+    # (a session went unresponsive while it watched a gate's log).
     # The waiter's own test is the shape read: a grep for "exited", the line
     # a background run's notification file ends on, as a loop's test or in
-    # its body; a grep for the word on its own is a search, and runs (B699).
+    # its body; a grep for the word on its own is a search, and runs.
     {"name": "notified-not-waited",
      "text": "A run started in the background says when it ends: its notification arrives by"
              " itself. Never wait for it in the foreground with a loop over its log (until grep"
@@ -260,7 +260,7 @@ ALWAYS = [
              " turn, and act on the notification.",
      "refuse": [f"{loop} grep *exited*" for loop in ("until", "while", "do")],
      "foreground": True},
-    # git's network half goes through aerie git (the operator, 27 Oct): the
+    # git's network half goes through aerie git: the
     # controller holds the credential and the project's git policy and its
     # secret scan stand in front of it, so a session's own git push or fetch,
     # with a token it was handed, would go round all three. A local git
@@ -318,8 +318,8 @@ def _off():
 
 
 def project_off(project):
-    """The names of the global rules turned off for this project alone (the
-    operator, 2 Oct): a rule worth having everywhere can still be wrong for
+    """The names of the global rules turned off for this project alone:
+    a rule worth having everywhere can still be wrong for
     one project, and turning it off there is the project's own choice."""
     with _lock:
         d = load()
@@ -382,7 +382,7 @@ def effective(project):
         return globals_now()
     here = project_off(project)
     own = rules(project)
-    # A project rule that names the global rule it replaces (R200 step 4)
+    # A project rule that names the global rule it replaces
     # takes that one's place: a session here reads the project's alone,
     # rather than both and an instruction to prefer one.
     gone = {r.get("replaces") for r in own if r.get("replaces")}
@@ -432,7 +432,7 @@ def _clean(r, i):
     name = name.strip("-")[:40].strip("-")
     if not NAME_RE.match(name):
         name = f"rule-{i + 1}"
-    # A framework's two halves (roadmap R31): the document in the repo that
+    # A framework's two halves: the document in the repo that
     # defines it in full, and the command that verifies it. A path is kept
     # repo-relative and cannot climb; a command is any line, run from the
     # project root by whoever runs `aerie rules check`, which is a session on its
@@ -447,10 +447,10 @@ def _clean(r, i):
             "doc": doc,
             "check": " ".join(str(r.get("check") or "").split())[:300],
             # Why the rule is what it is, kept for `aerie rules show` and the
-            # tab, never sent in the block (R202): a reason read at a rule's
+            # tab, never sent in the block: a reason read at a rule's
             # volume dilutes the rule.
             "why": str(r.get("why") or "").strip()[:MAX_TEXT],
-            # Commands it refuses outright (R200 step 3), each the start of a
+            # Commands it refuses outright, each the start of a
             # command as typed; commas between them, since one has spaces.
             "refuse": _refusals(r.get("refuse")),
             # The global rule this one takes the place of in its project.
@@ -496,7 +496,7 @@ def _rev_of(rows):
 # What a project with no rules hashes to. The poll used to say 0 for a
 # project absent from the file while the payload said this, so the panel
 # read itself as behind and fetched its rules (and the code base beside
-# them) twice more on every first open (B218).
+# them) twice more on every first open.
 EMPTY_REV = _rev_of([])
 
 
@@ -557,7 +557,7 @@ def replace(project, rules, rev=None, force=False):
         # The tab writes the WHOLE list, so a list that moved since it was
         # loaded is somebody else's work about to be overwritten: a rule a
         # session added with `aerie rules add`, one an administrator approved
-        # from the pending queue, another person's reword (B195). It used to
+        # from the pending queue, another person's reword. It used to
         # go through, and the log then said "you removed" a rule the person
         # saving had never seen. Checked inside the lock that guards the
         # write, against the number the tab was handed when it loaded, and
@@ -962,10 +962,10 @@ def matching(project, *, prompt="", path=""):
     return out
 
 
-# Whether a project has no repository (R208), from the server
+# Whether a project has no repository, from the server
 # (repos.is_work); nothing when nobody set it.
 work_of = None
-# What a session on a project with no repository is refused (R208): git,
+# What a session on a project with no repository is refused: git,
 # since nothing there is under it; the build, test and tree verbs; and the
 # notebook's writes, since it has none. The reason is the rule's text.
 WORK_GUARD = {
@@ -982,7 +982,7 @@ WORK_GUARD = {
 
 
 def guards(project):
-    """What the Bash guard refuses in this project (R200 step 3): each rule
+    """What the Bash guard refuses in this project: each rule
     in effect that refuses something, then the briefing's never-do lines,
     as {name, text, refuse, by}. What a node's guard caches."""
     out = [{"name": r["name"], "text": r["text"], "refuse": list(r["refuse"]),
@@ -1162,7 +1162,7 @@ def verb(name, act, req):
 
 
 def global_verb(act, req):
-    """The rules that apply to EVERY project (R63), saved by an
+    """The rules that apply to EVERY project, saved by an
     administrator. A shipped rule is read-only and is turned off rather
     than edited, so the only thing this writes for one is whether it is
     on. (payload, status)."""

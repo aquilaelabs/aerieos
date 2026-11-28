@@ -1,4 +1,4 @@
-"""A node's logs, bounded and readable (the operator, 12 Oct): one reader
+"""A node's logs, bounded and readable: one reader
 for every job's output that posts a meter's last frame even when it never
 prints a newline, files kept to a size and directories to a count, a fault
 said once an hour rather than on every tick, and output dropped while the

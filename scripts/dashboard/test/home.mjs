@@ -1,4 +1,4 @@
-// Home (R218 step 5, the design's the-dashboard/home rule): the landing page.
+// Home (the design's the-dashboard/home rule): the landing page.
 // Tiles across the install, each a link into its page; Attention, the bell's
 // own rows; the last ten jobs, each opening its row on the Jobs page; the
 // pinned projects at a glance; read whole on open and light when the queue
@@ -34,13 +34,13 @@ await section("the tiles: across the install, and what /api/home says", async ()
      `...the machines' and the queue's numbers are /api/home's (${by.nodes.value} of ${h.nodes?.enrolled} nodes, ${by.jobs.value} jobs running)`);
   ok(Array.isArray(h.jobs.last) && h.jobs.last.length <= 10 && typeof h.jobs.failed_today === 'number',
      `...which carries the last ten jobs and the ones failed today (${h.jobs.last.length} rows, ${h.jobs.failed_today} failed)`);
-  // B59: the sessions tile is the number the Sessions page it opens counts.
+  // The sessions tile is the number the Sessions page it opens counts.
   const listed = await page.evaluate(() => (state?.sessions || []).length);
   ok(by.sessions.value === String(listed) && listed > 0,
      `...and sessions open is what the Sessions page lists, terminals included (${by.sessions.value} of ${listed})`);
 });
 
-// ---- updates due counts each thing behind once (B28) ------------------------
+// ---- updates due counts each thing behind once ------------------------
 await section("updates due counts each thing behind once", async () => {
   const n = await page.evaluate(() => {
     const was = state.attention;
@@ -89,7 +89,7 @@ await section("a tile is a link into its page", async () => {
   await page.waitForSelector('.doc.on .homegrid', { timeout: 15000 });
   // Updates due are every node's toolchains, images, nginx and agents, which
   // one node's Library never holds: the tile brings Home's own
-  // Attention card into view, where they are listed (B73).
+  // Attention card into view, where they are listed.
   ok(await page.$eval('.doc.on .hometiles [data-htile="updates"]', t => t.getAttribute('href')) === '#/home',
      'the updates tile is a link to Home itself, not one node\'s Library');
   await page.click('.doc.on .hometiles [data-htile="updates"]');
@@ -113,7 +113,7 @@ await section("Attention is the bell's rows, and the pinned projects are at a gl
   await until(() => page.evaluate(() => !!document.querySelector('.doc.on .hglance [data-hproj="alpha"]')), 15000);
   ok(await page.$eval('.doc.on .hglance [data-hproj="alpha"]', b => b.closest('.hproj').querySelector('.pstate') !== null),
      'a pinned space is on Spaces at a glance, with its session state');
-  // In groups, as the Projects page is (R273): the ones in no group first,
+  // In groups, as the Projects page is: the ones in no group first,
   // then each group's name over its cards.
   await page.evaluate(async () => {
     setProjectPinned('beta', true);
@@ -139,7 +139,7 @@ await section("Attention is the bell's rows, and the pinned projects are at a gl
   await page.waitForSelector('.doc.on .homegrid', { timeout: 15000 });
 });
 
-// ---- the top bar's search (B72) ------------------------------------------------
+// ---- the top bar's search ------------------------------------------------
 await section("the top bar's search", async () => {
   ok(await page.$eval('#jump', i => i.placeholder) === 'jump to a page, space, container or node',
      'at 1280 the search\'s whole hint is shown, not cut mid-word');
@@ -186,8 +186,8 @@ await section("on a phone the cards stack and nothing scrolls sideways", async (
 // ---- no ring where it has no room -------------------------------------------
 // A press still waiting after a moment wears a ring (pressHold), and on the
 // rail that was a third line under the group pressed, pushing every group
-// below it; on a sub-nav it widened the page pressed (the operator, 13 Nov:
-// where the wheel would disrupt a small space, like the rail's icons, none
+// below it; on a sub-nav it widened the page pressed
+// (where the wheel would disrupt a small space, like the rail's icons, none
 // pops up). A button with room still wears it.
 await section("no ring where it has no room", async () => {
   // The delay is the subject: a read slow enough that a press would wear a ring.
@@ -226,7 +226,7 @@ await section("no ring where it has no room", async () => {
   await page.click('#ringProbe');
   const wore = await until(async () => (await rings()).includes('Read it again'), 1500, 50);
   // The ring is in place of the word, so the button is its own size wearing
-  // it (the operator, 22 Nov: a wheel only where it fits without making the
+  // it (a wheel only where it fits without making the
   // button bigger)...
   const worn = await size();
   // ...and so the same button wears it in a row it just fits: its row is as wide as it is.
@@ -245,7 +245,7 @@ await section("no ring where it has no room", async () => {
   await settled(page, { cap: 5000 });
 });
 
-// ---- a read that never answers (B1002) --------------------------------------
+// ---- a read that never answers --------------------------------------
 // One /api/status that never answered (git on a stalled share) held the poll
 // for good: refreshBusy stayed set, no poll was scheduled again, and every
 // press that awaited a refresh spun. Every read has a limit now; the suite
@@ -269,9 +269,9 @@ await section("a read that never answers is given up on, and the page goes on", 
   await settled(page, { cap: 5000 });
 });
 
-// ---- the controller restarts under the page (R246) -------------------------
+// ---- the controller restarts under the page -------------------------
 // With nothing unsaved the page starts again at once, as it always did. With
-// work on it that is not saved it waits (the operator, 13 Nov): a band under
+// work on it that is not saved it waits: a band under
 // the header says the controller was updated and what would be lost, with
 // Reload, and the page stays as it was left. It reloaded at once before, and
 // a staged edit or a half-typed message went with it.
@@ -291,7 +291,7 @@ await section("the controller restarts under the page", async () => {
   await ready(page);
   ok(await page.evaluate(() => window.__sameLoad !== true && document.getElementById('newBuild').hidden),
      '...and Reload starts the page again, the band gone');
-  // A form half filled in on any page or dialog holds it too (B1003): New
+  // A form half filled in on any page or dialog holds it too: New
   // space's name typed and not made, where only the notebooks, the space
   // settings dialog and the messages were counted. A field the page fills
   // itself, or one typed into and put back, is no work; and the browser asks
@@ -386,7 +386,7 @@ await section("the controller away for a restart", async () => {
 });
 
 // A group's bare address reads what its first page draws beside the status
-// read, as #/group/tool does (B1031: #/machines named Settings, which is the
+// read, as #/group/tool does (#/machines named Settings, which is the
 // Controller group's, and read nothing until the status had landed).
 await section("a group's bare address starts its first page's read with the status read", async () => {
   const p2 = await newPage(browser, { viewport: { width: 1280, height: 900 } });

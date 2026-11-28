@@ -28,7 +28,7 @@ const turned = (sel, on = true) => page.waitForFunction(([s, on]) => {
 }, [sel, on], { timeout: 10000 }).catch(() => {});
 
 // A card's link, lock, pin and the rest are on its back on the Projects
-// page (R138): Edit turns it over first, the way a thumb does.
+// page: Edit turns it over first, the way a thumb does.
 const pjMenu = async name => {
   // An archived card is in the Archived fold at the page's foot: opened
   // first, and the card brought on screen, as a person scrolls to it.
@@ -57,11 +57,11 @@ const pjMenu = async name => {
   if (turning) await sleep(Math.max(0, 500 - (Date.now() - pressed)));
 };await page.goto(URL);
 await ready(page);
-// The Nostromo glass (the operator, 24 Sep): a pane's bar, the dock's line
+// The Nostromo glass: a pane's bar, the dock's line
 // and the ground under a document wear one glass, over a pane left open so
 // it is the hull that shows through. The ground is the stack's and the
 // document box paints none, so the document fading in does not take the
-// glass with it (27 Sep).
+// glass with it.
 await section("The Nostromo glass", async () => {
   await page.evaluate(() => document.documentElement.dataset.theme = 'nostromo');
   const glass = await page.evaluate(() => {
@@ -125,7 +125,7 @@ await section("The header fits, at every width a phone comes in", async () => {
   const over = measured.filter(m => m.over > 0);
   const cut = measured.filter(m => m.clipped.length);
   // ...and the search keeps room to be typed into: six buttons a thumb wide
-  // once left it a sliver at 344px, with nothing overflowing (B744).
+  // once left it a sliver at 344px, with nothing overflowing.
   const narrow = measured.filter(m => m.jump < 80);
   // The room comes from the gear: on a phone its menu carries Report a bug
   // and Sign out, and the header does not.
@@ -135,7 +135,7 @@ await section("The header fits, at every width a phone comes in", async () => {
   const gearPhone = await page.evaluate(() => ({ menu: ['uiReport', 'uiOut'].every(id => document.getElementById(id).offsetWidth > 0),
     header: ['bReport', 'bOut'].some(id => document.getElementById(id).offsetWidth > 0) }));
   // ...on one row: Profile across it, the two beside it square icons, as the
-  // header draws them (the operator, 16 Oct).
+  // header draws them.
   const acct = await page.evaluate(() => ['uiProfile', 'uiReport', 'uiOut'].map(id => {
     const r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }));
   ok(acct.every(a => a[0] === acct[0][0]) && acct.slice(1).every(a => Math.abs(a[1] - a[2]) <= 1) && acct[0][1] > 2 * acct[1][1]
@@ -161,7 +161,7 @@ await section("The header fits, at every width a phone comes in", async () => {
        cut.length ? `: ${cut.map(m => `${m.clipped.join('/')} at ${m.w}`).join(', ')}` : ''}`);
 });
 
-// ---- the doctor: a dot in the top bar, its checks in a panel (R218 step 3) ----
+// ---- the doctor: a dot in the top bar, its checks in a panel ----
 // The column of cards went: the dot wears the worst check's color, and its
 // panel lists problems as lines in their level's color, each with the rest
 // of what the check said under it, and passing checks as chips.
@@ -171,7 +171,7 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   ok(/all 3 ok/.test(dd.said) && dd.w > 0 && dd.top,
      `the doctor is a dot in the top bar, its verdict all 3 ok (${JSON.stringify(dd)})`);
   ok(await page.$eval('#docPanel', p => p.hidden), '...its panel shut until pressed');
-  // A pass is the same green whatever the scheme (the operator, 16 Oct):
+  // A pass is the same green whatever the scheme:
   // on Ember, whose accent is orange, the dot is --pass, not the accent.
   const pass = await page.evaluate(() => {
     const h = document.documentElement, was = h.dataset.theme;
@@ -191,7 +191,7 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
     chips: document.querySelectorAll('#doctor .chips .pill').length }));
   ok(await page.$eval('#bDocDot', b => b.getAttribute('aria-expanded') === 'true') && /^all \d+ pass/.test(compact.sum) && compact.chips === 0,
      `...and a press opens it compact: its passing checks counted, not listed, the full ones being on Controller settings (${JSON.stringify(compact)})`);
-  // One header panel at a time (the operator, 16 Oct): the gear pressed
+  // One header panel at a time: the gear pressed
   // with the doctor open shuts the doctor, and the bell shuts the gear.
   await page.click('#bCards');
   const one = await page.evaluate(() => ({ doc: document.getElementById('docPanel').hidden, gear: !document.getElementById('uiMenu').hidden }));
@@ -204,8 +204,8 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   await page.waitForSelector('#docPanel:not([hidden])', { timeout: 5000 });
   ok(one.doc && one.gear && two.gear && two.bell,
      `...the gear pressed shuts it, and the bell shuts the gear: one header panel at a time (${JSON.stringify({ one, two })})`);
-  // A long check wraps inside the panel rather than ending in an ellipsis
-  // (B742): no tooltip says the rest.
+  // A long check wraps inside the panel rather than ending in an ellipsis:
+  // no tooltip says the rest.
   const long = await page.evaluate(() => {
     const keep = state.doctor.checks;
     state.doctor.checks = [...keep, { level: 'warn', text: 'a node cannot run a session: bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name and a fourth whose name is longer still' }];
@@ -360,7 +360,7 @@ await section("Every band of the tab starts at the same x", async () => {
     const x = sel => { const e = document.querySelector(sel);
       return e ? Math.round(e.getBoundingClientRect().x
                             + parseFloat(getComputedStyle(e).paddingLeft)) : null; };
-    // ...and at a desk the rules float in a card (R262): where the card
+    // ...and at a desk the rules float in a card: where the card
     // stands is what lines up with the bands around it.
     const card = document.querySelector('.fxtab .fx:has(> .rule)');
     const inCard = card && innerWidth > 900 && parseFloat(getComputedStyle(card).borderLeftWidth) > 0;
@@ -475,8 +475,8 @@ await section("Nothing readable in /reports and the way in says so", async () =>
      '...and a readable one turns it on again');
   // A fourth way to have nothing: a mount gone stale under the container.
   // The directory is fine on the host and every read of it here raises
-  // (NFS errno 116), and counts() runs on every /api/status, so the whole
-  // poll answered with the error and the page never left loading (B326).
+  // (NFS errno 116), and counts runs on every /api/status, so the whole
+  // poll answered with the error and the page never left loading.
   // No NFS in the harness to go stale, so the module is handed a reports
   // path that raises what a stale one does, on the look and on the listing.
   {
@@ -521,7 +521,7 @@ await section("Two projects whose names shorten to one slug are one dev instance
   mkdirSync(`${DIR}/ws/my-app`, { recursive: true });
   writeFileSync(`${DIR}/ws/My.App/README.md`, '#\n');
   writeFileSync(`${DIR}/ws/my-app/README.md`, '#\n');
-  registerProject('My.App', 'my-app');   // dropped in, recorded as an import would (R154)
+  registerProject('My.App', 'my-app');   // dropped in, recorded as an import would
   await refreshUntil(page, () => (state?.projects || []).some(p => p.name === 'my-app'),
                      { timeout: 20000 });
   const said = await page.evaluate(() => (state.projects || [])
@@ -539,7 +539,7 @@ await section("Two projects whose names shorten to one slug are one dev instance
                      { timeout: 20000 });
 });
 // ---- a project's card on the Projects page, at a phone and at a desk ------
-// A project is a card on the Projects page (R138): its front the agent, Add
+// A project is a card on the Projects page: its front the agent, Add
 // repository and Edit, no menu; Edit turns it over to the rest, at every
 // width.
 await section("a project's card on the Projects page, at a phone and at a desk", async () => {
@@ -553,7 +553,7 @@ await section("a project's card on the Projects page, at a phone and at a desk",
   ok(f.at(-1) === 'Edit' && f.includes('Add repository') && !await page.$(`${card} [data-pmore]`),
      `a phone's card shows its agent, Add repository and Edit, and no menu (${JSON.stringify(f)})`);
   // Its repositories sit close: a line is its name and branch, no control's
-  // height on the name's link (the operator, 27 Oct).
+  // height on the name's link.
   const lines = await page.$$eval(`${card} .pcfront .pcrepo`, rs => rs.map(r => Math.round(r.getBoundingClientRect().height)));
   ok(lines.length && lines.every(h => h <= 30), `...and its repositories' lines are set close (${lines.join(', ')}px)`);
   await page.click(`${card} .pcfront [data-pedit]`);
@@ -571,7 +571,7 @@ await section("a project's card on the Projects page, at a phone and at a desk",
   ok(/transform/.test(turn) && !/^\[/.test(turn), `...on a tween of its transform (${turn})`);
   // The face away is not painted at all once the turn ends: an engine with
   // no 3D compositing culls no back face, and drew the one away mirrored
-  // through the one on show (B1038).
+  // through the one on show.
   const faces = await page.waitForFunction(sel => {
     const c = document.querySelector(sel), v = e => getComputedStyle(e).visibility;
     return !!c && v(c.querySelector(':scope > .pcfront')) === 'hidden' && v(c.querySelector(':scope > .pcback')) === 'visible'
@@ -583,14 +583,14 @@ await section("a project's card on the Projects page, at a phone and at a desk",
   // The turn over: measured mid-turn, the icons of a face still swinging
   // round sit at five heights.
   await turned(card);
-  // The back's foot is one line of icons, each named (the operator, 25 Oct).
+  // The back's foot is one line of icons, each named.
   const foot = await page.$$eval(`${card} .pcback .pcacts > button`, bs => ({
     names: bs.map(b => b.getAttribute('aria-label')), tops: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size }));
   ok(foot.tops === 1 && ['Color', 'Group', 'Report bug', 'Back to the front'].every(n => foot.names.includes(n)) && !foot.names.includes('Settings'),
      `the back's controls are one line of named icons (${JSON.stringify(foot)})`);
   // A box opening on the back fades in by itself, with no copy of the face
   // fading out over it: the card's ground showed between the two, a flicker
-  // in Firefox (the operator, 27 Oct).
+  // in Firefox.
   const opened = await page.evaluate(sel => {
     document.querySelector(sel + ' .pcback [data-pcolor]').click();
     const pop = document.querySelector(sel + ' .pcback .pcpop');
@@ -602,7 +602,7 @@ await section("a project's card on the Projects page, at a phone and at a desk",
   ok(opened.ghosts === 0 && opened.fades === 1 && opened.face === 0,
      `...and a box opening there fades in alone, the face never copied over it (${JSON.stringify(opened)})`);
   // Back turns the same card, never a copy drawn over it as the turn ends:
-  // the grid replaced then flashed the card in Firefox (the operator, 29 Oct).
+  // the grid replaced then flashed the card in Firefox.
   const kept = await page.evaluate(async sel => {
     const c = document.querySelector(sel);
     c.querySelector('.pcback [data-pedit]').click();
@@ -679,9 +679,9 @@ await section("the card's notice", async () => {
   ok(await line() === '', 'a locked space says nothing: no session there is the decision, not a fault');
   await plant({ locked: false, session_at: '', session_why: '' });
   // Who is here is the card's state: this account's session as the dot
-  // and a word, in the session dot's own colors (the operator, 29 Sep).
+  // and a word, in the session dot's own colors.
   // Who is here, one row per person per agent where each session is
-  // (claude_where, B344).
+  // (claude_where).
   await page.evaluate(() => { state.claude_with = { alpha: ['test', 'alice'] };
                               state.claude_where = { alpha: [{ who: 'test', agent: 'claude', node: 'n1', working: false },
                                                              { who: 'alice', agent: 'claude', node: 'n1', working: true }] };
@@ -697,7 +697,7 @@ await section("the card's notice", async () => {
     tab.remove(); return same && !document.querySelector('.sdot');
   }), "the card's dot is drawn by the one rule the session dots share, and no dot of its own is left");
   // On Claude Code's permission prompt it is asking, amber, as the dock
-  // and Sessions say (B98), not waiting for you.
+  // and Sessions say, not waiting for you.
   {
     const asked = await page.evaluate(() => {
       state.claude_where.alpha[0] = { ...state.claude_where.alpha[0], working: false, asking: true };
@@ -709,7 +709,7 @@ await section("the card's notice", async () => {
     });
     ok(/asking you/.test(asked.word) && asked.asking,
        `a session on its permission prompt reads asking, with the amber dot (${asked.word})`);
-    // B104: another account's session on the prompt reads asking too, by
+    // Another account's session on the prompt reads asking too, by
     // that person's name and not "asking you", on the card's state and its
     // session rows.
     const theirs = await page.evaluate(() => {
@@ -725,7 +725,7 @@ await section("the card's notice", async () => {
     ok(/^alice asking/.test(theirs.word) && theirs.asking && theirs.row,
        `another account's session on its permission prompt reads asking, not waiting (${JSON.stringify(theirs)})`);
     // One person running two agents is two entries, each its own state and
-    // agent (B344), where they folded into one.
+    // agent, where they folded into one.
     const two = await page.evaluate(() => {
       state.claude_where = { alpha: [{ who: 'test', agent: 'claude', node: 'n1', working: false },
                                      { who: 'test', agent: 'codex', node: 'n1', working: true }] };
@@ -739,7 +739,7 @@ await section("the card's notice", async () => {
   await page.evaluate(() => liveRefresh());
   ok(/waiting for you|working/.test(await stateWord()),
      'liveRefresh reads who is here from /api/live and draws the cards again');
-  // Your own session starting is read off the status read at once (B828):
+  // Your own session starting is read off the status read at once:
   // the card's Manage agent reads its session list, which /api/live does not
   // carry. Someone else's coming or going, or nothing moving, reads nothing.
   const reads = await page.evaluate(async () => {
@@ -824,12 +824,12 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === 'nostro
 ok(await page.evaluate(() => { try { return localStorage.getItem('bb.theme'); }
                                catch (e) { return null; } }) === 'nostromo',
    '...and remembers it here rather than on the server: it is about the room, not the work');
-// ...for the account that picked it (B491): a browser whose choice was
+// ...for the account that picked it: a browser whose choice was
 // another account's takes this account's own scheme on the next poll,
 // rather than carrying the first account's colors over.
 // Asked of the poll until it has answered: a refresh joins one already out,
 // whose answer may predate the switch, and the page then read abyss still,
-// taking the two hallway checks below down with it (B622).
+// taking the two hallway checks below down with it.
 await page.evaluate(() => {
   localStorage.setItem('bb.theme', 'abyss'); localStorage.setItem('bb.theme.who', 'somebody-else');
   document.documentElement.dataset.theme = 'abyss';
@@ -839,7 +839,7 @@ const switched = await page.evaluate(() =>
   ({ theme: document.documentElement.dataset.theme || 'default', who: localStorage.getItem('bb.theme.who') }));
 ok(switched.theme === 'nostromo' && switched.who === 'test',
    `another account's choice in this browser gives way to this account's own scheme (${JSON.stringify(switched)})`);
-// Nostromo's dark half is the ship's hallways (the operator, 16 Oct): a
+// Nostromo's dark half is the ship's hallways: a
 // steel rail along the header's foot, drawn, and the deck grating and a
 // bulkhead on the page's own layer behind everything.
 const hall = await page.evaluate(() => ({ rail: /linear-gradient/.test(getComputedStyle(document.querySelector('header'), '::after').backgroundImage),
@@ -870,7 +870,7 @@ ok(await fieldBg() !== nosField,
    '...and a text field is painted from the scheme, not from a hardcoded hex');
 ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefined,
    'Default carries no attribute at all, so :root is simply left to stand');
-// The scheme's other half (R216): Dark, Light or System beside the swatches,
+// The scheme's other half: Dark, Light or System beside the swatches,
 // applied on the press like a scheme, kept in the browser and on the
 // account, and the swatches show the half that is on.
 await section("The scheme's other half", async () => {
@@ -891,7 +891,7 @@ await section("The scheme's other half", async () => {
   ok(await page.evaluate(() => { try { return localStorage.getItem('bb.mode'); } catch (e) { return 'no storage'; } }) === 'light',
      '...and the browser keeps it, as it keeps the scheme');
   // Reduce motion sits beside Dark, Light and System, the account's own and
-  // kept as the scheme is (the operator, 19 Oct): on <html> at once, in this browser, and on
+  // kept as the scheme is: on <html> at once, in this browser, and on
   // the account; every animation then ends where it would have, at once.
   await page.check('#uiMenu #uiMotion');
   await page.waitForFunction(() => document.documentElement.dataset.motion === 'reduce', null, { timeout: 5000 });
@@ -909,10 +909,10 @@ await section("The scheme's other half", async () => {
   const swLight = await page.$eval('#uiMenu .sw[data-theme="moss"]', b => getComputedStyle(b).backgroundColor);
   // A switch's pick (the gear's Dark and Light) is the lit control on show:
   // the page's sub-nav is tabs with no fill since 17 Oct.
-  // Waited for, not slept on (B753): the Light crossfade and the button's
+  // Waited for, not slept on: the Light crossfade and the button's
   // own color transition were still running 300ms in under a whole run.
   // A lit control in the light half is a soft tint of the second color with
-  // the ink on it (the operator, 16 Oct: the darkened fill was too dark).
+  // the ink on it (the darkened fill was too dark).
   const white = await page.waitForFunction(() => { const e = document.querySelector('#uiMenu .modeseg button.on');
     if (!e) return false;
     const c = getComputedStyle(e), x = document.createElement('canvas').getContext('2d');
@@ -922,8 +922,8 @@ await section("The scheme's other half", async () => {
   ok(white, `a lit control in the light half is a light tint with the ink on it (${
     await page.$eval('#uiMenu .modeseg button.on', e => getComputedStyle(e).color).catch(() => 'no button')})`);
   // Nostromo's light half is the ship's white corridors: rounded like the
-  // rest, its own wall panels rather than the deck, no steel rail (the
-  // operator, 16 Oct); the dark half keeps its hallway.
+  // rest, its own wall panels rather than the deck, no steel rail;
+  // the dark half keeps its hallway.
   await page.click('#uiMenu .sw[data-theme="nostromo"]');
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'nostromo' && document.documentElement.dataset.mode === 'light', null, { timeout: 5000 });
   const ship = () => page.evaluate(() => ({ r: getComputedStyle(document.documentElement).getPropertyValue('--r-control').trim(),
@@ -997,7 +997,7 @@ ok(about.includes('abc1234def5678901234567890abcdef12345678')
    '...and About carries the whole commit, the build time and where to look');
 await page.click('#aboutClose');
 await page.waitForSelector('#aboutModal', { state: 'hidden' });
-// Escape and the backdrop let a person out too (B229): after an update the
+// Escape and the backdrop let a person out too: after an update the
 // popup opens itself over whatever they came to do.
 await page.click('#bAbout');
 await page.waitForSelector('#aboutModal:not([hidden])');
@@ -1009,7 +1009,7 @@ await page.waitForSelector('#aboutModal:not([hidden])');
 await page.click('#aboutModal', { position: { x: 4, y: 4 } });
 await page.waitForSelector('#aboutModal', { state: 'hidden' });
 ok(true, '...and so does a click on the page under it');
-// One place for a dialog and the keyboard (R88): focus goes in as it opens,
+// One place for a dialog and the keyboard: focus goes in as it opens,
 // Tab and Shift+Tab go round inside it, Escape closes the one on top, and
 // the focus comes back to what opened it.
 await section("One place for a dialog and the keyboard", async () => {
@@ -1065,8 +1065,8 @@ await section("the welcome panel", async () => {
     body: JSON.stringify({ action: 'prefs', prefs: p }) })).json();
   await prefs({ welcome_seen: false });
   await page.reload(); await ready(page);
-  // An administrator has Home's Getting started for this (R267, the
-  // operator 18 Oct): the guide over it would be two at once, so it does
+  // An administrator has Home's Getting started for this:
+  // the guide over it would be two at once, so it does
   // not open by itself for one; it is About's, on its guide.
   await quiet(2500);
   ok(await page.$eval('#aboutModal', e => e.hidden),
@@ -1088,7 +1088,7 @@ await section("the welcome panel", async () => {
   });
   ok(guide.heads.join('|') === guide.docHeads.join('|') && !guide.plainAdmin && guide.plainLast,
      `About's guide is docs/start-here.md, section for section, and a plain account's leaves out As an administrator only (${guide.heads.join(', ')})`);
-  // B110: a link to a doc reads as its title, not its file name; a heading
+  // A link to a doc reads as its title, not its file name; a heading
   // starts where the text under it starts; and the guide has the box, with
   // the build lines on the changelog's page rather than under it.
   const look = await page.evaluate(() => {
@@ -1183,7 +1183,7 @@ print(json.dumps({"kept": [s["title"] for s in kept], "held": held, "series": se
        JSON.stringify(grouped.cats)}, ${grouped.lists.length} lists)`);
 
   // A release the size of the first bump (everything ever logged, dated in
-  // one move) is capped with a press to see the rest (B95). Not the section
+  // one move) is capped with a press to see the rest. Not the section
   // holding the "new since you last looked" line, which is the one thing
   // somebody opening this panel came for.
   await page.evaluate(() => abDrawLog({ present: true, seen: '', held: 0, series: '0.7',
@@ -1280,8 +1280,8 @@ tmuxKill('claude-alpha');
 await page.evaluate(() => refresh());
 
 // ---- every node's runner, on the CI runner page ----------------------------
-// A view of the NODES' runners: one row each above the chosen node's section
-// (the sidebar's Runner card's, until R218 step 3). Drawn directly, because
+// A view of the NODES' runners: one row each above the chosen node's section.
+// Drawn directly, because
 // each state needs a node to be in a particular one.
 const runnerCard = rows => page.evaluate(x => {
   const keep = state.node_runners; state.node_runners = x;
@@ -1294,7 +1294,7 @@ const runnerCard = rows => page.evaluate(x => {
 let rc = await runnerCard([]);
 ok(rc.body === '', 'with no runner anywhere there is no list: the node\'s own section says how to add one');
 // At a phone's width a row wraps, its state on a line of its own, rather
-// than running off the edge (B745).
+// than running off the edge.
 const narrowRows = await page.evaluate(() => {
   const keep = state.node_runners;
   state.node_runners = [{ id: 'n_x', node: 'bb-dev-sandbox-rh', url: 'http://192.168.1.16:3000/lab/hello', live: true,
@@ -1331,7 +1331,7 @@ ok(/installing/.test(rc.body) && !/not reported yet/.test(rc.body),
    '...and one being installed right now says that instead');
 await page.evaluate(() => refresh());
 
-// Lock and Archive, two presses since the operator split them (R119, 23 Oct).
+// Lock and Archive, two presses since the operator split them.
 // The lock: its owner's leaves the card in the grid with its mark and its
 // owner working; an administrator's shuts the owner out as well.
 await page.evaluate(() => { refresh(); openProjectsTab(); });
@@ -1471,7 +1471,7 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
      && !!r.querySelector('[data-kmark]') && !!r.querySelector('[data-lock]') && !!r.querySelector('[data-pmark]')),
    '...with the same controls on a card: its page, shell, Archive, Lock and the pin');
 
-// Groups (the operator, 18 Oct): a label of this account's that keeps
+// Groups: a label of this account's that keeps
 // projects together on the page, set from a card's menu in a box under its
 // name, the groups made already offered; an empty answer takes it out.
 await section("Groups (the operator, 18 Oct)", async () => {
@@ -1487,8 +1487,8 @@ await section("Groups (the operator, 18 Oct)", async () => {
   const g = await page.$eval('.doc .projtab .pjgroup[data-group="Clients"]', s => ({
     head: s.querySelector('.pjgname').textContent.replace(/\s+/g, ' ').trim(),
     cards: [...s.querySelectorAll('.pcard')].map(c => c.dataset.row) }));
-  // The groups as chips over the grid, as the Containers page's are (the
-  // operator, 19 Oct): All, No group and Clients, each counted; a chip
+  // The groups as chips over the grid, as the Containers page's are:
+  // All, No group and Clients, each counted; a chip
   // narrows the grid to its group, and All brings the rest back.
   const chips = await page.$$eval('.doc .projtab #pjChips [data-pjchip]', cs => cs.map(c =>
     `${c.firstChild.textContent.trim()} ${c.querySelector('.pill')?.textContent.trim()}`));
@@ -1501,7 +1501,7 @@ await section("Groups (the operator, 18 Oct)", async () => {
      `the groups are chips over the grid, each counted, and one narrows it to its group (${chips.join(' | ')})`);
   await pjMenu('gamma');
   // The card keeps its size as the box opens on it, the box in the
-  // repositories' place (the operator, 26 Oct).
+  // repositories' place.
   const cardH = () => page.$eval('.doc .projtab .pcard[data-row="gamma"]', c => Math.round(c.getBoundingClientRect().height));
   const shut = await cardH();
   await page.click('.doc .projtab .pcard[data-row="gamma"] [data-pgroup]');
@@ -1513,11 +1513,11 @@ await section("Groups (the operator, 18 Oct)", async () => {
   const listGone = await page.$eval('.doc .projtab .pcard[data-row="gamma"] .pcback .pcrepos', l => !l.checkVisibility());
   ok(Math.abs(opened - shut) <= 1 && listGone,
      `a card is the same size with its Group box open, the box in its repositories' place (${shut} then ${opened}, list hidden ${listGone})`);
-  // The field is also a pulldown of every group made (the operator, 26 Oct):
+  // The field is also a pulldown of every group made:
   // its chevron opens them all, Escape shuts the list before the box.
   await page.click('.doc .projtab .askline .combobtn');
   const offered = await page.$$eval('.doc .projtab .askline .combolist [data-combo]', bs => bs.map(b => b.textContent));
-  // B404: a press held on an option to scroll the list takes nothing; the
+  // A press held on an option to scroll the list takes nothing; the
   // click, a press and release on it, does.
   {
     const opt = await page.$('.doc .projtab .askline .combolist [data-combo]');
@@ -1565,10 +1565,10 @@ await section("Groups (the operator, 18 Oct)", async () => {
   await page.click('.doc .projtab .pcard[data-row="gamma"] [data-pgroup]');
   await page.waitForSelector('.doc .projtab .askline input', { timeout: 5000 });
   await page.click('.doc .projtab .askline [data-askno]');
-  // A box opening or closing on a card fades in what it brings (the
-  // operator, 26 Oct: they cut in): the box as it opens, the repositories
+  // A box opening or closing on a card fades in what it brings
+  // (they cut in): the box as it opens, the repositories
   // as it shuts, never the whole face, whose fade let the card's ground
-  // flash through in Firefox (the operator, 27 Oct). A move is a slide.
+  // flash through in Firefox. A move is a slide.
   await page.evaluate(() => { window.__fades = []; const was = fadeThrough, wasIn = fadeIn;
     const said = es => [...(es instanceof Element ? [es] : es || [])].map(e => (e.closest('.pcard')?.dataset.row || '?') + ':' + [...e.classList].join('.')).join(',');
     fadeThrough = (pick, swap) => { window.__fades.push('through ' + said(typeof pick === 'function' ? pick() : document.querySelectorAll(pick))); return was(pick, swap); };
@@ -1596,7 +1596,7 @@ await section("Groups (the operator, 18 Oct)", async () => {
   await page.evaluate(() => setProjectPinned(reposOf('gamma') || 'gamma', false));
   await pjMenu('gamma');
   // The pencil beside the group's name renames it in a box under the
-  // heading, for every project in it (R273).
+  // heading, for every project in it.
   await page.click('.doc .projtab .pjgroup[data-group="Clients"] [data-pjgrename]');
   await page.waitForSelector('.doc .projtab .pjgroup .askline input', { timeout: 5000 });
   await page.fill('.doc .projtab .pjgroup .askline input', 'Customers');
@@ -1605,7 +1605,7 @@ await section("Groups (the operator, 18 Oct)", async () => {
   ok(!(await page.$('.doc .projtab .pjgroup[data-group="Clients"]')),
      'the pencil beside a group\'s name renames the group, its spaces with it');
   // Delete group, last on the pencil's box, takes the group away and its
-  // projects back to no group (the operator, 19 Oct).
+  // projects back to no group.
   await page.click('.doc .projtab .pjgroup[data-group="Customers"] [data-pjgrename]');
   await page.waitForSelector('.doc .projtab .pjgroup .askline [data-askalso]', { timeout: 5000 });
   const last = await page.$eval('.doc .projtab .pjgroup .askline .askrow', r => r.lastElementChild.matches('[data-askalso].danger'));
@@ -1713,7 +1713,7 @@ await section("Full and Compact on the Spaces page", async () => {
   const grew = (k, up) => moved.moves.some(m => { const [key, h] = m.split(':'); const [a, b] = h.split('>').map(parseFloat);
     return key === k && (up ? b > a : b < a); });
   // The switch tweens every card from its size to its new one as its
-  // drawing fades through (the operator, 24 Nov: the boxes popped to their
+  // drawing fades through (the boxes popped to their
   // size half way through the fade): Compact shrinks each card, Full grows
   // each back.
   const all = await page.$$eval('.doc.on .projtab #pjGrid .pcard[data-pkey]', cs => cs.map(c => c.dataset.pkey));
@@ -1757,13 +1757,13 @@ await section("polls do not stack", async () => {
   // route was set is joined by the five asks, rightly, and the one it then
   // asks for is the remembered one: held, released, and nothing after it
   // but the fifteen-second poll, so the wait below for one more ran out at
-  // 15s on a loaded box (B430, B219). Waited out here, so the read the five
+  // 15s on a loaded box. Waited out here, so the read the five
   // join is always one the route holds: the poll's own, if it went first.
   for (const t1 = Date.now(); held === before && await page.evaluate(() => refreshBusy) && Date.now() - t1 < 20000;)
     await new Promise(r => setTimeout(r, 50));
   // Five asks while the first is still out. They must coalesce into one more.
   // The first is waited for rather than given a fixed 400ms: it goes only
-  // when the route lets it, which on a loaded box is later than that (B430).
+  // when the route lets it, which on a loaded box is later than that.
   await page.evaluate(() => { refresh(); refresh(); refresh(); refresh(); refresh(); });
   for (const t1 = Date.now(); held < before + 1 && Date.now() - t1 < 20000;)
     await new Promise(r => setTimeout(r, 50));
@@ -1782,7 +1782,7 @@ await section("polls do not stack", async () => {
         held - before} in ${Date.now() - t0}ms)`);
   await page.unroute('**/api/status*');
 });
-// ...and the revisions poll the same (R88): the timer, a tab coming back and
+// ...and the revisions poll the same: the timer, a tab coming back and
 // a menu let go each start one, and stacked an older reply landing second
 // set the page's revisions back and fired every watch again.
 await section("and the revisions poll the same", async () => {
@@ -1888,7 +1888,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
 // Renaming is a dialog now, not a prompt. One dialog, two doors: the gear is
 // the project's own settings and the chain is GitHub's half of them, so where
 // a credential is changed does not depend on whether a remote exists yet.
-await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
 await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnName', el => el.value) === 'alpha',
    'the rename dialog opens on the current name');
@@ -1896,7 +1896,7 @@ ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e
    'the settings say the folder the space lives in, and its id, under the name');
 await section("Sections, every one open by default at every width, with a jump bar", async () => {
   // Sections, every one open by default at every width, with a jump bar
-  // over them (the operator, 8 Oct: too much was hidden in folds). One shut
+  // over them (too much was hidden in folds). One shut
   // stays shut for the page's life. Read with $eval, which the harness's
   // own fold-opening leaves be.
   const folds = (p = page) => p.$$eval('details.rngroup', ds => ds.map(d => ({
@@ -1926,7 +1926,7 @@ await section("Sections, every one open by default at every width, with a jump b
   await phone.waitForSelector('#rnmodal:not([hidden])');
   ok(!shut(await folds(phone)), `on a phone every section is open too (${shut(await folds(phone)) || 'none shut'})`);
   // A chip on the bar opens its section as its heading does, the rest
-  // sliding shut on a phone (the operator, 26 Nov: a jump left the last one
+  // sliding shut on a phone (a jump left the last one
   // open).
   const openNow = async () => (await folds(phone)).filter(f => f.shown && f.open).map(f => f.k).join();
   await phone.$$eval('#rnmodal .sectjump a', as => as.find(a => a.textContent === 'Agents may')?.click());
@@ -1943,7 +1943,7 @@ await section("Sections, every one open by default at every width, with a jump b
   ok(door.general === 'none' && door.head === `Space P${door.want.replace(/^P?/, '')}.`,
      `a space's own settings have no General, the space's id a line under its title (${JSON.stringify(door)})`);
   // ...and its bar names the sections that show once their reads land
-  // (People, Nodes): drawn once at the opening, it had none for them (B1188).
+  // (People, Nodes): drawn once at the opening, it had none for them.
   const chips = await phone.waitForFunction(() => {
     const said = [...document.querySelectorAll('#rnmodal .sectjump a')].map(a => a.textContent);
     return said.includes('People') && said.includes('Nodes') ? said : false;
@@ -1957,11 +1957,11 @@ ok(await page.$eval('#rnTokenField', el => !el.hidden && el.closest('details')?.
    '...and its credential is in its Repository section, where the chain opens too (the operator, 23 Nov)');
 // Its people (membership.py): the owner, who may hand it on and make it
 // invite only, staged until Save, and an Invite that acts on the press;
-// the space's, so on its own dialog (R223).
+// the space's, so on its own dialog.
 await page.evaluate(() => renameProject('alpha', 'project'));
 await page.waitForSelector('#rnPeopleField:not([hidden]) #rnOwner', { timeout: 10000 });
 // What Invite only allows is the ? help on Space owner, the field it sits
-// under, and who may add people the one on People (R244), not prose drawn
+// under, and who may add people the one on People, not prose drawn
 // on every visit; the section is its form of two settings and a facts line.
 ok(await page.$eval('#rnOwner', s => s.value) === 'test'
    && await page.$('#rnInviteOnly:not([disabled])') !== null
@@ -1973,7 +1973,7 @@ await page.click('#rnInviteOnly');
 ok(await page.$eval('#rnInviteOnly', c => c.checked)
    && (await api('/api/members', { action: 'view', project: 'alpha' })).body.invite_only === false,
    '...ticking Invite only stages it and changes nothing until Save');
-// People is a section of its own (R255 step 7): its change wakes its own
+// People is a section of its own: its change wakes its own
 // Save, not The project's.
 await page.waitForFunction(() => !document.querySelector('.rnbar[data-rnbar="people"] [data-rnsave]')?.disabled, null, { timeout: 5000 });
 ok(await page.$eval('#rnPeopleField', f => f.closest('details')?.dataset.sect === 'rn:people')
@@ -1988,8 +1988,8 @@ ok(!gp.push && gp.guards === false && /Claude, which always may/.test(gp.label |
    `Agents may: no push line, the guards folded, and Claude's place said beside the list (${JSON.stringify(gp)})`);
 await page.click('#rnCancel');
 
-// Its Android signing keys (R106) are a view of the notebook's own, Signing,
-// in Ship after VMs (R103, the operator 22 Oct), and no longer a section of
+// Its Android signing keys are a view of the notebook's own, Signing,
+// in Ship after VMs, and no longer a section of
 // the settings: a section per key with a row per route, a picked keystore
 // staged until its section's Save, its password asked for before anything
 // is sent, and a key the server will not keep refused with nothing kept.
@@ -2041,7 +2041,7 @@ await section("Its Android signing keys", async () => {
      && await page.$eval(`${V} [data-ssave="signing:key:default"]`, b => !b.disabled),
      `...and one the server will not keep is refused, its draft kept and nothing kept (${signErr.slice(0, 90)})`);
   await page.click(`${V} [data-srevert="signing:key:default"]`);
-  // Import a backup (R103, the operator 22 Oct): the band under the head,
+  // Import a backup: the band under the head,
   // a zip that is not Download backup's two files refused by name.
   await page.click(`${V} #sgImp`);
   execFileSync('python3', ['-I', '-c', 'import sys, zipfile\nwith zipfile.ZipFile(sys.argv[1], "w") as z:\n  z.writestr("alpha-default-sideload.p12", "x")\n  z.writestr("password.txt", "keystore and key password: p\\n")\n  z.writestr("extra.sh", "x")',
@@ -2054,7 +2054,7 @@ await section("Its Android signing keys", async () => {
      'Import a backup unrolls under the head, and a zip holding more than the keystore and password.txt is refused by name, the form left open');
   await page.click(`${V} #sgAddCancel`);
   await api('/api/signing', { action: 'backup-password', project: 'alpha', current: 'a-backup-password', new: '' });
-  // A rotated key (R106 step 7): the retired one says why it is kept and
+  // A rotated key: the retired one says why it is kept and
   // offers no Remove; the one it went to says who still sees the old.
   const sd = `${DIR}/state/signing/alpha`;
   for (const [k, rec] of [['default', { retired_for: 'watch' }], ['watch', { rotated_from: 'default' }]]){
@@ -2072,7 +2072,7 @@ await section("Its Android signing keys", async () => {
      && now && /Rotated from default: Android 9 and newer see this key, older devices still see default/.test(now.text) && !now.rotate
      && /^2 keys\b/.test(await page.$eval(`${V} #sgHint`, e => e.textContent.replace(/\s+/g, ' ').trim())),
      'a retired sideload key says why it is kept and offers no Remove, the key it went to says who still sees the old one, and a tile counts them');
-  // Releases (R106): a workflow that hands over its unsigned APK has it
+  // Releases: a workflow that hands over its unsigned APK has it
   // signed here, and the view names the key each app's releases sign with,
   // a retired key's successor; the bell says what would stop it before the
   // release, and its row opens this view.
@@ -2093,7 +2093,7 @@ await section("Its Android signing keys", async () => {
   ok(await page.$(`${V} #sgRelGo`) !== null && /signed on the space's node.*never in CI/s.test(await page.$eval(`${V} #sgRel`, e => e.textContent)),
      '...says the APK is signed on the space\'s node and not in CI, and offers a look now');
   // What keeps the project's node from a key's work is said in its words,
-  // naming the node and what it lacks, never the controller's keytool (B232).
+  // naming the node and what it lacks, never the controller's keytool.
   const signList = (await api('/api/signing', { project: 'alpha', action: 'list' })).body;
   const nodeLine = await page.$eval(`${V} .sgnode`, e => e.textContent.trim()).catch(() => '');
   ok(!/keytool/i.test(await page.$eval(V, e => e.textContent)) && typeof signList.node_why === 'string'
@@ -2122,7 +2122,7 @@ await section("Its Android signing keys", async () => {
 
 // An invitation waiting on this account sits in the bell with its answer,
 // above the page's own notes, like every other thing waiting on you.
-// The poll held for it (B750): one landing between the write and the read
+// The poll held for it: one landing between the write and the read
 // put the server's empty list back.
 await holdPoll(page);
 await page.evaluate(() => { state.invites = [{ id: 7, project: 'beta', by: 'ada', at: Math.floor(Date.now() / 1000) }];
@@ -2140,7 +2140,7 @@ await page.evaluate(() => { state.invites = []; drawBell(); toggleBell(false); }
 await pjMenu('alpha');
 await page.click('.doc .projtab [data-l="alpha"]');
 // Its notebook's Settings at Repository, where the credentials are drawn
-// (the operator, 23 Nov: the section was one line and a button to a dialog).
+// (the section was one line and a button to a dialog).
 await page.waitForFunction(() => /\/settings/.test(location.hash)
   && document.querySelector('.nbsettings #rnAuthField:not([hidden])'), null, { timeout: 15000 }).catch(() => {});
 const chainAt = await page.evaluate(() => ({ at: location.hash, dialog: !document.getElementById('rnmodal').hidden,
@@ -2206,7 +2206,7 @@ ok(addrAfter.body.url === addrWas, '...and the remote still points where it did'
 await page.fill('#rnAddr', addrWas);
 await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
 
-// Test (the operator, 7 Oct): a press asks the server for a read and a
+// Test: a press asks the server for a read and a
 // dry-run push and draws what is missing in red under the button, a list
 // when it is more than one thing; the server's half is unit/test_auth_test.py,
 // so its answer is set here and the draw is what is read.
@@ -2296,7 +2296,7 @@ await page.click('#rnAuthNone');
 v = await seen();
 ok(v.onNone && !v.bad,
    '...and picking it settles the dialog, because nothing is missing any more');
-// Somebody who is not its owner (the operator, 23 Nov): the switch and the
+// Somebody who is not its owner: the switch and the
 // deploy key's verbs are dead or not drawn, the switch's line naming whose
 // it is, and the tokens' rows say each person pushes with their own.
 await authState({ now: 'none', token: true, ssh: true, deploy: null, owner: { me: false, name: 'ada' },
@@ -2315,7 +2315,7 @@ ok(other.sw.every(Boolean) && /ada, its owner, sets this/.test(other.hint) && ot
    && /ada, its owner, has Authentication set to Off/.test(other.off),
    `for anybody but its owner the switch is dead and says whose it is, no deploy key is offered, and each person's row says their own pushes use it (${JSON.stringify(other).slice(0, 300)})`);
 
-// File access over FTP (R151): the owner's section, staged until Save. alpha
+// File access over FTP: the owner's section, staged until Save. alpha
 // has no node here, so turning it on is refused in the dialog by name; an
 // account's access saves on its own, and reads back on the next open.
 await page.click('#rnCancel');
@@ -2324,8 +2324,8 @@ await section("The editor's and the apps' door is on unless a project closed it"
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.waitForSelector('#rnFtpField:not([hidden])', { timeout: 10000 });
   await page.evaluate(() => { const d = document.querySelector('details[data-sect="rn:files"]'); d.open = true; });
-  // The editor's and the apps' door is on unless a project closed it
-  // (R104, the operator, 22 Oct): switched off here, the section is shut.
+  // The editor's and the apps' door is on unless a project closed it:
+  // switched off here, the section is shut.
   const editorOn = await page.$eval('#rnFtpEditor', c => c.checked);
   ok(editorOn, '...a space is open to its people\'s editors and apps until its owner closes it (R104)');
   await page.click('#rnFtpEditor');
@@ -2345,11 +2345,11 @@ await section("The editor's and the apps' door is on unless a project closed it"
   const draft = await page.evaluate(() => rnFtpChange());
   ok(draft?.on === true && draft.port === 2121 && draft.access?.[uid] === 'rw',
      `...and what Save sends is the switch, the port and the access picked (${JSON.stringify(draft)})`);
-  // ...and how long it stays on (R196): a day picked is sent as its seconds.
+  // ...and how long it stays on: a day picked is sent as its seconds.
   await page.selectOption('#rnFtpFor', '86400');
   const timed = await page.evaluate(() => rnFtpChange());
   ok(timed?.for === 86400 && timed.on === true, `...and Keep it on for a day sends how long (${JSON.stringify(timed)})`);
-  // The editor's door (R159): its own switch over the same people, with no
+  // The editor's door: its own switch over the same people, with no
   // port, and FTPS left off.
   await page.click('#rnFtpOn');
   await page.click('#rnFtpEditor');
@@ -2370,7 +2370,7 @@ await section("The editor's and the apps' door is on unless a project closed it"
 // when a session starts rather than typed into a running one, so the dialog's
 // job is to say which of those two you are doing.
 await page.evaluate(() => { if (!document.getElementById('rnmodal').hidden) closeRename(); });
-await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
 await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnTitle', e => e.textContent.trim()) === 'alpha',
    'the dialog is the space\'s settings, not a rename form wearing its name');
@@ -2388,12 +2388,12 @@ await section("which asks, names the bin, and moves nothing when declined", asyn
   await page.click('#rnDelete');
   await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 15000 });
   // The settings close before the question is put: read once it has been
-  // asked and answered, not in the moment between (B817, 'asked: nothing').
+  // asked and answered, not in the moment between ('asked: nothing').
   await until(() => asked, 15000, 100);
   await page.waitForFunction(() => !document.querySelector('.askdlg'), null, { timeout: 5000 });
   ok(/moves to \/workspace\/\.trash\/alpha/.test(asked) && existsSync(`${DIR}/ws/alpha/.git`),
      `...which asks, names the bin, and moves nothing when declined (asked: ${asked.replace(/\s+/g, ' ').slice(0, 90) || 'nothing'})`);
-  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
   await page.waitForSelector('#rnmodal:not([hidden])');
 });
 await page.selectOption('#rnAsks', 'fewer');
@@ -2405,7 +2405,7 @@ ok(!await page.$eval('#rnAsks', e => e.disabled) && !(await page.$('#rnModel')) 
 // it back without saving.
 await page.selectOption('#rnAsks', '');
 await page.fill('#rnName', 'alpha draft name');
-// The bars wake on a 0 ms timer after the input (B691): read them after it.
+// The bars wake on a 0 ms timer after the input: read them after it.
 await page.waitForFunction(() => !document.querySelector('.rnbar[data-rnbar="project"] [data-rnsave]')?.disabled, null, { timeout: 5000 });
 ok(await page.$eval('.rnbar[data-rnbar="project"] [data-rnsave]', b => !b.disabled)
    && await page.$eval('.rnbar[data-rnbar="runs"] [data-rnsave]', b => b.disabled),
@@ -2415,7 +2415,7 @@ await page.waitForFunction(() => document.getElementById('rnName').value === pro
 ok(!await page.$('#rnColor'), '...and the dialog has no color: a space\'s color is each person\'s own');
 await page.click('#rnCancel');
 await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 10000 });
-// A color is this account's own (the operator, 18 Oct): picked from a card's
+// A color is this account's own: picked from a card's
 // menu, Color, nine swatches and none unrolling under its name, worn by the
 // card and the project's page at once, and stored for this account rather
 // than on the project. No dot beside the name: it read as a checkbox.
@@ -2442,7 +2442,7 @@ ok(kept.mine === 'teal' && kept.project === '' && !await page.$('.doc .projtab [
    `a pick wears it on the card at once and rolls the swatches up, kept as this account's and not the space's (${JSON.stringify(kept)})`);
 // Settings is the gear at the back's top right, where the front's Edit
 // stands, and Back, which turns the card over saving nothing, is the last of
-// the foot's icons and no primary (the operator, 18 Nov: the two traded).
+// the foot's icons and no primary (the two traded).
 const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback', b => ({
   top: b.querySelector('.pcname .actbar [data-rn]')?.getAttribute('aria-label') || '',
   foot: [...b.querySelectorAll('.pcfoot > button')].map(x => x.dataset.pedit !== undefined ? 'Back' : x.getAttribute('aria-label')),
@@ -2450,7 +2450,7 @@ const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback', b => (
 ok(back.top === 'Settings' && back.foot.at(-1) === 'Back' && !back.foot.includes('Settings') && !back.primary,
    `a card's back has Settings at its top right and Back last in its foot (${JSON.stringify(back)})`);
 // A long name wraps on the back with its Settings held at the card's top
-// right (the operator, 26 Oct: it pushed the button onto a line of its own).
+// right (it pushed the button onto a line of its own).
 for (const w of [1280, 393]){
   await page.setViewportSize({ width: w, height: 900 });
   const line = await page.evaluate(() => {
@@ -2473,7 +2473,7 @@ for (const w of [1280, 393]){
      `a long name wraps beside Settings, which stays at the card's top right, and beside the marks on the front, at ${w} (${JSON.stringify(line)})`);
 }
 await page.setViewportSize({ width: 1280, height: 800 });
-// One card on its back at a time (the operator, 26 Oct): Edit on another
+// One card on its back at a time: Edit on another
 // turns this one back, a box open on it canceled.
 await section("One card on its back at a time", async () => {
   const A = '.doc .projtab .pcard[data-row="alpha"]', G = '.doc .projtab .pcard[data-row="gamma"]';
@@ -2498,7 +2498,7 @@ await section("One card on its back at a time", async () => {
   await turned(A);
 });
 // A card that moves slides there, the rest closing up, and the page follows
-// the one pressed on (the operator, 26 Oct). A star moves nothing, the page
+// the one pressed on. A star moves nothing, the page
 // being by name; a space whose name comes to sort first (a rename's answer)
 // moves up, slid there and in sight.
 await section("A card that moves slides there, the rest closing up, and the page follows", async () => {
@@ -2520,14 +2520,14 @@ await section("A card that moves slides there, the rest closing up, and the page
   await page.click(`${sel} .pcfront [data-pmark]`);
   await page.waitForFunction(s => !document.querySelector(s)?.querySelector('.pcfront [data-pmark].on'), sel, { timeout: 10000 }).catch(() => {});
   // Each slide a card starts is counted as it starts: sampled, one that had
-  // not begun or had ended read as none (B1032).
+  // not begun or had ended read as none.
   await page.evaluate(() => { window.__slid = 0;
     if (!window.__slideCounted){ const was = Element.prototype.animate;
       Element.prototype.animate = function(k, o){ try { if (this.classList?.contains('pcard') && /translate/.test(JSON.stringify(k))) window.__slid++; } catch {} return was.call(this, k, o); };
       window.__slideCounted = true; } });
   // Its name made to sort first, as the answer to a rename pressed on it,
   // the status poll held meanwhile: a read landing under a gate's load put
-  // the server's name back and the card where it was (B1032, seen false).
+  // the server's name back and the card where it was (seen false).
   await holdPoll(page);
   await page.evaluate(k => { pjFollow = { key: k, until: Date.now() + 8000 }; const r = state.repos[k]; r.__was = r.name; r.name = '0 first'; drawProjects(state.projects); }, last);
   const r = await page.waitForFunction(s => {
@@ -2571,9 +2571,9 @@ ok(true, '...and none takes it off again');
 // Back to the projects tab, which the notebook pushed out of the pane.
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.doc .projtab .pcard', { timeout: 15000 });
-// A card's Settings is the project's own dialog (R208, the operator, 3 Nov),
+// A card's Settings is the project's own dialog,
 // over the Projects page, whether or not its notebook was open a moment ago
-// (B82 was the Settings view turning the notebook behind the page): the form
+// (the Settings view once turned the notebook behind the page): the form
 // comes back from the notebook's view to the dialog for it.
 await pjMenu('alpha');
 await page.click('.doc .projtab .pcard[data-row="alpha"] [data-rn]');
@@ -2585,7 +2585,7 @@ await page.click('#rnCancel');
 await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.doc .projtab .pcard', { timeout: 15000 });
-await page.evaluate(n => renameProject(n), 'alpha');  // the settings form (the row's gear went in R119 step 3)
+await page.evaluate(n => renameProject(n), 'alpha');  // the settings form (the row's gear went)
 await page.waitForSelector('#rnmodal:not([hidden])');
 await page.click('#rnCancel');
 
@@ -2593,16 +2593,16 @@ await page.click('#rnCancel');
 // about. Declining the restart used to return before anything was written, so
 // somebody who wanted the setting kept and their conversation left alone got
 // neither, and restarting the session by hand afterwards changed nothing,
-// because there was nothing stored to read (B88).
+// because there was nothing stored to read.
 await section("Saving and interrupting are two decisions, and only one of them is asked", async () => {
   tmuxNew('claude-alpha', `${DIR}/ws/alpha`);
   await refreshUntil(page, () => liveSessions().has(myClaude('alpha')),
                      { timeout: 20000 });
-  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.selectOption('#rnAsks', 'fewer');
-  // Both answers are on the section's bar from the start (the operator,
-  // 10 Oct): a first press that only asked saved nothing for whoever pressed
+  // Both answers are on the section's bar from the start:
+  // a first press that only asked saved nothing for whoever pressed
   // it once and moved on.
   const before = page.dialogs.length;
   await page.waitForSelector('.rnbar[data-rnbar="yours"] [data-rnkeep]:not([hidden])', { timeout: 10000 });
@@ -2639,7 +2639,7 @@ await section("Saving and interrupting are two decisions, and only one of them i
   await refreshUntil(page, () => liveSessions().has(myClaude('alpha')), { timeout: 20000 });
   // A change a running session reads when it is used (the build command)
   // asks nothing.
-  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
   await page.waitForSelector('#rnmodal:not([hidden])');
   const wasBuild = await page.$eval('#rnBuildCmd', e => e.value);
   await page.fill('#rnBuildCmd', wasBuild + ' && make all');
@@ -2647,7 +2647,7 @@ await section("Saving and interrupting are two decisions, and only one of them i
   await saveDialog(page);
   ok(plain && await page.evaluate(() => liveSessions().has(myClaude('alpha'))) && page.dialogs.length === before,
      'a change the session reads when it is used (the build command) asks nothing and ends nothing');
-  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.fill('#rnBuildCmd', wasBuild);
   await saveDialog(page);
@@ -2658,13 +2658,13 @@ await section("Saving and interrupting are two decisions, and only one of them i
   tmuxKill('claude-alpha');
   await refreshUntil(page, () => !liveSessions().has(myClaude('alpha')),
                      { timeout: 20000 });
-  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went)
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.click('#rnCancel');
 });
 
 // Ghosted where no session can start: a project locked against this account,
-// which for its owner is an administrator's lock (R119). Unlike the credential
+// which for its owner is an administrator's lock. Unlike the credential
 // fields above there is no typing that brings this back, so the reason is the
 // whole message.
 writeFileSync(`${DIR}/state/locked-projects.json`, JSON.stringify({ gamma: { by: 'u_0000aaaa', admin: true }, delta: { by: 'u_0000aaaa', admin: true } }));
@@ -2781,7 +2781,7 @@ await section("the theme crossfades", async () => {
   const was = await bg();
   // To a scheme the page is not already on: one an earlier check left on
   // Nostromo swapped to Nostromo again, changed nothing and read as no
-  // swap at all (B487).
+  // swap at all.
   const swap = await page.evaluate(() => {
     applyTheme(document.documentElement.dataset.theme === 'nostromo' ? 'ember' : 'nostromo');
     return { during: document.documentElement.classList.contains('theming'),
@@ -2851,13 +2851,13 @@ await section("one field skin, everywhere", async () => {
 
 // ---- one frame ---------------------------------------------------------
 // At a desk the terminal's frame ends at its panes: the band that stood
-// under them held Commands alone, which is gone (the operator, 12 Nov), and
+// under them held Commands alone, which is gone, and
 // the terminal's keys float over it. A band drawn there again, or a gap
 // left where it was, is what this measures.
 await section("one frame", async () => {
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')]
     .find(x => /^Terminal$/.test(x.textContent.trim())); b && b.click(); });
-  // A terminal in the dock, in front (R218 step 4).
+  // A terminal in the dock, in front.
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) dockShow(t.id); });
   // The terminal the dock's, and drawn.
   await page.waitForFunction(() => { const t = tabs.find(x => x.kind === 'term');
@@ -2973,16 +2973,16 @@ await section("the logs, in the gear menu", async () => {
   ok(arc.status === 200 && arc.ct === 'application/gzip' && arc.len > 0,
      'and the whole archive comes back as a tarball');
   // ...and the diagnostics, with what sessions reported about AerieOS in
-  // them (the operator, 24 Sep): a zip from a link beside the logs, the
+  // them: a zip from a link beside the logs, the
   // report as diagnostics.json and each conversation a report carries as a
-  // file of its own beside it (the operator, 2 Oct).
+  // file of its own beside it.
   const dg = await page.evaluate(async () => {
     const r = await fetch('/logs/download?what=diag');
     const b = new Uint8Array(await r.arrayBuffer());
     let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192));
     return { status: r.status, ct: r.headers.get('content-type'),
              cd: r.headers.get('content-disposition'), zip: btoa(s),
-             // The bug reports section's markup (the operator, 26 Oct: the
+             // The bug reports section's markup (the
              // download is where the reports it carries are), not the logs'.
              link: /<a class="btnish" href="\/logs\/download\?what=diag" download/.test(reportsSection())
                && !/what=diag/.test(logSection()) };
@@ -3012,13 +3012,13 @@ ok((await api('/api/pin', { name: 'alpha', pinned: true })).status === 400,
    'a space name is not a command, and the command pin says so');
 ok((await api('/api/project-pin', { name: 'lx-free', pinned: true })).status === 400,
    '...and a command name is not a project');
-// The bb commands left the panel (the operator, 17 Oct): every one has its
+// The bb commands left the panel: every one has its
 // page, so a pin names a Linux or git command and a bb one is not a command.
 ok((await api('/api/pin', { name: 'status', pinned: true })).status === 400,
    '...and a bb command is no longer one to pin');
 await api('/api/pin', { name: 'lx-free', pinned: false });
 
-// ---- a project on several nodes: one chooser, a part per node (R82) --------
+// ---- a project on several nodes: one chooser, a part per node --------
 // The press opens a chooser with each node under its name, what it has and
 // how busy it is: Resume and New conversation where this account is signed
 // in, that node's sign-in where it is not, and only the reason where a
@@ -3048,7 +3048,7 @@ await section("a project on several nodes", async () => {
   await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
   // Read in the one evaluation that waits for it: the card repaints, and a
   // read after a separate wait found the menu mid-rebuild.
-  // One node at a time (the operator, 22 Oct): a switch of the nodes' names,
+  // One node at a time: a switch of the nodes' names,
   // the one the project works on picked, its facts on a quiet line, and a
   // line per agent there with its presses.
   const readMenu = () => page.waitForFunction(() => {
@@ -3056,7 +3056,7 @@ await section("a project on several nodes", async () => {
     if (!m || !m.querySelector('#rmNodeSel')) return null;
     return JSON.stringify({ nodes: [...m.querySelectorAll('#rmNodeSel option')].map(o => `${o.selected ? '*' : ''}${o.textContent.trim()}`),
       facts: m.querySelector('.rmfacts')?.textContent.trim() || '', state: m.querySelector('.rmstate')?.textContent.trim() || '',
-      // The Start band's lines (R143): a conversation to resume is a row of
+      // The Start band's lines: a conversation to resume is a row of
       // the Resume band under it, read apart.
       lines: [...m.querySelectorAll('.rmline:not(.rmconv)')].map(l => `${[...l.querySelector('.rmwho').children].map(e => e.textContent.trim()).join(' ')}: ${
         [...l.querySelectorAll('button')].map(b => b.textContent.trim()).join('/')}`),
@@ -3071,7 +3071,7 @@ await section("a project on several nodes", async () => {
      && menu.lines[0] === 'Claude: New' && menu.titles.join() === 'Start,Resume',
      `...and a Start band with a line for Claude there, New where this account is signed in, and a Resume band under it (${menu.lines.join(' | ')}; ${menu.titles.join()})`);
   // Start is one line, the agents installed on the node picked a pulldown
-  // and the picked one's press beside it (the operator, 26 Oct); an agent
+  // and the picked one's press beside it; an agent
   // not installed there is not in it.
   const pull = await page.evaluate(async () => {
     const p = state.projects.find(x => x.name === 'alpha'), n = p.session_nodes.find(x => x.id === 'n_ubu');
@@ -3106,8 +3106,8 @@ await section("a project on several nodes", async () => {
   writeFileSync(`${tdir}/aaaaaaaa-0000-4000-8000-000000000001.jsonl`,
     '{"type":"user","message":{"role":"user","content":"hi"}}\n'
     + '{"type":"assistant","message":{"model":"claude-fable-5-1","role":"assistant","content":[]}}\n');
-  // What New starts on is under the agent's line (R284 step 4, the operator,
-  // 26 Nov: the step of its own was a fourth press for two picks already
+  // What New starts on is under the agent's line
+  // (the step of its own was a fourth press for two picks already
   // kept): Model and Effort, this account's for the space, with the last
   // session's model named on the default; New starts at once.
   await page.evaluate(() => { resumeModelNow = { project: '', model: '' }; placeResumeMenu(); });
@@ -3180,7 +3180,7 @@ await section("a project on several nodes", async () => {
      `with a session running on one node the press opens the chooser on that node, marked in the picker: yours on top with Open, Restart and End, the other node still in it (${live.nodes.join()}; ${live.line}; ${live.buttons.join(' | ')})`);
   ok(live.fresh[0] === 'Claude as Claude 2:New@2',
      `...and Start's New beside it opens a second Claude session, in a slot of its own (R143: ${live.fresh.join(' | ')})`);
-  // ...up to the project's cap (R143): a slot past it is refused at the
+  // ...up to the project's cap: a slot past it is refused at the
   // terminal, whatever asks for it, saying how many it lets each person run.
   {
     const cap = async n => (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
@@ -3210,7 +3210,7 @@ await section("a project on several nodes", async () => {
   ok(/End your Claude session on alpha on ubu\?/.test(page.dialogs.at(-1) || '') && ended.asked?.node === 'n_ubu'
      && ended.asked?.name === await page.evaluate(() => myClaude('alpha')) && ended.dropped === 1 && !ended.tab && !ended.open,
      `End session asks first, ends that node's session and drops its tab (${JSON.stringify(ended)})`);
-  // Restart (the operator, 12 Oct): the model and effort first, then the
+  // Restart: the model and effort first, then the
   // question, and only then the session ended and started again. Asked
   // first and ended at once, it left a person picking a model with no
   // session running, and a start racing the end needed a second press.
@@ -3272,7 +3272,7 @@ await section("a project on several nodes", async () => {
   }
   // On a phone the Restart step stays on the screen, its Restart included,
   // with the model's longest choice in the box and nothing in it reaching
-  // past its edge (B140). Drawn by resumePicker itself, from alpha's card.
+  // past its edge. Drawn by resumePicker itself, from alpha's card.
   {
     const desk = page.viewportSize();
     // An XL phone, 449 wide: under 600 the two fields are one column.
@@ -3376,7 +3376,7 @@ await section("a project on several nodes", async () => {
     const sameVisit = projectNote(p, true);
     pnoteOnShow('');
     pnoteOnShow('bandtest');
-    // An error is red, a wait yellow (the operator, 29 Oct).
+    // An error is red, a wait yellow.
     const waiting = projectNote({ ...p, session_why: 'bb-sandbox is reconnecting after the controller restarted', session_waiting: true }, true);
     return { band: has(shown), card: /pband/.test(card) ? 'band' : /pnote dim/.test(card) ? 'line' : card, away, sameVisit, back: has(projectNote(p, true)),
              red: /class="pnote bad pband"/.test(shown), yellow: /class="pnote warn pband"/.test(waiting) };
@@ -3409,10 +3409,9 @@ await section("a project on several nodes", async () => {
 // ---- a dialog that scrolls says so, and opens at its top -------------------
 // On a short screen the project's settings dialog is taller than the room:
 // its title and its buttons stay put with their hairlines while what is
-// between them scrolls (the operator, 16 Oct: no black fades), it still
+// between them scrolls (no black fades), it still
 // knows which edge has more (the classes a list's hairline follows); and
-// closed and opened again it is back at its top, however far down it was
-// (the operator, 30 Sep).
+// closed and opened again it is back at its top, however far down it was.
 await section("a dialog that scrolls says so, and opens at its top", async () => {
   await page.setViewportSize({ width: 420, height: 560 });
   const box = '#rnmodal > .box';
@@ -3433,7 +3432,7 @@ await section("a dialog that scrolls says so, and opens at its top", async () =>
   const readsEnd = await page.$eval('#rnReads', l => [l.classList.contains('scrollup'), l.classList.contains('scrolldown')]);
   ok(reads.room > 0 && reads.down && !reads.up && /inset/.test(reads.shadow) && readsEnd[0] && !readsEnd[1],
      `a list that scrolls, the space's Reads, draws a hairline on the edge with more past it, and the other at its end (${JSON.stringify({ ...reads, shadow: reads.shadow.slice(0, 30), end: readsEnd })})`);
-  // To the end once the dialog has stopped growing (B741, B749): its
+  // To the end once the dialog has stopped growing: its
   // sections fill in after it opens (the Claude section's content is a
   // thousand pixels that land late), so a wait that succeeded at the first
   // height was read after the rest had arrived, with more below. Its height
@@ -3460,8 +3459,8 @@ await section("a dialog that scrolls says so, and opens at its top", async () =>
   await page.evaluate(() => closeRename());
   await page.setViewportSize({ width: 1280, height: 900 });
 });
-// A reload reads the page the address names beside the status read (the
-// operator, 18 Oct: it showed the boot's placeholder, then the page's own
+// A reload reads the page the address names beside the status read
+// (it showed the boot's placeholder, then the page's own
 // while only then asking for its data): its reads start before the status
 // read has answered, and each is asked once.
 // Where each of these reads was asked from, said when one is asked twice.

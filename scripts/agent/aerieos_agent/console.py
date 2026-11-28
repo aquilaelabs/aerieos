@@ -1,4 +1,4 @@
-"""A way in at the console of AerieOS (R194, the operator, 1 Nov): a
+"""A way in at the console of AerieOS: a
 password set on the Nodes page logs in at the screen as admin, with sudo for
 root. Root itself stays without one. The image's root is read-only and
 forgets at every boot, so the password's hash is kept on the data partition

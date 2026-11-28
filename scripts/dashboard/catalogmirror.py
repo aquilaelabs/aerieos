@@ -1,4 +1,4 @@
-"""A mirror of the vetted catalog (R169 step 6), for a controller that cannot
+"""A mirror of the vetted catalog, for a controller that cannot
 reach it: one archive holding the catalog's index.json and index.sig as the
 maintainers signed them, and a git bundle per repository holding every
 commit the index pins there (repos/KEY.bundle, KEY the first 16 hex of the
@@ -122,7 +122,7 @@ def take(aid, now):
 
 
 def take_file(path, now):
-    """Keep a mirror archive on disk (the stick's copy, R169 step 6): as
+    """Keep a mirror archive on disk (the stick's copy): as
     take, and {same: True} when the one held was made at the same time."""
     try:
         with tarfile.open(path) as t:

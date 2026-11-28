@@ -10,7 +10,7 @@ lets this container carry no Claude.
 That is not a convenience given up lightly: every failure this has had came
 from one OAuth grant living on several machines. A refresh ROTATES the
 refresh token, so two copies sign each other out (bug #64), and a node that
-was away holds one the server has retired (B100). Claude issues a grant per
+was away holds one the server has retired. Claude issues a grant per
 login, so a login per machine is the supported shape.
 
 **What the controller keeps is what each node reported**, per AerieOS
@@ -24,7 +24,7 @@ account and another node in to another, and the row of each says which.
 The Users page says when two AerieOS accounts are on one Anthropic
 account, since Anthropic's terms allow one person per Claude account.
 
-The other coding agents (R95 step 3) keep the same record, one file per
+The other coding agents keep the same record, one file per
 agent: what each node reported the account is signed in to ChatGPT (Codex
 CLI) or GitHub (Copilot CLI) as there. Every function takes the agent's id,
 Claude's when none is named, whose file is where it always was.
@@ -51,7 +51,7 @@ def _path(home, agent="claude"):
     the account's own .claude. Not under .config: on the controller that is
     one of the box's shared dotfiles (BB_SHARED_DOTFILES), so every account
     read and wrote one file, and a node's report that a second account had
-    no Codex login took the first one's away (B236)."""
+    no Codex login took the first one's away."""
     if agent == "claude":
         return Path(home) / ".claude" / MARK
     return Path(home) / ".claude" / f".bb-grant-{agent}.json"
@@ -70,7 +70,7 @@ def sealed_on(tokseal, uid, agent="claude"):
 def rev(home):
     """A number that moves when a node reports this account's sign-in to any
     coding agent, or that it is gone: the newest of the account's records.
-    The page re-reads on it (the operator, 24 Nov: a sign-in finished on
+    The page re-reads on it (a sign-in finished on
     the node and the page said so only after a reload)."""
     if not home:
         return 0
@@ -155,7 +155,7 @@ def report(home, node_id, email, plan="", signed_in=True, agent="claude"):
 def emails_of(home):
     """{agent id: "a@x, b@y"}: the accounts each live coding agent is signed
     in as on any node, for whoever is shown them (People, Profile), an agent
-    with none left out (B296: a ChatGPT sign-in read as no login at all)."""
+    with none left out (a ChatGPT sign-in read as no login at all)."""
     out = {}
     for a in agents.live():
         emails = sorted({v["email"] for v in nodes_of(home, a.id).values() if v.get("email")}, key=str.lower)
@@ -168,8 +168,8 @@ def logins_of(rows):
     """Which Anthropic accounts each AerieOS account is signed in as, on
     any node, and whether two of them share one, for the Users page.
 
-    From the record, not from a credential: no login lives on this container
-    (R47), and what it keeps instead is what each node reported.
+    From the record, not from a credential: no login lives on this container,
+    and what it keeps instead is what each node reported.
 
     Anthropic's consumer terms allow one person per Claude account, so two
     AerieOS accounts on one login is said on the row rather than left for

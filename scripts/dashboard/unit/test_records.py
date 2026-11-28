@@ -1,4 +1,4 @@
-"""records.py (R167): every record kind round-trips through JSON, YAML and
+"""records.py: every record kind round-trips through JSON, YAML and
 Markdown, a document says its format and when it was printed, and an apply
 plan names what an edited record would change and never a removal."""
 import os

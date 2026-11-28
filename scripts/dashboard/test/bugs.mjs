@@ -26,7 +26,7 @@ await page.goto(URL);
 await ready(page);
 
 // ---- the way in ----------------------------------------------------------
-const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page (R218 step 3)
+const row = n => `.pgrid .pcard[data-row="${n}"]`;   // the project's card on the Projects page
 await page.evaluate(n => openNotebook(n), 'alpha');
 await nbShown(page);
 await nbGo(page, 'bugs');
@@ -46,7 +46,7 @@ await page.fill('.bugform .bfArea', 'scripts/dashboard/index.html (the picker)')
 await page.fill('.bugform .bfRepro', '1. open the picker on a phone\n2. rotate');
 await page.fill('.bugform .bfExpected', 'the selection survives');
 await page.fill('.bugform .bfActual', 'it resets to the first entry');
-// Whether those steps show it (R124): one of four, Not tried until pressed.
+// Whether those steps show it: one of four, Not tried until pressed.
 const reprWas = await page.$eval('.bugform .bfRepr .on', b => b.dataset.repr);
 await page.click('.bugform .bfRepr [data-repr="sometimes"]');
 await page.click('.bugform .bfGo');
@@ -120,7 +120,7 @@ ok(true, 'the tab picks up what a session filed');
 
 // ---- closing one, with the note that is the point --------------------------
 page.dialogs = [];
-// The note is typed in the row (R254 step 6), not in the browser's prompt.
+// The note is typed in the row, not in the browser's prompt.
 // (no question modal, either: page.dialogs, emptied above, stays empty)
 await openFold(page, '#bugList .bug[data-id="1"]');
 await page.click('#bugList .bug[data-id="1"] .bFix');
@@ -130,12 +130,12 @@ ok(page.dialogs.length === 0 && /Close as fixed/.test(await page.$eval('#bugList
 await page.fill('#bugList .bug[data-id="1"] .dropbox textarea', 'the select re-measures on rotate now');
 await page.click('#bugList .bug[data-id="1"] .dropbox .primary');
 await page.waitForFunction(() => document.querySelector('#bugList .bug[data-id="1"] .bstat')?.textContent === 'fixed', { timeout: 10000 });
-// Drawn closed on the press (the operator, 22 Nov); the tracker follows.
+// Drawn closed on the press; the tracker follows.
 ok(await until(() => read().find(b => b.id === 1).status === 'fixed'
    && read().find(b => b.id === 1).status_note === 'the select re-measures on rotate now', 10000),
    'marking one fixed asks what fixed it, shows it closed on the press, and keeps the answer on the bug');
 ok(!/picker loses/.test(bbBug()), '...and it leaves the open list');
-// What a report knows is facts above its verbs (R254 step 3): who reported
+// What a report knows is facts above its verbs: who reported
 // it and when, how it was closed and when, with the note; the verbs are an
 // action bar with the one that cannot be undone last. It was six buttons in
 // a plain div with Delete third, where the thumb goes.
@@ -144,7 +144,7 @@ await section("What a report knows is facts above its verbs", async () => {
     bar: el.querySelector('.macts')?.classList.contains('actbar'),
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])),
     // Last on the bar, or last under its ⋯ where a fixed bug keeps it with
-    // the changelog's three (R255).
+    // the changelog's three.
     last: (() => {
       const l = [...el.querySelectorAll('.macts > button, .macts > .more')].at(-1);
       return (l?.matches('.more') ? l.querySelector('.actmenu > button:last-of-type') : l)?.className || '';
@@ -184,7 +184,7 @@ await section("but not closing a closed one", async () => {
 // ---- the version it was seen in, and closed in (roadmap #6) ---------------
 // A tree with no commits has nothing honest to say about its version, and
 // nothing is said: a blank, never a made-up number. Its own project rather
-// than alpha, which another file commits in (B144). A project with a commit
+// than alpha, which another file commits in. A project with a commit
 // gets the same identity `aerie version` prints, on filing and again on closing.
 await section("the version it was seen in, and closed in", async () => {
   const N = `${DIR}/ws/eta`;
@@ -253,7 +253,7 @@ ok((await ids()).slice(0, 2).join() === '3,2',
    'title A–Z orders by the words, open ones still first');
 await page.selectOption('#bugSort', 'severity');
 
-// The band narrows the list (R254 step 1): Open and Closed chips, and a
+// The band narrows the list: Open and Closed chips, and a
 // search by words or number, reports left out wearing .off.
 const shownIds = () => page.$$eval('#bugList .bug:not(.off)', ds => ds.map(d => d.dataset.id).sort().join());
 await page.click('#bugChips [data-bgchip="closed"]');
@@ -261,7 +261,7 @@ await page.waitForFunction(() => document.querySelectorAll('#bugList .bug:not(.o
 ok(await shownIds() === '1', 'the Closed chip shows the closed report alone');
 await page.click('#bugChips [data-bgchip="open"]');
 ok(await shownIds() === '2,3', '...Open the outstanding ones');
-// ...and a chip per release a report was seen in (the operator, 21 Oct):
+// ...and a chip per release a report was seen in:
 // the build's X.Y.Z, oldest first, Unknown for a report with none.
 const rel = await page.evaluate(() => {
   const rows = [{seen_in: '0.5.4-dev.3481+018be7f'}, {seen_in: '0.5.10'}, {seen_in: 'v0.5.4'}, {}];
@@ -317,7 +317,7 @@ await page.evaluate(() => notebooks.get('alpha').reloadBugs());
 await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 3,
                            { timeout: 10000 });
 
-// An open report's bar on a phone (B43): four on it share the width, and
+// An open report's bar on a phone: four on it share the width, and
 // none is cut short ('Send to Clau' at 360 and 393).
 await section("An open report's bar on a phone", async () => {
   const was = page.viewportSize();
@@ -342,7 +342,7 @@ await section("An open report's bar on a phone", async () => {
 // closed bug stops the same report being chased twice. This is for the report
 // that should never have been filed, and it says so in the log.
 await openFold(page, '#bugList .bug[data-id="3"]');
-await page.click('#bugList .bug[data-id="3"] .macts .more > button');   // an open report's Remove is under More (R254 step 7)
+await page.click('#bugList .bug[data-id="3"] .macts .more > button');   // an open report's Remove is under More
 await page.click('#bugList .bug[data-id="3"] .bRm');
 await page.waitForSelector('.bug .dropbox textarea', { timeout: 10000 });
 ok(read().some(b => b.id === 3),
@@ -364,14 +364,14 @@ await page.click('.bug .dropbox .stop');
 await page.waitForFunction(() => !document.querySelector('.bug .dropbox'),
                            null, { timeout: 10000 });
 ok(read().some(b => b.id === 3), 'Cancel closes it and deletes nothing');
-await page.click('#bugList .bug[data-id="3"] .macts .more > button');   // an open report's Remove is under More (R254 step 7)
+await page.click('#bugList .bug[data-id="3"] .macts .more > button');   // an open report's Remove is under More
 await page.click('#bugList .bug[data-id="3"] .bRm');
 await page.waitForSelector('.bug .dropbox textarea', { timeout: 10000 });
 await page.fill('.bug .dropbox textarea', 'filed against the wrong space');
 await page.click('.bug .dropbox .danger');
 await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 2,
                            { timeout: 10000 });
-// The row goes on the press (the operator, 22 Nov); the tracker follows.
+// The row goes on the press; the tracker follows.
 ok(await until(() => !read().some(b => b.id === 3), 10000), 'Delete it takes the row on the press, and for good');
 ok(/wrong space/.test(bbBug('history', '--find', 'wrong space')),
    '...leaving the reason in the log, which is all that is left of it');
@@ -412,7 +412,7 @@ bbBug('reopen', naId);
 const naSaid = bbBug('na', naId, 'removed again in the CLI').trim();
 ok(read().find(b => String(b.id) === naId).status === 'na',
    'aerie bug na does the same from a session');
-// B58: and says so in a sentence, not "B7 na".
+// And says so in a sentence, not "B7 na".
 ok(naSaid === `B${naId} closed as not applicable`, `...in words (${naSaid})`);
 
 // ---- a session writing while the tab is open ------------------------------
@@ -516,7 +516,7 @@ await section("opening one is a slide, not a snap", async () => {
   await nbGo(page, 'bugs');
   // Waited on the LOAD, not on a row appearing. The view is drawn before its
   // fetch lands, so a wait on `.bug` was a wait on a round trip it could not
-  // see, and about one run in three it lost (B99). reloadBugs returns the
+  // see, and about one run in three it lost. reloadBugs returns the
   // fetch, so awaiting it is awaiting the data the rows are made of.
   await page.evaluate(() => notebooks.get('alpha').reloadBugs());
   await page.waitForSelector('#bugList .bug', { timeout: 15000 });
@@ -527,8 +527,8 @@ await section("opening one is a slide, not a snap", async () => {
   // miss the tween the way asking "is it animating?" in a later round trip
   // can. The shut height is read here too: measured a round trip earlier it
   // was sometimes an OPEN row's, because a revision poll landing between the
-  // two calls redrew the list with the row a prior check had left open
-  // (B204), which read as the slide starting from the wrong height.
+  // two calls redrew the list with the row a prior check had left open,
+  // which read as the slide starting from the wrong height.
   const kf = await page.evaluate(s => {
     const el = document.querySelector(s);
     if (el.open) el.open = false;             // a shut row is what is measured
@@ -552,7 +552,7 @@ await section("opening one is a slide, not a snap", async () => {
   // repaint swaps the row for an equal one (closeFold copes), but a height
   // sampled on the old row and one on its replacement agree only while nothing
   // around it moved (the first-child border, the doc's scrollbar), which is not
-  // what this is about (B71). Shut means the box is its summary plus its own
+  // what this is about. Shut means the box is its summary plus its own
   // padding and border, with no inline height left by the tween.
   const back = await page.$eval(sel, d => {
     const cs = getComputedStyle(d), sum = d.querySelector("summary");
@@ -588,7 +588,7 @@ await section("a fold pressed while it still slides keeps that press", async () 
   ok(got.sliding && got.open, `a fold opened while its closing slide still runs stays open after that slide would have ended (${JSON.stringify(got)})`);
   // ...and a second press with nothing under it means the other way: held
   // open for its closing slide, the fold read as open and took the second
-  // press as shut too (B838).
+  // press as shut too.
   const twice = await page.evaluate(async s => {
     const el = document.querySelector(s);
     el.open = true;
@@ -764,7 +764,7 @@ ok(settledBug.repro === "the operator's repro, typed at length"
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);
-// A deleted report's number is not handed out again either (bug B72). Last,
+// A deleted report's number is not handed out again either. Last,
 // because its two log lines would push the oldest verb off the History
 // pane's first page for the check above.
 await section("A deleted report's number is not handed out again either", async () => {
@@ -774,7 +774,7 @@ await section("A deleted report's number is not handed out again either", async 
   bbBug('rm', String(n), 'numbering fixture');
 });
 
-// B197: the token an open Bugs tab watches was the history's LENGTH, and the
+// The token an open Bugs tab watches was the history's LENGTH, and the
 // history is capped, so past 300 events it sat at 300 for good and the tab
 // never re-read again. A tracker at the cap, one more write, and the token has
 // to have moved.

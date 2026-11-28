@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Two hooks that hold a session to its house rules (R200), with the
+"""Two hooks that hold a session to its house rules, with the
 project and the account baked into the command line by bb-tty's
-claude_scope():
+claude_scope:
 
     bb-rule-hook guard PROJECT SESSION    # PreToolUse, on Bash
     bb-rule-hook recall PROJECT SESSION   # SessionStart, after a compaction
@@ -22,8 +22,8 @@ MAP, and GUARD on a call it lets through: a search for where a name is
 defined or called (grep for `def NAME`, `function NAME`, `NAME(`, or the
 Grep tool's pattern) is handed `aerie map find NAME`'s answer beside it, a
 few lines, so a session that reached for grep out of habit still gets the
-one-call answer and does not spend the reads it would have saved (the
-operator, 12 Oct). The search runs either way; a name the map does not
+one-call answer and does not spend the reads it would have saved.
+The search runs either way; a name the map does not
 know adds nothing.
 
 RECALL runs when Claude Code has summarized a long conversation. The
@@ -64,8 +64,8 @@ def guards(project):
     return have
 
 
-# A recording, said at the moment it arrives or is reached for (the
-# operator, 17 Oct: the briefing named aerie capture reel, and a session sent a
+# A recording, said at the moment it arrives or is reached for
+# (the briefing named aerie capture reel, and a session sent a
 # phone's screen recording pulled frames with ffmpeg by hand). A note beside
 # the turn, as the code map's is beside a search: it moves what a session
 # does where a line in a briefing read hours earlier does not.
@@ -105,7 +105,7 @@ def map_first(req, patterns, also=""):
     import subprocess
     bb = os.path.join(HERE, "..", "aerie")
     said = []
-    # Every name in one ask (R228 step 16): each was a process of its own and
+    # Every name in one ask: each was a process of its own and
     # a load of the index, 0.8 s a name inside the tool call it rides on.
     try:
         r = subprocess.run(["bash", bb, "map", "find", *names], capture_output=True, text=True, timeout=15,

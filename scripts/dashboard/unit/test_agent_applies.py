@@ -106,7 +106,7 @@ def plane(sh_rc=0):
 
 class ControllerUpdate(unittest.TestCase):
     """A bare-metal controller's update, as its own node's root agent runs it:
-    the tag a release is named by, a pre-release's included (B1164: every
+    the tag a release is named by, a pre-release's included (every
     vX.Y.Z-dev.N the controller offered was refused), and nothing else."""
 
     def run_one(self, tag):

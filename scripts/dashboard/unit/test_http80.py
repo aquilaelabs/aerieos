@@ -1,4 +1,4 @@
-"""http://THE-MACHINE/ finds the dashboard (R202): a redirect on port 80 on a
+"""http://THE-MACHINE/ finds the dashboard: a redirect on port 80 on a
 controller's own machine that lets go for nginx and for a compose job; nginx
 itself never points a request at the dashboard."""
 import os
@@ -83,7 +83,7 @@ class TheLoop(unittest.TestCase):
 
 class Nginx(unittest.TestCase):
     def test_nginx_never_points_a_stranger_at_the_dashboard(self):
-        # The operator, 1 Nov: a name nothing routes is closed, on every
+        # A name nothing routes is closed, on every
         # machine, the controller's own too.
         routes = npx.clean_routes([{"host": "a.example", "path": "/", "port": 8080}])
         conf = npx.nginx_conf(routes, {})

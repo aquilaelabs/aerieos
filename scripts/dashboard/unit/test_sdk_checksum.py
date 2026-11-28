@@ -1,4 +1,4 @@
-"""What a toolchain's download should be (R137): each row's checksum source
+"""What a toolchain's download should be: each row's checksum source
 read as its publisher states it, a row that names none refused, and every
 tarball and script row of the shipped catalog naming one."""
 import json
@@ -42,7 +42,7 @@ class Checksum(unittest.TestCase):
             self.assertEqual(sdkmeta.checksum(row({"from": "file", "url": "{url}.sha256"}), "https://r/rustup-init", "")[1], H64)
 
     def test_a_one_line_file_naming_another_file_is_not_this_file_s(self):
-        # B1052: one line naming another file was taken as this file's digest.
+        # One line naming another file was taken as this file's digest.
         import contextlib
         import io
         said = io.StringIO()

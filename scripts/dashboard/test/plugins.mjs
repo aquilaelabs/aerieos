@@ -38,7 +38,7 @@ stage(owner, {
   'pyright-lsp@claude-plugins-official': inst('user'),
   'feature-dev@claude-plugins-official': inst('project', { projectPath: '/workspace/alpha' }),
 }, { 'code-simplifier@claude-plugins-official': true, 'pyright-lsp@claude-plugins-official': false });
-// ...and the MCP servers each agent is set up with (R95 step 15), by name.
+// ...and the MCP servers each agent is set up with, by name.
 writeFileSync(join(homes, owner, '.claude.json'), JSON.stringify({ mcpServers: { github: { command: 'gh-mcp', env: { TOKEN: 'never-read' } } } }));
 mkdirSync(join(homes, owner, '.codex'), { recursive: true });
 writeFileSync(join(homes, owner, '.codex', 'config.toml'), '[mcp_servers.docs]\ncommand = "docs-mcp"\n');
@@ -77,13 +77,13 @@ await sleep(1100);
 await beat([{ ...mine, email: '' }]);
 ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a heartbeat must not cost one');
 
-// The Installed page says them, per agent on that node (R95 step 15, on
-// each agent's row there since R172), and says where they are changed.
+// The Installed page says them, per agent on that node (on
+// each agent's row there), and says where they are changed.
 await section("The Installed page says them, per agent on that node", async () => {
   const browser = await launch();
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL); await ready(page);
-  // Each agent's own page on the node (R181 step 2): its Yours section.
+  // Each agent's own page on the node: its Yours section.
   const PAGE = name => `.thingtab [data-instnode="${minted.id}"][data-thing="agent:${name}"]`;
   const read = name => page.evaluate(s => (document.querySelector(`${s} .agextras`)?.closest('.agpart')?.textContent || '').replace(/\s+/g, ' ').trim(), PAGE(name));
   await page.evaluate(id => openInstalledOn(id, 'claude'), minted.id);

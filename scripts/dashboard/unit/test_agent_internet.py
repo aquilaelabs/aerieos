@@ -1,4 +1,4 @@
-"""Whether a node reaches the internet, as its census says it (B770): asked
+"""Whether a node reaches the internet, as its census says it: asked
 at most every ten minutes, but a "no" from the agent's first minutes is
 asked again after one, since the first look is at boot, before the network
 is up, and stood for ten minutes on a machine that had it."""

@@ -439,7 +439,7 @@ class Table(unittest.TestCase):
         self.assertEqual(nodes.census_unknown(["cpu"]), [])
 
     def test_every_agents_sealed_sign_in_is_kept(self):
-        # The four shipped agents' and a pack's (B902: claude and codex only,
+        # The four shipped agents' and a pack's (claude and codex only,
         # so Grok's and Copilot's seals never reached a terminal's open).
         seals = {a: {"R": "ab"} for a in ("claude", "codex", "grok", "copilot", "kimi")}
         seals.update({"Bad Name": {"R": "ab"}, "x" * 17: {"R": "ab"}})
@@ -454,7 +454,7 @@ class Table(unittest.TestCase):
 
     def test_a_mounts_long_reason_ends_on_a_word(self):
         # The agent's stale-handle reason ends on what to do and ran past
-        # the 200 kept, so the row read 'then Apply s' (B914).
+        # the 200 kept, so the row read 'then Apply s'.
         why = ("mounted, but the handle is stale: the export was re-created under it on the host; "
                "re-export it there (on a NAS host: the share's NFS setting off and on, or a pool the "
                "mover leaves alone), then Apply storage here")
@@ -466,7 +466,7 @@ class Table(unittest.TestCase):
 
     def test_a_field_in_a_shape_it_cannot_read_is_left_out_not_the_hello(self):
         # A list where a dict goes, a word where a number does: that field
-        # is left out and said once, and the rest kept (B904: it raised, and
+        # is left out and said once, and the rest kept (it raised, and
         # the whole hello was refused).
         err = io.StringIO()
         nodes._census_said.discard("shape store_dirs")    # said once a process, and the frozen cases came first

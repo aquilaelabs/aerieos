@@ -16,7 +16,7 @@ set -euo pipefail
 . /opt/aerieos/scripts/lib/common.sh
 
 # The store's one standing rule, kept at boot: the android system images
-# shared across platforms (roadmap R19).
+# shared across platforms.
 sdk_share_images "$(sdk_store_root)"
 ROOT="$(sdk_root)"
 mkdir -p "$ROOT" 2>/dev/null || true
@@ -25,9 +25,9 @@ mkdir -p "$ROOT" 2>/dev/null || true
 # Not $ROOT/env.sh: the toolchain store root is a share the sandbox mounts too, at its
 # own path, and every line generated here is absolute, so a copy in the
 # store is wrong for whichever machine did not write it last. Container-local
-# instead; sdk.sh's sdk_env_file() is the same answer, one generator, and
+# instead; sdk.sh's sdk_env_file is the same answer, one generator, and
 # it lives in sdk.sh, which common.sh does not pull in, so both are sourced
-# (B82: the hook exited 127 on 'command not found' and the file was never
+# (the hook exited 127 on 'command not found' and the file was never
 # written).
 ENV_FILE="$(run_as_builder bash -c '. /opt/aerieos/scripts/lib/common.sh; . /opt/aerieos/scripts/lib/sdk.sh; sdk_env_file')"
 mkdir -p "$(dirname "$ENV_FILE")" 2>/dev/null || true

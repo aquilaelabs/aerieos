@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""aerie map: a code map a session asks instead of grepping (roadmap R75).
+"""aerie map: a code map a session asks instead of grepping.
 
 One index over a project tree: every function a file defines, every call
 by name with the function it was made from, every element id and class a
@@ -68,7 +68,7 @@ INDEX_DIR = ".bb-map"
 # own files during the window when both exist.
 FORMAT = 5
 INDEX_FILE = f"map{FORMAT}.json"
-# ...and in a file of their own since format 5 (R228 step 16), what each
+# ...and in a file of their own since format 5, what each
 # file calls and the functions it passes by name: 85% of the index's bytes,
 # read by who-calls, coverage and preflight, and by none of the lookups a
 # session makes most (find, defs, draws), which read the rest in a tenth of
@@ -86,8 +86,8 @@ SKIP_DIRS = {".git", "node_modules", "dist", "__pycache__", ".bb-map", "scratchp
 # The scanners' version: a file indexed by other ones is scanned again
 # though it has not changed, so a fix to a scanner reaches every file. It
 # is this file's own fingerprint, never a number bumped by hand: a scanner
-# changed without a bump left indexes answering from the old reading (the
-# operator, 8 Oct), and any edit here costs one rebuild of a few seconds.
+# changed without a bump left indexes answering from the old reading,
+# and any edit here costs one rebuild of a few seconds.
 try:
     SCANNER = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 except OSError:                  # (run from somewhere it cannot read itself)
@@ -98,12 +98,12 @@ EXTS = {".py": "py", ".js": "js", ".mjs": "js", ".cjs": "js", ".ts": "js", ".tsx
         ".swift": "js", ".dart": "js", ".c": "c", ".h": "c", ".cc": "c", ".cpp": "c",
         ".hpp": "c", ".cxx": "c", ".hh": "c", ".m": "js", ".mm": "js", ".php": "js", ".scala": "js",
         ".groovy": "js", ".astro": "html", ".vue": "html", ".svelte": "html",
-        # Data and prose (R167): a setting or a key where a file defines it,
+        # Data and prose: a setting or a key where a file defines it,
         # and a document's headings, read by markup.py beside this file.
         ".json": "data", ".yml": "data", ".yaml": "data", ".toml": "data", ".xml": "data",
         ".md": "data", ".env": "data", ".example": "data"}
 # Source the map does not read, named in an answer that came back empty, so
-# "nothing draws .x" is not read as the whole truth (B578)
+# "nothing draws .x" is not read as the whole truth
 NOT_READ = {".css", ".scss", ".sass", ".less", ".rb", ".erb", ".lua", ".ex", ".exs", ".erl",
             ".hs", ".ml", ".clj", ".cljs", ".r", ".jl", ".pl", ".pm", ".elm", ".fs", ".vb",
             ".twig", ".hbs", ".ejs", ".njk", ".liquid", ".jinja", ".j2", ".pug", ".haml",
@@ -274,12 +274,12 @@ def scan_python(text, sink):
                     call_funcs.add(id(f))
             # A name read and not called: passed (runner.register("compose",
             # run_compose_job)), assigned, listed. Located, like the brace
-            # languages' (B227), so who-calls can say where.
+            # languages', so who-calls can say where.
             if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load) \
                     and id(child) not in call_funcs:
                 sink.add_ref(child.id, child.lineno, enclosing())
             # ...and `module.name` read and not called: a function handed on
-            # (node_addr=nodes.ssh_addr_of), which read as never used (B543).
+            # (node_addr=nodes.ssh_addr_of), which read as never used.
             if isinstance(child, ast.Attribute) and isinstance(child.ctx, ast.Load) \
                     and id(child) not in call_funcs:
                 sink.add_ref(child.attr, child.lineno, enclosing())
@@ -312,12 +312,12 @@ SEL_TAG = re.compile(r"(?<![\w$#.-])(?:" + "|".join(sorted(HTML_TAGS, key=len, r
 SEL_PART = re.compile(r"([#.])([A-Za-z_][\w-]*)")
 SEL_COMPOUND = re.compile(r"(?<![\w$.#*/-])(?:[#.][A-Za-z_][\w-]*)+")
 # An event attribute's value is JavaScript: every call in
-# onclick="jumpToLogSection('errors'); return false" is one (B584)
+# onclick="jumpToLogSection('errors'); return false" is one
 REL_PATH = re.compile(r"\.{1,2}/[\w./@-]+")
 HANDLER_ATTR = re.compile(r"""\bon[a-z]+\s*=\s*(["'])(.*?)\1""")
 HANDLER_CALL = re.compile(r"(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(")
 # Where a string is a class list: classList.add('a', 'b'), .toggle('x', on),
-# .className = 'a ' + (b ? 'c' : 'd'), setAttribute('class', ...) (B586)
+# .className = 'a ' + (b ? 'c': 'd'), setAttribute('class', ...)
 CLASS_CTX = re.compile(r"""(?:\bclassList\.(?:add|remove|toggle|contains|replace)\(\s*"""
                        r"""(?:(['"`])[\w\s-]*\1\s*,\s*)*|\.className\s*\+?=\s*[^;\n]*"""
                        r"""|\bsetAttribute\(\s*['"]class['"]\s*,\s*[^;\n]*)$""")
@@ -362,7 +362,7 @@ def strings_draw(s):
             and re.match(r"^[\s\w#.\[\]=\"':>,()*+~^$|-]+$", s):
         # an attribute's value is not a selector (`a[href="#main"]` names
         # no id main), and a tag before a class is no word: `a.al-skip`
-        # is the class al-skip (B576)
+        # is the class al-skip
         s = re.sub(r"\[[^\]]*\]", " ", s)
         s = SEL_TAG.sub(" ", s)
         # a compound whole, `#x.y.z`, each part of it
@@ -386,8 +386,8 @@ LINE_COMMENT = re.compile(r"(?m)(?:^|(?<=\s))//[^\n]*$|/\*(?:(?!\*/).)*\*/\s*$",
 ARROW_PARAMS = r"(?:\((?:[^()]|\([^()]*\))*\)|[A-Za-z_$][\w$]*)"
 TS_ARROW_PARAMS = r"(?:\((?:[^()]|\([^()]*\))*\)(?:\s*:\s*[\w$<>\[\],.|&?'\" ]+?)?|[A-Za-z_$][\w$]*)"
 TS_SUFFIXES = {".ts", ".tsx", ".astro", ".vue", ".svelte"}
-# Where a function is named after its return type with no keyword before it
-# (B809): Java's `String quote(String v) {`, C#'s, Dart's `String quote(v) =>
+# Where a function is named after its return type with no keyword before it:
+# Java's `String quote(String v) {`, C#'s, Dart's `String quote(v) =>
 # v;`. The code before the name is modifiers and annotations, then a type;
 # a control word in the type's place (`return quote(`, `new Foo(`) is a call.
 TYPED_SUFFIXES = {".java", ".cs", ".dart"}
@@ -397,7 +397,7 @@ NOT_A_TYPE = {"return", "new", "throw", "else", "case", "await", "yield", "typeo
               "in", "is", "as", "do", "goto", "assert", "not", "and", "or", "default", "break",
               "continue", "if", "while", "for", "switch", "catch", "using", "lock", "checked"}
 # A Kotlin or Scala statement a new line starts with, ending an expression
-# body that ran on without a `;` (B810): `fun a(v) = quote(v)` then `fun b`.
+# body that ran on without a `;`: `fun a(v) = quote(v)` then `fun b`.
 FN_LINE_WORDS = {"fun", "def", "val", "var", "override", "private", "public", "protected",
                  "internal", "class", "object", "suspend", "inline"}
 JSX_SUFFIXES = {".tsx", ".jsx", ".astro"}
@@ -414,7 +414,7 @@ STATEMENT_WORDS = {"const", "let", "var", "function", "return", "if", "for", "wh
                    "export", "import", "throw", "try", "switch"}
 
 
-# Languages whose double-quoted strings run code, by how they mark it (B808).
+# Languages whose double-quoted strings run code, by how they mark it.
 INTERP = {".kt": "dollar", ".kts": "dollar", ".dart": "dollar", ".groovy": "dollar", ".scala": "dollar",
           ".swift": "paren"}
 
@@ -468,7 +468,7 @@ class JSScanner:
         self.mm_close = None     # where a method header's own `)` closed, for `): T {`
         self.kw, self.types, self.modifiers = self.words
         self.shape_methods = shape_methods
-        # a language whose strings run code: Kotlin's "${f()}", Swift's "\(f())" (B808)
+        # a language whose strings run code: Kotlin's "${f}", Swift's "\(f)"
         self.interp = INTERP.get(Path(sink.path).suffix, "")
         self.base = base            # where this text starts in its file
         self.fn_words = FN_WORDS if fn_words is None else fn_words
@@ -634,9 +634,9 @@ class JSScanner:
     def interp_string(self, q):
         """A string that runs code, Kotlin's "x=${quote(v)}" or Swift's
         "\\(f(v))": each expression scanned as code by a nested pass, as a
-        template's ${} is, so the call in it is recorded (B808). Kotlin's
+        template's ${} is, so the call in it is recorded. Kotlin's
         and Swift's \"\"\" strings run over lines. False for a quote left open
-        at the line's end, which string() takes as the one character it is."""
+        at the line's end, which string takes as the one character it is."""
         s, n = self.s, len(self.s)
         triple = s.startswith(q * 3, self.i)
         j = start = self.i + (3 if triple else 1)
@@ -686,11 +686,11 @@ class JSScanner:
         the function it sits in, at a depth no brace of the expression's
         closes: its own count starts at nothing, so with the outer pass's
         depths, `{h: 1}` in `${box({f: [field(`...`, {h: 1})]})}` ended
-        the function it sits in (B1193)."""
+        the function it sits in."""
         sub.stack = [(n, -1, None) for n, _, _ in self.stack]
         if self.pending is not None and self.parens > self.paren_at_pending:
             # in a default parameter, `function f(fmt = v => `${g(v)}`)`:
-            # the call is f's, as one outside a template there is (B761)
+            # the call is f's, as one outside a template there is
             sub.stack.append((self.pending["name"], -1, None))
         elif self.exprs and self.exprs[-1][3] == len(self.stack):
             # inside `x => `...${f()}...`` or Kotlin's `fun a() = "${f()}"`:
@@ -758,7 +758,7 @@ class JSScanner:
         """Past the brace that closes a template's ${ whose expression starts
         at k, a template inside it taken whole however deep its own ${} nest:
         skipped to the next backtick, a deeper template's, the braces were
-        miscounted and every call after it given the wrong caller (B1193)."""
+        miscounted and every call after it given the wrong caller."""
         s, n, depth = self.s, len(self.s), 1
         while k < n:
             c = s[k]
@@ -895,7 +895,7 @@ class JSScanner:
         # hands to onclick without calling it.
         # A parameter or a local that takes a function's name is not that
         # function handed on: `fun f(reach: Float)` and its uses named reach
-        # five times (B590). Its declaration shadows the name for the rest
+        # five times. Its declaration shadows the name for the rest
         # of the function it is declared in.
         in_params = self.pending is not None and self.parens > getattr(self, "paren_at_pending", 0)
         if not after_dot and nxt != "(" and word not in self.kw and (
@@ -933,8 +933,8 @@ class JSScanner:
             # what follows the keyword is the name, whatever other languages
             # make of the word: Kotlin's fun record(, fun delete(, fun open(
             self.begin_def(word, "function")
-            # `(function initGuide() {...})()` names nothing outside itself:
-            # nothing calls it by that name, and it is not dead (B585)
+            # `(function initGuide {...})` names nothing outside itself:
+            # nothing calls it by that name, and it is not dead
             self.pending["named_expr"] = self.before_fn in ("(", "=", ",", ":", "!", "?", "&", "|",
                                                             "return", "=>")
             self.pending["recv"] = bool(self.fn_words & {"fun", "func"})
@@ -1089,7 +1089,7 @@ class JSScanner:
                 # an anonymous function: `function(` or `async (`; body follows.
                 # Its own parameter list, so its { is its body even inside a
                 # call's parentheses, and the keyword spent, so the first name
-                # in the body is not read as the function's (B545).
+                # in the body is not read as the function's.
                 # `x.animate = function(` is named for what it is assigned to,
                 # as an arrow is; one handed straight to a call stays anonymous
                 # (the text before the keyword, whatever space stands between it
@@ -1207,7 +1207,7 @@ class JSScanner:
                 and re.fullmatch(r"\s*(?::\s*[\w$<>\[\],.?*() ]+)?\s*", s[self.pending_close:self.i]):
             # Kotlin's `fun a(v: String) = quote(v)`, Scala's `def a(v) = ...`:
             # a body that is one expression, so the calls in it are a's, not
-            # the class's around it (B810), and it ends where the expression does
+            # the class's around it, and it ends where the expression does
             d, self.pending = self.pending, None
             d["expr"] = True
             self.exprs.append((d, self.depth, self.nest(), len(self.stack)))
@@ -1216,7 +1216,7 @@ class JSScanner:
             return
         if c == "=" and s[self.i:self.i + 2] == "=>" and self.typed and self.maybe_method \
                 and self.maybe_method[2] == self.parens and (self.last_sig == ")" or self.typed_tail()):
-            # Dart's `String quote(v) => v;`: a typed head's arrow body (B809),
+            # Dart's `String quote(v) => v;`: a typed head's arrow body,
             # one expression, its header taken back from the calls
             name, line, _ = self.maybe_method
             self.maybe_method = None
@@ -1234,7 +1234,7 @@ class JSScanner:
             # `const NAME = x => expr`: a definition with no brace to hang a
             # body on, so it has no `at` for the instrumenter and its end is
             # its line; but it is a function, found, called, passed and
-            # counted like one (B224: drawLinux was nowhere in the map).
+            # counted like one (drawLinux was nowhere in the map).
             j, n = self.i + 2, len(s)
             while j < n and s[j] in " \t":
                 j += 1
@@ -1265,8 +1265,8 @@ class JSScanner:
                     self.arrow_defaults(m.group(1))
                     d["expr"] = True
                     self.exprs.append((d, self.depth, self.nest(), len(self.stack)))
-                    # A property (`nb.clashResume = () =>`): the object's to
-                    # call, so nothing here can see its calls (B271).
+                    # A property (`nb.clashResume = =>`): the object's to
+                    # call, so nothing here can see its calls.
                     d["prop"] = m.start(1) > 0 and s[max(0, self.i - 200):self.i][m.start(1) - 1] == "."
                 elif key and self.last_kw != "function":
                     # `render: (el, t) => renderProfileInto(el)` in a table:
@@ -1335,15 +1335,15 @@ class JSScanner:
         if m and self.is_default(head, m.start(1)):
             self._prop = False
             return ""
-        # A property (`nb.clashResume = () =>`) is the object's to call:
+        # A property (`nb.clashResume = =>`) is the object's to call:
         # kept as a definition for the attribution of what it draws, marked
-        # so `unused` does not name it as never called (B271).
+        # so `unused` does not name it as never called.
         self._prop = bool(m) and m.start(1) > 0 and head[m.start(1) - 1] == "."
         if m and m.group(1) not in self.kw:
             return m.group(1)
         # `name: (...) =>` in an object: a key after the brace or a comma
         # that opens its entry, as OBJ_KEY_ARROW reads one, and never the
-        # word before a conditional's colon (`x ? null : e => {`, B922).
+        # word before a conditional's colon (`x ? null: e => {`).
         m = re.search(r"(?:^|[{,])\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?" + self.params + r"\s*=>\s*$",
                       head, re.M)
         if m:
@@ -1375,7 +1375,7 @@ def code_only(text, suffix=".js"):
     return "".join(out)
 
 
-# ---- C and C++ (B544) -------------------------------------------------------
+# ---- C and C++ -------------------------------------------------------
 # Their own scanner, because the brace scanner above read them as JavaScript:
 # every `struct X` mention (a parameter, a local, a cast) became a class, no
 # C function header was a definition, and a prototype was a call. Here a
@@ -1484,9 +1484,9 @@ def _c_branches(out, conds, blank):
     """Which branches of each #if the scanner reads. Every one, when each
     branch's braces balance by themselves: the SIMD paths of ggml, one
     whole function per branch, were missing from the map behind their
-    first branch (B805). Only the first, the rest blanked, when any branch
+    first branch. Only the first, the rest blanked, when any branch
     is out of balance, since two that each open a brace left one unclosed
-    and the rest of the file inside the function above it (B554). An inner
+    and the rest of the file inside the function above it. An inner
     #if is settled before the one around it, so its blanked branches are
     not counted there."""
     def balance(a, b):
@@ -1512,7 +1512,7 @@ def _c_branches(out, conds, blank):
 def _c_untemplate(head):
     """A header with its `template <...>` lists cut out: a default there,
     `int N = 0` or `enable_if<...>::type = 0`, is no assignment, and the
-    function under it was dropped as one (B807)."""
+    function under it was dropped as one."""
     out, i = [], 0
     for m in re.finditer(r"\btemplate\s*<", head):
         if m.start() < i:
@@ -1557,7 +1557,7 @@ def _jni_method(name):
 
 def scan_c(text, sink):
     scan_sections(text, sink)
-    # #define NAME and NAME(...): what a header's API often is (B554).
+    # #define NAME and NAME(...): what a header's API often is.
     for m in re.finditer(r"(?m)^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)", text):
         sink.add_def(m.group(1), text.count("\n", 0, m.start()) + 1, "macro", "")
     code = _c_blank(text)
@@ -1648,7 +1648,7 @@ def scan_c(text, sink):
                         before = body[:k]
                         # An explicit specialization names its arguments
                         # after the name (template <> int tmax<int>(...)),
-                        # which is the name's: report #85, B575.
+                        # which is the name's.
                         tb = before.rstrip()
                         if tb.endswith(">") and not tb.endswith("operator>") and not tb.endswith("->"):
                             depth_, q = 0, len(tb) - 1
@@ -1760,7 +1760,7 @@ def scan_c(text, sink):
                 pre = code[max(0, i - 80):i].rstrip()
                 pw = re.search(r"([A-Za-z_]\w*)$", pre)
                 # `Widget w(3);`: a name straight after a type name is the
-                # variable being made, not a function called (B554).
+                # variable being made, not a function called.
                 declared = bool(pw) and pw.group(1) not in C_DECL_OK
                 if code[j:j + 1] == "(" and word not in C_CONTROL and not declared:
                     qm = re.search(r"([A-Za-z_]\w*)\s*(?:\.|->|::)$", pre)
@@ -1773,7 +1773,7 @@ def scan_c(text, sink):
                 # At file scope, a name after `=`, `,`, `{`, a cast's `)` or
                 # `&` is a value being stored: `.to_float = (fn_t) f,` in a
                 # dispatch table is how ggml wires every routine, and C's
-                # tables generally (report #83, B569). Only names the tree
+                # tables generally (report #83). Only names the tree
                 # defines as functions are kept from these.
                 sink.add_ref(word, line_at[i], fn_name())
             i = m.end()
@@ -1796,7 +1796,7 @@ SCRIPT = re.compile(r"<script\b[^>]*>(.*?)</script>", re.S | re.I)
 def scan_html(text, sink):
     scan_sections(text, sink)
     pos = 0
-    # An Astro component's `---` frontmatter is its script (B578)
+    # An Astro component's `---` frontmatter is its script
     fm = re.match(r"---[ \t]*\n(.*?)\n---[ \t]*(?:\n|$)", text, re.S)
     if fm and Path(sink.path).suffix == ".astro":
         scan_js(fm.group(1), sink, 2, fm.start(1))
@@ -1818,7 +1818,7 @@ def markup_draws(markup, sink, line0):
             sink.add_call(name, "", ln, "(markup)")
 
 
-# `name() {`, `function name {` and `function name() {` alike (B279).
+# `name {`, `function name {` and `function name {` alike.
 SH_DEF = re.compile(r"^\s*(?:function\s+([A-Za-z_][\w-]*)\s*(?:\(\))?|([A-Za-z_][\w-]*)\s*\(\))\s*\{")
 SH_COMMENT = re.compile(r"(^|\s)#.*$")
 SH_TRAP = re.compile(r"^\s*trap\s")
@@ -1887,7 +1887,7 @@ def scan_sh(text, sink, known=()):
     word = re.compile(r"(?<![\w./-])([A-Za-z_][\w-]*)(?![\w-])")
     for i, ln in enumerate(lines, 1):
         # A comment starts at a hash at the start or after a space: the
-        # hash of `${#arr[@]}` is not one (B279).
+        # hash of `${#arr[@]}` is not one.
         # (trap's quoted command does run, later: `trap 'cleanup' EXIT`)
         code = "" if ln.lstrip().startswith("#") else \
             SH_COMMENT.sub("", ln if SH_TRAP.match(ln) else sh_code(ln))
@@ -2062,7 +2062,7 @@ def build(root, prior=None):
 
 
 def scan_data(text, sink, suffix):
-    """A data file's keys as definitions (R167): a compose service's
+    """A data file's keys as definitions: a compose service's
     environment keys, .env.example's settings, the Unraid template's
     Config targets, a JSON or TOML file's keys and a Markdown file's
     headings, each at its line, so `aerie map find DASHBOARD_PORT` answers
@@ -2093,7 +2093,7 @@ _ENV_READ = re.compile(r"""(?:environ(?:\.get)?\s*[\[(]\s*["']|getenv\s*\(\s*["'
 
 
 def env_reads(root, files, fresh):
-    """Where the code reads a setting (R167): every `os.environ.get("X")`,
+    """Where the code reads a setting: every `os.environ.get("X")`,
     `getenv("X")`, `$X` and `process.env.X` whose X some data file defines
     as a setting, recorded as a call of X from `env`, so `aerie map who-calls
     DASHBOARD_PORT` answers. Only the files scanned this build are read
@@ -2110,7 +2110,7 @@ def env_reads(root, files, fresh):
             continue
         # Only the rows this pass wrote go: a python call on a variable
         # named env (env.update(...)) is qualified "env" too, and the map
-        # has to keep it (B406).
+        # has to keep it.
         calls = [c for c in files[rel]["calls"] if not (c.get("qual") == "env" and c.get("setting"))]
         for n, line in enumerate(text.splitlines(), 1):
             for name in {m.group(1) for m in _ENV_READ.finditer(line)}:
@@ -2189,7 +2189,7 @@ def exclude(root):
     Here and not only where the dashboard creates a project, which is where
     it used to be written: a project that predated that, or whose map a
     session built, showed .bb-map/ untracked, and `git add -A` took a
-    multi-megabyte index into a commit (B247). Found through git, so a
+    multi-megabyte index into a commit. Found through git, so a
     worktree writes it to the exclude file its repository shares; a tree
     with no repository has nothing to write it into, and the Git view's
     Init runs this when it makes one. Never the project's .gitignore, which
@@ -2225,8 +2225,8 @@ def exclude(root):
 
 class Index(dict):
     """The index as load and build hand it. idx["calls"] and idx["passed"]
-    are joined from CALLS_FILE on the first question that asks for them
-    (R228 step 16): a lookup of a definition reads a tenth of the bytes."""
+    are joined from CALLS_FILE on the first question that asks for them:
+    a lookup of a definition reads a tenth of the bytes."""
 
     def __missing__(self, key):
         if key in LAZY:
@@ -2321,9 +2321,9 @@ def load(root, force=False):
             langs[rel] = lang
         except OSError:
             continue
-    # ...and read by the scanner that would read it now (B553): a file whose
+    # ...and read by the scanner that would read it now: a file whose
     # language or scanner moved since it was indexed is stale though it has
-    # not changed, and build() rescans just those.
+    # not changed, and build rescans just those.
     if set(now) != set(have) or any(now[k] != have[k].get("mtime") or "defs" not in have[k]
                                     or have[k].get("lang") != langs[k]
                                     or have[k].get("scan") != SCANNER for k in now):
@@ -2439,7 +2439,7 @@ def page_bindings(idx, root, name):
     """Where a page script declares `name` at its top level: a `let`, `var`
     or `const` that is not a function, which the defs never carried, so
     `find active` said nothing defines what page-state.js declares on line
-    30 (B299). (file, line, kind) per declaration."""
+    30. (file, line, kind) per declaration."""
     out = []
     decl = re.compile(r"^(let|var|const)\s+(.*)$")
     for f in page_scripts(idx):
@@ -2454,7 +2454,7 @@ def page_bindings(idx, root, name):
 # A name declared as a value rather than a function or a type, by each
 # language's own words: what `find` falls back to when no definition has the
 # name. A Kotlin table in a companion object (`val ACTIONS = linkedMapOf(`)
-# was "nothing defines ACTIONS" (report #66, B527), and a python module's
+# was "nothing defines ACTIONS" (report #66), and a python module's
 # constant was the same.
 VALUE_DECL = {
     "py": lambda n: rf"^{n}\s*(?::[^=]+)?=(?!=)",
@@ -2499,7 +2499,7 @@ SHOW_LINES = 400
 def named(idx, name):
     """The definitions called `name`, or, for a dotted one, the module's or
     the class's own: `users.may` is may in users.py, `Handler._who` the
-    method in Handler, `nb.drawView` a property set on nb (R289: a session
+    method in Handler, `nb.drawView` a property set on nb (a session
     reads code as module.name, and each of those said nothing defines it)."""
     rows = [d for d in idx["defs"] if d["name"] == name]
     if rows or "." not in name:
@@ -2567,7 +2567,7 @@ def q_find(idx, name, root=None):
     rows = named(idx, name)
     # A page script's top-level let beside a definition of the same name is
     # listed too: with a python def called active, the def alone was the
-    # answer and the page variable's place was missed (B1148).
+    # answer and the page variable's place was missed.
     found = page_bindings(idx, root, name) if root and "." not in name else []
     if not rows and not found:
         more = value_decls(idx, root, name)
@@ -2591,7 +2591,7 @@ def q_find(idx, name, root=None):
 
 # Said under every answer that would have a session delete or rename
 # something: the map is an index, and a miss there deletes working code
-# (MediaReducer's unused was wrong 50 times in 51 before B584).
+# (one project's unused list was wrong 50 times in 51 before this was said).
 GREP_FIRST = ("(the map is an index, not a parser: {} before deleting or renaming, since a call "
               "from a string, a template or a file it does not read is not in it)")
 
@@ -2637,7 +2637,7 @@ def q_who_calls(idx, name, root):
 
 def q_calls(idx, name):
     rows = [c for c in idx["calls"] if c["caller"] == name or c["caller"].endswith("." + name)]
-    # A Kotlin or Java `external fun` is its JNI function in C (B554).
+    # A Kotlin or Java `external fun` is its JNI function in C.
     if not rows:
         for d in idx["defs"]:
             if d["name"] == name and d.get("kind") == "jni" and d.get("jni"):
@@ -2666,7 +2666,7 @@ def q_defs(idx, path):
     anon = [d for d in rows if d["name"] == "(anonymous)"]
     # A file of closures alone (a WordPress plugin's add_action callbacks)
     # lists them, each with what it is handed to; beside named ones they
-    # are counted, since every callback of a page would bury them (B577).
+    # are counted, since every callback of a page would bury them.
     for d in sorted(named if named else anon, key=lambda d: d["line"]):
         indent = "  " if d["parent"] else ""
         span = f"-{d['end']}" if d["end"] > d["line"] else ""
@@ -2707,7 +2707,7 @@ def suites_for(idx, paths):
     a suite that calls a function they define, names an id or class they
     draw, asks an API path they name, or names one of them outright (a
     suite that runs scripts/aerie). A changed suite reaches itself. The
-    map's half of a preflight (R75 step 3)."""
+    map's half of a preflight."""
     files = set()
     for p in paths:
         files |= {f for f in idx["files"] if f == p or f.endswith("/" + p)}
@@ -2840,7 +2840,7 @@ _CSS_NOTE = re.compile(r"/\*.*?\*/", re.S)
 _CSS_PRELUDE = re.compile(r"([^{}]*)\{")   # a rule's selector, or an @media's condition
 _CSS_CLASS = re.compile(r"\.(-?[A-Za-z_][\w-]*)")
 # A class name a template builds: `gl${lane % 5}` and `sk-${shape}` give a
-# family by its head, `${kind}tab` by its tail (B79: R60's sweep read only
+# family by its head, `${kind}tab` by its tail (a sweep that read only
 # whole names, took .gl0 to .gl4 for dead and left the Git graph blank).
 _TPL_HEAD = re.compile(r"""(?:^|[\s"'`])([A-Za-z_][\w-]*)\$\{""")
 _TPL_TAIL = re.compile(r"""\}([A-Za-z_][\w-]*)(?=[\s"'`]|$)""")
@@ -2862,7 +2862,7 @@ def unused_classes(idx, path=None, root="."):
             continue
         if Path(f).suffix in (".html", ".htm"):
             # Its own <style>, and the stylesheets beside it that it links
-            # (the dashboard's, a file a cascade layer since R9 step 4), each
+            # (the dashboard's, a file a cascade layer step 4), each
             # said by its own file.
             linked = [(str(Path(f).parent / h), Path(root) / Path(f).parent / h) for h in _LINKED.findall(text)]
             for name, css in [(f, "\n".join(_STYLE.findall(text)))] + [(n, _read(q)) for n, q in linked]:
@@ -2915,11 +2915,11 @@ def q_functions_unused(idx, path=None, root="."):
         # A handler assigned to an element (el.onclick = ...) is used by the
         # browser, which the map cannot see; its name says what it is. And
         # a property of an object (nb.clashResume = ...) is called as the
-        # object's, which the map does not follow either (B271).
+        # object's, which the map does not follow either.
         # ...and a constructor, which `new` calls by its class's name...
         # ...nor a method, which is called through its object as well, often by
         # a framework the tree only hands it to: VS Code calls a file system's
-        # createDirectory, and nothing here does (8 Oct).
+        # createDirectory, and nothing here does.
         if (n.startswith("on") and n[2:3].islower()) or d.get("prop") or d.get("named_expr") \
                 or n == "constructor" or d["kind"] == "method":
             continue
@@ -2990,7 +2990,7 @@ def coverage_ingest(root, idx, files, strip=""):
     definitions by file and name, nearest line."""
     cov = coverage_load(root) or {"format": COVERAGE_FORMAT, "suites": {}}
     # A suite this run counted is what this run saw of it, the counts of its
-    # runs before put away (R228 step 20): added to for good, what a suite
+    # runs before put away: added to for good, what a suite
     # stopped reaching, a function renamed and a folder moved (the agent's,
     # 495 keys under its old name) stayed on it and planned it. Its files in
     # one run (the page's, the server's, a rerun's) still add up.
@@ -3059,7 +3059,7 @@ def targets(idx):
     return rows
 
 
-# ---- what a change touches, by coverage (the operator, 29 Sep) ---------------
+# ---- what a change touches, by coverage ---------------
 # A whole gate was 25 minutes of wall for a change to one handler, because
 # server.py, index.html and the briefing each read as "every suite". The
 # covered run already says which suites reach which function, so a change
@@ -3094,8 +3094,8 @@ def changed_ranges(root, base, files):
 
 # A function nearly every suite reaches (the status read, the page's draw)
 # is passed through by each on its way to what it tests, and a change to one
-# planned all of them: one that 70 of 85 suites reach was a whole gate (R228
-# step 20). Past MOST_SHARE of the covered suites, the MOST_TAKE that run it
+# planned all of them: one that 70 of 85 suites reach was a whole gate.
+# Past MOST_SHARE of the covered suites, the MOST_TAKE that run it
 # most often stand for them. A whole gate still runs before a release, on
 # its tag, and when the harness changes.
 MOST_SHARE = 0.75
@@ -3254,7 +3254,7 @@ def affected(idx, cov, ranges, root=None):
     # A lab suite needs a real service and is run by name (aerie tests lab),
     # never picked, whichever road reached it: the file's own answer already
     # left them out, and a drawn name did not, so a change posting to a path
-    # a lab suite also asks planned that lab suite (B395).
+    # a lab suite also asks planned that lab suite.
     for s_ in [k for k in suites if k.startswith("lab-")]:
         del suites[s_]
     return suites, notes, unknown, every
@@ -3423,7 +3423,7 @@ def script_bodies(root, f):
         return []
     if minified(text):
         # a bundle the index skips is no page's own code, and code_only over
-        # xterm.js's one 290 kB line took fifty seconds (B804)
+        # xterm.js's one 290 kB line took fifty seconds
         return []
     if f.endswith(".html"):
         return [(code_only(m.group(1)).split("\n"), text.count("\n", 0, m.start(1)) + 1)
@@ -3466,7 +3466,7 @@ def q_state(idx, root, path=None):
     column 0 of a page script is one; every assignment to it across every
     page script is found, with the function it sits in and whether the right
     side reads `state` (the poll) or a fetch. One fed from `state` is a copy
-    of the poll kept by hand, which is how B213 and B215 happened; one fed
+    of the poll kept by hand, which goes stale; one fed
     from a fetch is that fetch's cache. Timers, drags and open menus are the
     page's own and read as local."""
     files = page_scripts(idx)
@@ -3743,7 +3743,7 @@ def q_sections(idx, path, cov=None):
 
 
 # Every verb a person asks, in one line: what bare `aerie map` ends with, and
-# what bb's own usage names (B546: the two had drifted apart).
+# what bb's own usage names (the two had drifted apart).
 VERBS = ("aerie map find NAME | show NAME|FILE:LINE | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
          "state [FILE] | sections FILE | unused [FILE] | addresses [FILE...] | coverage | covered NAME | "
          "uncovered [FILE] | affected --base REF FILES... | languages | build; aerie map help says what each does")
@@ -3753,7 +3753,7 @@ LANG_WORDS = {"py": "python", "c": "C and C++", "js": "brace scanner (C-shaped l
 
 
 def languages():
-    """Which files the map reads, by scanner, and what it does not (B546)."""
+    """Which files the map reads, by scanner, and what it does not."""
     by = {}
     for ext, lang in sorted(EXTS.items()):
         by.setdefault(lang, []).append(ext)
@@ -3767,7 +3767,7 @@ def languages():
 
 
 def summary(idx):
-    # Counted by extension (B806): the scanner's name said a Kotlin tree
+    # Counted by extension: the scanner's name said a Kotlin tree
     # was 44 js. A script with none is named by what its #! runs.
     langs = {}
     for name, f in idx["files"].items():
@@ -3795,7 +3795,7 @@ def main(argv):
         args = args[2:]
     verb = args[0] if args else ""
     rest = args[1:]
-    # `--format json|yaml|markdown` on find, who-calls and defs (R167): the
+    # `--format json|yaml|markdown` on find, who-calls and defs: the
     # entries as records, through records.py beside the dashboard.
     fmt, rest = "text", list(rest)
     for i, a in enumerate(list(rest)):
@@ -3918,7 +3918,7 @@ def main(argv):
         sys.stdout.write(records.dump(records.document("map", rows, Path(root).name), fmt))
         return 0
     if verb == "find" and len(rest) > 1:
-        # Several names in one process (R228 step 16), each answer under the
+        # Several names in one process, each answer under the
         # line that asks it: the rule hook asks all of one grep's names at
         # once, where each was a process and a load of the index.
         out = []

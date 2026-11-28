@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A lived-in /config as this tree's controller writes it, kept as the
-upgrade suite's fixture for this release (R79): every later build is started
+upgrade suite's fixture for this release: every later build is started
 on it by scripts/dashboard/test/upgrade.mjs, which checks the build migrates
 it and keeps everything in it. A release runs this once, commits what it
 writes, and `aerie version release` refuses a version that has none.

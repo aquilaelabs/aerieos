@@ -1,11 +1,11 @@
-"""A project's file access over FTP (R151, the operator, 7 Oct): whether it
+"""A project's file access over FTP: whether it
 is on, the port, and which accounts may sign in to it with read or read and
 write, kept in ftp.json by project.
 
 The server is the node's: the ftp toolchain's bb-ftpd, one per project,
 started by the agent on the project's primary node from what hello hands it
 (for_node). It never sees a password's answer. Each login is relayed by the
-agent to the ftp-auth verb, which lands in login() here: the name and the
+agent to the ftp-auth verb, which lands in login here: the name and the
 password checked as the dashboard's sign-in checks them, then the access
 this project's settings give that account. Nothing is cached on the node,
 so taking an access away holds from the next login.
@@ -29,7 +29,7 @@ ask_hello = None             # node id -> the agent is told now, not in ten minu
 node_info = None             # node id -> {"name", "addr", "has_ftp": True|False|None}
 mfa = None                   # the second factors (mfa.py): enabled(uid), totp_check(uid, code)
 # A locked project's refusal for an account (projects.locked_out), set by
-# server.py: a lock makes every way into the files read-only (B263).
+# server.py: a lock makes every way into the files read-only.
 locked_out = lambda name, uid: None  # noqa: E731
 
 ACCESS = ("r", "rw")
@@ -56,7 +56,7 @@ def configure(*, state, workspace, write_json, users, audit, project_node, ask_h
     globals().update(FILE=Path(state) / "ftp.json", WORKSPACE=Path(workspace), write_json=write_json,
                      users=users, audit=audit, project_node=project_node, ask_hello=ask_hello,
                      node_info=node_info, mfa=mfa)
-    # A timer set before a restart, armed again (R196).
+    # A timer set before a restart, armed again.
     for rec in _load().values():
         r = _clean(rec)
         if r["on"] and r["until"]:
@@ -124,14 +124,14 @@ def _clean(rec):
     except (TypeError, ValueError):
         port = 0
     acc = rec.get("access") if isinstance(rec.get("access"), dict) else {}
-    # The editor's and the apps' door is open unless the project closed it
-    # (R104): being on a project is what lets a person's own machine in.
+    # The editor's and the apps' door is open unless the project closed it:
+    # being on a project is what lets a person's own machine in.
     until = rec.get("until") if isinstance(rec.get("until"), int) and not isinstance(rec.get("until"), bool) else 0
     return {"on": bool(rec.get("on")), "port": port, "editor": bool(rec.get("editor", True)),
             "access": {str(k): v for k, v in acc.items() if v in ACCESS}, "until": until if rec.get("on") else 0}
 
 
-# How long FTP may be kept on (R196, the operator, 1 Nov): until turned off,
+# How long FTP may be kept on: until turned off,
 # or for an hour, a day or a week, after which it turns itself off.
 FOR = (0, 3600, 86400, 7 * 86400)
 
@@ -218,7 +218,7 @@ def save(project, req, by):
             rec["until"] = int(time.time()) + f if f else 0
         if not rec["on"]:
             rec["until"] = 0
-        # The editor's door (R159): the same people and access, through the
+        # The editor's door: the same people and access, through the
         # controller's Files API rather than an FTPS server on the node.
         if "editor" in req:
             rec["editor"] = bool(req.get("editor"))
@@ -351,7 +351,7 @@ def login(node, project, name, password, addr):
     denied = {"access": "", "why": "Authentication failed."}
     rec = get(project)
     if not rec["on"] or project_node(project) != node:
-        # Said to the audit log as the other refusals are (B429), so the
+        # Said to the audit log as the other refusals are, so the
         # Audit page tells this from a wrong password: the server's own
         # words stay the same, since they say no more than a sign-in page.
         audit(f"ftp:{addr}", "ftp-login-refused", project,
@@ -361,14 +361,14 @@ def login(node, project, name, password, addr):
     if _throttled(addr):
         return {"access": "", "why": "Too many failed logins from this address; try again in a few minutes."}
     # Counted against the node the login came through as well as the
-    # address it names (B721): the node writes that address, so a node
+    # address it names: the node writes that address, so a node
     # changing it on every try was never held.
     password = str(password or "")
     u = users.authenticate(str(name or ""), password, where=f"node:{node}")
     # An account with two-factor sign-in types its password with its
     # authenticator's six digits right after it, the one way an FTP client
     # can carry a code: its password alone opened its files here, where it
-    # opens nothing anywhere else (B723).
+    # opens nothing anywhere else.
     if u and mfa is not None and mfa.enabled(u.get("uid", "")):
         _failed(addr)
         audit(u["name"], "ftp-login-refused", project, {"addr": addr, "why": "its password alone, and the account has two-factor sign-in"})
@@ -379,7 +379,7 @@ def login(node, project, name, password, addr):
         if cand and mfa.enabled(cand.get("uid", "")):
             # The account's hold on wrong codes is the web sign-in's too: an
             # FTP client guessing codes was held by nothing but the node's
-            # password count (R288).
+            # password count.
             keys = (f"acct:{cand['uid']}",)
             if mfa.held(*keys):
                 _failed(addr)
@@ -404,7 +404,7 @@ def login(node, project, name, password, addr):
 def access_for(u, project, door):
     """(access, why): what this account may do with `project`'s files
     through `door`, "ftp" (the node's FTPS server) or "editor" (the Files
-    API the VS Code extension uses, R159). "r" or "rw", or "" with the
+    API the VS Code extension uses). "r" or "rw", or "" with the
     sentence why not. The one answer both doors give, asked afresh on every
     login and every request, so access taken away holds from the next one.
     A session is never a person and has the tree already: none."""
@@ -418,12 +418,12 @@ def access_for(u, project, door):
     # Taken off the project since: its access went with it.
     if access and not users.may_see(u, project):
         access = ""
-    # ...and no more than the account's roles give on this project (R152
-    # (f)): a role without File access refuses even the project's owner.
+    # ...and no more than the account's roles give on this project:
+    # a role without File access refuses even the project's owner.
     lvl = users.roles.level_of(u, "files", project, users.may_work)
     # The editor's and the apps' door: someone on the project has what their
-    # roles' File access gives, with no grant of their own needed (R104, the
-    # operator, 22 Oct); a grant on the list still narrows it. FTPS keeps
+    # roles' File access gives, with no grant of their own needed;
+    # a grant on the list still narrows it. FTPS keeps
     # its list, being a server on the network with passwords of its own.
     if door == "editor" and not rec["access"].get(users.uid_of(u)) and users.may_see(u, project):
         access = {"write": "rw", "read": "r"}.get(lvl, "")
@@ -433,8 +433,8 @@ def access_for(u, project, door):
         access = "r"
     if not access:
         return "", "This account has no file access to this space."
-    # A project locked against this account (R119) is read here as it is on
-    # the page: nothing of it changes, through this door either (B263).
+    # A project locked against this account is read here as it is on
+    # the page: nothing of it changes, through this door either.
     if access == "rw" and locked_out(project, users.uid_of(u)):
         access = "r"
     return access, ""

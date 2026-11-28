@@ -1,9 +1,9 @@
-"""The coding agents on the nodes (R95 step 2, R145): which version of
+"""The coding agents on the nodes: which version of
 Claude Code, Codex CLI, Copilot CLI and the others each node runs, what the
 latest is, and the one way each is installed, updated or removed.
 
 One pattern for every row of the agent table that has a row in the Library
-(agents.installable()). A session runs on a node, and the node carries the
+(agents.installable). A session runs on a node, and the node carries the
 agent in the session account's home, installed there on purpose and never
 by the provisioner. The node's agent probes its version on every heartbeat
 (the census's session.<reported>), so the controller always knows what
@@ -64,8 +64,8 @@ _latest = {}               # {agent id: {version, at, error, checking}}
 # {(agent id, node id): when} for an update pressed and not yet queued:
 # ending the node's sessions comes first and is a round trip each, and in
 # those seconds the hold read nothing, so a project's Claude button was live
-# and a press on it started a session the update was about to end (the
-# operator, 29 Sep). The job is the fact once it exists; this is the fact
+# and a press on it started a session the update was about to end.
+# The job is the fact once it exists; this is the fact
 # until then.
 _pressed = {}
 catalog_entry = None       # server: the signed index's official entry of this name, or None
@@ -91,8 +91,8 @@ def _ahead(a):
 
 def recipe(agent_id, ask=True):
     """(recipe, "catalog" or "release"): how this agent is installed, as
-    the node is handed it with every install, update and removal (R169 step
-    13). The agent table's own, which shipped with this release, unless the
+    the node is handed it with every install, update and removal.
+    The agent table's own, which shipped with this release, unless the
     catalog's signed index pins this agent's pack with a higher rev: then
     the catalog's, fetched at that commit with its archive's sha256 checked
     and the manifest held to its shape, as any pack's is. A pack that is
@@ -287,8 +287,8 @@ def updating(node_id, agent_id):
 
 def start_hold(project, node_id, agent_id):
     """A sentence when a session of this agent on this node has to wait,
-    or "": its update running there holds every start until it ends (R95
-    step 18). Nothing updates by itself: a node stays on what it has until
+    or "": its update running there holds every start until it ends.
+    Nothing updates by itself: a node stays on what it has until
     Update is pressed (the switch that updated a node behind before a
     session started went on 7 Oct, the operator's)."""
     n = nodes.node(node_id) if nodes else None
@@ -352,7 +352,7 @@ def update(principal, node_id, agent_id):
 
 
 def remove(principal, node_id, agent_id):
-    """Queue the job that takes this agent off the node (R145), the update
+    """Queue the job that takes this agent off the node, the update
     job's other action, its sessions there ended first."""
     a = _agent(agent_id)
     n = nodes.node(node_id) if nodes else None
@@ -373,7 +373,7 @@ def remove(principal, node_id, agent_id):
 
 
 def update_done(job, state):
-    """The census catches up with an install the moment it finishes (B249).
+    """The census catches up with an install the moment it finishes.
     The version the controller compares rides the node's census, which
     rides its hello every ten minutes, so the bell and the row said an
     update was out for up to ten minutes after the job installed it. The
@@ -387,14 +387,14 @@ def update_done(job, state):
     if not a:
         return None
     full = nodes.job(job["id"], with_log=True) or {}
-    # A removal (R145): none now, so the row and the session gate say so
+    # A removal: none now, so the row and the session gate say so
     # before the next hello does.
     if (job.get("spec") or full.get("spec") or {}).get("action") == "remove":
         nodes.reported_set(job["node"], "session", a.reported, "")
         return None
     # The node writes the version as the program's --version prints it,
-    # what follows the number included (Claude Code's own "(Claude Code)",
-    # B167): matched with or without it, and kept on the value, which is
+    # what follows the number included (Claude Code's own "(Claude Code)"):
+    # matched with or without it, and kept on the value, which is
     # how the census itself reads.
     m = re.search(re.escape(a.product) + r" (\d[\w.+-]*)(?:" + re.escape(a.census_suffix)
                   + r")? is what a session here runs now", full.get("log") or "")
@@ -404,8 +404,8 @@ def update_done(job, state):
 
 
 def row(n, agent_id):
-    """This agent as a row of the Library and the Installed page (R145,
-    R95), or None on a node that runs no session account: what a session
+    """This agent as a row of the Library and the Installed page,
+    or None on a node that runs no session account: what a session
     of it there runs, installed on purpose rather than by the provisioner.
     The version is the census's (the program's --version as the session
     account), the latest this module's check, and the job behind install,
@@ -421,7 +421,7 @@ def row(n, agent_id):
     a = agents.get(agent_id)
     se = (n.get("reported") or {}).get("session") or {}
     # A hosting-only node runs no session, so nothing there runs a coding
-    # agent: no row, whatever its census says (the operator, 11 Oct).
+    # agent: no row, whatever its census says.
     if not a or n.get("kind") != "agent" or not se.get("up") or (n.get("config") or {}).get("host_only"):
         return None
     inst = installed(n, a.id)
@@ -448,7 +448,7 @@ def rows(n):
 
 
 def verb(principal, req):
-    """The coding agents' presses in the Library and on the Installed page (R95, the operator 22 Oct: the one way an
+    """The coding agents' presses in the Library and on the Installed page (the one way an
     agent is installed): install (or update), remove or check, for one
     agent on one node. The caller has decided who may. (payload, status)."""
     action = str(req.get("action") or "")
@@ -469,7 +469,7 @@ def start(delay=None):
     """One check of each soon after the controller starts. After that each
     is asked on the toolchains' own clock (toolchains.node_checks_due:
     weekly, and when a node starts) and on a press of Check for updates,
-    like every toolchain (R145). The update itself is never on a clock: a
+    like every toolchain. The update itself is never on a clock: a
     press."""
     wait = float(os.environ.get("BB_CLAUDE_CHECK_DELAY") or 20) if delay is None else delay
 

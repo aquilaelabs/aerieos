@@ -89,7 +89,7 @@ class OneReader(unittest.TestCase):
         sig = os.path.join(ROOT, "scripts", "agent", "agent.sig")
         # The tree's own file, held as test_agent_release_sig holds it
         # (alone_with, the same lock by name): put back here while that test
-        # stood between unlinking it and reading it, it found one (B1109).
+        # stood between unlinking it and reading it, it found one.
         import fcntl
         import hashlib
         lock = open(os.path.join(tempfile.gettempdir(), "aerieos-agent-sig-"

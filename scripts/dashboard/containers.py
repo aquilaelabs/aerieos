@@ -35,14 +35,14 @@ from fields import field  # noqa: E402
 # What the verbs at the foot need from the rest of the server, set by
 # server.py: a project's Run its container dial, the account store, the
 # asking (phone.ask_rebuild), and the sessions' networks told when a
-# container changes hands (R79).
+# container changes hands.
 dial = None
 users = None
 ask_rebuild = None
 net_nudge = None
-# Whether a node's published ports are meant to stay on it (nodes.ports_local_on, R190).
+# Whether a node's published ports are meant to stay on it (nodes.ports_local_on).
 ports_local = None
-# Each container's last hour on a node, by name (nodes.ctr_spark, R218 step 9).
+# Each container's last hour on a node, by name (nodes.ctr_spark).
 ctr_spark = None
 
 
@@ -54,7 +54,7 @@ def _targets(name):
     The rule every executing surface here follows: what reaches a command
     line is a string this server handed out. A name typed by somebody, or
     remembered by a page from a listing five minutes old, is not that, so it
-    is looked up again before it is used (R68 step 1).
+    is looked up again before it is used.
 
     The second half is what `aerie devapp ls` prints: an instance under its
     compose name, whose containers are named for it and its services
@@ -82,7 +82,7 @@ def _known_container(name):
 
 
 BOOT_CTL = ("boot-on", "boot-off")
-# Onto the LAN and off it again (R178): an administrator's, read by the wall
+# Onto the LAN and off it again: an administrator's, read by the wall
 # the node's agent keeps around each project's containers.
 LAN_CTL = ("lan-on", "lan-off")
 
@@ -104,7 +104,7 @@ def container_ctl(name, what):
         return {"error": f"no container called {name} on this daemon now: the list is "
                          "read again before anything is acted on, and it has moved"}
     if what in BOOT_CTL:
-        # Start on boot (R122): the restart policy, on every container the
+        # Start on boot: the restart policy, on every container the
         # name means, and kept for an instance so a rebuild keeps it.
         on = what == "boot-on"
         r = devapp._run([devapp.DOCKER, "update", "--restart", "unless-stopped" if on else "no",
@@ -191,8 +191,8 @@ def name_free(name):
     """Why a container cannot be made under `name`, or "": one the store
     has, or a name another project's instance resolves to. Asked before a
     session's request reaches the bell as well as by create_container, so an
-    administrator is not asked to decide on a request no answer can build
-    (B309). The way forward is named rather than "pick another name": the
+    administrator is not asked to decide on a request no answer can build.
+    The way forward is named rather than "pick another name": the
     usual reason to ask again under a name is to change that container,
     and a second name is a second container on the same data."""
     slug = devapp._slug(name) or ""
@@ -240,7 +240,7 @@ def relative_builds(compose_text, env_text=""):
     context: for a container written here that is its own data directory,
     which is empty, since compose resolves a relative path against the
     project directory it is handed and such a container has no project tree
-    behind it (B329). Asked of compose itself, twice, with two scratch
+    behind it. Asked of compose itself, twice, with two scratch
     directories standing in for the data directory: a context that moves
     with the project directory is relative, however it was written (a bare
     `build: .`, `..`, a context key, the default context, a variable), and
@@ -328,8 +328,8 @@ def create_container(name, compose_text, env_text="", node="", for_project="", a
     with devapp.edit_rec(slug, devapp.MAIN, create=True) as rec:
         rec["source"] = "file"
         # Not listed while compose reads it: a manager listing that landed
-        # in this window drew a row for a container that was then refused
-        # (B239). A time, so a record left by a restart mid-check is listed
+        # in this window drew a row for a container that was then refused.
+        # A time, so a record left by a restart mid-check is listed
         # again after PENDING_S rather than hidden with its name taken.
         rec["pending"] = int(time.time())
         if node:
@@ -347,12 +347,12 @@ def create_container(name, compose_text, env_text="", node="", for_project="", a
         devapp.forget_container(slug)
         return {"error": ("compose will not read that:\n" + r["out"]).strip()[-600:]}
     # ...and a file that reads but builds from its own empty data directory
-    # is a container that can never be built (B329), taken away the same way.
+    # is a container that can never be built, taken away the same way.
     why = build_refusal(name, compose_text, env_text)
     if why:
         devapp.forget_container(slug)
         return {"error": why}
-    # Made from an app (R238 step 3): which one, at which pin and with which
+    # Made from an app: which one, at which pin and with which
     # fields, kept beside its compose file, so Configure opens on its panel.
     if app:
         keep_app(slug, app)
@@ -366,7 +366,7 @@ def create_container(name, compose_text, env_text="", node="", for_project="", a
 
 
 # ---- a container made from an app ------------------------------------------
-# What a container made from an app keeps of it (R238 step 3): app.json
+# What a container made from an app keeps of it: app.json
 # beside its compose file, nasapps.snapshot's record. Edited by hand, it
 # is taken away and the container is a written one like any other.
 APP_FILE = "app.json"
@@ -422,7 +422,7 @@ def app_made(req, a, node="", keep=None, name=""):
     holds it or as a container kept it; `keep` the container's values on an
     edit, so a secret is made once and a port it holds is its own; `name`
     the container's, whose own key a router field takes at the router
-    picked (R238 step 7), `routers` the nodes whose routers it uses."""
+    picked, `routers` the nodes whose routers it uses."""
     import nasapps
     import router
     extra, why = nasapps.extra_env(a, req.get("env"))
@@ -630,7 +630,7 @@ def update_container(name, compose_text, env_text):
 
 # A private key inline in a compose file (the nginx tab's tls_key configs)
 # is for the node, never for a text box: the editor's copy shows a line in
-# its place (B656). Matched on the config's name and its content block.
+# its place. Matched on the config's name and its content block.
 _KEY_BLOCK = re.compile(r"^(  tls_key[^\n]*:\n    content: \|\n)(?:      [^\n]*\n)+", re.M)
 
 
@@ -639,8 +639,8 @@ def redact_keys(compose):
 
 
 def rename_container(name, new, instance=None):
-    """A container under a new name, while it is down (the operator, 11
-    Oct: the name is editable in the Edit dialog once the container is
+    """A container under a new name, while it is down
+    (the name is editable in the Edit dialog once the container is
     down, and a project's container is named whatever its owner wants, not
     after the project). `name` is a written container's, or with `instance`
     the project a project's container is made from. The name is its compose
@@ -686,7 +686,7 @@ def rename_container(name, new, instance=None):
 def read_container(name):
     """What was written, for the editor to open on, and whether it is
     AerieOS's own: the editor opened while the page's list was put away has
-    no row to read that from (B810)."""
+    no row to read that from."""
     try:
         compose = (devapp.containers_dir(name) / "docker-compose.yml").read_text(
             encoding="utf-8", errors="replace")
@@ -695,7 +695,7 @@ def read_container(name):
     env = devapp.read_env(name, devapp.MAIN)
     return {"compose": redact_keys(compose), "env": env,
             "managed": devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM,
-            # ...and the app it was made from, read back for its panel (R238).
+            # ...and the app it was made from, read back for its panel.
             "app": app_view(name, env)}
 
 
@@ -735,12 +735,12 @@ def set_container_owner(name, owner):
     node = devapp._node_here()
     if owner:
         # Only to a project that works on this node: given to one elsewhere
-        # it would be out of reach of that project's sessions (R79).
+        # it would be out of reach of that project's sessions.
         why, own = devapp.on_project_node(owner, node)
         if why:
             return {"error": why}
-        # ...and under a name nothing else of the project's answers to (the
-        # operator, 11 Oct): a container's name is what a session asks for
+        # ...and under a name nothing else of the project's answers to:
+        # a container's name is what a session asks for
         # (aerie devapp log NAME), and one that is some instance's compose
         # name, or a stranger already given to this project on another
         # node, would make that ask mean two things. Renamed first.
@@ -785,16 +785,16 @@ def _answer(r):
 
 
 def session_verb(sess, me, act, name, req, read_only=False):
-    """A SESSION's word on one container that belongs to its project (the
-    operator, 24 Sep): on its project's nodes, its log when it asks, since
+    """A SESSION's word on one container that belongs to its project:
+    on its project's nodes, its log when it asks, since
     that is reading it, and start, stop or restart as the project's Run its
     container setting allows. (payload, status)."""
     # Looked for on each of the project's nodes, primary first: its
-    # containers live on any of them (R82), and asking the primary
+    # containers live on any of them, and asking the primary
     # alone refused the project's own dev instance on its second
-    # node as not its own (B268).
-    # ...and on every node it hosts its containers on (R166, B649), and the
-    # node each of its instances was put on (B338): devapp.container_nodes.
+    # node as not its own.
+    # ...and on every node it hosts its containers on, and the
+    # node each of its instances was put on: devapp.container_nodes.
     c, owner, nid = None, "", devapp.project_daemon(sess)
     where = devapp.container_nodes(sess) or [nid]
     for cand in where:
@@ -867,7 +867,7 @@ def admin_verb(act, name, nid, under):
     with devapp.on_node(nid or None):
         if act == "owner":
             r = set_container_owner(name, under)
-            # Whose it is also decides whose sessions may reach it (R79).
+            # Whose it is also decides whose sessions may reach it.
             if not r.get("error"):
                 net_nudge()
             return _answer(r)
@@ -875,7 +875,7 @@ def admin_verb(act, name, nid, under):
             return container_logs(name), 200
         if act in LAN_CTL:
             return _answer(container_lan(name, nid, act == "lan-on"))
-        # The two prunes the Images and volumes section offers (R216):
+        # The two prunes the Images and volumes section offers:
         # `name` is which, images or volumes, and nothing is named.
         if act == "prune":
             if name not in devapp.PRUNES:
@@ -885,7 +885,7 @@ def admin_verb(act, name, nid, under):
 
 
 def images_view(nid):
-    """The daemon's images and volumes on node `nid` (R216), as
+    """The daemon's images and volumes on node `nid`, as
     devapp.images_view reads them, under that node's address."""
     with devapp.on_node(nid or None):
         return {"node": nid, **devapp.images_view()}
@@ -905,12 +905,12 @@ def tab_verb(act, name, req, seen):
         # Not one of AerieOS's own (System's, the nginx tab's today): its
         # file is written from that tab, and the editor's copy has the
         # private key redacted (read_container), so saving that copy would
-        # write the redaction over the key (B656). The tab's own Save goes
+        # write the redaction over the key. The tab's own Save goes
         # through update_container directly.
         if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
             return {"error": f"{name} is AerieOS's own, written from the nginx page: change it there"}, 403
         compose, env = req.get("compose") or "", req.get("env") or ""
-        # Made from an app (R238 step 3): its panel's values make the
+        # Made from an app: its panel's values make the
         # environment, the file stays the one it was made with, or the
         # Library's newer one when Configure takes it; edited by hand, it
         # leaves the app and is saved as written.
@@ -928,7 +928,7 @@ def tab_verb(act, name, req, seen):
         r = update_container(name, compose, env)
         if snap and not r.get("error") and (req.get("by_hand") or req.get("newer")):
             keep_app(name, None if req.get("by_hand") else made.get("app"))
-        # A router it no longer uses lets go of its key (R238 step 7).
+        # A router it no longer uses lets go of its key.
         if snap and not r.get("error") and not req.get("by_hand"):
             import router
             router.drop_container(name, keep=made.get("routers") or ())
@@ -957,7 +957,7 @@ def tab_verb(act, name, req, seen):
     under = field(req, "owner")
     if under and under not in mine:
         return {"error": f"not a space: {under}"}, 400
-    # From an app the Library holds (R238 step 3): its panel's values make
+    # From an app the Library holds: its panel's values make
     # the environment and its compose file is the catalog's, never the page's.
     compose, env, app = req.get("compose") or "", req.get("env") or "", None
     if field(req, "app"):
@@ -982,14 +982,14 @@ def tab_verb(act, name, req, seen):
     if r.get("error") and app:
         import router
         router.drop_container(devapp._slug(name))
-    # Made for a project: its sessions may reach it (R79).
+    # Made for a project: its sessions may reach it.
     if not r.get("error") and under:
         net_nudge()
     return _answer(r)
 
 
 def stats_view(nid, seen):
-    """What the containers on `nid`'s daemon are using now (R216), by
+    """What the containers on `nid`'s daemon are using now, by
     name: the page asks for it beside the list, never inside it. `seen` as
     manager_view takes it: an administrator reads every container, anybody
     else the containers of the instances of their projects."""
@@ -1004,8 +1004,8 @@ def stats_view(nid, seen):
         got = {"error": got.get("error", ""),
                "stats": {n: v for n, v in (got.get("stats") or {}).items()
                          if any(n == pn or n.startswith(pn + "-") or n.startswith(pn + "_") for pn in mine)}}
-    # Each container's last hour, where its node's agent samples it (R218
-    # step 9): the containers this account sees and no others.
+    # Each container's last hour, where its node's agent samples it:
+    # the containers this account sees and no others.
     return {"node": nid, **got, "spark": ctr_spark(nid, set(got.get("stats") or {})) if nid and ctr_spark else {}}
 
 
@@ -1014,8 +1014,8 @@ def manager_view(nid, seen):
     to the node, and every container on that node's daemon that is not one
     of them. `seen` is None for an administrator, or the projects whose
     instances and containers this account may see: a node is shared, and
-    anything else on it is another project's work, or nobody's (the
-    operator, 24 Sep)."""
+    anything else on it is another project's work, or nobody's.
+    """
     # Refresh is the retry: drop the memoised availability first, so a
     # daemon wired up thirty seconds ago is noticed by pressing the
     # button rather than by waiting for the memo to lapse.
@@ -1036,7 +1036,7 @@ def manager_view(nid, seen):
     # a container moved to a VPS that then answers nowhere (11 Oct).
     got["nginx_ports"] = sorted({int(r.get("port") or 0) for r in (nginxproxy.record(got["node"]).get("routes") or [])}
                                 if got["ports_local"] else set())
-    # ...and the node's nginx as a row would route through it (R209): whether
+    # ...and the node's nginx as a row would route through it: whether
     # it is deployed, the certificates it holds (by the domain each is filed
     # under) and the ports its routes already point at, whatever the node's
     # port setting.
@@ -1045,11 +1045,11 @@ def manager_view(nid, seen):
                     "certs": sorted(k for k, v in (nrec.get("certs") or {}).items() if (v or {}).get("set")),
                     "routed": sorted({int(r.get("port") or 0) for r in (nrec.get("routes") or [])}),
                     # ...and each route whole, so a row can say the address
-                    # nginx answers for its port at (R216).
+                    # nginx answers for its port at.
                     "routes": [{"host": r.get("host") or "*", "path": r.get("path") or "/",
                                 "port": int(r.get("port") or 0), "tls": bool(r.get("tls"))}
                                for r in (nrec.get("routes") or [])]}
-    # Which of AerieOS's own each System row is (R181): its Configure
+    # Which of AerieOS's own each System row is: its Configure
     # opens that one's page. The scanners are a compose job of their own on
     # the node, never an instance, so their containers are put under
     # System here by their compose project's name.
@@ -1066,23 +1066,23 @@ def manager_view(nid, seen):
             i["system"] = ours.get(i.get("project", ""), "")
         i["relocating"] = relocate.view(i.get("project", ""), i.get("instance", ""))
         # Why a row publishes on every address of a node whose ports stay
-        # on it (R217): 0.0.0.0 in its compose file, by name or through a
+        # on it: 0.0.0.0 in its compose file, by name or through a
         # variable defaulting to it, wins over the daemon's loopback default,
         # and a down row with such a file will do the same when it comes up.
         if got["ports_local"]:
             i["open_from"] = devapp.every_address(i.get("project", ""), i.get("instance", "") or devapp.MAIN)
         # A node's nginx behind the newest line says so on its row, with
-        # Update (R192); "" for every other row.
+        # Update; "" for every other row.
         if i.get("owner") == devapp.SYSTEM:
             i["nginx_to"] = nginxproxy.behind_named(i.get("project", ""))
             # ...and another of AerieOS's own whose entry names another
             # image than its file runs, with Update as on every row.
             i["images_behind"] = [packformat.image_said(to) for to in entry_moved(i.get("project", ""), kept).values()]
         # ...and any other's registry images behind what the registry serves
-        # (imagecheck, R195): the row says which, with Update.
+        # (imagecheck): the row says which, with Update.
         # AerieOS's own image is said by the digest its release's signed
         # list names, and a tag that serves another image than the newest
-        # signed release names is said in a line of its own (R199).
+        # signed release names is said in a line of its own.
         # A container made from an app whose entry names another digest
         # says that one, short, and the registry is not asked about it.
         else:
@@ -1097,7 +1097,7 @@ def manager_view(nid, seen):
                             if i.get("owner") in seen]
         got["containers"] = [c for c in got.get("containers") or []
                              if c.get("owner") in seen]
-        # Whether anything was left out, and nothing about what (B89): an
+        # Whether anything was left out, and nothing about what: an
         # empty page then says the daemon holds what this account may not
         # read, rather than that the daemon is empty.
         got["unseen"] = was > len(got["instances"]) + len(got["containers"])

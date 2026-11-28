@@ -1,4 +1,4 @@
-"""ciwatch.py (R117): one look at a project's CI. The tree's workflows give
+"""ciwatch.py: one look at a project's CI. The tree's workflows give
 a moving label and actions a major behind; a stand-in for GitHub's API
 gives a red newest run on main and the notice GitHub wrote on it. What it
 finds is kept, and a red main branch is what the bell is handed."""
@@ -136,10 +136,10 @@ class Look(unittest.TestCase):
         self.assertEqual(ciwatch.red(["app"]), [])
 
     def test_a_red_row_blocks_work_and_stays_until_a_run_passes(self):
-        # R280 (the operator, 24 Nov): a failing CI run blocks work, so it is
+        # A failing CI run blocks work, so it is
         # Active, drawn with no Dismiss, and a key put away before hides
         # nothing; it leaves when a run passes. Its key still names the run
-        # (B331: "run 11" was two keys, and neither the row's).
+        # ("run 11" was two keys, and neither the row's).
         import bellseen
         ciwatch.look("app")
         rows = ciwatch.red(["app"])
@@ -151,7 +151,7 @@ class Look(unittest.TestCase):
         self.assertTrue(out[0]["active"])
 
     def test_a_finding_carries_its_fix_and_a_press_writes_only_that_line(self):
-        # R117 step 4: the label and an action a major behind are one press.
+        # The label and an action a major behind are one press.
         rec = ciwatch.look("app")
         fixes = {f["where"]: f["fix"] for f in rec["findings"] if f.get("fix")}
         self.assertEqual(fixes, {"android.yml:5": {"from": "ubuntu-latest", "to": "ubuntu-24.04"},
@@ -196,7 +196,7 @@ class Look(unittest.TestCase):
         self.assertTrue(ciwatch.due("app"))
 
     def test_gitea_and_forgejo_workflows_are_read_too(self):
-        # B92: a repository on a Gitea or Forgejo host keeps its workflows
+        # A repository on a Gitea or Forgejo host keeps its workflows
         # in its own directory; a file there is read, named with its
         # directory, offered an action's fix, and not GitHub's label.
         for d in (".gitea", ".forgejo"):

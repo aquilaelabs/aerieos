@@ -146,7 +146,7 @@ def _pin_release(pin_dir, cmd, root, who=None):
     and the command and each helper beside it a link into it, so the agent
     finds its helpers where it looks, beside its own executable. Copying the
     one binary left Codex 0.163 without codex-code-mode-host, and every
-    command a session ran failed (B247). The folder is read as the account
+    command a session ran failed. The folder is read as the account
     `who` it was installed for (_tree_as)."""
     new, rel, old = (os.path.join(pin_dir, n) for n in (".release.new", "release", ".release.old"))
     shutil.rmtree(new, ignore_errors=True)
@@ -171,8 +171,8 @@ def _release_root(exe, src, home):
     ~/.local/bin/codex into ~/.codex/packages/.../bin). A binary that IS the
     file in ~/.local/bin is one binary, and its "release folder" was the
     account's whole ~/.local: Copilot's pin copied a gigabyte of it, its
-    share/ and state/ among it, root-owned and readable by every account
-    (B262)."""
+    share/ and state/ among it, root-owned and readable by every account.
+    """
     if os.path.basename(os.path.dirname(src)) != "bin" or os.path.realpath(exe) != src \
             or os.path.abspath(exe) == src:
         return ""
@@ -195,8 +195,8 @@ def steady(title):
 class SessionWatch:
     """The node's sessions reported the moment one changes (a session
     starting, ending, a Claude pane turning from waiting to working), so
-    the dot beside a name on a project's row follows within seconds (the
-    operator, 25 Sep). The heartbeat carries the same rows on its own turn,
+    the dot beside a name on a project's row follows within seconds.
+    The heartbeat carries the same rows on its own turn,
     every poll; this is the edge in between."""
 
     def __init__(self, agent):
@@ -251,12 +251,12 @@ class SessionsMixin:
         if not who_name:
             return
         # The copy already unpacked for this node's sessions, never a fetch:
-        # this runs on the heartbeat, and `bundle()` pulls from the controller
+        # this runs on the heartbeat, and `bundle` pulls from the controller
         # every time it is called. `.bb/current/scripts` is what a shell here
         # puts on its PATH, so it is the same bb the session itself runs. It
         # looked for `.bb/current/bb`, which no bundle has, found nothing and
         # returned, so no idle session's token was ever refreshed and each
-        # ran out twelve hours after its last call (B335).
+        # ran out twelve hours after its last call.
         store = tc_root(self.state)
         bb = os.path.join(store, ".bb", "current", "scripts", "aerie") if store else ""
         if not bb or not os.access(bb, os.X_OK):
@@ -279,8 +279,8 @@ class SessionsMixin:
             env.update({"BUILDER_HOME": env.get("HOME", ""), "BB_ACCOUNT_UID": uid,
                         "BB_PROJECT": project, "BB_TOKEN": token,
                         "BUILDERBOT_ROLE": "node"})
-            # Kept by the account's own user where its home is that user's
-            # (R125): the session account cannot write there any more.
+            # Kept by the account's own user where its home is that user's:
+            # the session account cannot write there any more.
             run_bb, run_who = bb, who
             dropper = getattr(self, "drop_for", None)
             if dropper:
@@ -307,7 +307,7 @@ class SessionsMixin:
     def keep_said(self, key, msg):
         """Log why an idle session's token was not refreshed, once an hour per
         session: this was silent, and a session's token then ran out twelve
-        hours after its last call with nothing on the node saying why (B419)."""
+        hours after its last call with nothing on the node saying why."""
         now = time.monotonic()
         seen = self.__dict__.setdefault("_keep_said", {})
         if now - seen.get(key, -1e9) < 3600:
@@ -316,7 +316,7 @@ class SessionsMixin:
         log(f"session tokens: {msg}")
         # ...and kept for the controller, which the hello carries: the log
         # above is the node's own journal, which nothing on the dashboard or
-        # in a session reads, so in practice it was still silent (B419).
+        # in a session reads, so in practice it was still silent.
         recent = self.__dict__.setdefault("_keep_recent", [])
         recent.append({"at": int(time.time()), "key": str(key)[:80], "msg": str(msg)[:300]})
         del recent[:-8]
@@ -329,7 +329,7 @@ class SessionsMixin:
         tw = self.__dict__.get("_tokenwatch")
         return {"said": said, "ok": int(self.__dict__.get("_keep_ok") or 0),
                 # Who opened an account's token here that was neither it nor
-                # the agent (R125 step 6), for the controller's audit.
+                # the agent, for the controller's audit.
                 "reads": tw.report() if tw else []}
 
     # -- the session half (roadmap #24) ---------------------------------------
@@ -383,7 +383,7 @@ class SessionsMixin:
         # root-owned, so `claude update` typed in a session changes nothing
         # that runs here, and the auto-updater is off (bb-tty).
         pinned = [CLAUDE_DIR] if os.access(os.path.join(CLAUDE_DIR, "claude"), os.X_OK) else []
-        # ...and each other coding agent's pinned copy the same way (R95).
+        # ...and each other coding agent's pinned copy the same way.
         pinned += [os.path.join(AGENTS_DIR, s["id"]) for s in AGENT_INSTALLS.values()
                    if os.access(os.path.join(AGENTS_DIR, s["id"], s["command"]), os.X_OK)]
         env["PATH"] = ":".join([os.path.join(bbdir, "scripts")] + pinned
@@ -402,7 +402,7 @@ class SessionsMixin:
     def session_bind(self):
         if SESSION_BIND:
             return SESSION_BIND
-        # A node behind a tunnel (R161) is reached at its address there,
+        # A node behind a tunnel is reached at its address there,
         # and only there: the session ports listen on nothing else.
         t = self.state.get("tunnel") if isinstance(self.state.get("tunnel"), dict) else {}
         if t.get("addr"):
@@ -415,7 +415,7 @@ class SessionsMixin:
     def session_start(self, into):
         """The session half (roadmap #24): what a terminal here runs, bb-tty
         from the bundle as the session account (or through bb-session tty as
-        the account's own user, R125), recorded for the screen relay's
+        the account's own user), recorded for the screen relay's
         terminal server (term.py), which opens one for each signed /term the
         controller sends. Nothing is started: there is no process to keep up
         and no port of its own, only the relay's."""
@@ -430,7 +430,7 @@ class SessionsMixin:
         bind = self.session_bind()
         self.session_bound = bind
         self.session_stale = ""
-        # Where accounts are their own users (R125) a terminal starts
+        # Where accounts are their own users a terminal starts
         # through bb-session tty, which asks the controller whose it is and
         # runs as that account from the root-owned bundle.
         mine = getattr(self, "account_users_ready", None)
@@ -441,8 +441,7 @@ class SessionsMixin:
             rw, ro = [bbtty], [bbtty]
         cwd = env["HOME"] if os.path.isdir(env["HOME"]) else "/"
         # The read-only kind is told so: bb-tty then says where the sign-in
-        # happens instead of prompting for a code nobody can type into it
-        # (B137).
+        # happens instead of prompting for a code nobody can type into it.
         self.term_kinds = {"rw": {"argv": rw, "env": dict(env), "who": who, "cwd": cwd},
                            "ro": {"argv": ro, "env": dict(env, BB_TTY_RO="1"), "who": who, "cwd": cwd}}
         self.session_up = True
@@ -452,7 +451,7 @@ class SessionsMixin:
         self.ctr_start(bbtty)
 
     def ctr_start(self, bbtty):
-        """The container terminal (R218 step 4): a shell inside a container
+        """The container terminal: a shell inside a container
         and nothing else, as the docker account, which jobs already run as
         and the session account is kept apart from (that one is in no docker
         group: docker is root on the machine). bb-tty under BB_TTY_CTR opens
@@ -541,7 +540,7 @@ class SessionsMixin:
         while sessions run: the same digest, so nothing restarts, but every
         heartbeat task that runs bb (an idle session's token, the logins
         list, the census's versions) and every shell's PATH need it there.
-        A store emptied by hand took it (the operator, 12 Oct: "no bundle bb
+        A store emptied by hand took it ("no bundle bb
         at .../.bb/current/scripts/aerie, so no idle session's token is
         refreshed"), and only the next job or session start fetched it.
         Once a minute at most while it is missing."""
@@ -569,7 +568,7 @@ class SessionsMixin:
 
     def _tmux(self, argv, timeout=10):
         """tmux on the server a session is on. Where accounts are their own
-        users (R125) each runs its own: a command aimed at an account's
+        users each runs its own: a command aimed at an account's
         session (its u_X~ name) goes to that account's server, and to the
         session account's for one started before the switch; a listing is
         every server's, joined. Otherwise the session account's alone."""
@@ -592,10 +591,10 @@ class SessionsMixin:
 
     def _tmux_users(self):
         """Whose tmux servers there are: the session account's, and each
-        account's own user where accounts are (R125)."""
+        account's own user where accounts are."""
         users = [self.session_account()]
         # Every account user there is, the setting on or not: one turned off
-        # still has its sessions running until they end (R125).
+        # still has its sessions running until they end.
         if os.geteuid() == 0:
             # ...read once a minute, not every turn (accounts.kept_lookup).
             users += kept_lookup("bbu-users", lambda: sorted(p.pw_name for p in pwd.getpwall()
@@ -639,7 +638,7 @@ class SessionsMixin:
         # so on the row. Before the title, which is free text and goes last.
         # ...and whether its program has ended: a pane whose agent fails stays
         # with its last words (remain-on-exit), so its session lived on and
-        # read as running until somebody pressed Restart (B1120). Said with
+        # read as running until somebody pressed Restart. Said with
         # the exit status, before the title.
         out = self._tmux(["list-panes", "-a", "-F",
                           "#{session_name}\t#{pane_active}\t#{session_attached}\t"
@@ -666,7 +665,7 @@ class SessionsMixin:
 
     def logins_now(self):
         """Which Anthropic account each AerieOS account here is signed in
-        as, or None when there is nothing new to say (B104).
+        as, or None when there is nothing new to say.
 
         The controller holds no credential and learns of a login only when
         something on the machine tells it. That used to be a session's hook
@@ -697,12 +696,12 @@ class SessionsMixin:
             return None
         if not who:
             return None
-        # Where accounts own their homes (R125) the session account can read
+        # Where accounts own their homes the session account can read
         # none of them: read as root, and only from the root-owned bundle,
         # which nothing outside a view can change. On a node that pinned a
         # release key that copy is unpacked only from a bundle whose every
         # shipped file its release signed, this lister among them
-        # (release.may_keep_bundle, R267 step 6), so what root runs here is
+        # (release.may_keep_bundle), so what root runs here is
         # the release's and not the controller's word; a node with no key
         # takes its controller's, as it takes its agent.
         lister = os.path.join(ROOT_BUNDLE_DIR, "current", "scripts", "lib", "login-list.py")
@@ -774,8 +773,8 @@ class SessionsMixin:
         # Counted once the pane is still, as notify.tell does: a pane still
         # drawing the last send's output (a shell's "command not found"
         # repeats the line) put a copy on screen after the count, which read
-        # as this line's echo, and Enter went to a box that never took it
-        # (B389). At most a second.
+        # as this line's echo, and Enter went to a box that never took it.
+        # At most a second.
         flat = screen()
         for _ in range(4):
             time.sleep(0.25)
@@ -791,7 +790,7 @@ class SessionsMixin:
         # quarter-second looks, one more per 120 characters, since a TUI
         # re-renders as it takes input and a long line is not on screen
         # inside a short one. Two looks left the bell's Resume unsent in an
-        # idle session that took a second to draw it (B774); the first look
+        # idle session that took a second to draw it; the first look
         # that sees it sends, so a quick one waits no longer.
         for _ in range(8 + len(text) // 120):
             time.sleep(0.25)
@@ -860,9 +859,9 @@ class SessionsMixin:
 
     def agent_update(self, job, spec):
         """Install, update or remove one of the other coding agents for the
-        SESSION account (R95 step 2). Which agent is AGENT_INSTALLS's row
-        for this job's type; how is the recipe the controller handed over
-        (R169 step 13), held to its shape."""
+        SESSION account. Which agent is AGENT_INSTALLS's row
+        for this job's type; how is the recipe the controller handed over,
+        held to its shape."""
         how = AGENT_INSTALLS.get(job.job.get("type") or "")
         if not how:
             job.say("refused: no coding agent is installed by this job\n")
@@ -972,7 +971,7 @@ class SessionsMixin:
     def agent_install(self, job, spec, how):
         """One coding agent installed, updated or removed for the SESSION
         account, from its row (AGENT_INSTALLS, CLAUDE_INSTALL): one path for
-        every agent (R95 step 18).
+        every agent.
 
         The recipe runs as the session account, into its home. A held one
         (held_install): what it declares is fetched and held to its sha256
@@ -1005,7 +1004,7 @@ class SessionsMixin:
             env.update({"HOME": os.path.expanduser("~"), "USER": who_name, "LOGNAME": who_name})
         home = env.get("HOME") or os.path.expanduser("~")
         pin_dir = how.get("pin_dir") or os.path.join(AGENTS_DIR, how["id"])
-        # Taken off, from the Installed page (R145): the pinned copy a
+        # Taken off, from the Installed page: the pinned copy a
         # session runs and the account's own install under its home.
         if spec.get("action") == "remove":
             gone = []
@@ -1181,7 +1180,7 @@ class SessionsMixin:
                     _pin_release(pin_dir, cmd, root, who)
                 else:
                     # One binary, and any release folder an earlier pin made
-                    # (B262) goes with what it held.
+                    # goes with what it held.
                     shutil.rmtree(os.path.join(pin_dir, "release"), ignore_errors=True)
                     tmp = os.path.join(pin_dir, cmd + ".new")
                     _file_as(who, src, tmp)
@@ -1211,7 +1210,7 @@ class SessionsMixin:
         job.say(f"{product} {ver} is what a session here runs now\n")
         # ...and the controller hears it now: the version it compares rides
         # the census, which rides hello, so without this the bell kept saying
-        # an update was out for up to ten minutes after it landed (B249).
+        # an update was out for up to ten minutes after it landed.
         self.hello_again(f"{product} was updated")
         return "succeeded", 0
 
@@ -1219,7 +1218,7 @@ class SessionsMixin:
     def published_now(self):
         """The published host ports of every container here, by compose
         project, for the controller to hand other nodes' sessions of the
-        same project (R82). One docker ps a minute, cached between; None
+        same project. One docker ps a minute, cached between; None
         where there is no docker, so the heartbeat says nothing about it."""
         now = time.time()
         if now - getattr(self, "published_at", 0) < 60:
@@ -1227,7 +1226,7 @@ class SessionsMixin:
         self.published_at = now
         # On the PATH, as sessnet looks: DOCKER_BIN is the bare name unless
         # the environment names a path, and os.access on a bare name looks
-        # in the working directory, so this said None on every node (B764).
+        # in the working directory, so this said None on every node.
         docker = shutil.which(DOCKER_BIN)
         if not docker:
             self.published = None
@@ -1251,7 +1250,7 @@ class SessionsMixin:
         its state and its health, hashed. The controller moves the Containers
         page's token when it changes, so a container that crashed, or that a
         shell or a session started or removed, is on the page within a
-        heartbeat, with no Refresh to press (the operator, 17 Oct). Read at
+        heartbeat, with no Refresh to press. Read at
         most every ten seconds; None where there is no docker."""
         now = time.time()
         if now - getattr(self, "ctr_digest_at", 0) < 10:
@@ -1275,7 +1274,7 @@ class SessionsMixin:
         return self.ctr_digest
 
     def held_now(self):
-        """The sessions here a controller outage held (R251): each account's
+        """The sessions here a controller outage held: each account's
         gate (bb-gate) leaves a mark beside its stamp while it refuses for an
         outage and takes it off with the first call it lets through. Read
         from the session account's home, where every account's cache lives on
@@ -1300,8 +1299,8 @@ class SessionsMixin:
 
     def stats_now(self):
         """What each running container here uses, by name: [cpu %, memory %],
-        for the hour's ring the controller keeps (R218 step 9). One docker
-        stats a minute, read on a thread of its own (R228 step 18): it takes
+        for the hour's ring the controller keeps. One docker
+        stats a minute, read on a thread of its own: it takes
         two seconds, and on the loop's own turn a job, a cancel or a sync
         hint waited them out. Its answer rides the first heartbeat after it
         lands; None meanwhile, where there is no docker or it did not
@@ -1316,7 +1315,7 @@ class SessionsMixin:
             if now - getattr(self, "stats_at", 0) < 60 or getattr(self, "stats_reading", False):
                 return None
             self.stats_at = now
-            if not shutil.which(DOCKER_BIN):        # on the PATH (B764)
+            if not shutil.which(DOCKER_BIN):        # on the PATH
                 return None
             self.stats_reading = True
 
@@ -1334,7 +1333,7 @@ class SessionsMixin:
 
     def stats_read(self):
         """One docker stats, read into {name: [cpu %, memory %]}, or None."""
-        docker = shutil.which(DOCKER_BIN)       # on the PATH (B764)
+        docker = shutil.which(DOCKER_BIN)       # on the PATH
         if not docker:
             return None
         out = _run([docker, "stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemPerc}}"],
@@ -1443,7 +1442,7 @@ class SessionsMixin:
                 last = float(act.strip())
             except ValueError:
                 continue
-            # The account's prefix alone off: a second slot ends in ~2 (R143).
+            # The account's prefix alone off: a second slot ends in ~2.
             base = re.sub(r"^u_[0-9a-f]{8}~", "", name)
             if base.startswith(agent_prefixes()) and time.time() - last > limit * IDLE_UNIT:
                 log(f"sessions: ending {name} (idle {limit} minute(s), the controller's rule)")

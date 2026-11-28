@@ -1,4 +1,4 @@
-"""The session port's rule is the screen relay's port alone (R133): a node
+"""The session port's rule is the screen relay's port alone: a node
 provisioned while ttyd's ports were open to the controller has them on
 its next check narrowed to 7684, the one port its terminals and its VMs'
 screens come in on, the controller's and nobody else's on the LAN

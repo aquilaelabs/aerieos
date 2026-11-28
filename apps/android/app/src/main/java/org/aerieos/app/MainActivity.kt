@@ -87,10 +87,10 @@ import org.aerieos.app.ui.ToolsScreen
 import org.aerieos.app.ui.UsersScreen
 
 // A FragmentActivity rather than a ComponentActivity: BiometricPrompt (the
-// app's lock, R133) is a fragment of the activity it is shown over.
+// app's lock) is a fragment of the activity it is shown over.
 class MainActivity : FragmentActivity() {
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    // The lock (R133): locked every time the app leaves the screen, and the
+    // The lock: locked every time the app leaves the screen, and the
     // phone's own lock asked for when it comes back, while the setting is
     // on. `prompting` keeps the credential screen (its own activity on
     // older Android) from reading as the app leaving.
@@ -165,7 +165,7 @@ fun AerieTheme(content: @Composable () -> Unit) {
     // their panels and text from the tokens directly, and Material's scheme
     // underneath is the same half, so a light system setting never puts
     // black headings on a dark page or the other way round. System follows
-    // the phone (R50 step 16).
+    // the phone.
     val sysDark = androidx.compose.foundation.isSystemInDarkTheme()
     SideEffect { org.aerieos.app.ui.Schemes.systemDark = sysDark }
     val light = org.aerieos.app.ui.Schemes.half.light
@@ -210,7 +210,7 @@ fun AerieApp(openOn: String, activity: MainActivity) {
     val store = remember { Store(context).also { org.aerieos.app.ui.Schemes.pick(it.scheme); it.scheme = org.aerieos.app.ui.Schemes.current.name
         org.aerieos.app.ui.Schemes.pickMode(it.mode) } }
     var signedIn by remember { mutableStateOf(store.signedIn) }
-    // A pairing from before tokens (R290): its kept password traded once
+    // A pairing from before tokens: its kept password traded once
     // for this phone's own token, and forgotten. One whose account asks a
     // second factor, or a dashboard not answering, stays as it was until
     // the next start or a sign-in.
@@ -223,7 +223,7 @@ fun AerieApp(openOn: String, activity: MainActivity) {
             } catch (e: Exception) { /* kept as it was; said by nothing, since nothing changed for the person */ }
         }
     }
-    // Which pairing is in front (R132): the screens are keyed by it, so a
+    // Which pairing is in front: the screens are keyed by it, so a
     // switch redraws every one of them from the other dashboard.
     var current by remember { mutableStateOf(store.pairing?.id ?: "") }
     val locked by activity.locked
@@ -239,10 +239,10 @@ fun AerieApp(openOn: String, activity: MainActivity) {
         return
     }
     // Nobody is an administrator until the dashboard says so, and the
-    // answer survives a rotation (B275): a user saw the Nodes tab until
+    // answer survives a rotation: a user saw the Nodes tab until
     // Home reloaded.
     var isAdmin by rememberSaveable { mutableStateOf(false) }
-    // What the account may install (R137): toolchains-write, from the same
+    // What the account may install: toolchains-write, from the same
     // can the page reads; an administrator until Home has said.
     var mayTools by rememberSaveable { mutableStateOf(false) }
     var waiting by rememberSaveable { mutableStateOf(0) }
@@ -259,11 +259,11 @@ fun AerieApp(openOn: String, activity: MainActivity) {
         val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
         LaunchedEffect(signedIn) {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                // On screen is when Android lets the live connection start
-                // (R125): it was stopped, or its start was refused, behind.
+                // On screen is when Android lets the live connection start:
+                // it was stopped, or its start was refused, behind.
                 Live.startIfWanted(context)
                 while (true) {
-                    // Every pairing (R132): one whose sign-in is refused is
+                    // Every pairing: one whose sign-in is refused is
                     // forgotten by tickAll, and the rest go on.
                     if (store.watch) Watch.tickAll(context, store)
                     if (!store.signedIn) { signedIn = false; return@repeatOnLifecycle }

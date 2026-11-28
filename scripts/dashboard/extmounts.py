@@ -1,5 +1,5 @@
-"""Other disks and other shares on the controller's own machine (R162 step
-4): a USB or eSATA disk, or a remote SMB or NFS share, mounted from the
+"""Other disks and other shares on the controller's own machine:
+a USB or eSATA disk, or a remote SMB or NFS share, mounted from the
 Storage page as a backup target or a source to copy in, never pooled.
 The record is the controller's (extmounts.json under the state, a share's
 password sealed under the install key as every secret is), handed whole to

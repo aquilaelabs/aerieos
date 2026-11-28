@@ -1,5 +1,5 @@
 """Each account's own key, for its coding agents' sign-ins sealed on the
-nodes (R154; the operator, 27 Oct: made per account and kept by the
+nodes (made per account and kept by the
 controller, sealed under the install key).
 
 An account's key pair on a node is derived from this key rather than from
@@ -12,7 +12,7 @@ time its person opens a terminal there, and seals it again under the new.
   STATE/account-keys.json  {uid: {"key": sealed, "prev": sealed, "made": t,
                             "changed": t}}, each key 32 bytes sealed under
                             the install key; nothing here opens without it.
-                            An account under a key of its own (R157) has
+                            An account under a key of its own has
                             "own" in place of "key": {"pub": the X25519
                             public half of what the person holds (a
                             passkey's PRF output, or a key they keep),
@@ -25,7 +25,7 @@ time its person opens a terminal there, and seals it again under the new.
   STATE/account-secrets.json  {uid: {"forges": {id: {"host", "sealed",
                             "login", "scheme", "at"}}}}: the account's key
                             store, each forge token it gave a repository
-                            sealed under its own key (the operator, 27 Oct),
+                            sealed under its own key,
                             any number for one host (a fine-grained token is
                             often one repository's), sealed again when that
                             key changes; a project links to one by its id and
@@ -78,7 +78,7 @@ def _load_secrets():
 
 
 def _load():
-    d = statefile.read_json(_file())         # read once while the same file (R228 step 1)
+    d = statefile.read_json(_file())         # read once while the same file
     return d if isinstance(d, dict) else {}
 
 
@@ -102,7 +102,7 @@ def _entry(uid):
 
 
 def own_of(uid):
-    """The "own" record of an account under a key of its own (R157), or
+    """The "own" record of an account under a key of its own, or
     None for one under the install key."""
     r = _entry(uid).get("own")
     return r if isinstance(r, dict) and r.get("sealed") else None
@@ -119,7 +119,7 @@ def key_under_install(uid):
 def key_of(uid, make=True):
     """The account's key, made the first time it is asked for, or None with
     no install key (nothing is sealed then) or a uid that is not one. For
-    an account under a key of its own (R157): the key while they have
+    an account under a key of its own: the key while they have
     unlocked their store, else None."""
     if signing.MASTER is None or not re.fullmatch(r"u_[0-9a-f]{8}", str(uid or "")):
         return None
@@ -130,7 +130,7 @@ def key_of(uid, make=True):
     # A key that is there and does not open (sealed under an install key
     # this start was not given) is kept for that key, never made anew: a
     # new one in its place lost every token sealed under the old for good,
-    # at every start with a mistyped INSTALL_KEY (B542).
+    # at every start with a mistyped INSTALL_KEY.
     if k or not make or r.get("key"):
         return k
     with _lock:
@@ -180,7 +180,7 @@ def _drop_previous(uid):
     prev = previous_of(uid)
     if not prev or (on_nodes and on_nodes(uid, prev)):
         return False
-    # Nor while a token is still under it alone (B548): one the change could
+    # Nor while a token is still under it alone: one the change could
     # not seal again, or one given while it ran, was lost with it. Each such
     # one is sealed again under today's key first, so a later try settles it.
     if _under_only(uid, prev):
@@ -254,7 +254,7 @@ def pub_remembered(uid, node, old):
 
 
 def move_to_own(uid, secret, how, passkey=""):
-    """The store moved under a key the person holds (R157 step 1): the
+    """The store moved under a key the person holds: the
     account key, opened now, sealed to the public half of `secret` and the
     seal under the install key dropped; the window opens at once. Refused
     while the key before is still on the nodes, since both would have to
@@ -428,14 +428,14 @@ def _open_entry(k, f):
 def link_forge(uid, host, line, login):
     """A forge token the account gave, as git's credential line
     (scheme://user:token@host), sealed under the account's own key: one
-    entry per account on a host (the operator, 30 Oct: the current token or
+    entry per account on a host (the current token or
     its replacement, never a record of the ones before). A new token for an
     account already there replaces its entry in place, the id kept so every
     project linked to it uses the new one; any other entry for that account
     and host is dropped, its id in `replaced` for the caller to move the
     projects linked to it. ({ok, id, host, login, replaced}, status)."""
     host = _bare(host)
-    # The key read under the lock a change takes (B548): read before it, a
+    # The key read under the lock a change takes: read before it, a
     # token given while the account's key changed was sealed under the old.
     with _lock:
         k = key_of(uid)
@@ -468,7 +468,7 @@ def unlink_forge(uid, fid):
         if fs.pop(str(fid), None) is None:
             return False
         statefile.write_json(_secrets_file(), sd, mode=0o600)
-    # What was opened of it goes with it, its handouts shredded (B546): a
+    # What was opened of it goes with it, its handouts shredded: a
     # leaked token removed on Profile stayed opened and handed out until
     # the window ended.
     unlocks.lock(uid, why="a token removed")
@@ -492,13 +492,13 @@ def open_entry_with(uid, fid, k):
     if not (f and k):
         return ""
     # ...or with the key before, which is kept exactly while a token is
-    # still under it alone (B548).
+    # still under it alone.
     return _open_entry(k, f) or ((prev := previous_of(uid)) and _open_entry(prev, f)) or ""
 
 
 def forge_line(uid, fid="", host="", why="", project="", by=""):
-    """The account's credential line, opened per use through unlocks
-    (R158 step 5): the entry `fid`, or its newest for `host`; "" for none,
+    """The account's credential line, opened per use through unlocks:
+    the entry `fid`, or its newest for `host`; "" for none,
     or while the store is locked."""
     e = entry_for(uid, fid, host)
     if not e:

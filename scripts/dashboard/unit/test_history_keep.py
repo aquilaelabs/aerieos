@@ -1,4 +1,4 @@
-"""History worth reading (R254 step 5): a reorder is one line, from where an
+"""History worth reading: a reorder is one line, from where an
 item started to where it ended, and the tracker's log keeps each report's
 filing and closing through its trim, as the roadmap keeps a finished item."""
 import json

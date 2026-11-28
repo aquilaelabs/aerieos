@@ -1,5 +1,5 @@
 """What a push would send, read for secrets and private things before it
-goes (R219, the operator, 14 Oct): a token, a key, a password, a private key
+goes: a token, a key, a password, a private key
 block, a connection string with a password in it, an email address, an IP
 address. The added lines of the diff the push would land are scanned; a
 line that matches is a FINDING, keyed by the file and the line's text, and
@@ -15,7 +15,7 @@ read from the environment, a documentation address (example.com,
 localhost, 192.0.2.x), and a line okayed before.
 
 The whitelist is STATE/pushok.json: {project: {key: {at, by, path, text}}},
-written by okay() and read by fresh(). Nothing here runs git: gitrelay.py
+written by okay and read by fresh. Nothing here runs git: gitrelay.py
 makes the diff in its own repository and hands the text over.
 """
 import hashlib

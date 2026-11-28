@@ -1,4 +1,4 @@
-"""A node is heard while its loop takes a census (the operator, 7 Oct): a
+"""A node is heard while its loop takes a census: a
 hello said on the loop, after a job changed the machine, takes the census
 there, over a minute on a busy node, and the controller read the node as
 not answering on every project row. census_beating tells it the node is

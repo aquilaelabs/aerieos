@@ -25,7 +25,7 @@ def had_state():
 
 
 def stores_kept(stores, given, had):
-    """The stores an enrollment lands with (B658): a role the flags left
+    """The stores an enrollment lands with: a role the flags left
     at its default keeps the path the node's record already has, so a
     script run again on an enrolled node (which hands the provisioner
     nothing for a store it did not name) does not move the toolchains,
@@ -85,7 +85,7 @@ def cmd_enroll(args):
     if opts["--reach"] not in ("", "public"):
         raise SystemExit("--reach takes public: the controller published at a hostname by a tunnel "
                          "from home, verified by the system's CAs")
-    # Through a public hostname (R170) the controller's own certificate is
+    # Through a public hostname the controller's own certificate is
     # never seen, only the name's public one: verified by CA, never pinned.
     if opts["--reach"] == "public":
         opts["--pin"] = Controller.CA
@@ -102,7 +102,7 @@ def cmd_enroll(args):
     if opts["--reach"]:
         state["reach"] = opts["--reach"]
         state["tunnel"] = {"kind": opts["--reach"], "host": ctl.host}
-    # The door in for SSH (R174): which client the provisioner installed,
+    # The door in for SSH: which client the provisioner installed,
     # and its name, so the census says so and the row's switch finds it.
     if opts["--door"]:
         if opts["--door"] not in ("cloudflared", "tailscale"):
@@ -204,8 +204,8 @@ def cmd_run():
 def cmd_selfcheck():
     """This agent loaded as `run` loads it, every module of it compiled, and
     this node's state read, said in one line: what a self-update asks of the
-    file it is about to install, before that file replaces the running one
-    (R241). It dials nothing and changes nothing. Reaching here is the first
+    file it is about to install, before that file replaces the running one.
+    It dials nothing and changes nothing. Reaching here is the first
     half: the entry imported this module, and with it everything `run`
     imports. The rest are compiled and not run, so a module that is only
     loaded when its work comes up, and may want a library this machine does
@@ -259,7 +259,7 @@ def cmd_status():
 
 
 def cmd_follow(args):
-    """follow URL EXPECT (R175 step 3): the line the new controller's Nodes
+    """follow URL EXPECT: the line the new controller's Nodes
     page gives for a node that outlived the old controller, so it was never
     told the move. Knocks there at once with this node's own token, checks
     the answer against EXPECT, and on the right answer writes the new
@@ -516,7 +516,7 @@ def cmd_check_update(args):
 
 def cmd_root_asks(args):
     """root-asks [on|off]: whether this machine runs a root command the
-    controller sends (R227 step 2)."""
+    controller sends."""
     state = load_state()
     if not args:
         print("root commands from the controller: "

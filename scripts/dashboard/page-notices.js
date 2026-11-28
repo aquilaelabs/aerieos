@@ -1,7 +1,7 @@
-// The Notifications page (R218 step 6, the design's the-dashboard/notifications
+// The Notifications page (the design's the-dashboard/notifications
 // rule), at #/notifications, opened from the bell's See all. Two parts:
 //
-//   Active (R280, the operator, 24 Nov): every ask, invitation and held
+//   Active: every ask, invitation and held
 //   change, each a row with what it is and what it would run, its Approve
 //   and Deny ON the row, and the long part (a compose file, the lines a push
 //   flagged, a release's notes) whole in a scrolling box behind a fold;
@@ -23,8 +23,8 @@ let noticesErr = "";
 let noticesChip = "";            // the chip in force: "", a kind, or "bad" for failures
 
 function openNotices(){
-  // Every long part shut each time the page is come back to (the operator,
-  // 24 Nov): one opened stays open while the page is read, through the
+  // Every long part shut each time the page is come back to:
+  // one opened stays open while the page is read, through the
   // redraws the poll makes, and not past it.
   for (const k of Object.keys(sectOpen)) if (/^notices:(ask|okayed):/.test(k)) delete sectOpen[k];
   document.querySelectorAll('details:is([data-sect^="notices:ask:"], [data-sect^="notices:okayed:"])').forEach(d => { d.open = false; });
@@ -105,7 +105,7 @@ function renderNoticesInto(i){
   const d = docSurface(i, "notices");
   if (!d) return;
   if (noticesData === null){
-    // Its template (R218 step 16): the History section and its name are the
+    // Its template: the History section and its name are the
     // page's own; what was kept is on its way.
     d.setBar(`<span class="dim">${skv(4)}</span>`);
     drawHTML(d.list, skTpl(docSection("notices", "history", "History", "", skRows(5))));
@@ -113,19 +113,19 @@ function renderNoticesInto(i){
     return;
   }
   const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows(), blocking = needsRows("active");
-  // Only the rows on show are built, a page at a time (pageLimit, R228 step 13).
+  // Only the rows on show are built, a page at a time (pageLimit).
   const lim = pageLimit(d.list, "ntList", rows.length);
   const groups = [...Object.entries(NOTICE_KINDS).map(([k, label]) => ({key: k, label, count: all.filter(n => n.kind === k).length})),
                   {key: "bad", label: "Failures", count: all.filter(n => n.level === "bad").length}];
   // In an action bar as every page's bar action is, which keeps it at the
   // right on a phone too, where it sat at the left once the spacer folded.
-  // It clears History alone, and says so: Active above it is never cleared
-  // (R280), and Clear all read as both.
+  // It clears History alone, and says so: Active above it is never cleared,
+  // and Clear all read as both.
   d.setBar(`<span class="sp"></span>
     ${all.length ? `<span class="actbar"><button type="button" class="danger" id="ntClear">${noticesChip && noticesChip !== "bad" ? `Clear ${esc(NOTICE_KINDS[noticesChip].toLowerCase())}` : "Clear history"}</button></span>` : ""}`);
   const html = (noticesErr ? `<div class="hint bad">${esc(noticesErr)}</div>` : "")
     // Active, above History: what waits on an answer, then what blocks
-    // work now, none of it with a × (R280). Not drawn with nothing in it
+    // work now, none of it with a ×. Not drawn with nothing in it
     // (the house rule: what has nothing to act on is not shown); while
     // something waits it opens by itself, and on a phone, one section at a
     // time, it is the one.

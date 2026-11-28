@@ -1,4 +1,4 @@
-"""ZFS pools on the controller's own machine (R162 step 1): each pool as
+"""ZFS pools on the controller's own machine: each pool as
 zpool says it (size, what is used, health, its members by layout, the last
 scrub) for the census, and the storage-pool job: a pool made, grown,
 scrubbed, a member replaced, the pool exported or destroyed, each argument
@@ -6,7 +6,7 @@ held to its shape and each disk to the census's list before zpool runs.
 Disks are named to zpool by their /dev/disk/by-id links, so a pool follows
 its disks across ports and reboots; a disk that holds anything is refused
 unless the job says to wipe it, and nothing is ever made on the system disk.
-Snapshots (R162 step 5): each pool's bb-KIND-DATE-TIME snapshots counted by
+Snapshots: each pool's bb-KIND-DATE-TIME snapshots counted by
 kind for the census, and the storage-snapshot job: one taken of the pool's
 every dataset (the oldest of its kind pruned past what is kept), a dataset
 rolled back to one, or one destroyed.
@@ -29,7 +29,7 @@ POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}")
 POOL_RESERVED = re.compile(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)")
 LAYOUTS = {"single": 1, "mirror": 2, "raidz1": 3, "raidz2": 4}
 ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy", "import")
-# Pools another machine made, imported here as they are (R163 step 1): kept
+# Pools another machine made, imported here as they are: kept
 # under /mnt by their own mountpoints (altroot /mnt, as a NAS that mounts its
 # pools there does), which zpool.cache does not keep, so each is imported
 # again from this record at the agent's minute pass after a reboot.
@@ -86,7 +86,7 @@ def pools_now():
         props = _out([shutil.which("zfs") or "zfs", "get", "-H", "-o", "value", "mountpoint,encryption,keystatus", f[0]]).split("\n")
         mp = (props[0] if props else "").strip()
         row["mount"] = mp[:120] if mp.startswith("/") else ""
-        # Native encryption (R162 step 3): whether the root dataset is
+        # Native encryption: whether the root dataset is
         # encrypted, and whether its key is loaded; locked means nothing
         # under it is mounted until a key comes.
         row["encrypted"] = len(props) > 1 and props[1].strip() not in ("", "off", "-")
@@ -142,7 +142,7 @@ def importable_now():
         elif cur is not None and k == "state":
             cur["state"] = v.lower()[:16]
         elif cur is not None and k in ("action", "status"):
-            # Last used by another system and never exported (B938): a
+            # Last used by another system and never exported: a
             # machine whose stick died meets its own pools so, under the
             # new stick's host id.
             if "another system" in v or "'-f'" in v:
@@ -203,7 +203,7 @@ def give_backup_dir(top, acct):
 def pool_guid(zpool, name):
     """The pool's own number (its guid, what zpool import lists as its id),
     or "": what an import is kept by, so the minute pass imports that pool
-    and never another of the same name (B857)."""
+    and never another of the same name."""
     got = _out([zpool, "get", "-H", "-o", "value", "guid", name], timeout=30).strip()
     return got if re.fullmatch(r"\d{1,24}", got) else ""
 
@@ -212,7 +212,7 @@ def mount_under(say, run, zfs, pool, root):
     """Each dataset of `pool` mounted where its mountpoint is under `root`,
     and one whose mountpoint is elsewhere said and left: a pool's
     mountpoints are its disks' to say, and `zfs mount -a` mounted one saying
-    /etc there (B857). The first exit code that was not 0, or 0."""
+    /etc there. The first exit code that was not 0, or 0."""
     listed = _out([zfs, "list", "-H", "-r", "-t", "filesystem", "-o", "name,mountpoint,canmount,mounted", pool], timeout=60)
     worst = 0
     for line in listed.splitlines():
@@ -279,7 +279,7 @@ def snapshots_now():
 
 
 def safe_mode():
-    """Safe mode on AerieOS (R161 step 2): aeriesafe=1 on the kernel's
+    """Safe mode on AerieOS: aeriesafe=1 on the kernel's
     command line; every encrypted pool stays locked in it."""
     try:
         with open(os.environ.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
@@ -293,7 +293,7 @@ class PoolsMixin:
     _pool_keys = ()
 
     def pool_keys_want(self, rows):
-        """The passphrases the hello hands over (R162 step 3): kept in this
+        """The passphrases the hello hands over: kept in this
         process's memory only (never node.json, never a file), and every
         locked pool among them unlocked and mounted now; nothing in Safe
         mode. A pool made later finds its passphrase here (create)."""
@@ -347,8 +347,8 @@ class PoolsMixin:
 
     def backup_dirs_pass(self):
         """Once a minute: on each pool and the array here, the folder the
-        controller keeps copies of its configuration in, made its account's
-        (B937): a pool's top is root's, so the copies were written nowhere
+        controller keeps copies of its configuration in, made its account's:
+        a pool's top is root's, so the copies were written nowhere
         but the stick, and a stick that died took them with it."""
         if os.geteuid() != 0:
             return
@@ -369,7 +369,7 @@ class PoolsMixin:
         """Once a minute: a pool imported from another machine that is not
         imported now (after a reboot) imported again, as it was: by its own
         number, never by a name another pool plugged in could carry, and
-        never forced (B857). This machine's host id is pinned (pin_hostid),
+        never forced. This machine's host id is pinned (pin_hostid),
         and a pool it imported is its own to import again without force."""
         rows = _imported()
         zpool = shutil.which("zpool")
@@ -518,7 +518,7 @@ class PoolsMixin:
                 argv = [zpool, "add", name] + vdev
             say(f"pool {action} {name}: {layout} of {', '.join(want)} ({', '.join(ids)})\n")
             if action == "create" and cfg.get("encrypt") is True:
-                # Native encryption (R162 step 3): the passphrase never rides
+                # Native encryption: the passphrase never rides
                 # the job; it came with the hello (pool_keys_want) and goes to
                 # zpool on its stdin, nowhere else.
                 key = next((k["passphrase"] for k in getattr(self, "_pool_keys", []) if k.get("pool") == name), "")
@@ -565,7 +565,7 @@ class PoolsMixin:
                 say("refused: a pool's id is its number, as zpool import lists it\n")
                 return "failed", 64
             if cfg.get("force") is True:
-                # One last used by another system (B938): forced only with its
+                # One last used by another system: forced only with its
                 # name typed again; never upgraded either way.
                 if str(cfg.get("confirm") or "") != name:
                     say("refused: importing a pool another system used last takes its name typed again\n")
@@ -585,7 +585,7 @@ class PoolsMixin:
                 return "failed", 64
             say(f"pool destroy {name}: everything on it is gone\n")
             rc = self._sh(job, [zpool, "destroy", "-f", name], timeout=600)
-            # ...and no longer one to import again (B857).
+            # ...and no longer one to import again.
             if rc == 0 and any(x["name"] == name for x in _imported()):
                 _imported_set([x for x in _imported() if x["name"] != name])
         self.hello_again(f"the pool {name}: {action}")

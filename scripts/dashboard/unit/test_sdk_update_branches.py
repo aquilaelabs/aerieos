@@ -1,5 +1,5 @@
-"""`aerie toolchains update NAME` runs nothing a vendor serves that day
-(R267 step 17). A row its entry pins updates to what the entry names, by its
+"""`aerie toolchains update NAME` runs nothing a vendor serves that day.
+A row its entry pins updates to what the entry names, by its
 own recipe (sdk_update's first branch, held in test_sdk_pin.py); the
 branches after it are for a row with nothing on offer. Two of them could no
 longer be reached by a shipped row, since flutter is pinned at a commit and

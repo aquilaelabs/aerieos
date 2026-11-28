@@ -1,4 +1,4 @@
-"""The Library (R170): everything an AerieOS installs or runs, as one
+"""The Library: everything an AerieOS installs or runs, as one
 list of one shape, for one node. The toolchains the catalog offers with
 what the node's store holds (toolchains.payload_for_node), the coding
 agents with their version against the latest (agentcode.rows), the tool
@@ -20,7 +20,7 @@ import agents
 import packformat
 
 KINDS = ("toolchain", "agent", "pack", "service", "app", "companion")
-# Who stands behind a card, as a person reads it (the operator, 12 Nov):
+# Who stands behind a card, as a person reads it:
 # AerieOS's own shipped rows and the packs its maintainers wrote are both
 # Packaged by Aerie, a verified vendor's own pack is Verified, anybody's pack
 # the maintainers reviewed is Vetted, and what a person added themselves is
@@ -78,7 +78,7 @@ def repo_of(catalog_url):
     return u.rsplit("/", 1)[0] if u.endswith((".json", ".sig")) else u.rstrip("/")
 
 
-# No app is shipped (R238): one is a card because the catalog's signed index
+# No app is shipped: one is a card because the catalog's signed index
 # lists it or because it is kept here. An install that has read no index
 # and keeps none says so in a line where the Apps would be.
 NO_APPS = "No app is offered: the catalog could not be read, and none is kept here."
@@ -96,7 +96,7 @@ def _tier(t):
 
 def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(), pack_values=None, pack_mine=None):
     """The one list, in the page's order: agents, toolchains, packs, the
-    services (R172: a deployed thing of AerieOS's, its configuration on
+    services (a deployed thing of AerieOS's, its configuration on
     the card), apps, the catalog's offers, the companions. `services` is
     [{manifest, status, ready, all_projects}] and `pack_values` {pack name:
     its answers on this node} for the packs with a config block."""
@@ -107,13 +107,13 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     # this build's is read at the older pin it keeps for it, and nothing
     # is said of the newer one.
     entries = packformat.taken(catalog_index)
-    # Who each tool is by (the operator, 12 Nov), for its card to name beside
+    # Who each tool is by, for its card to name beside
     # the tier: a shipped row's own word, a coding agent's provider, and for
     # what the signed catalog lists, the entry's. Never a sideloaded pack's
     # own claim: what nobody vetted does not get to say whose it is.
     said = {e["name"]: e.get("maker", "") for e in entries}
     # ...and this person's own answers, for the fields a pack scopes to a
-    # person (R172 step 5): None where it asks none of them, or they may not.
+    # person: None where it asks none of them, or they may not.
     pack_mine = pack_mine or {}
     tc = node_payload or {}
     plat = str(tc.get("platform") or "")
@@ -124,7 +124,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     # ...and the job's own names it has not reached: until its agent says
     # which it is on, the first is the one it works on and the rest wait. A
     # card pressed read as not pressed until then, its Software update still
-    # offered while the Jobs page said it ran (the operator, 17 Nov).
+    # offered while the Jobs page said it ran.
     if job.get("running") and job.get("action") != "check":
         ahead = [str(x) for x in job.get("queue") or []]
         if not busy_on and ahead:
@@ -138,7 +138,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "update": r.get("state") == "update", "running": bool(r.get("running")), "doing": r.get("action") or "",
                     "error": r.get("error") or "",
                     "verb": "update" if r.get("state") == "update" else ("" if r.get("installed") else "install")})
-    # What is the machine's own rather than the store's (R102, step 5): the
+    # What is the machine's own rather than the store's: the
     # NVIDIA driver and the container toolkit where the node has the card,
     # as toolchain rows carrying their machine record for the card's lines
     # and the driver's version pick.
@@ -158,7 +158,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "verb": "" if not m.get("managed") else "update" if m.get("newer") else ("" if here else "install")})
     packs_here = set()
     # The index's pin of each pack it offers: one kept from it at another
-    # commit is offered the new pin on its row (R169 step 4).
+    # commit is offered the new pin on its row.
     # A pin written in a format past this build's is no update to offer:
     # the pin compared is the one this build takes, so a pack kept from an
     # entry's older pin is offered its newer one only by a build that reads it.
@@ -186,14 +186,14 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     # ...and each download it declares, as a page reads one: {to, url, held, sha256, keys, sig, platform}.
                     "downloads": i.get("downloads") or [],
                     "pack": {k: pack.get(k) for k in ("url", "commit", "path", "by", "at", "tier", "verbs", "here", "disabled")} if pack else None,
-                    # What it asks for per node, and what it has been given here (R172).
+                    # What it asks for per node, and what it has been given here.
                     "config": i.get("config") or [], "values": pack_values.get(i["name"]) if i.get("config") else None,
                     "mine": pack_mine.get(i["name"]),
                     "repin": _repin(pack, pins.get(i["name"])) if pack else None,
                     # A pack that brings a coding agent is its card under Coding
-                    # agents (R169 step 9), installed and updated as a pack.
+                    # agents, installed and updated as a pack.
                     **({"group": "agent"} if pack and pack.get("agent") else {}),
-                    # Its own icon's address, the pin in it so an update is a new one (R182).
+                    # Its own icon's address, the pin in it so an update is a new one.
                     "icon": f"/api/pack-icon?name={i['name']}&v={str(pack.get('commit') or '')[:12]}" if pack and pack.get("icon") else "",
                     "verb": "update" if i.get("state") == "update" else ("" if i.get("installed") else "install")})
     for s in services or []:
@@ -218,7 +218,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "port": a.get("port"), "media": bool(a.get("media")), "secrets": a.get("secrets") or [],
                     # Its compose file as the catalog holds it, and the blanks New container fills (step 2).
                     "compose": a.get("compose") or "", "blanks": sorted(set(re.findall(r"\$\{([A-Z_]+)\}", a.get("compose") or ""))),
-                    # ...what its panel asks for, its network and whether it is going (R238).
+                    # ...what its panel asks for, its network and whether it is going.
                     "fields": a.get("fields") or [], "own": a.get("own") or [], "network": a.get("network") or "", "going": a.get("going") or "",
                     "icon": a.get("icon") or "",
                     # What its images are held to (pack format 5): {word, why}, pinned when every one has its digest.
@@ -226,7 +226,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "installed": False, "version": "", "latest": "", "update": False, "running": False, "verb": "install"})
     # The shipped rows by the names the catalog gives them (a toolchain's
     # colon as a hyphen, an agent by its id): an official entry naming one is
-    # that row, listed once (R170 step 6).
+    # that row, listed once.
     shipped = {i["name"].replace(":", "-") for i in tc.get("items") or []} | {r.get("agent", "") for r in agent_rows or []}
     app_ids = {a["id"] for a in apps or []}
     for e in entries:
@@ -234,9 +234,9 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         # withdrew is not offered (the bell says so to an install that holds it).
         if e["name"] in packs_here or e.get("withdrawn") or (e.get("tier") == "official" and e["name"] in shipped):
             continue
-        # A Docker app in the catalog (R170 step 7): an Apps card until it is
+        # A Docker app in the catalog: an Apps card until it is
         # kept here, its Install keeping it and opening New container; a
-        # service is its own row (R172).
+        # service is its own row.
         if e.get("kind") == "app":
             if e["name"] not in app_ids:
                 out.append({"kind": "app", "tier": _tier(e.get("tier")), "name": e["name"], "label": e.get("label") or e["name"], "about": e.get("about") or "",
@@ -266,10 +266,10 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "platforms": [], "installed": False, "version": c.get("version") or "", "latest": "", "update": False, "running": False,
                     "dev": bool(c.get("dev")), "download": first, "files": c.get("files") or [], "absent": c.get("absent") or "",
                     "verb": "download" if first else ""})
-    # A card not for this node (R170 step 9, the operator, 28 Oct: Xcode on
+    # A card not for this node (Xcode on
     # a Linux node): judged here for every row with a platforms list, the
     # toolchains' own verdict kept; the page leaves it out and counts it.
-    # What each is about and when the catalog added it (R256), where its
+    # What each is about and when the catalog added it, where its
     # index entry says: a shipped toolchain's and a kept pack's as well as
     # an offer's, by name.
     told = {e["name"]: e for e in entries}
@@ -285,7 +285,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         if not r["wrong_platform"] and plat and r.get("platforms") and not _supports(r["platforms"], plat):
             r["wrong_platform"] = f"not for this node ({plat}): {', '.join(r['platforms'])}"
         # The toolchains' own verdict names the platforms alone: said as
-        # the rest are, now a card for another system can be shown (R256).
+        # the rest are, now a card for another system can be shown.
         elif r["wrong_platform"] and not r["wrong_platform"].startswith("not for"):
             r["wrong_platform"] = f"not for this node{f' ({plat})' if plat else ''}: {r['wrong_platform']}"
     return out
@@ -298,10 +298,10 @@ fits = lambda manifest: True    # noqa: E731
 
 def _too_new(e, index):
     """Why this build does not take a catalog entry, or "": its format is
-    past the one this build reads (R234), named with the first AerieOS that
+    past the one this build reads, named with the first AerieOS that
     reads it where the index says; or it says the AerieOS release lines it
     works with and this build's is not one of them. Such an entry is not
-    listed on the Library at all (the operator, 12 Nov): the page counts
+    listed on the Library at all: the page counts
     them in its head, so a person knows another AerieOS would show more."""
     fmt = packformat.of(e) or 1
     why = packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
@@ -336,7 +336,7 @@ def _supports(platforms, plat):
     return any(x == plat or x == f"{o}/*" for x in platforms)
 
 
-# ---- browsing it (R256) ----
+# ---- browsing it ----
 
 # How many cards a shelf on the front page shows, and the most a list asks
 # for at once.
@@ -393,14 +393,14 @@ def _front_order(r):
 
 
 def browse(rows, q="", kind="", topic="", tier="", here=True, sort="", offset=0, limit=30, kinds=()):
-    """One look at the Library for the page (R256): the rows narrowed by the
+    """One look at the Library for the page: the rows narrowed by the
     words, the kind (or Installed or Updates), the topic and the source,
     and, while `here`, to what runs on the node; the count for every chip
     and topic under the other narrowings; how many the node's platform hid;
     and either the front page's shelves (nothing narrowed) or one page of
     the one sorted list."""
-    # An entry this AerieOS does not take is never shown (the operator, 12
-    # Nov), counted for the page's head with the rest of what it says of
+    # An entry this AerieOS does not take is never shown,
+    # counted for the page's head with the rest of what it says of
     # the node, which is about every row whatever is narrowed.
     later = [r for r in rows if r.get("too_new")]
     rows = [r for r in rows if not r.get("too_new")]

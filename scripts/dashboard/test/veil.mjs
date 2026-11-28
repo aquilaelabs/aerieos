@@ -95,7 +95,7 @@ ok(page.errors.length === 0, 'a pane replaced while covered raises nothing');
 const refused = [];
 page.on('console', m => { if (/Content Security Policy|Refused to execute inline/i.test(m.text())) refused.push(m.text()); });
 // A console tab onto a VM the list does not have is dropped once the list
-// lands (vmReapConsoles, B172), which on an idle machine is before the
+// lands (vmReapConsoles), which on an idle machine is before the
 // checks below look: so the list read here has the VM the tab is onto.
 await page.route(u => u.pathname === '/api/vms', async r => {
   const real = await r.fetch();

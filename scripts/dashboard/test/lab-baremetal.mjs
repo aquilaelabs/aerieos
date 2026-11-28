@@ -1,5 +1,5 @@
 // A controller installed bare metal, and the wall around its own node,
-// walked on a real machine (roadmap R90 step 9): for each system, a VM made
+// walked on a real machine: for each system, a VM made
 // on a real VM host, the controller installed in it from a ref of the
 // repository with nodes/install-controller.sh, its own node enrolled; then
 // what a session there may not reach, each tried and each refused: the
@@ -16,7 +16,7 @@
 //   BB_LAB_SSH         the private half's path ON THE VM HOST, readable by its
 //                      job account: the walk reaches a VM through jobs there
 //   BB_LAB_REF         the ref of github.com/aquilaelabs/aerieos to install
-//   BB_LAB_REF_NEXT    a newer ref to update to (R90 step 5), optional
+//   BB_LAB_REF_NEXT    a newer ref to update to, optional
 //                      (the branch under test, pushed)
 //   BB_LAB_PROJECT     a project there to make the VMs in (hello)
 //   BB_LAB_SYSTEMS     the catalog's OS ids, comma-separated (ubuntu-24.04)
@@ -78,7 +78,7 @@ const exec = async argv => {
   const log = (Array.isArray(l) ? l.join('\n') : String(l)).replace(/^exec\n/, '');
   return { state: j?.state || 'timeout', log };
 };
-// A log said in a verdict on its one line (B324): what reads a run's verdict
+// A log said in a verdict on its one line: what reads a run's verdict
 // (tests-verdict.py, the rule hook) takes the FAIL line alone, and a log
 // carried with its newlines came back as its first line, "exec".
 const oneLine = s => String(s || '').trim().replace(/\s*\n\s*/g, ' | ');
@@ -180,7 +180,7 @@ for (const os of SYSTEMS){
     const broken = await inVm(ip, 'usermod -aG docker bb; /usr/local/sbin/bb-session check 2>&1; echo "rc=$?"; gpasswd -d bb docker >/dev/null; /usr/local/sbin/bb-session check >/dev/null 2>&1; echo "mended=$?"');
     ok(/rc=2/.test(broken) && /job account \(bb\) is in the docker group/.test(broken) && /mended=0/.test(broken),
        `[${os}] the wall broken, bb-session refuses and says why; mended, it starts sessions again (${oneLine(broken).slice(0, 300)})`);
-    // An update to a newer pushed ref (R90 step 5), when one is named: the
+    // An update to a newer pushed ref, when one is named: the
     // installer's --update from that ref's tree, the install on the new
     // release and answering. There is no going back by hand.
     if (process.env.BB_LAB_REF_NEXT){

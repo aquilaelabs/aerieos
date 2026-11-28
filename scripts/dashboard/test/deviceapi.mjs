@@ -1,4 +1,4 @@
-// The released apps' contract (R79 step 8). test/device-api.json pins, per
+// The released apps' contract. test/device-api.json pins, per
 // app, every endpoint the Windows companion and the VS Code extension call
 // and the fields each reads, with their types; this drives every pinned
 // endpoint on this tree's controller, as the app would, and fails when one
@@ -120,7 +120,7 @@ const VSCODE = {
   'POST /api/v1/files rename': () => files('rename', { path: 'pin-written.txt', to: 'pin-dir/pin-renamed.txt', overwrite: false }),
   'POST /api/v1/files delete': () => files('delete', { path: 'pin-dir', recursive: true }),
   'POST /api/v1/files search': () => files('search', { path: '', query: 'needle' }),
-  // What opening an agent's session asks first (R128): the boot it starts for.
+  // What opening an agent's session asks first: the boot it starts for.
   'GET /api/status': async () => {
     try { return { status: 200, json: await ed.status() }; }
     catch (e) { return { status: e.status || 0, json: e.body || { error: e.message } }; }

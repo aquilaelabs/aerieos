@@ -2,7 +2,7 @@
 
 Per project, the operator says how much they want to be in the loop on what
 a session ENTERS into each of the three tabs, meaning a roadmap item, a bug
-report or a house rule (roadmap #27, decided 7 Sep):
+report or a house rule (roadmap #27):
 
     auto   it lands as it always has, marked as the session's
     ask    it is held here; the operator approves or denies it on the notebook
@@ -379,8 +379,8 @@ def payload(project):
         gate = {}
     rs = listing(project)
     by_kind = {k: sum(1 for r in rs if r.get("kind") == k) for k in KINDS}
-    # The revision of this answer, as revisions() counts it, so the band
-    # records what it read and not the page's later token (B201).
+    # The revision of this answer, as revisions counts it, so the band
+    # records what it read and not the page's later token.
     with _lock:
         d = load()
     rev = (sum(r.get("id", 0) for r in d["projects"].get(project) or []) * 1000

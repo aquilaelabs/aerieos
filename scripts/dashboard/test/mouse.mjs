@@ -6,7 +6,7 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
 await page.goto(URL);
 await page.waitForFunction(() => typeof state !== 'undefined' && !!state && Array.isArray(state.projects), { timeout: 40000 });
-// The dock (R218 step 4): three shells on its line, the workspace's and two
+// The dock: three shells on its line, the workspace's and two
 // more; a press on one brings it forward, its − puts it away.
 await page.evaluate(() => { newShell(''); newShell(''); });
 await page.waitForFunction(() => document.querySelectorAll('#pane1 .dtab[data-id]').length === 3);
@@ -20,7 +20,7 @@ await page.click(`#pane1 .dtab[data-id="${ids0[1]}"] [data-min]`);
 await page.waitForFunction(id => !tabs.some(t => t.id === id), ids0[1], { timeout: 5000 });
 ok(await page.evaluate(() => tabOf(panes[1])?.kind === 'term'), '...and its − puts it away, the next terminal taking the dock');
 // More terminals than the line holds: the one in front is brought into view
-// on it, at either end (B740).
+// on it, at either end.
 await section("More terminals than the line holds", async () => {
   const before = await page.evaluate(() => tabs.map(t => t.id));
   await page.evaluate(() => { for (let i = 0; i < 9; i++) newShell(''); });
@@ -49,7 +49,7 @@ await section("More terminals than the line holds", async () => {
 await page.evaluate(() => dockToggle(true));
 await page.waitForSelector('#pane1 .slot.on.ownterm', { timeout: 10000 });
 // The dock keeps its height between a shell, whose Commands bar sits under
-// the panes, and Chat, which has none (the operator, 26 Oct).
+// the panes, and Chat, which has none.
 await section("The dock keeps its height between a shell, whose Commands bar sits under", async () => {
   const look = () => page.evaluate(() => ({ h: Math.round($('pane1').getBoundingClientRect().height), kind: tabOf(panes[1])?.kind }));
   const press = re => page.evaluate(src => [...document.querySelectorAll('#pane1 .dtab > button')].find(b => new RegExp(src).test(b.textContent.trim()))?.click(), re);
@@ -87,7 +87,7 @@ await page.evaluate(() => refresh());
 ok(await page.$eval('#pane1 .dtab[data-id]', el => el.dataset.mark === 'kept'),
    'an unchanged poll leaves the dock\'s line alone');
 // ...and a real change lands in the line while the tabs already on it stay
-// the elements they were (R244: the line is patched, each tab kept by its id).
+// the elements they were (the line is patched, each tab kept by its id).
 const tabsBefore = await page.$$eval('#pane1 .dtab[data-id]', ts => ts.length);
 await page.evaluate(() => { window.__dtab = document.querySelector('#pane1 .dtab[data-id]'); newShell(''); });
 const landed = await page.waitForFunction(n => document.querySelectorAll('#pane1 .dtab[data-id]').length > n, tabsBefore, { timeout: 5000 }).then(() => true, () => false);
@@ -120,7 +120,7 @@ const stale = await page.evaluate(() => {
 });
 ok(stale, 'a layout one revision behind is ignored');
 
-// R131: which tab is in front is this browser's own. A layout another
+// Which tab is in front is this browser's own. A layout another
 // browser wrote with a different tab in front still brings its tabs, and
 // leaves this browser's front tab where it was; a reload keeps it; and a
 // switch here writes nothing to the server.

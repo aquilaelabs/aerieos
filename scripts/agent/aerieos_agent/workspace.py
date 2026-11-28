@@ -439,7 +439,7 @@ class WorkspaceMixin:
         # What the build took on this node, its workspace and the project's
         # cache as it left them, measured before the workspace goes: the
         # Artifacts view shows it and the next build's room check wants at
-        # least that much free (R110 step 7).
+        # least that much free.
         cache = os.path.join(((self.state.get("stores") or {}).get("cache") or "/tmp"),
                              re.sub(r"[^A-Za-z0-9._-]", "_", project or "project"))
         took = {"kind": "room", "workspace": dir_bytes(jobdir), "cache": dir_bytes(cache)}
@@ -529,7 +529,7 @@ class WorkspaceMixin:
 
         On a node that trusts a release key the bundle is held to the list
         of files its release signed before any of it is unpacked
-        (release.may_keep_bundle, R267 step 6). One that fails is unpacked
+        (release.may_keep_bundle). One that fails is unpacked
         nowhere, and the answer is the bundle this node had before, the
         directory `.bb/current` points at, or '' with none. The refusal is
         remembered with the digest and with what this node trusted, so the
@@ -750,8 +750,8 @@ class WorkspaceMixin:
         at it; the copies of other bundles go. Only ever from a tar the
         bundle's signed list passed (_bundle_checked, release.may_keep_bundle):
         that list names these files with the rest a release ships, so on a
-        node that pinned AerieOS's release key they are the release's (R267
-        step 28: a second signature over them alone said nothing more).
+        node that pinned AerieOS's release key they are the release's
+        (a second signature over them alone said nothing more).
         Whether it was kept."""
         into = os.path.join(TOOLS_DIR, name)
         # This bundle's already, checked when it was kept: nothing to do,
@@ -763,7 +763,7 @@ class WorkspaceMixin:
                 files = {}
                 for m in tar.getmembers():
                     rel = m.name.lstrip("./")
-                    # ...and the provisioner's family files (R204), which it
+                    # ...and the provisioner's family files, which it
                     # sources from beside itself.
                     if (rel not in ROOT_TOOLS and not rel.startswith("nodes/families/")) or not m.isfile():
                         continue
@@ -794,7 +794,7 @@ class WorkspaceMixin:
     def _keep_root_bundle(tar_path, name, say):
         """The whole bundle, root-owned and nobody else's to write, unpacked
         from the checked tar into ROOT_BUNDLE_DIR/<name>/ and current pointed
-        at it (R125): what bb-session tty starts a terminal from. The ones
+        at it: what bb-session tty starts a terminal from. The ones
         before it are kept while a session entered under them still runs
         (stale_bundles)."""
         into = os.path.join(ROOT_BUNDLE_DIR, name)

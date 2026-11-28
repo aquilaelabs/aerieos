@@ -1,6 +1,6 @@
 """A session's release from a branch other than the one builds ship from is
-a dev pre-release unless --stable is said, and the channel is named (R190
-step 1): a stable release cut from claude/0.9.0 had to be pulled."""
+a dev pre-release unless --stable is said, and the channel is named:
+a stable release cut from claude/0.9.0 had to be pulled."""
 import os
 import subprocess
 import sys

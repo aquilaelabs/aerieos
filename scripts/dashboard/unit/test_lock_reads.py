@@ -1,4 +1,4 @@
-"""A space's lock refuses writes, and its history is read through it (B1036).
+"""A space's lock refuses writes, and its history is read through it.
 
 The roadmap's and the bugs' handlers let the history and finished reads past
 the read-only gate, then the lock's 409 refused a member it held out anyway;
@@ -87,7 +87,7 @@ class LockedReads(unittest.TestCase):
 
 
 class NameIsText(unittest.TestCase):
-    """A JSON list as the space's name is a refusal, not a 500 (B1036): four
+    """A JSON list as the space's name is a refusal, not a 500: four
     handlers read it raw, and the list reached a set lookup."""
 
     def test_the_handlers_read_the_name_through_field(self):

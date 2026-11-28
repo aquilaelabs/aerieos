@@ -9,18 +9,18 @@ import re
 import threading
 import time
 
-# Injected by configure(): the server's subprocess runner, the wait that
+# Injected by configure: the server's subprocess runner, the wait that
 # holds the first run until the container has finished starting, and what a
-# runner token's node id and slot are in a person's words (B71).
+# runner token's node id and slot are in a person's words.
 run = None
 wait_for_boot = None
 runner_named = None
-# () -> [{level, text, detail}]: checks the controller answers itself, which
-# aerie doctor cannot see from a shell (the clusters kept, R281). Set by the
+# -> [{level, text, detail}]: checks the controller answers itself, which
+# aerie doctor cannot see from a shell (the clusters kept). Set by the
 # server; each failing check is a warn, never the run's failure.
 extra = None
 
-# Half an hour, a constant (R29): the card's own button re-runs it on demand,
+# Half an hour, a constant: the card's own button re-runs it on demand,
 # which is the control anybody actually reached for.
 EVERY = 1800
 
@@ -45,7 +45,7 @@ def configure(*, run, wait_for_boot, runner_named=None):
 def _runner_line(check):
     """A runner token's line with its node by name and its runner by the
     repository it serves, and for a failure the way to the page a new token
-    is given on (B71): `href` and `act` the panel draws as a link."""
+    is given on: `href` and `act` the panel draws as a link."""
     m = RUNNER.match(check["text"])
     if not m or runner_named is None:
         return check
@@ -99,7 +99,7 @@ def refresh(wait=False):
 
 # A line that names the doc its fix is in, as aerie doctor writes it for a
 # terminal ("... (docs/reference.md)"): on the page, a link to that doc's
-# section in Help (the operator, 26 Oct).
+# section in Help.
 DOC_LINKS = (("the install key is kept beside the state", "#/help/reference/the-install-key", "How"),
              ("no install key:", "#/help/reference/the-install-key", "How it works"),
              ("/config is on a FUSE share", "#/help/unraid/the-config-path", "How"))   # docs/unraid.md, The config path

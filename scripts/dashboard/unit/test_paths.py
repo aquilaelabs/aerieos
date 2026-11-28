@@ -72,7 +72,7 @@ class Paths(unittest.TestCase):
 
     def test_a_place_made_is_the_controllers_alone(self):
         # Beside a controller installed bare metal, the node's accounts are on
-        # the same machine (R90 step 15): a store moved is made 0700.
+        # the same machine: a store moved is made 0700.
         r = paths.set_path("project-snapshots", str(self.root / "deep" / "snaps"))
         self.assertTrue(r.get("ok"), r)
         self.assertEqual(os.stat(self.root / "deep" / "snaps").st_mode & 0o777, 0o700)

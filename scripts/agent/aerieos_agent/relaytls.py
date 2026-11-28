@@ -1,4 +1,4 @@
-"""TLS for the node's relay port (R243): the terminals, the file explorer's
+"""TLS for the node's relay port: the terminals, the file explorer's
 requests and a VM's screen crossed the LAN as plain websockets, so anybody
 on the network read what was typed in a shell. Both ends keep the code they
 had, written for a plain socket: the TLS is done here, in one thread per

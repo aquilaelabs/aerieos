@@ -1,4 +1,4 @@
-// The Library (R170): one page under Build for everything an AerieOS
+// The Library: one page under Build for everything an AerieOS
 // installs or runs on a node, as one list of one shape. Opens on the
 // harness's stub node, a section per kind always drawn, the rows read from
 // /api/library; the search and the chips narrow the list and save nothing;
@@ -35,7 +35,7 @@ const KINDS = ['agent', 'toolchain', 'pack', 'service', 'app', 'companion'];
 // Waits for the page to have drawn what a narrowing asked the server for.
 const settled = () => page.waitForFunction(() => !readBusy('library') && !!document.querySelector('.doc .librarytab .libgroups'), null, { timeout: 20000 });
 
-// ---- the front page: shelves, never the whole catalog (R256) ----------------
+// ---- the front page: shelves, never the whole catalog ----------------
 await page.waitForSelector('.doc .librarytab .libgroup', { timeout: 15000 });
 const shelves = await page.$$eval('.doc .librarytab .libgroup', ds => ds.map(d => ({ key: d.dataset.libgroup, cards: d.querySelectorAll('.lcard').length,
   all: d.querySelector('[data-libshelf]')?.textContent.trim() || '' })));
@@ -51,7 +51,7 @@ ok(MINE.length ? shelves[0]?.key === 'installed' : !shelves.some(sh => sh.key ==
    `...and what is on this node comes first (${MINE.length} installed or with an update)`);
 ok(await page.evaluate(() => !(lib.rows || []).length && Array.isArray(lib.shelves)),
    'the page holds the shelves the server picked, never the whole catalog');
-// No pack at all is no Tool packs shelf (the operator, 29 Oct), unless the
+// No pack at all is no Tool packs shelf, unless the
 // catalog has something to say over them.
 ok(await page.evaluate(async () => {
   const keep = lib;
@@ -69,8 +69,8 @@ const shape = ALL.map(r => [r.kind, r.tier, typeof r.label, typeof r.about, type
 ok(shape.length > 0 && shape.every(([k, t, l, a, i, v]) => KINDS.includes(k)
    && ['official', 'verified', 'vetted', 'sideloaded'].includes(t) && l === 'string' && a === 'string' && i === 'boolean' && v === 'string'),
    `every row is one shape: kind, tier, label, about, installed, verb (${shape.length} rows)`);
-// What runs only elsewhere is counted by the server and said over the list
-// (R170 step 9), never in the head since R274.
+// What runs only elsewhere is counted by the server and said over the list,
+// never in the head.
 ok(await page.evaluate(n => (lib.facts?.other_platform || 0) === n, ALL.filter(r => r.wrong_platform && !r.too_new).length)
    && await page.evaluate(() => !/Not for this node/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '')),
    'the cards not for this node are counted, and not in the head (R170 step 9, R274)');
@@ -83,8 +83,8 @@ ok(tierPills.length > 0 && tierPills.every(t => /^(packaged by aerie|verified|ve
 ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && libTierWord('verified') === 'Verified'
      && LIB_TIERS.map(([, l]) => l).join(', ') === 'Packaged by Aerie, Verified, Vetted, Sideloaded'),
    'the tier chips are Packaged by Aerie, Verified, Vetted and Sideloaded');
-// ...and to the left of that pill a card names who the tool itself is by
-// (the operator, 12 Nov): the tier is the pack's, the maker the tool's.
+// ...and to the left of that pill a card names who the tool itself is by:
+// the tier is the pack's, the maker the tool's.
 await section("and to the left of that pill a card names who the tool itself is by", async () => {
   // Found by the search, as a person would find one past a shelf's eight.
   await page.fill('.doc .librarytab #libFind', 'jdk');
@@ -105,13 +105,13 @@ await section("and to the left of that pill a card names who the tool itself is 
 });
 ok(await page.evaluate(() => {
   const head = document.querySelector('.doc .librarytab .pghead');
-  // Its status line says what wants doing, or that all is up to date (R274):
+  // Its status line says what wants doing, or that all is up to date:
   // what is installed is the Installed chip's count, not said twice.
   return !!head?.querySelector('.pgline') && /updates? due|installed, all up to date/.test(head.querySelector('.pgline').textContent);
 }), 'the head\'s status line says the updates due, or that what is installed is up to date');
 
 // ---- search and chips ----------------------------------------------------
-// The server narrows (R256): the search, a chip or a topic is one sorted
+// The server narrows: the search, a chip or a topic is one sorted
 // list, a page of it at a time, and the shelves come back with nothing
 // narrowed.
 const firstTc = HERE.find(r => r.kind === 'toolchain')?.label || '';
@@ -150,7 +150,7 @@ if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
      && document.querySelectorAll('.doc .librarytab .lcard').length === Math.min(n, 30) && lib.total === n
      && document.querySelector('.doc .librarytab [data-libkind="toolchain"]').classList.contains('on'), tcs.length),
      `a kind chip is that kind's list alone, a page of it, the chip wearing .on (${tcs.length})`);
-  // ...and the source chips count within it (the operator, 31 Oct).
+  // ...and the source chips count within it.
   const facet = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.doc .librarytab [data-libtier]')]
     .map(b => [b.dataset.libtier, +(b.querySelector('.pill')?.textContent || 0)])));
   const want = Object.fromEntries(['official', 'verified', 'vetted', 'sideloaded'].map(k => [k, tcs.filter(r => r.tier === k).length]).filter(([, c]) => c));
@@ -161,14 +161,14 @@ if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
   ok(await page.$$eval('.doc .librarytab .libgroup', ds => ds.length > 1), '...and All puts the shelves back');
 } else ok(true, 'one kind only here, so no kind chips (chips need two groups)');
 
-// The address is the list (R256): a reload of one with the search in it
+// The address is the list: a reload of one with the search in it
 // lands on the same list, the read sent before the address was applied
 // asked again rather than dropped.
 await section("a reload of a list lands on the same list", async () => {
   const word = (HERE.find(r => r.kind === 'toolchain')?.name || 'jdk').slice(0, 3);
   await page.fill('.doc .librarytab #libFind', word);
   // The list's own cards, never its placeholder's: a narrowing draws six
-  // shimmering cards on the press (the operator, 22 Nov), which carry no row.
+  // shimmering cards on the press, which carry no row.
   await page.waitForFunction(q => libQ === q && /[?&]q=/.test(location.hash) && !!document.querySelector('.doc .librarytab .libone .lcard[data-lrow]'), word, { timeout: 15000 });
   const before = await page.$$eval('.doc .librarytab .libone .lcard[data-lrow]', cs => cs.map(c => c.dataset.lrow).join());
   await page.reload();
@@ -180,7 +180,7 @@ await section("a reload of a list lands on the same list", async () => {
   await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 });
 
-// Rows (R256): at a desk a card a line, its head, what it is and its verbs
+// Rows: at a desk a card a line, its head, what it is and its verbs
 // side by side; on a phone two lines, the name across the card and the
 // verbs beside its pills; anything else under those.
 await section("Rows: a card a line at a desk and on a phone", async () => {
@@ -222,13 +222,13 @@ if (off){
 } else ok(true, 'nothing here is for another system');
 
 // The page's buttons on the search's line under the head, the bar empty
-// (the operator, 29 Oct: they stood over a gap).
+// (they stood over a gap).
 ok(await page.evaluate(() => !!document.querySelector('.doc .librarytab .libsearchrow #libFind')
    && !!document.querySelector('.doc .librarytab .libsearchrow .actbar [data-libcheck]')
    && !document.querySelector('.pane .bar [data-libcheck], .doc .librarytab .docbarrow [data-libcheck]')),
    'Check for updates and Add your own sit on the search\'s line, not in a bar over the head');
 
-// Installed, the chip after All (the operator, 29 Oct): the cards
+// Installed, the chip after All: the cards
 // installed on this node, each in its own kind's section; no chip while
 // nothing is.
 if (HERE.some(r => r.installed)){
@@ -246,7 +246,7 @@ await page.click('.doc .librarytab [data-libkind=""]');
 await page.waitForFunction(() => libKind === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 } else ok(!(await page.$('.doc .librarytab [data-libkind="installed"]')), 'nothing installed here, so no Installed chip');
 
-// Updates, the chip after Installed (the operator, 29 Oct): the cards with an
+// Updates, the chip after Installed: the cards with an
 // update due, each in its own section, and no chip while none is.
 if (HERE.some(r => r.update || r.repin)){
   ok(await page.evaluate(() => {
@@ -264,7 +264,7 @@ if (HERE.some(r => r.update || r.repin)){
   await page.waitForFunction(() => libKind === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 } else ok(!(await page.$('.doc .librarytab [data-libkind="update"]')), 'no update due here, so no Updates chip');
 
-// ---- Details opens the entry's own page (R183) ------------------------------
+// ---- Details opens the entry's own page ------------------------------
 // A card stays a card; Details opens that entry's page, a page a press opens
 // with the small top header's Back to the Library, its body what Details
 // says: the catalog's entry alone.
@@ -295,7 +295,7 @@ await section("a toolchain card to open", async () => {
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'library', null, { timeout: 10000 });
   ok(true, '...and Back returns to the Library');
   // An entry's address with no entry named lands on the Library, not on
-  // whatever page was on show (B1175: the CI runner's stayed).
+  // whatever page was on show (the CI runner's stayed).
   await page.evaluate(() => { location.hash = '#/machines/runner'; });
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'runner', null, { timeout: 10000 });
   await page.evaluate(() => { location.hash = '#/build/entry'; });
@@ -361,7 +361,7 @@ await section("the verbs are the pages' own", async () => {
     await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
   } else ok(true, 'nothing uninstalled to install on the stub');
 });
-// Install on an app row opens New container on that app's panel (R238).
+// Install on an app row opens New container on that app's panel.
 if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')){
   const id = await page.$eval('.doc .librarytab [data-libkind="app"][data-libact="install"]', b => b.dataset.libname);
   await page.click('.doc .librarytab [data-libkind="app"][data-libact="install"]');
@@ -434,7 +434,7 @@ await section("Add your own", async () => {
   await page.click('#tpmodal [data-tprmapp]');
   // The ask slides in, so it is pressed by the page rather than by a pointer
   // waiting for it to settle; found and pressed in one look, since under a
-  // whole run's load it was gone again between a wait and the press (B933).
+  // whole run's load it was gone again between a wait and the press.
   await page.waitForFunction(() => { const b = document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]');
     if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
   await page.waitForFunction(() => document.getElementById('tpmodal').hidden && !document.querySelector('.doc .librarytab .lcard[data-lrow="app:notes"]'), null, { timeout: 15000 });
@@ -442,7 +442,7 @@ await section("Add your own", async () => {
   ok(true, 'Remove in there takes it off the catalog, and the card goes');
 });
 
-// ---- an app's own fields (R238) --------------------------------------------
+// ---- an app's own fields --------------------------------------------
 // An app of pack format 4, kept as the catalog's are, opens New container on
 // its panel: each kind of field drawn as its answer is, its file read-only,
 // a variable it sets refused in the Environment by name; a container made
@@ -555,7 +555,7 @@ await section("an app's panel", async () => {
   writeFileSync(f, JSON.stringify(d));
 });
 
-// ---- a service's card: the catalog's entry alone (R172) ----------------------
+// ---- a service's card: the catalog's entry alone ----------------------
 // The model router is a Services card whose Install is dead until something
 // is behind it, set on the Installed page; its Details show the entry and
 // draw no Configure of their own.
@@ -573,7 +573,7 @@ await section("a service's card", async () => {
 // A chip pressed from a long list draws its placeholder at once, while the
 // total in hand is still the list's before: "6 of 61 coding agents" stood
 // under the six placeholder cards, then inside the first real card that
-// took their place (the operator, 23 Nov). The read is held here, so the
+// took their place. The read is held here, so the
 // placeholder is on screen while it is asked.
 await section("a narrowing's placeholder has no foot", async () => {
   await toLibrary();
@@ -601,9 +601,9 @@ await section("a narrowing's placeholder has no foot", async () => {
 });
 
 // A row still installing is read again as the jobs revision moves, while the
-// Library is on show, and never on a clock of its own (R283 step 4; before
-// it, a three-second timer read on after the page was left, B1096, and an
-// entry's page stacked them, B1161).
+// Library is on show, and never on a clock of its own (before
+// it, a three-second timer read on after the page was left, and an
+// entry's page stacked them).
 await section("a row still installing is read again as the jobs revision moves, only while the Library is on show", async () => {
   await toLibrary();
   await page.route('**/api/library?*', async r => {
@@ -644,7 +644,7 @@ await section("a row still installing is read again as the jobs revision moves, 
   await toLibrary();
 });
 
-// A hosting-only node (R291, the operator, 25 Nov: spaces build on a node of
+// A hosting-only node (spaces build on a node of
 // their own and deploy to a hosting one): its Library offers services and
 // apps alone, its kind chips with them, says once where the rest goes, and
 // an install of a build tool there is refused in a sentence, never queued.
@@ -677,7 +677,7 @@ await section("a hosting-only node offers only what it runs", async () => {
 // ---- no node ---------------------------------------------------------------
 // A read of the nodes in flight (the poll's) lands after the list is
 // emptied and fills it again, so it is emptied again until the page says
-// there is none (B978).
+// there is none.
 await page.waitForFunction(() => {
   if (document.querySelector('.doc .librarytab .libnone')) return true;
   if (!readBusy('nodes') && !readBusy('library') && (nodesList?.length || libNode || lib)){ nodesList = []; nodesStale = false; libNode = ''; lib = null; loadLibrary(); }

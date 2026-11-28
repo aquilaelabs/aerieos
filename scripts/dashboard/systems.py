@@ -1,5 +1,5 @@
 """The systems a node can be: what Enroll node's pulldown offers, and which
-provisioner family file the built script carries for each (R204).
+provisioner family file the built script carries for each.
 
 An entry is a distribution as a person knows their machine (what
 os-release's PRETTY_NAME says); its family is the provisioner file under
@@ -24,8 +24,8 @@ WALK = ("a VM made a node from its cloud image, enrolled; VM host installed and 
 WALK_NO_VM_HOST = WALK.replace("VM host installed and removed; ", "")
 
 # An entry's "vetted" is typed where nothing dates it (a system in daily
-# use). One with "walked" is vetted by the lab's own record (labrecord.py,
-# R3 step 8): its line is what was walked, dated by the newest walk on
+# use). One with "walked" is vetted by the lab's own record (labrecord.py):
+# its line is what was walked, dated by the newest walk on
 # record whose machine said it was this system, and with no walk on record
 # it is not vetted. The dates were typed here by hand before, and stayed
 # as the provisioner changed under them.
@@ -78,7 +78,7 @@ def of_os(text):
     """The system whose ids name what the census says of the machine's OS
     ("linux x86_64 Ubuntu 24.04.2 LTS", "linux x86_64 Rocky Linux 9.4"),
     or "" when none does: a row enrolled before the system was recorded
-    on it (R210) gets its script built for the system it reports."""
+    on it gets its script built for the system it reports."""
     words = re.findall(r"[a-z]+", str(text or "").lower())
     if "red" in words and "hat" in words:
         return "rhel"

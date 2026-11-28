@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# A controller installed bare metal starts here (R90 step 3).
+# A controller installed bare metal starts here.
 #
 # What the container's entrypoint is under tini, this is under systemd: the
 # unit nodes/install-controller.sh writes (aerieos-controller.service)
@@ -19,8 +19,8 @@
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "host-boot.sh runs as root, from the aerieos-controller service" >&2; exit 1; }
-# What the controller writes is its account's alone, wherever it writes it
-# (R90 step 15): its own folders are 0700 already, and a store moved from
+# What the controller writes is its account's alone, wherever it writes it:
+# its own folders are 0700 already, and a store moved from
 # Settings to a folder of the machine's is made the same way rather than
 # readable by the node's accounts beside it.
 umask 077
@@ -48,7 +48,7 @@ export PUID PGID BB_ACCOUNT
 
 # The folder the deploy-key agent's socket for the account lives in: the
 # account's group may enter it and nobody else (the node's session and job
-# accounts above all, R90's wall), where the container's sits in /run.
+# accounts above all), where the container's sits in /run.
 sock_dir() {
     local d
     d="$(dirname "${SSH_AUTH_SOCK:-/run/aerieos-controller/ssh-agent.sock}")"
@@ -65,7 +65,7 @@ main() {
     sock_dir
     setup_ssh_agent
     record_image
-    # Before the hooks, which start the dashboard (B388).
+    # Before the hooks, which start the dashboard.
     install_key_file
     load_deploy_keys
     run_hooks

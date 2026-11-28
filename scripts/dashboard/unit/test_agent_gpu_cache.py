@@ -1,5 +1,5 @@
 """The card is read on a thread of its own and the heartbeat takes what it
-last read (B841): nvidia-smi takes a second or so to start, and asked three
+last read: nvidia-smi takes a second or so to start, and asked three
 times before every work poll it held a job queued after another for three
 seconds on a node with the driver installed. The sample never waits on it,
 one reading is two calls, and a driver with no card is asked again only
@@ -42,7 +42,7 @@ class GpuCache(unittest.TestCase):
         t0 = time.monotonic()
         first = gpu.gpu_cached()
         # Under one stand-in nvidia-smi's 0.3 s, not a guess at how fast a
-        # busy machine starts a thread (B812: 0.1 s was missed in a whole run).
+        # busy machine starts a thread (0.1 s was missed in a whole run).
         self.assertLess(time.monotonic() - t0, 0.25, "the first call starts the reader and returns")
         self.assertEqual(first, {})
         for _ in range(200):

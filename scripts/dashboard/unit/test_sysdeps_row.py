@@ -81,7 +81,7 @@ class Reason(unittest.TestCase):
         self.assertNotIn("pid", got)
 
     def test_a_long_reason_starts_at_a_line_not_mid_word(self):
-        # B83: a tool pack's install, as bb-dev-sandbox logged it; the row
+        # A tool pack's install, as bb-dev-sandbox logged it; the row
         # was cut by characters from the end and began '3pack · * branch'.
         out = "Permission denied: " + "x" * 300
         got = self.why("== aerie toolchains install wordy\n"
@@ -113,7 +113,7 @@ class Reason(unittest.TestCase):
 
 
 class CheckAndUpdate(unittest.TestCase):
-    """A check and an update leave an installed toolchain installed (B1017):
+    """A check and an update leave an installed toolchain installed:
     the store's word called each one failed."""
 
     def test_a_check_is_its_job_s_end(self):

@@ -1,4 +1,4 @@
-"""Backups off the machine (R162 step 5): the record of what the
+"""Backups off the machine: the record of what the
 controller's own machine copies where (a pool, the array or the
 controller's state to the array, a disk or a share under /mnt/other), how
 many runs to keep, each a row on the Storage page with Run now and a

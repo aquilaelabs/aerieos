@@ -1,4 +1,4 @@
-"""A project's git token kept sealed under the install key (R135): written as
+"""A project's git token kept sealed under the install key: written as
 ciphertext where there is a key, open lines sealed at start, read plain by
 the dashboard, and handed to git by git-credential-bb only for the scheme
 and host it was written for; another key, or none, opens nothing."""
@@ -59,7 +59,7 @@ class Sealed(unittest.TestCase):
         self.assertEqual(gitcreds.seal_all(), 0)
 
     def test_a_reseal_keeps_the_people_who_gave_a_token(self):
-        # B543: a project's own line beside its givers' account: lines;
+        # A project's own line beside its givers' account: lines;
         # sealed again (at start, or after the install key changed) it kept
         # the one line and every giver was gone.
         signing.load_master(str(self.tmp / "none"))
@@ -71,7 +71,7 @@ class Sealed(unittest.TestCase):
         self.assertEqual(gitcreds.read_line("web"), "https://oauth2:tok@github.com")
 
     def test_people_giving_a_project_a_token_at_once_are_all_kept(self):
-        # B549: each read the givers and rewrote them, and one lost another.
+        # Each read the givers and rewrote them, and one lost another.
         import threading
         signing.load_master(str(self.tmp / "none"))
         gitcreds.keep_as_own("web", "https://oauth2:tok@github.com")
@@ -99,7 +99,7 @@ class Sealed(unittest.TestCase):
         self.assertFalse(gitcreds.names_helper(f"store --file={gitcreds.path('web')}", "web"))
         # ...known by its name, wherever it was written from: one linked
         # before the install moved to /opt/aerieos names /opt/builderbot,
-        # a link to the same file (B1144), and the old helper line beside
+        # a link to the same file, and the old helper line beside
         # another is found among them.
         old = f"!/opt/builderbot/scripts/dashboard/git-credential-bb {gitcreds.path('web')}"
         self.assertTrue(gitcreds.names_helper(old, "web"))

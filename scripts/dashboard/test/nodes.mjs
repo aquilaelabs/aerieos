@@ -39,9 +39,9 @@ const nodeOptions = page => page.$$eval('.pane .bar #ndPick option', os => os.ma
 
 // The page kept whichever node list answered last, not the one it asked for
 // last, so a list the poll asked for before a change could land after the
-// read that followed it (B849, numbered since). A wait on what a row says
+// read that followed it (numbered since). A wait on what a row says
 // still reads the list again while it waits, so one slow answer cannot hold
-// it (B606, B652).
+// it.
 const nodesUntil = async (page, fn, arg, { timeout = 20000 } = {}) => {
   const until = Date.now() + patience(timeout);
   for (;;){
@@ -53,9 +53,9 @@ const nodesUntil = async (page, fn, arg, { timeout = 20000 } = {}) => {
 
 // A box in the enroll and VM dialogs is typed while the Nodes tab behind them
 // repaints. A repaint handed the caret back to the tab field that last had it,
-// the rename box, even out of a dialog (B848, fixed in the page), and a fill
+// the rename box, even out of a dialog (fixed in the page), and a fill
 // focuses the box and then inserts into whatever has the focus, so the text
-// went to the tab's field (B651, B612, B467). Filled again until the box
+// went to the tab's field. Filled again until the box
 // holds it, so any repaint that still moves the caret cannot pass for typing.
 const fillHeld = async (page, sel, value) => {
   for (let i = 0; i < 5; i++){
@@ -102,7 +102,7 @@ ok(local && local.kind === 'local' && local.state === 'online'
    'local is this container, with a real census');
 ok(!local.capabilities.includes('docker-host'),
    '...and no docker-host capability: the local node is not a sandbox');
-// A node's Updates line names the release key it pinned and its spare (R232),
+// A node's Updates line names the release key it pinned and its spare,
 // and says when this build names a spare the node has not pinned yet.
 await section("A node's Updates line names the release key it pinned and its spare", async () => {
   const said = await page.evaluate(() => {
@@ -164,8 +164,8 @@ ok(!list.some(n => n.kind === 'ssh'),
 ok(list[0].id === 'local',
    'local lists first: the one node every deployment has');
 
-// ---- the default node runs docker, when any node says so (B113) -----------
-// node_for() took the newest node with an ADDRESS, and an address is not a
+// ---- the default node runs docker, when any node says so -----------
+// node_for took the newest node with an ADDRESS, and an address is not a
 // daemon: a Mac enrolled as a guest, with ssh and no docker, would have become
 // the host of every instance nobody bound to a node. The census already says
 // which nodes run docker, so those are preferred, with nothing asked on the
@@ -329,7 +329,7 @@ await section("phase 2: the Nodes tab", async () => {
   // A node's own row, not the template's: the template drawn while the list
   // is on its way has a row of the same class and a placeholder where the
   // picker goes, and read then (a loaded run, the list slow to land) the
-  // picker had no options at all (B219).
+  // picker had no options at all.
   await page.waitForSelector('.nodestab .ndrow[data-node]', { timeout: 15000 });
   const listed = await nodeOptions(page);
   ok(listed.length === 1 && !listed.includes('local'),
@@ -387,7 +387,7 @@ await section("phase 2: the Nodes tab", async () => {
   });
   ok(added && added.kind === 'agent',
      'a machine is enrolled with a token, and arrives as an agent node');
-  // A project on two nodes (R82): the row carries a chooser row per node,
+  // A project on two nodes: the row carries a chooser row per node,
   // each saying whether a session can start there, and a terminal asked
   // for with :n:NODE is judged on that node; a node outside the set falls
   // to the primary. buildbox reports no session half, so it refuses.
@@ -409,7 +409,7 @@ await section("phase 2: the Nodes tab", async () => {
     const t2 = await fetch(base + '/termws?arg=' + encodeURIComponent('claude:beta:n:n_notinset'), { headers: H });
     ok(!/buildbox/.test(await t2.text()), '...while a node outside the set falls to the primary');
     // A build from the dashboard falls over to a node of the set that is
-    // up (R82 step 6): buildbox's enrolment counted as a heartbeat, so its
+    // up: buildbox's enrolment counted as a heartbeat, so its
     // last one is aged past the live window first, and put back after, since
     // the docker tests below want it dialing in; then with it as the primary
     // the job runs on the sandbox and its spec says which it stood in for.
@@ -431,7 +431,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
     await post('/api/prefs', { project: 'beta', node: '', nodes: [] });
     agentSeen(0);
     // Why an idle session's token was not kept here, as the agent said it
-    // on its hello (B419): on the node's row, in the warning color, with when
+    // on its hello: on the node's row, in the warning color, with when
     // one was last kept; the node's journal was the only place it went.
     execFileSync('python3', ['-c', `
 import importlib.util, json, sys, time
@@ -505,8 +505,8 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
 
 // ---- phase 2: the docker manager's picker ----------------------------------
 // A group header says its node's state as a pill beside the picker, so the
-// node on show is its name alone in the picker (the operator, 18 Nov:
-// "draconis (qui..." beside NOT ANSWERING); the others in its list still say
+// node on show is its name alone in the picker
+// ("draconis (qui..." beside NOT ANSWERING); the others in its list still say
 // they are quiet, where it helps the choice, and a picker with no pill says
 // it for every node.
 await section("a group header's picker leaves the quiet word to its pill", async () => {
@@ -530,7 +530,7 @@ await section("a group header's picker leaves the quiet word to its pill", async
      `a group header's picker names its node alone beside the pill, the others quiet as they are (${JSON.stringify(opts)})`);
   // ...and is as wide as the name it shows, measured rather than left to
   // the browser, which cut it short with room beside it (bb-sand… on a
-  // phone in Firefox, the operator, 19 Nov; WebKit too): its ink, its
+  // phone in Firefox; WebKit too): its ink, its
   // padding and room for the arrow, and again when the name changes.
   const fit = await page.evaluate(async () => {
     const s = document.querySelector('.pane .bar #ndPick'), cs = getComputedStyle(s);
@@ -562,7 +562,7 @@ await section("phase 2: the docker manager's picker", async () => {
   await page.waitForSelector('.dmtab .dmpick', { timeout: 15000 });
   // Waited for AND read in one go: the tab redraws from the poll, so a list
   // read in a second round trip can land on the moment between two draws and
-  // come back empty (B99's family; this file has had three).
+  // come back empty (this file has had three).
   const opts = await page.waitForFunction(() => {
     const os = [...document.querySelectorAll('.pane .bar #ndPick option')];
     return os.length ? os.map(o => o.textContent.trim()) : false;
@@ -612,11 +612,11 @@ await section("phase 2: the docker manager's picker", async () => {
   // and back: the sandbox's last-known answer paints instantly from cache.
   // Waited for at the point of USE, not at the assertion above: the picker
   // is drawn only while nodesList holds more than one node, and a reload of
-  // that list between the two takes the element with it (B69's sibling).
+  // that list between the two takes the element with it.
   // Found and used in ONE evaluate, because the gap between two is the bug
   // this comment is about: the wait said the picker was there and the list
   // reloaded before the next round trip could touch it, so the set threw on
-  // null about one run in several (B99's family, a site the report did not
+  // null about one run in several (a site the report did not
   // name). A predicate with a side effect, deliberately.
   await page.waitForFunction(() => {
     const s = document.querySelector('.pane .bar #ndPick');
@@ -748,7 +748,7 @@ await section("the configuration plane on the row", async () => {
   // WORKING never runs out. One idle past twelve hours has nothing to slide
   // it, and a dead token is deliberately never renewed, since that refusal is
   // what makes the life mean anything for one that leaked. So the machine the
-  // session runs on is handed a fresh one on the beat it already has (R27).
+  // session runs on is handed a fresh one on the beat it already has.
   {
     const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
     // The tmux sessions ride the heartbeat, so they are reported the way a
@@ -757,7 +757,7 @@ await section("the configuration plane on the row", async () => {
       headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ sample: { cpu_pct: 1, mem_mb: 8192, mem_used_mb: 512, sessions },
                              running: [], wait: 0 }) });
-    // A session name is the node's own word (B762): it earns a token only
+    // A session name is the node's own word: it earns a token only
     // for a space that works on this node and an account that may work on it.
     await beat([{ name: `${uid}~claude-alpha` }, { name: `${uid}~shell-3` }]);
     const stray = await napi('/api/v1/agent/hello', {
@@ -768,7 +768,7 @@ await section("the configuration plane on the row", async () => {
     await napi('/api/prefs', { project: 'alpha', node: minted.id, nodes: [minted.id] });
     await beat([{ name: `${uid}~claude-alpha` }, { name: 'u_0badc0de~claude-alpha' }, { name: `${uid}~shell-3` }]);
     // ...and only for an account and space whose terminal this controller
-    // opened on that node (R288 step 7), so a stolen node token is handed no
+    // opened on that node, so a stolen node token is handed no
     // token the node was not given already.
     const unasked = await napi('/api/v1/agent/hello', {
       census: CENSUS, version: shipped.version, digest: shipped.digest },
@@ -788,7 +788,7 @@ await section("the configuration plane on the row", async () => {
          JSON.stringify(toks.map(t => t.project))})`);
     // Worth being a real credential rather than a shape: the whole point is
     // that the session can go on using it.
-    // Asked of a route a session's token reaches (R227 step 4): its brief.
+    // Asked of a route a session's token reaches: its brief.
     const briefOf = p => fetch(URL.replace(/\/$/, '') + '/api/brief?project=' + p, { headers: { Authorization: 'Bearer ' + toks[0].token } }).then(r => r.status);
     const asSession = [await briefOf('alpha'), await briefOf('beta')];
     ok(asSession[0] === 200 && asSession[1] === 400,
@@ -819,7 +819,7 @@ await section("the configuration plane on the row", async () => {
   // A node's containers changing by themselves (one crashed, a shell ran
   // docker) move the Containers page's token by the fingerprint each
   // heartbeat carries, and a heartbeat with the same one does not: the page
-  // has no Refresh since (the operator, 17 Oct).
+  // has no Refresh since.
   {
     const tok = async () => (await page.evaluate(async () => (await (await fetch('/api/revs')).json()).containers));
     const beatCtr = dig => fetch(base + '/api/v1/agent/work', { method: 'POST',
@@ -877,11 +877,11 @@ await section("the configuration plane on the row", async () => {
      && !meters.some(m => /missing/.test(m.val))
      && meters.every(m => /^\d+%$/.test(m.width)),
      `each store is a meter with its headroom (${meters.map(m => m.label + ' ' + m.val).join(', ')})`);
-  // ...and what the charts below draw is not a bar again (the operator,
-  // 17 Oct): no CPU, memory, GPU or VRAM meter beside their hour.
+  // ...and what the charts below draw is not a bar again:
+  // no CPU, memory, GPU or VRAM meter beside their hour.
   ok(!meters.some(m => ['cpu', 'memory', 'gpu', 'vram'].includes(m.label)),
      `the charted numbers are not meters too (${meters.map(m => m.label).join(', ')})`);
-  // Its last hour (R218 step 9): CPU and memory as two small charts from
+  // Its last hour: CPU and memory as two small charts from
   // the controller's ring of its samples, each naming itself and saying its
   // latest, low, average and high without a hover.
   const charts = await page.$$eval(`${ROW} .ndcharts .chart`, cs => cs.map(c => ({
@@ -893,7 +893,7 @@ await section("the configuration plane on the row", async () => {
      `a node's page charts its last hour of CPU and memory, and its card's busyness and memory where it has one (${JSON.stringify(charts.map(c => [c.t, c.v, c.s]))})`);
   // The line holds through a node's uneven reports: bursts seconds apart
   // while it is busy and one a poll while it idles low are one line, and
-  // only a real silence breaks it (the operator, 16 Oct: the low stretches
+  // only a real silence breaks it (the low stretches
   // drew as dots).
   const runsOf = await page.evaluate(() => {
     const t0 = 1_000_000, pts = [];
@@ -926,7 +926,7 @@ await section("the configuration plane on the row", async () => {
   await page.evaluate(() => document.activeElement?.blur());
   ok(await page.$eval(`${ROW} .ndtools`, e => /flutter/.test(e.textContent) && /node/.test(e.textContent)),
      'the row shows what is installed on the node, which is what a space bound to it can build');
-  // The runner is a tool of its own since R121 (the operator, 4 Oct): the same
+  // The runner is a tool of its own: the same
   // section, drawn and wired on the CI runner tab for the picked node.
   await page.evaluate(id => openRunnerTab(id), minted.id);
   const RROW = `.runnertab .ndrow[data-node="${minted.id}"]`;
@@ -948,7 +948,7 @@ await section("the configuration plane on the row", async () => {
   await page.fill(`${RROW} [data-k="runner:labels"]`, 'gpu');
   await page.click(`${RROW} [data-nrunneradd]`);
   await page.waitForSelector(RUN, { timeout: 10000 });
-  // A runner is a record (the operator, 17 Nov): read-only in the table,
+  // A runner is a record: read-only in the table,
   // its Edit opening its actions in place.
   const shut = await page.$eval(RUN, r => !r.querySelector('[data-nrunner]') && !!r.querySelector('[data-nredit]'));
   await page.click(`${RUN} [data-nredit]`);
@@ -971,7 +971,7 @@ await section("the configuration plane on the row", async () => {
   ok(pressedState === true, 'a node action goes dead the instant it is pressed, not when it answers');
   // On the CI runner tab the runner's own state line is what says it.
   // Read again while waiting: a list asked for before the press can land
-  // after the press's own read and stand without the job (B652).
+  // after the press's own read and stand without the job.
   await nodesUntil(page, sel => /installing now/.test(
     document.querySelector(sel + ' .ndrunstate')?.textContent || ''), RUN);
   // The runner section says so itself, in its own state line, with the
@@ -1037,7 +1037,7 @@ await section("the configuration plane on the row", async () => {
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /not listening/.test(
     document.querySelector(sel + ' .ndrunstate')?.textContent || ''), RUN, { timeout: 10000 });
-  // Its state a pill, and why under it as notices (R218 step 28).
+  // Its state a pill, and why under it as notices.
   ok(await page.$eval(RUN, r => /no workflow will reach it/.test(r.querySelector('.ndrunnote.bad')?.textContent || '')
        && /registration may not have finished/.test(r.textContent) && r.querySelector('.ndrunstate').classList.contains('off'))
      && await page.$$eval(`${RROW} .ndrun`, rows => rows.length === 1),
@@ -1071,7 +1071,7 @@ await section("the configuration plane on the row", async () => {
        [...e.querySelectorAll(':scope > details.sect > summary .sst')].every(s => s.textContent.trim())),
      '...every section says its state on its summary, so a phone reads the headings and picks one');
   // Every section open, and at a desk a press on a heading leaves it open:
-  // nothing on a page folds at a desk (the operator, 18 Oct), only on a
+  // nothing on a page folds at a desk, only on a
   // phone, one at a time.
   {
     const sects = `${ROW} .ndconfbody > details.sect`;
@@ -1110,13 +1110,13 @@ await section("the configuration plane on the row", async () => {
                                    name: 'shed', url: 'https://github.com/example-org',
                                    labels: ['builderbot', 'shed'] }] });
   // "shed" is not the condition: the card has carried the name since the
-  // install press above, on whichever poll landed since, and refresh() asked
+  // install press above, on whichever poll landed since, and refresh asked
   // while the fifteen-second poll is out returns at once and re-polls after
   // it, so the first draw here can be from an answer computed before this
-  // hello. Wait for the state the assertion is about (B73).
+  // hello. Wait for the state the assertion is about.
   // One runner is told by its own section; the list of every node's
-  // runners is for comparing several, so with one it is not drawn (the
-  // operator, 18 Oct: it said the same thing twice).
+  // runners is for comparing several, so with one it is not drawn
+  // (it said the same thing twice).
   await page.evaluate(() => { refresh(); openRunnerTab(); });
   await page.waitForFunction(() => {
     const r = document.querySelector('.doc.on .ndruns .ndrun');
@@ -1148,9 +1148,9 @@ await section("the configuration plane on the row", async () => {
   await page.fill(`${ROW} [data-k="store:cache"]`, '/scratch/cache');
   ok(await page.$(`${ROW} [data-k="store:artifacts"]`) !== null,
      'the fold carries the artifacts store: this node\'s copy of what spaces built');
-  // Its first line keeps room under the heading (the operator, 23 Oct:
-  // "Mounts at boot." sat on it), and a mount's form is a form like every
-  // other (the forms rule, 27 Nov): at a desk its source and mountpoint side
+  // Its first line keeps room under the heading
+  // ("Mounts at boot." sat on it), and a mount's form is a form like every
+  // other (the forms rule): at a desk its source and mountpoint side
   // by side, its kind under them, and read-only a line of its own.
   {
     const lay = await page.evaluate(sel => {
@@ -1185,7 +1185,7 @@ await section("the configuration plane on the row", async () => {
   const caret = await page.evaluate(() => document.activeElement?.dataset?.k || document.activeElement?.tagName);
   ok(kept === '/mnt/appdata' && caret === 'store:cache',
      `a repaint under the editor keeps what was typed and where the caret was (kept ${kept}, caret ${caret})`);
-  // A record's Save writes it at once (the operator, 17 Nov), the store
+  // A record's Save writes it at once, the store
   // typed beside it staying a draft of its own.
   await page.click(`${NEW} [data-msave]`);
   await page.waitForFunction(id => (nodesList.find(n => n.id === id)?.config?.desired?.mounts || []).some(m => m.path === '/mnt/appdata'),
@@ -1197,7 +1197,7 @@ await section("the configuration plane on the row", async () => {
      && /not applied yet/.test(mRow) && /Edit/.test(mRow) && await page.$eval(`${ROW} [data-k="store:cache"]`, e => e.value === '/scratch/cache')
      && await page.$eval(`${ROW} [data-napply="storage"]`, b => b.disabled),
      `...a mount's Save writes it and the reported ones at once, its row read-only with Edit and not applied yet, the store still a draft and Apply waiting for its Save (${mRow.trim().slice(0, 80)})`);
-  // What is at a path is the node's to say (R120): the page asks before it
+  // What is at a path is the node's to say: the page asks before it
   // saves. Answered here as an agent would, from what this map says the
   // node's disk holds; any path it does not name is not there.
   const disk = {};
@@ -1233,7 +1233,7 @@ await section("the configuration plane on the row", async () => {
      'Save puts the desired config on the record, validated');
   // A folder that already holds files gets one named for the node inside it,
   // and the setting changes to that; the data coming along is its own
-  // question (the operator, 23 Oct), answered no here.
+  // question, answered no here.
   {
     disk['/srv/full'] = { exists: true, dir: true, files: true };
     disk['/var/lib/builderbot/artifacts'] = { exists: true, dir: true, files: true };
@@ -1248,7 +1248,7 @@ await section("the configuration plane on the row", async () => {
        && /Bring the artifacts data across from \/var\/lib\/builderbot\/artifacts/.test(asked[1])
        && after.stores.artifacts === '/srv/full/shed' && after.keep.includes('artifacts'),
        `a folder holding files gets one named for the node, the setting is that, and declining the copy starts it empty (${JSON.stringify(after.keep)}; ${asked.length} asked)`);
-    // A folder that already is a store is adopted as it is (R212): a
+    // A folder that already is a store is adopted as it is: a
     // toolchain share holding this node's own folder, the marker in it,
     // keeps the setting as typed, nests nothing and asks no bring-across.
     disk['/srv/sdk'] = { exists: true, dir: true, files: true, mine: true };
@@ -1288,7 +1288,7 @@ await section("the configuration plane on the row", async () => {
     ok(own.length === 1 && /the folder AerieOS put this node's artifacts store in before/.test(own[0]) && ownRec.stores.artifacts === '/srv/full2/shed',
        `the folder nested for the node before, typed itself, is adopted as it is (${own.length} asked; ${ownRec.stores.artifacts})`);
     // A store pointed into a mount saved here and not on the node yet is
-    // told so (the operator, 23 Oct): what is on the share cannot be seen
+    // told so: what is on the share cannot be seen
     // until Apply mounts it, so no folder is chosen from what is there now.
     const told = [];
     for (let i = 0; i < 4; i++) page.answers.push(q => { told.push(q.text); return 0; });
@@ -1337,8 +1337,8 @@ await section("the configuration plane on the row", async () => {
   answering = false;
   await answerer;
   // A job's log is the only copy of what a node's job wrote, it lives in the
-  // controller's store, and until R17 step 1 nothing deleted one: a build's
-  // log runs to megabytes, so a busy project filled the database quietly. The
+  // controller's store, and left alone nothing deletes one: a build's
+  // log runs to megabytes, so a busy project fills the database quietly. The
   // ROW stays and only the chunks go, because a list that forgets a build ran
   // is worse than one that cannot show its output.
   {
@@ -1385,7 +1385,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        'a sweep for one space leaves another alone, and the sweep for all of them takes the aged one');
   }
 
-  // appdata is a store role like the other four (R17 step 2): where a node
+  // appdata is a store role like the other four: where a node
   // keeps a dev instance's databases is a fact about that node, so it is
   // reported with its headroom and edited here, rather than being
   // BB_DEV_DATA_DIR on the controller and an optional mount to go with it.
@@ -1403,13 +1403,13 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        '...and refused the same paths the others are, so it cannot be pointed at /etc');
   }
   // A hand-made request's resolver that is not text is told what a resolver
-  // is, rather than raising on .strip() (B181).
+  // is, rather than raising on .strip.
   {
     const r = await napi('/api/v1/nodes', { action: 'config', id: minted.id,
       config: { ...rec.config.desired, network: { mode: 'static', address: '10.0.0.40/24', dns: [1] } } });
     ok(/a resolver is an address/.test(r.error || ''), `a resolver that is not text is refused in words (${r.error})`);
   }
-  // Static routes (the operator, 7 Oct), in either mode: a network with its
+  // Static routes, in either mode: a network with its
   // prefix via a router, given as {to, via} or "TO via VIA", kept once each;
   // what is not one is refused in words. The agent renders them per backend
   // (unit/test_agent_routes.py).
@@ -1432,8 +1432,8 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(!bad.length, `a network with no prefix, the default route and a router that is not an address are refused in words${bad.length ? ` (not: ${bad.join(' | ')})` : ''}`);
     await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: rec.config.desired });
   }
-  // json.loads takes Infinity, and int() of it raised, failing the node's
-  // whole hello (B180): a non-finite number in a census is no number.
+  // json.loads takes Infinity, and int of it raised, failing the node's
+  // whole hello: a non-finite number in a census is no number.
   {
     const body = JSON.stringify({ census: { ...CENSUS, session: { up: true, up_s: '__INF__' },
         stores: { ...CENSUS.stores, data: { ...CENSUS.stores.data, free_mb: '__INF__' } } },
@@ -1483,10 +1483,9 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
      `Apply storage asks once, first, when it would unmount something the node has, naming it (${page.dialogs[0]?.replace(/\n/g, ' ').slice(0, 90)})`);
   for (const j of (await napi('/api/v1/jobs?active=1')).jobs)
     await napi('/api/v1/jobs', { action: 'cancel', id: j.id });
-  // A node holds its projects as a synced copy (R162), the one way it
-  // holds them (R163): no /workspace mount may be configured, the row says
-  // what each copy is doing, and the node can be taken off it and put back
-  // (R164).
+  // A node holds its projects as a synced copy, the one way it
+  // holds them: no /workspace mount may be configured, the row says
+  // what each copy is doing, and the node can be taken off it and put back.
   {
     const hello = census => fetch(base + '/api/v1/agent/hello', { method: 'POST',
       headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
@@ -1522,7 +1521,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        '...and Stop syncing is under its Spaces, with no line of its own saying what that list says (the operator, 26 Oct)');
     const again = await napi('/api/v1/nodes', { action: 'to-sync', id: minted.id });
     ok(/already/.test(again.error || ''), `Move to a synced copy is refused in words while it holds one (${again.error})`);
-    // ...and off it again (R164): Stop syncing holds sessions while what is
+    // ...and off it again: Stop syncing holds sessions while what is
     // left goes up, Clean up is offered once the node says nothing is, and
     // from off one press moves it to a synced copy again.
     const beat = extra => fetch(base + '/api/v1/agent/work', { method: 'POST',
@@ -1585,7 +1584,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
                              running: [], wait: 0 }) });
     await hello(CENSUS);
   }
-  // Hosting only (the operator, 10 Oct): a node that runs containers sent to
+  // Hosting only: a node that runs containers sent to
   // it and nothing else, so nothing of it comes back to the controller.
   {
     const H = { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' };
@@ -1595,10 +1594,10 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const held = await napi('/api/v1/nodes', { action: 'host-only', id: minted.id });
     ok(/gamma lists this node/.test(held.error || ''),
        `a node a space lists cannot be made hosting only until it is moved off (${held.error})`);
-    // The node's Spaces section lists the spaces that have it (R294 step 12:
-    // a node is the space's setting), each name opening its notebook and
+    // The node's Spaces section lists the spaces that have it
+    // (a node is the space's setting), each name opening its notebook and
     // Settings opening the space's own settings at its Nodes, which is where
-    // a node is taken off (the operator, 26 Oct: not removed from the node's
+    // a node is taken off (not removed from the node's
     // page).
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
     const projBtn = `${ROW} .ndproj [data-ndproj="gamma"]`;
@@ -1638,7 +1637,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     // Oct): it is a row under Also works on, marked Hosting only, and
     // nothing else.
     await page.evaluate(async () => { nodesList = null; await loadNodes(); });
-    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     await page.waitForFunction(id => [...document.querySelectorAll('#rnNodesMore [data-moreadd] option')].some(o => o.value === id), minted.id, { timeout: 10000 })
       .catch(async e => { console.log('[diag] Also works on: ' + JSON.stringify(await page.evaluate(() => ({ space: rnSpaceOn, node: state?.can?.node, mode: rnMode,
@@ -1647,7 +1646,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        && await page.$eval(`#rnNodesMore [data-moreadd] option[value="${minted.id}"]`, o => /\(Hosting only\)$/.test(o.textContent)),
        'a hosting-only node is not offered as a space\'s primary, only under Also works on\'s Add a node, marked Hosting only');
     await page.click('#rnCancel');
-    // Nothing on it runs Claude Code (the operator, 11 Oct): no section on
+    // Nothing on it runs Claude Code: no section on
     // its row, and no Claude Code among its coding agents (the Library's
     // cards and the Installed page's rows).
     await page.waitForFunction(sel => !document.querySelector(sel + ' .ndagents'), ROW, { timeout: 10000 }).catch(() => {});
@@ -1655,7 +1654,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(!(await page.$(`${ROW} .ndagents`)) && !(tcHost.rows || []).some(m => m.name === 'claude-code'),
        `a hosting-only node's row has no Claude Code section, and its coding agents no Claude Code row (${JSON.stringify((tcHost.rows || []).map(m => m.name))})`);
     // A root command on it, by name, for a project that hosts containers
-    // there (the operator, 11 Oct): refused for a project that does not,
+    // there: refused for a project that does not,
     // asked for one that does, and refused where the row's switch is off.
     const rootAsk = () => napi('/api/phone', { action: 'ask', kind: 'root', why: 'look', cmd: ['true'], project: 'gamma', node: 'shed' });
     const notMine = await rootAsk();
@@ -1677,7 +1676,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const off = await rootAsk();
     ok(/root/.test(off.error || '') && !off.ok, `...and off, the ask is refused and told so (${off.error})`);
     await napi('/api/v1/nodes', { action: 'root-asks', id: minted.id, on: true });
-    // Its own room (R294 step 7): blank is the install's, a number its own,
+    // Its own room: blank is the install's, a number its own,
     // saved with the section; blank again gives the install's back.
     {
       const F = `${ROW} [data-room="room_floor_gb"]`;
@@ -1703,7 +1702,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       const back = await until(async () => !('room_floor_gb' in ((await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config || {})), 10000, 200);
       ok(back, '...and blank saved gives the install\'s back');
     }
-    // Its system's packages on its own page (R294 step 13), as its agent
+    // Its system's packages on its own page, as its agent
     // counts them, where they were the controller's own machine's alone.
     {
       await agent('hello', { census: { ...CENSUS, host_updates: { pending: 3, security: 1, reboot: true, checked: Math.floor(Date.now() / 1000) } },
@@ -1715,7 +1714,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       }, ROW, { timeout: 15000 }).then(h => h.jsonValue(), () => page.$eval(`${ROW} .ndhost`, e => e.textContent).catch(() => 'none'));
       ok(/3 updates/.test(pk || ''), `a node's page says what waits for its system's packages, in the warn voice for security and a restart (${pk})`);
     }
-    // The machine's own console switched root commands off (R227 step 2):
+    // The machine's own console switched root commands off:
     // its census says so, the ask is refused before anybody is asked, and
     // the row says where it is switched back on, under the box.
     await agent('hello', { census: { ...CENSUS, root_off: true }, version: shipped.version, digest: shipped.digest });
@@ -1746,12 +1745,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     if (backOn.id) await napi('/api/phone', { action: 'deny', id: backOn.id });
     ok(backOn.ok, `...and switched back on there, the ask goes to a person again (${backOn.error || 'asked'})`);
     await napi('/api/prefs', { project: 'gamma', hosts: [] });
-    // Each project's containers kept to their own network (R178), on every
-    // node with no switch since R146: the hello says so.
+    // Each project's containers kept to their own network, on every
+    // node with no switch: the hello says so.
     const hc = await (await agent('hello', { census: CENSUS, version: shipped.version, digest: shipped.digest })).json();
     ok(hc.session_net?.ctr_on === true && typeof hc.session_net?.ctr === 'object',
        `a hosting-only node keeps each space's containers to their own network: the hello says so (${JSON.stringify(hc.session_net)})`);
-    // ...and its published ports bind to 127.0.0.1 by default (R190): the
+    // ...and its published ports bind to 127.0.0.1 by default: the
     // hello says so and the row's switch is on; switched off, the next
     // hello says so; the census says what docker binds to.
     ok(hc.ports_local === true && await page.$eval(`${ROW} [data-k="portslocal"]`, c => c.checked),
@@ -1773,7 +1772,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const ex = await napi('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['true'] });
     ok(/hosts containers only, and a exec job/.test(ex.error || ''), `only container jobs go to it (${ex.error})`);
     // ...and one docker verb about the containers it hosts, which is how
-    // the Docker tab lists them and reads a log there (B642): a bare exec
+    // the Docker tab lists them and reads a log there: a bare exec
     // of anything else is still refused.
     const dps = await napi('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['docker', 'ps', '--all'] });
     ok(!dps.error && dps.job, `docker ps goes to it, since that is how its containers are listed (${dps.error || dps.job})`);
@@ -1784,12 +1783,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     if (dps.job) await napi('/api/v1/jobs', { action: 'cancel', id: dps.job });
     const bind = await napi('/api/prefs', { project: 'gamma', nodes: [minted.id] });
     ok(/hosts containers only/.test(bind.error || ''), `and no space may list it (${bind.error})`);
-    // Disable (the operator, 11 Oct): kept and configured, off every picker
+    // Disable: kept and configured, off every picker
     // and refused to a project's set until Enable; Un-enroll is the one
     // way off, cleaning the machine where it can.
     await page.click(`${ROW} [data-nd="host-off"]`);
     await page.waitForSelector(`${ROW} [data-nd="host-only"]`, { timeout: 10000 });
-    // Neither while anything runs there (the operator, 11 Oct): a session
+    // Neither while anything runs there: a session
     // or a container the heartbeat reports holds both off until it is gone.
     const beatIn = s => fetch(base + '/api/v1/agent/work', { method: 'POST',
       headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
@@ -1809,12 +1808,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        && /disabled/.test(await page.$eval(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`, e => e.textContent))
        && /disabled on the Nodes page/.test(dis.error || ''),
        `Disable asks nothing (it costs nothing: Enable is on the same row), says the node is disabled in its header's pill, and a space may not add it until Enable (${dis.error})`);
-    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id)),
        '...and the space settings\' node picker does not offer it');
     await page.click('#rnCancel');
-    // What it does is said on its row (the operator, 18 Oct: Advanced's
+    // What it does is said on its row (Advanced's
     // actions a row each, the words beside the button, not in a tooltip).
     const unro = await page.$eval(`${ROW} [data-nd="unenroll"]`, b => ({ text: b.textContent, title: b.closest('.ndact')?.querySelector('.sub')?.textContent || '' }));
     ok(/Un-enroll/.test(unro.text) && /Takes AerieOS off the machine/.test(unro.title) && !(await page.$(`${ROW} [data-nd="retire"]`)),
@@ -1835,12 +1834,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await page.waitForFunction(() => document.getElementById('ndmodal').hidden, null, { timeout: 5000 });
     await page.click(`${ROW} [data-nd="enable"]`);
     await page.waitForSelector(`${ROW} [data-nd="disable"]`, { timeout: 10000 });
-    // Its state is the header's pill over the row (the operator, 17 Nov).
+    // Its state is the header's pill over the row.
     ok(/online/.test(await page.$eval(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`, e => e.textContent)), '...and Enable puts it back online');
     await page.click(`${ROW} [data-nd="host-only"]`);
     await page.waitForSelector(`${ROW} [data-nd="host-off"]`, { timeout: 10000 });
-    // ...except as where its containers may also go (prefs.hosts, the
-    // operator, 10 Oct), which only a hosting-only node may be.
+    // ...except as where its containers may also go (prefs.hosts),
+    // which only a hosting-only node may be.
     const hosted = await napi('/api/prefs', { project: 'gamma', hosts: [minted.id] });
     // The poll answers from what it last read, so asked until it has it.
     const gammaHosts = want => page.evaluate(async want => {
@@ -1855,12 +1854,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const hostsNow = await gammaHosts(minted.id);
     ok(!hosted.error && hostsNow.join() === minted.id,
        `...but a space may name it under Hosts its containers on (${hosted.error || hostsNow.join()})`);
-    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's
     await page.waitForSelector(`#rnNodesMore:not([hidden]) .rnmore[data-id="${minted.id}"]`, { timeout: 10000 });
     ok(/Hosting only/.test(await page.$eval(`#rnNodesMore .rnmore[data-id="${minted.id}"]`, r => r.textContent))
        && await page.$eval('.rnbar[data-rnbar="runs"] [data-rnsave]', b => b.disabled),
        '...listed under Also works on, marked Hosting only, nothing unsaved');
-    // A record (the operator, 17 Nov): its bin takes it off at once.
+    // A record: its bin takes it off at once.
     await page.click(`#rnNodesMore .rnmore[data-id="${minted.id}"] [data-morerm]`);
     const left = await until(async () => (await gammaHosts('')).length === 0 || null, 15000, 300);
     ok(left === true, `...and its bin there takes it off at once (${left})`);
@@ -1879,7 +1878,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const rec = (await napi('/api/v1/nodes')).nodes.find(n => n.id === vps.id);
     ok(vps.ok && rec?.config?.host_only === true, `a node enrolled as hosting only is so from the start (${vps.error || 'ok'})`);
     await napi('/api/v1/nodes', { action: 'retire', id: vps.id });
-    // Lock down (R92): one press on a hosting-only node's page, after which
+    // Lock down: one press on a hosting-only node's page, after which
     // the box may take only the job that stops it, and is removed when it ends.
     {
       const lk = await napi('/api/v1/nodes', { action: 'enroll', name: 'vps-lock', host_only: true });
@@ -1925,7 +1924,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await hello({ ...CENSUS, door: { kind: 'cloudflared', host: 'ssh-shed.example.com', installed: true, active: true } });
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
     await page.waitForSelector(`${ROW} .nddoor [data-nd="door"]`, { timeout: 10000 });
-    // Said as the Sessions section's facts (the operator, 18 Oct): how it
+    // Said as the Sessions section's facts: how it
     // reaches the controller, and its door, the machine's own way in.
     const facts = await page.$eval(`${ROW} .ndsessfacts`, e => e.textContent.replace(/\s+/g, ' '));
     ok(/Reaches the controller ?(over the LAN|over WireGuard|through )/.test(facts),
@@ -1951,7 +1950,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await page.waitForFunction(sel => /SSH door\s*cloudflared at ssh-shed\.example\.com, shut/.test(document.querySelector(sel + ' .ndsessfacts')?.textContent.replace(/\s+/g, ' ') || ''), ROW, { timeout: 10000 });
     ok(await page.$eval(`${ROW} .nddoor`, e => /Open the door/.test(e.textContent) && !e.querySelector('.ndcmd')),
        '...and reported shut, the row offers Open the door and no command');
-    // The Features section (R91): each feature bb-sandbox installs, with
+    // The Features section: each feature bb-sandbox installs, with
     // Install or Uninstall as the machine reports it, a system job each; a
     // machine with no /dev/kvm says why instead of offering VM host, and the
     // firewall is offered only on a hosting-only node.
@@ -1972,13 +1971,13 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       ok(inst?.spec?.config?.id === 'vmhost' && inst.spec.config.op === 'install',
          `...and Install queues the feature system job (${JSON.stringify(inst?.spec)})`);
       // While it is at work another system verb stays live and, pressed, is
-      // queued behind it: named so on the press (the operator, 22 Nov).
+      // queued behind it: named so on the press.
       const ahead = await page.evaluate(() => ndAhead({ name: 'shed', applying: { id: 'j_a', feature: 'vmhost', op: 'install' },
         jobs: [{ id: 'j_q', type: 'system', state: 'queued', apply: 'door' }, { id: 'j_a', type: 'system', state: 'running', apply: 'feature' }] }));
       ok(ahead === 'the install of VM host',
          `...and a system verb pressed meanwhile is said to be queued behind the one at work, by its name (${ahead})`);
       // The agent takes it and it succeeds: until the census after it, the
-      // row waits rather than offering Install again (B162).
+      // row waits rather than offering Install again.
       const took = await (await agent('work', { running: [], wait: 0 })).json();
       await agent('result', { job: took.id, state: 'succeeded', exit: 0 });
       await page.evaluate(async () => { await refresh(); await loadNodes(); });
@@ -2003,7 +2002,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       if (rm) await napi('/api/v1/jobs', { action: 'cancel', id: rm.id });
     }
     await hello(CENSUS);
-    // Agent log beside it (R133 step 12): the agent's own journal opened in
+    // Agent log beside it: the agent's own journal opened in
     // the dock, a read-only tab of its own.
     await page.waitForSelector(`${ROW} [data-ndlog]`, { timeout: 10000 });
     await page.click(`${ROW} [data-ndlog]`);
@@ -2012,7 +2011,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(logTab && /^Log: shed's agent$/.test(logTab.label), `Agent log opens the node's agent journal in the dock (${logTab?.label})`);
     await page.evaluate(id => { const t = tabs.find(x => x.arg === `log:node:${id}:agent`); if (t) dropTab(t.id); dockToggle(false); openNodesTab(); }, minted.id);
     await page.waitForSelector(`${ROW} [data-nd="reenroll-now"]`, { timeout: 10000 });
-    // Enroll script on the row (R177, R210): the node's script again, one
+    // Enroll script on the row: the node's script again, one
     // press and no dialog, built from the row's own answers and bound to
     // the machine it reported, with no secret in it; run on another
     // machine the controller refuses it, on the same it enrolls again
@@ -2021,7 +2020,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await hello({ ...CENSUS, machine: MACHINE });
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
     // Just a token in the Features section's Enroll again lands on the row
-    // too (B656): it was refused as a second node with the row's name.
+    // too: it was refused as a second node with the row's name.
     // Pressed before the script, whose mint revokes this token.
     await page.click(`${ROW} .ndfeat [data-nd="reenroll"]`);
     await page.waitForSelector('#ndBody #ndEnTok', { timeout: 10000 });
@@ -2043,7 +2042,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        `Enroll script downloads the node's script at once, bound to the machine it reported, its stores where they are and no secret in it (${said4}; ${run4.replace(/bbe_[^']+/, 'bbe_…').slice(0, 160)})`);
     await page.click('#ndBody #ndTokDone');
     // The system the script was built for is the one the row's census
-    // names (R210), recorded on the row by that mint; the Features
+    // names, recorded on the row by that mint; the Features
     // section's Enroll again opens the dialog on the row's answers, the
     // system among them, its name fixed.
     const recorded = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config?.system;
@@ -2100,7 +2099,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   ok(phone.over <= 0 && phone.seen >= 8 && phone.small === 0,
      `...and at phone width it does not scroll sideways (${phone.over}px) and its ${phone.seen} controls are the field type, ${phone.field}px (${phone.small} smaller)`);
   await page.evaluate(sel => document.querySelector(sel + ' .ndmount.open [data-mcancel]')?.click(), ROW);
-  // A guest node's one line where Storage and Network would be (B157): inset
+  // A guest node's one line where Storage and Network would be: inset
   // from the screen's edges and clear of the next section's head, in the
   // note voice, at phone width as at a desk.
   const guest = await page.evaluate(sel => {
@@ -2119,7 +2118,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
      `a guest node's storage line is inset and clear of the next section on a phone, in the note font (${JSON.stringify(guest)})`);
   await page.setViewportSize({ width: 1280, height: 900 });
 
-  // ---- toolchains on the node, from the Library (phase 6, R170) ----------
+  // ---- toolchains on the node, from the Library (phase 6) ----------
   await page.evaluate(() => openLibrary());
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   ok(await page.$$eval('.pane .bar #ndPick option', os => os.length > 0 && !os.some(o => o.value === 'local')),
@@ -2133,7 +2132,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   const libOn = id => page.waitForFunction(x => libNode === x && lib?.node === x
       && !!document.querySelector(`.doc .librarytab [data-libnode="${x}"] .lcard`), id, { timeout: 15000 });
   await libOn(minted.id);
-  // A pick is a history entry (B31): Back returns to the node before, on
+  // A pick is a history entry: Back returns to the node before, on
   // this page, and Forward to the one picked.
   if (libBefore && libBefore !== minted.id){
     const libHash = id => '#/build/library/' + encodeURIComponent(id);
@@ -2153,20 +2152,20 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
      && !tools.some(t => /3\.24\.0/.test(t)),
      'a node\'s versions come from its own aerie toolchains versions, not the census summary');
   // Its headroom is the Installed page's to say, at the foot of what the
-  // store holds (R274): the Library says none of it.
+  // store holds: the Library says none of it.
   const room = await page.$eval('.doc .librarytab .pghead', e => e.textContent.replace(/\s+/g, ' '));
   ok(tools.some(t => /6655482e/.test(t)) && !(await page.$eval('.doc .librarytab', e => e.textContent)).match(/[GM]B free/g),
      `picking the node lists what its census says it has, and leaves the store's headroom to Installed (${room.slice(0, 120)} | ${tools.filter(t => /installed|21\.0/.test(t)).join(' || ').slice(0, 300)})`);
   ok(!/installed at\s*(<|$)/m.test(await page.$eval('.doc .librarytab', e => e.textContent)),
      'an installed toolchain on a node reads "installed", not "installed at" with nothing after it');
-  // Check for updates is a live control on a node (R67). It used to be
+  // Check for updates is a live control on a node. It used to be
   // disabled whenever a node was picked, and a node is the only thing this
   // page ever shows, so it could never be pressed: dead furniture with a
   // tooltip explaining why it would stay that way.
   ok(await page.$eval('.doc .librarytab [data-libcheck]', b => !b.disabled && /upstream/.test(saidOf(b))),
      'Check for updates can be pressed on a node, and says what it does');
 
-  // ---- system packages a held recipe needs (roadmap R51) ------------------
+  // ---- system packages a held recipe needs ------------------
   // The store is a share, so a recipe installed from one node is on every
   // node, while the libraries it needs are each machine's own. The census
   // says which are missing, the Library says so over its cards with one
@@ -2230,7 +2229,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
         body: JSON.stringify({ census: { ...CENSUS, sysdeps: sd, store_dirs: { top: ['flutter', 'node', 'dotnet'], android: [] } },
                                version: shipped.version, digest: shipped.digest }) });
       await held({ family: 'dnf', unmet: { dotnet: ['libicu'] } });
-      // Installed now, so it has a page of its own under Installed (R181 step 2).
+      // Installed now, so it has a page of its own under Installed.
       const DN = `.doc .thingtab [data-instnode="${minted.id}"][data-thing="toolchain:dotnet"]`;
       await page.evaluate(id => openThing(id, 'toolchain:dotnet'), minted.id);
       await page.waitForFunction(sel => /missing here/.test(document.querySelector(sel + ' .idetail .tcsysd')?.textContent || ''), DN, { timeout: 15000 });
@@ -2275,7 +2274,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       body: JSON.stringify({ sample: { cpu_pct: 1, sessions: [
         { name: `${uid}~claude-alpha`, created: now - 3600, title: '✳ Claude Code' },
         { name: `${uid}~shell-2`, created: now - 10, title: 'bash' }] }, running: 0, wait: 0 }) });
-    // Each toolchain's own page (R181 step 2), read in turn.
+    // Each toolchain's own page, read in turn.
     const pageText = async key => {
       await page.evaluate(([id, k]) => { openThing(id, k); loadInstalled(); }, [minted.id, key]);
       await page.waitForSelector(`.doc .thingtab [data-instnode="${minted.id}"][data-thing="${key}"] .idetail`, { timeout: 15000 });
@@ -2335,7 +2334,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
        `...while one that resolves its own platform is not refused FOR ITS PLATFORM: this node's refusal is the shared store, a different thing (${String(fine.error).slice(0, 60)})`);
     if (fine.job) await napi('/api/v1/jobs', { action: 'cancel', id: fine.job });
     // Two architectures on one store is the design now, not a clash: each
-    // machine installs under its own <os>-<arch> scope (roadmap R19), so
+    // machine installs under its own <os>-<arch> scope, so
     // the x86_64 node's install is queued while the arm64 node shares the
     // share. Canceled at once, so the one-at-a-time rule below starts clean.
     const clash = await napi('/api/toolchains', { action: 'install', names: ['jdk'], node: minted.id });
@@ -2349,7 +2348,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       body: JSON.stringify({ census: { ...CENSUS, arch: 'x86_64', stores: { ...CENSUS.stores,
           toolchains: { ...CENSUS.stores.toolchains, id: ID } } },
         version: shipped.version, digest: shipped.digest }) });
-    // Each node installs into its own directory of the store (R196), so the
+    // Each node installs into its own directory of the store, so the
     // same toolchain on both at once is two directories, not a clash; the
     // one thing they share is the Android system images, whose image jobs
     // wait for each other (unit/test_store_areas.py holds that).
@@ -2415,7 +2414,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       return seen;
     }, 20000, 250);
     // Canceled before it began anything, so jdk did not fail, it was not
-    // tried (B683): only what the log shows begun can have failed.
+    // tried: only what the log shows begun can have failed.
     ok(seen && seen.action === 'install' && seen.done.includes('flutter')
        && !seen.failed.includes('jdk'),
        `a finished node job says what actually landed, read from the census, and a stopped one fails nothing it never began (${
@@ -2558,8 +2557,8 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     }
 
     // A level a project compiles against with no image of it here is said
-    // on this tab, with the index's plain image of that level to pick (B720:
-    // the Toolchains tab had guessed the id and failed the job with it).
+    // on this tab, with the index's plain image of that level to pick
+    // (the Toolchains tab had guessed the id and failed the job with it).
     {
       const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
       mkdirSync(`${DIR}/ws/alpha/app`, { recursive: true });
@@ -2578,7 +2577,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
 
-    // The images at a glance (R216): tiles of how many, the AVDs on them.
+    // The images at a glance: tiles of how many, the AVDs on them.
     await page.evaluate(() => { emu = null; loadEmulator(); });
     await page.waitForSelector('.emutab .pgline .pgl', { timeout: 15000 });
     ok((await page.$$eval('.emutab .pgline .pgl', ls => ls.map(l => l.textContent.replace(/\s+/g, ' ').trim()))).some(x => /\bimages?\b/.test(x)),
@@ -2606,13 +2605,13 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   // ago: read on a poll from between the two, the form took the node as
   // saved already, and its Save refused a section as changed since the
   // settings were opened, which left the record without what this block
-  // typed (and the busy check below with no node to ask about, B219).
+  // typed (and the busy check below with no node to ask about).
   await page.evaluate(() => refresh());
   // As on the first opening after a page load: the node list has not been
   // fetched yet. The picker used to stay hidden until the dialog was closed
   // and opened again; it has to appear on this opening, when the list lands.
   await page.evaluate(() => { nodesList = null; });
-  // The node is the space's (R223): its own dialog, the card's door; the
+  // The node is the space's: its own dialog, the card's door; the
   // build command and outputs are the repository's, in its settings after.
   await page.evaluate(n => renameProject(n, 'project'), 'alpha');
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
@@ -2638,7 +2637,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
      && saved.dev_keep === 5,
      `Save writes the space's node, the command, the outputs, the days captures are kept and the dev builds kept of each onto the space record (${
        saidNo || 'saved'}: ${JSON.stringify({ node: saved.node, build: saved.build, outputs: saved.outputs, capture_days: saved.capture_days, dev_keep: saved.dev_keep })})`);
-  // Whether that node is quiet enough to time on (R108): the agent's
+  // Whether that node is quiet enough to time on: the agent's
   // heartbeat says its load and what runs there by kind, and the answer
   // joins it with the jobs and sessions there, naming no other project.
   await fetch(base + '/api/v1/agent/work', { method: 'POST',
@@ -2662,7 +2661,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   await pickNode(page, minted.id);
   // Read again while waiting: a list the poll asked for before the save can
-  // land after this read and say the record's old changes (B606).
+  // land after this read and say the record's old changes.
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await nodesUntil(page, sel => /matches what is saved/.test(
     document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW);
@@ -2678,7 +2677,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(await page.$eval(`${ROW} .ndconfstate`, e => /1 change to apply.*\/mnt\/new/.test(e.textContent)),
      `...and says how many changes are waiting and what they are (${
        await page.$eval(`${ROW} .ndconfstate`, e => e.textContent.trim().slice(0, 90))})`);
-  // ...under Storage alone: Network's line beside its dead Apply says nothing of a mount (B23).
+  // ...under Storage alone: Network's line beside its dead Apply says nothing of a mount.
   {
     const netSaid = await page.$eval(`${ROW} [data-napply="network"]`,
       b => b.closest('.actbar')?.querySelector('.ndconfstate')?.textContent.trim() || '');
@@ -2764,14 +2763,14 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.waitForSelector('#bellPanel .bnote.att', { timeout: 10000 });
   const bellText = await page.$eval('#bellPanel', e => e.textContent.replace(/\s+/g, ' '));
   // An agent behind, inside its window, blocks nothing: it is under Earlier,
-  // with its Dismiss (R280).
+  // with its Dismiss.
   ok(/Earlier/i.test(bellText) && /agent update on/i.test(bellText) && /runs agent 3 and this controller ships/.test(bellText)
      && await page.$('#bellPanel [data-bnode]') !== null,
      `the bell lists "Agent update on" the node under Earlier, with a way to the Nodes page (${bellText.slice(0, 160)})`);
   ok(await page.$eval('#bBell .dot', d => d.classList.contains('warn')),
      '...in amber: an update waiting is not work stopped');
   // A node that takes only a signed release, on a build that is not one, is
-  // not promised an update that it refuses each time (B1039): the row says
+  // not promised an update that it refuses each time: the row says
   // why it is held, in the note's own voice, and what it waits for.
   const heldRow = await page.evaluate(() => { const d = document.createElement('div');
     const a = { kind: 'agent', node: 'box', id: 'n_held', from: '0.9.1', to: '0.9.2', window: false, auto: false, back: '', failed: '', projects: [],
@@ -2783,9 +2782,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
      && !/updates itself once the node is idle/.test(heldRow.held) && !heldRow.bad && /updates itself once the node is idle/.test(heldRow.plain),
      `a node held for a signed build says so on its bell row, not in red, and is not promised an update (${heldRow.held.slice(0, 200)})`);
   // A node that refused this controller's bundle keeps the one it had, and
-  // that is said (R267 step 6): a row of its own in the same voice, with
+  // that is said: a row of its own in the same voice, with
   // what was wrong as one phrase and nothing of the keys that node takes
-  // (the operator, 20 Nov: the row was a paragraph with the keys' first
+  // (the row was a paragraph with the keys' first
   // characters in it), and a link to that node's Sessions section.
   const refusedRow = await page.evaluate(() => { const d = document.createElement('div');
     const a = { kind: 'bundle-refused', node: 'box', id: 'n_refused', key: 'bundle:n_refused@abababababababab',
@@ -2817,7 +2816,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
      && !heldNote.plain,
      `the node's Sessions section says it refused the bundle, what was wrong, and that it runs the one it had, and says nothing without the refusal (${heldNote?.note})`);
   // A node that would refuse this build (it checks signatures, this build is
-  // unsigned) is not told to press Update agent (B1108): the row says what
+  // unsigned) is not told to press Update agent: the row says what
   // keeps it, once, and the button is dead; the Updates fact says only what
   // the node takes.
   const heldBar = await page.evaluate(id => { const n = nodesList.find(x => x.id === id); if (!n) return null;
@@ -2837,7 +2836,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(/^signed builds only \(1 key added at its console\)/.test(heldFact) && !/refused|unsigned/.test(heldFact),
      `...and the Updates fact says only what it takes, the refusal being the agent bar's (${heldFact})`);
   // Its link goes to THIS node, whichever the tab was on, with Update agent
-  // brought into view (the operator, 4 Oct).
+  // brought into view.
   const other = await page.evaluate(id => nodesList.find(n => n.id !== id && n.kind === 'agent' && n.state !== 'retired')?.id, minted.id);
   if (other) await page.evaluate(o => { nodesPick = o; readMoved('nodes'); drawPanes(); }, other);
   await page.click(`#bellPanel [data-bnode="${minted.id}"]`);
@@ -2854,7 +2853,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(await page.$eval('.nodestab [data-nd="update-agent"]', b => {
        const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }),
      `...and its link opens the Nodes page on that node${other ? ' (from another)' : ''}, Update agent in view`);
-  // The runner is on its own tab now (R121), held by the same rule there.
+  // The runner is on its own tab now, held by the same rule there.
   // Each page read once it is drawn: the runner's Install, then the node's
   // row back on the Nodes page, which is what is read next.
   const runnerOff = await page.evaluate(async id => {
@@ -2922,13 +2921,13 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     ROW, { timeout: 10000 });
   ok(await page.$eval(`${ROW} [data-nd="update-agent"]`, b => b.disabled),
      '...and stays grayed while the update is queued, not only for the round trip');
-  // With a job still running there the update waits for it (B516): the node
+  // With a job still running there the update waits for it: the node
   // takes no new work meanwhile, and the line says so rather than "Updating"
   // for minutes. The listing is answered with one running job added, since a
   // node behind takes nothing but its update and so cannot be made busy here.
   // A request still out when the route is taken away is handled by the
   // default, and its fulfill then says so: passed over, where it ended the
-  // suite under a whole run's load (B924).
+  // suite under a whole run's load.
   const busyList = async route => {
     try {
       const r = await route.fetch(); const j = await r.json();
@@ -2985,7 +2984,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(true, 'an agent brought current takes its alert out of the bell by itself');
 
   // ---- a project's copy not there yet is waited for -----------------------------
-  // A node holds its projects as a synced copy (R163): until its agent says
+  // A node holds its projects as a synced copy: until its agent says
   // a project's copy is ready, the button waits with the reason, and once it
   // is, the session starts there. No mount is asked for, whatever the census
   // says of /workspace.
@@ -3006,7 +3005,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   const row = (await napi('/api/status')).projects.find(p => p.name === 'alpha');
   ok(row?.session_at === 'shed' && row?.session_why === '',
      'and once the copy is there the button is live there');
-  // A mount that is there and answers Stale file handle (roadmap R41): every
+  // A mount that is there and answers Stale file handle: every
   // list of mounts calls it fine and every read fails, and remounting on the
   // node does not help when the export was re-created under it on the host.
   // The census says so, the row says so in red with the host-side fix, and
@@ -3028,7 +3027,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`, r =>
        /\/devdata: mounted, but the handle is stale/.test(r.textContent) && /re-export it there/.test(r.textContent)),
      'the row says which mount is stale and that the fix is on the host, whether or not the desired list names it');
-  // The whole reason sits under the mount's own row (B660), where it wraps,
+  // The whole reason sits under the mount's own row, where it wraps,
   // since the cell at the end of the line shows only its first words and the
   // section's state line names a failed apply instead of it once one failed.
   // The desired list names /devdata for this, and is put back after.
@@ -3060,7 +3059,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   }
   await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: { mounts: staleMounts, stores: {}, network: { mode: 'dhcp' } } });
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
-  // Whether a session there is kept to its own project (R35): on the
+  // Whether a session there is kept to its own project: on the
   // Sessions section's status when it is not, since a folded section shows
   // nothing else, and why; and said plainly when it is.
   const isoCensus = iso => fetch(base + '/api/v1/agent/hello', { method: 'POST',
@@ -3138,7 +3137,7 @@ await section("a node's path mapping", async () => {
   ok(await page.$('.nodestab .ndrow[data-node="local"] .ndpaths') === null,
      '...while the controller, whose paths are its own, is not a row here at all');
 
-  // ---- renaming a node (the operator's ask, 15 Sep) ------------------------
+  // ---- renaming a node ------------------------
   // The name is what a node is called everywhere: the pickers, the project
   // rows, the label a runner installed from now on registers with. One word,
   // and not one another node already wears.
@@ -3151,7 +3150,7 @@ await section("a node's path mapping", async () => {
     ok(/not a node to rename/.test(loc.error || ''), 'the controller\'s own row is not renamed');
     await openSection(page, 'nodes:advanced', `.nodestab .ndrow[data-node="${sb.id}"]`);
     await page.fill(`.nodestab .ndrow[data-node="${sb.id}"] .ndnameform [data-k="name"]`, 'sandbox-two');
-    // A heartbeat repaints the tab; the name being typed survives it (B176).
+    // A heartbeat repaints the tab; the name being typed survives it.
     // Repainted once the box that was typed in is no longer the page's.
     const typedName = await page.$(`.nodestab .ndrow[data-node="${sb.id}"] .ndnameform [data-k="name"]`);
     await page.evaluate(() => loadNodes());
@@ -3174,7 +3173,7 @@ await page.evaluate(() => nodeAct({ action: 'paths', id: nodesList.find(n => n.n
 // Retire what this file made, the way agent.mjs does: the store outlives a
 // suite, and a node left online here becomes the DEFAULT node for the files
 // after it, which sent devapp's compose at a machine that does not exist.
-// ...and a node that leaves re-runs the Doctor (B710): its cached verdict
+// ...and a node that leaves re-runs the Doctor: its cached verdict
 // named the node's daemon for up to half an hour after the row was gone.
 const docBefore = await page.evaluate(() => state.doctor?.when || 0);
 for (const n of (await (await fetch(URL.replace(/\/$/, '') + '/api/v1/nodes',
@@ -3200,7 +3199,7 @@ await page.waitForSelector('.pane .bar #ndVm', { timeout: 20000 });
 // somebody having to remember the flag.
 await page.click('.pane .bar #ndEnroll');
 await page.waitForSelector('#ndBody #ndEnUser', { timeout: 10000 });
-// The machine's system (R204): the vetted ones by name, nothing tagged dev
+// The machine's system: the vetted ones by name, nothing tagged dev
 // while Offer dev features is off, Ubuntu first as the default.
 const sysOpts = await page.$$eval('#ndBody #ndEnSystem option', os => os.map(o => `${o.value}:${o.textContent}`));
 ok(sysOpts.length >= 2 && sysOpts[0].startsWith('ubuntu:') && sysOpts.some(o => o.startsWith('rocky:')) && !sysOpts.some(o => /\(dev\)/.test(o)),
@@ -3209,11 +3208,11 @@ ok(await page.$eval('#ndBody #ndEnUser', i => i.value) === 'bb',
    'Enroll node opens on bb as the account jobs run as');
 await fillHeld(page, '#ndBody #ndEnName', 'joesbox');
 await fillHeld(page, '#ndBody #ndEnUser', 'joe');
-// Read back before the press: a run under load once minted joesbox for bb
-// (B331), and whether the field still held joe at the press is the fact
+// Read back before the press: a run under load once minted joesbox for bb,
+// and whether the field still held joe at the press is the fact
 // that says where to look.
 await section("Read back before the press", async () => {
-  // Said with what was read (B331, 1 Oct): a sighting under load had the
+  // Said with what was read: a sighting under load had the
   // account right at Mint and the name apparently not, and this check
   // printed neither.
   const held = await page.$eval('#ndBody', b => ({ name: b.querySelector('#ndEnName')?.value,
@@ -3232,12 +3231,12 @@ ok(await page.$eval('#ndBody .ndtoken', el =>
      /provision-linux\.sh --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})? --agent-digest sha256:[0-9a-f]{64}/.test(el.textContent)
      && /aerieos-agent enroll --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})?( --pin sha256\/\/[A-Za-z0-9+\/]{43}=)?\s*$/.test(el.textContent)),
    '...and after it the release key the node pins, with the digest the provisioner holds the agent to');
-// Where the provisioner comes from (B133): the dialog's first line fetches
+// Where the provisioner comes from: the dialog's first line fetches
 // it from this controller with the same token, and that route serves it.
 ok(await page.$eval('#ndBody .ndtoken', el => /curl -fsSL( -k --pinnedpubkey sha256\/\/[A-Za-z0-9+\/]{43}=)? -H 'Authorization: Bearer bbe_[^']+' '[^']*\/api\/v1\/agent\/download\?what=provisioner' -o provision-linux\.sh/.test(el.textContent)),
    '...after a curl that fetches the provisioner from this controller with the token');
 // Held to the controller's own key where its port answers a handshake at the
-// page's address (R267 step 15): the address named is https, each fetch
+// page's address: the address named is https, each fetch
 // carries the pin, and the provisioner and the agent are handed the same one.
 ok(await page.$eval('#ndBody .ndtoken', el => {
      const t = el.textContent, pin = t.match(/--pinnedpubkey (sha256\/\/[A-Za-z0-9+\/]{43}=)/)?.[1];
@@ -3254,9 +3253,9 @@ await section("and the route hands the enroll token the provisioner itself", asy
      `...and the route hands the enroll token the provisioner itself (${r.status}, ${body.length} bytes)`);
   const no = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download?what=provisioner');
   ok(no.status === 401, '...and nobody else');
-  // A Mac is a dev feature until one is proven (the operator, 12 Oct): with
+  // A Mac is a dev feature until one is proven: with
   // dev features off the dialog names no Mac and the route serves no Mac
-  // provisioner; on, the route serves it (B150).
+  // provisioner; on, the route serves it.
   const macAt = URL.replace(/\/$/, '') + '/api/v1/agent/download?what=provisioner-macos';
   const off = await fetch(macAt, { headers: { Authorization: 'Bearer ' + tok } });
   ok(!(await page.$eval('#ndBody .ndtoken', el => /provision-macos/.test(el.textContent))) && off.status === 404,
@@ -3279,7 +3278,7 @@ await page.evaluate(async () => {
   if (n) await nodeAct({ action: 'retire', id: n.id });
 });
 
-// Enroll node asks its questions and answers with one script (R161): the
+// Enroll node asks its questions and answers with one script: the
 // provisioner, the answers and the token inside, and behind WireGuard the
 // router's config narrowed to the controller, with the router's one-way
 // rules on the dialog. A config that cannot be used is refused before a
@@ -3290,7 +3289,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
     'PublicKey = cHVibGlja2V5cHVibGlja2V5cHVibGlja2V5cHViMDA=', 'AllowedIPs = 0.0.0.0/0',
     'Endpoint = home.example.net:51820', ''].join('\n');
   const rows = async () => (await page.evaluate(async () => { await loadNodes(); return nodesList.length; }));
-  // WireGuard and the Tailscale door have no walk on record (R48): with dev
+  // WireGuard and the Tailscale door have no walk on record: with dev
   // features off they are not offered, and the server refuses them.
   const devSet = v => page.evaluate(async on => { await fetch('/api/settings', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ set: { offer_unvetted: on } }) });
@@ -3346,7 +3345,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
   const prov = readFileSync(`${REPO}/nodes/provision-linux.sh`, 'utf8');
   ok(/^enroll-cloudbox-n_[0-9a-f]+\.sh$/.test(file) && script.startsWith('#!/usr/bin/env bash') && part('PROVISIONER') === prov,
      `Make the script saves ${file}, named with the row's id, the provisioner this controller ships inside it`);
-  // ...and the picked system's family file beside it (R204): Ubuntu's is the
+  // ...and the picked system's family file beside it: Ubuntu's is the
   // Debian family's, sourced by the core from $dir/provision-family.sh.
   ok(part('FAMILY') === readFileSync(`${REPO}/nodes/families/deb.sh`, 'utf8') && /base64 -d > "\$dir\/provision-family\.sh"/.test(script),
      'the script carries the picked system\'s provisioner family beside the core');
@@ -3364,7 +3363,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
      `...and the pending row knows its tunnel address before the machine exists (${JSON.stringify(row?.config)})`);
   await page.click('#ndBody #ndTokDone');
   if (row) await page.evaluate(id => nodeAct({ action: 'retire', id }), row.id);
-  // Through a public hostname (R170): the dialog holds Hosting only on,
+  // Through a public hostname: the dialog holds Hosting only on,
   // asks for the name, refuses an address, and the script runs the
   // provisioner with --reach public; the home end is the tunnel's rule
   // (cloudflared's config as the example), and the controller answers that
@@ -3398,7 +3397,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
   const row2 = await page.evaluate(async () => { await loadNodes(); return nodesList.find(n => n.name === 'vpsbox'); });
   ok(row2?.state === 'pending' && row2.config?.tunnel?.host === 'bb.example.com' && row2.config?.host_only === true,
      `...and the pending row is hosting only with its hostname (${JSON.stringify(row2?.config)})`);
-  // One name, one node (the operator, 11 Oct): the same name again is
+  // One name, one node: the same name again is
   // refused rather than a second waiting row; the row shows what its
   // script was made with, its id, and offers the script again or Discard.
   const napi = api;
@@ -3417,7 +3416,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
   await page.click(`${ROW2} [data-nd="reenroll"]`);
   await page.waitForSelector('#ndBody #ndEnReach', { timeout: 10000 });
   // A waiting node never ran its script, so its new one is a first
-  // enrollment in its words, not a repair "on the same machine" (B637).
+  // enrollment in its words, not a repair "on the same machine".
   ok(await page.$eval('#ndBody', b => /a token good once, for a day/.test(b.textContent) && !/run it again on the same machine/.test(b.textContent)),
      'a waiting node\'s new script is worded as a first enrollment, not a repair of a machine it never had');
   const [dl5] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('#ndBody #ndEnGo')]);
@@ -3445,7 +3444,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
   ok(gate.page === 200 && gate.tunnel === 403 && gate.agent !== 403,
      `...and a request wearing a tunnel edge's headers reaches the agent's API alone (${JSON.stringify(gate)})`);
   if (await page.$eval('#ndmodal', m => !m.hidden).catch(() => false)) await page.click('#ndBody #ndTokDone').catch(() => {});
-  // A door in for SSH (R174): the dialog's recipe, its hostname and secret;
+  // A door in for SSH: the dialog's recipe, its hostname and secret;
   // the script carries the secret in a block and runs the provisioner with
   // the door's flags; the pending row knows the door; and once the node
   // reports it, the row's switch queues the system job.
@@ -3476,7 +3475,7 @@ await section("Enroll node asks its questions and answers with one script", asyn
   await devSet(false);
 });
 
-// What is offered (roadmap R54, step 6): with unvetted features off the
+// What is offered: with unvetted features off the
 // generator knows one hypervisor, the one every sandbox here was made on,
 // and refuses the rest with the sentence that names the switch. The rest
 // of this section runs with the switch on, as a dev instance does.
@@ -3492,8 +3491,8 @@ await section("What is offered", async () => {
   await page.evaluate(async () => { await fetch('/api/settings', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ set: { offer_unvetted: true } }) }); });
 });
-// A VM catalog that lands after its dialog closed paints over nothing else
-// (B424): Render a VM, closed before the answer, Enroll opened in the same
+// A VM catalog that lands after its dialog closed paints over nothing else:
+// Render a VM, closed before the answer, Enroll opened in the same
 // box and typed into, then the answer, and the enroll form is still there.
 await section("A VM catalog that lands after its dialog closed paints over nothing else", async () => {
   await page.evaluate(() => {
@@ -3652,7 +3651,7 @@ await section("debug: whose machine logs a node's sessions may read", async () =
   }, [node, extra]);
 
   // Debug mode is on here: the harness starts the controller with
-  // DEBUG_MODE=1, which is what turns it on (the operator, 26 Oct); off is a
+  // DEBUG_MODE=1, which is what turns it on; off is a
   // controller started without it, which reset_debug's unit test holds.
   let r;
 
@@ -3712,7 +3711,7 @@ await section("Uninstall from the row", async () => {
   };
   const plain = await mint('laptop', { cpu: 2, mem_mb: 4096, arch: 'x86_64', system: 'linux', docker: true });
   const shed = await mint('shed2', { cpu: 2, mem_mb: 4096, arch: 'x86_64', system: 'linux', docker: true, sandbox: true });
-  // Reboot and Shut down from the row (the operator, 25 Sep): a system job
+  // Reboot and Shut down from the row: a system job
   // the agent runs as root, refused where nothing from here would reach
   // the machine. The controller's own machine is rebooted from its host.
   {
@@ -3748,7 +3747,7 @@ await section("Uninstall from the row", async () => {
                           false, () => false)));
     ok(local === false, `...and the controller's own row has neither (${local})`);
   }
-  // The GPU display (R20): a node whose census names an NVIDIA card gets the
+  // The GPU display: a node whose census names an NVIDIA card gets the
   // line in Health with Set up GPU display where it is a sandbox; a node
   // that is not one is refused with the command for the machine.
   {
@@ -3775,7 +3774,7 @@ await section("Uninstall from the row", async () => {
     // and say one pressed now waits for it (job_waits holds it on the server).
     const held = await page.$eval(`.ndrow[data-node="${shed.id}"]`, r => ({
       dead: ['reboot', 'poweroff'].map(w => r.querySelector(`[data-nd="${w}"]`)?.disabled),
-      // Said on the action's own row, under its name (the operator, 18 Oct).
+      // Said on the action's own row, under its name.
       why: r.querySelector('[data-nd="reboot"]')?.closest('.ndact')?.querySelector('.sub')?.textContent || '' }));
     ok(held.dead.every(d => !d) && /A change to this node \(gpu\) is running here: one pressed now waits for it to end/.test(held.why),
        `while a change is applying on the node, Reboot and Shut down say a press waits for it (${held.why})`);
@@ -3792,7 +3791,7 @@ await section("Uninstall from the row", async () => {
     await page.evaluate(() => loadNodes());
     await page.waitForFunction(id => !(nodesList || []).find(n => n.id === id)?.jobs?.some(j => j.apply === 'gpu'), shed.id, { timeout: 15000 });
     await page.evaluate(id => { const c = nodesConf[id]; if (c?.draft){ c.draft.gpuEmu = undefined; } readMoved('nodes'); drawPanes(); }, shed.id);
-    // What the card is for (R102): a GPU section with two switches and one
+    // What the card is for: a GPU section with two switches and one
     // Apply. Neither writes on the click; Apply sends each only where its
     // tick differs from what the node has.
     const sect = `.ndrow[data-node="${shed.id}"] details[data-sect="nodes:gpu"]`;
@@ -3843,7 +3842,7 @@ await section("Uninstall from the row", async () => {
     // The briefing's GPU section reaches a session only where its project's
     // node reports a card: a fact about the machine, not the tree.
     // gamma, not delta: delta is the fixture's locked project, whose
-    // settings nobody changes (R119).
+    // settings nobody changes.
     const prevNode = (await napi('/api/status')).projects?.find(p => p.name === 'gamma')?.prefs?.node || '';
     await napi('/api/prefs', { project: 'gamma', node: '' });
     const without = (await napi('/api/preamble?project=gamma')).text || '';
@@ -3854,7 +3853,7 @@ await section("Uninstall from the row", async () => {
     ok(!/- gpu: /.test(without) && /- gpu: the card/.test(withCard) && /aerie gpu run \[--mem MB\] -- CMD/.test(gpuTopic),
        'the briefing names its GPU topic for a space whose node has a card, and for no other; the topic answers either way');
   }
-  // The sound a node has (R107): the census's cards and server, cleaned on
+  // The sound a node has: the census's cards and server, cleaned on
   // the way in, and a line on the row in words.
   {
     const hello = census => fetch(base + '/api/v1/agent/hello', { method: 'POST',
@@ -3874,8 +3873,8 @@ await section("Uninstall from the row", async () => {
        && words[1] === 'sound: HDA Intel PCH through pipewire'
        && /Dummy \(virtual\), with no sound server/.test(words[2]) && words[3] === '',
        `the row says the sound in words, and nothing for a node that has not said (${words.join(' | ')})`);
-    // ...and whether it reaches the internet (R82), with its docker group
-    // (R86): kept as a boolean and a number, the row saying only "no".
+    // ...and whether it reaches the internet, with its docker group:
+    // kept as a boolean and a number, the row saying only "no".
     await hello({ internet: false, docker_gid: 983 });
     const rec2 = (await napi('/api/v1/nodes')).nodes.find(n => n.id === shed.id);
     ok(rec2?.reported?.internet === false && rec2.reported.docker_gid === 983,
@@ -3894,7 +3893,7 @@ await section("Uninstall from the row", async () => {
       .replace(/<[^>]+>/g, '').trim());
     ok(/^the toolchain store is mounted noexec: aerie and every terminal here cannot run/.test(nx),
        `...and a store mounted noexec, which stops every terminal there (${nx})`);
-    // A toolchain store the node cannot write (R85): the Library says so
+    // A toolchain store the node cannot write: the Library says so
     // over its cards, before a job fails on it.
     await hello({ store_ro: true });
     await page.evaluate(() => loadNodes());
@@ -3905,7 +3904,7 @@ await section("Uninstall from the row", async () => {
     await hello({});
     await page.evaluate(() => openNodesTab());
   }
-  // The NVIDIA driver as a card of the Library (R102, R170): installed by
+  // The NVIDIA driver as a card of the Library: installed by
   // the same job as the store's toolchains and asked by the same check,
   // with a pick of the branches apt offers that is live only while no
   // driver is installed; its state and Remove are its row on the Installed
@@ -3969,7 +3968,7 @@ await section("Uninstall from the row", async () => {
     const drawn = await page.$eval(DRV, e => ({ text: e.textContent.replace(/\s+/g, ' ').trim(),
       install: !!e.querySelector('[data-libact="install"][data-libname="nvidia-driver"]'),
       opts: [...e.querySelectorAll('#libDrvSel option')].map(o => o.textContent.trim()), dead: e.querySelector('#libDrvSel').disabled,
-      // This machine's own rows come before the store's (the operator, 18 Oct).
+      // This machine's own rows come before the store's.
       first: e.closest('.libgroup')?.querySelector('.lcard') === e }));
     ok(/NVIDIA driver/.test(drawn.text) && /GeForce RTX 3070 Ti/.test(drawn.text) && drawn.install && drawn.first,
        `the Library draws the driver's card first among the toolchains, with Install (${drawn.text.slice(0, 90)})`);
@@ -3977,12 +3976,12 @@ await section("Uninstall from the row", async () => {
        && /^610\.57\.04 · newer than recommended$/.test(drawn.opts[1]) && /^595\.91\.07 · open kernel modules$/.test(drawn.opts[2]),
        `its version pick lists the branches apt offers, the recommended one first (${drawn.opts.join(' | ')})`);
     // ...and in Rows the pick is a line under the card's own, the name
-    // keeping its width beside the verbs, at a desk and on a phone (the
-    // operator, 19 Nov: the pulldown took the name's column, a letter wide).
+    // keeping its width beside the verbs, at a desk and on a phone
+    // (the pulldown took the name's column, a letter wide).
     // As the Rows button does it: the view, then the read marked moved, or
     // the draw is skipped as nothing new. Without the mark this waited on
     // whatever read came next to repaint, which under a gate's load was not
-    // within its time (19 Nov). What the page held is said if it is not drawn.
+    // within its time. What the page held is said if it is not drawn.
     await page.evaluate(() => { libView = 'list'; readMoved('library'); drawPanes(); });
     const inRows = await page.waitForSelector('.doc .librarytab .lgrid.lrows > .lcard[data-lrow="toolchain:nvidia-driver"] #libDrvSel',
                                               { timeout: 20000 }).then(() => true, () => false);
@@ -4055,7 +4054,7 @@ await section("Uninstall from the row", async () => {
     ok(page.dialogs.length === nr + 1 && /Remove NVIDIA's driver from shed2\?.*nouveau takes the card back/s.test(page.dialogs[nr] || '') && rd?.action === 'remove' && (rd.queue || []).includes('nvidia-driver'),
        `Remove asks first, naming the driver, and queues the removal (${(page.dialogs[nr] || '').slice(0, 50)})`);
     await napi('/api/v1/jobs', { action: 'cancel', id: rd?.id });
-    // The container toolkit (R102): the machine's second card, after the
+    // The container toolkit: the machine's second card, after the
     // driver it needs. Refused alone where there is no driver and queued
     // after it when both are asked for; its install says first that it adds
     // NVIDIA's package source; and there is no card without Docker.
@@ -4198,7 +4197,7 @@ await section("Claude Code on a node", async () => {
   const me = (await napi('/api/v1/nodes')).nodes.find(n => n.id === en.id);
   ok(!!me?.live && me.reported?.session?.claude === '1.0.0 (Claude Code)',
      `the node dials in reporting its Claude Code (hello: ${JSON.stringify(hi).slice(0, 80)}; row: live=${me?.live} session=${JSON.stringify(me?.reported?.session || null).slice(0, 120)})`);
-  // Claude Code is a coding agent of the node (R145, R95): the agents'
+  // Claude Code is a coding agent of the node: the agents'
   // check asks its latest; the toolchain check (the Library's Check for
   // updates) asks the node's toolchains alone.
   const ack = await napi('/api/agents', { action: 'check' });
@@ -4231,8 +4230,8 @@ await section("Claude Code on a node", async () => {
      && (st.attention || []).filter(a => a.id === en.id && a.kind === 'toolchain').length === 1
      && (st.attention || []).filter(a => a.id === en.id && a.kind === 'agents').length === 1,
      `...a row of its own, beside the toolchains' row, one each per node (${JSON.stringify(row?.tools)})`);
-  // Each row's link opens its own page on the node (the operator, 9 and
-  // 22 Oct), from whichever node that page was on.
+  // Each row's link opens its own page on the node,
+  // from whichever node that page was on.
   await page.waitForFunction(id => (state?.attention || []).some(a => a.kind === 'agents' && a.id === id)
                                    && (state?.attention || []).some(a => a.kind === 'toolchain' && a.id === id), en.id, { timeout: 15000 });
   await page.evaluate(() => { tcNode = 'local'; });
@@ -4244,15 +4243,15 @@ await section("Claude Code on a node", async () => {
   ok(/1 coding agent update on clbox/.test(agBell) && /Claude Code: 1\.0\.0 → 1\.2\.0/.test(agBell) && /Library/.test(agBell)
      && /1 toolchain update on clbox/.test(tcBell) && /Go: 1\.27\.0 → 1\.28\.0/.test(tcBell) && !/Claude Code/.test(tcBell),
      `the bell says each in a line, the coding agents on their row and the toolchains on theirs, the versions under the fold (${agBell.slice(0, 100)} | ${tcBell.slice(0, 80)})`);
-  // B57: what the update ends is the Claude sessions running there, counted,
+  // What the update ends is the Claude sessions running there, counted,
   // not the projects bound to the node.
   const ends = /ends the Claude sessions there \((\d+) running\)/.exec(agBell);
   ok(typeof agRow.sessions === 'number' && (agRow.sessions ? ends && +ends[1] === agRow.sessions : !ends && !/ends the Claude/.test(agBell)),
      `...and its warning counts the Claude sessions running there (${agRow.sessions}: ${ends?.[0] || 'none said'})`);
-  // Dismiss puts that version away for this account (bellseen.py, R144),
+  // Dismiss puts that version away for this account (bellseen.py),
   // with the drawer left open; Show again brings it back. The line counting
   // what was put away comes with the press, unrolling in as the row folds,
-  // not a moment after the server answers (the operator, 23 Nov: Dismiss
+  // not a moment after the server answers (Dismiss
   // skipped): the answer is held here, so the press is all there is.
   await page.route('**/api/bell', r => r.request().method() === 'POST'
     ? setTimeout(() => r.continue().catch(() => {}), 1500) : r.continue());
@@ -4274,19 +4273,19 @@ await section("Claude Code on a node", async () => {
   await page.waitForSelector(`#bellPanel [data-bag="${en.id}"]`, { timeout: 15000 });
   ok(true, '...and Show again brings it back');
   // The node was enrolled through the API, so the page may not have listed
-  // it yet; the page still opens on it, not on another (B754).
+  // it yet; the page still opens on it, not on another.
   // The drawer is drawn anew on every poll, so a press can straddle a
   // redraw: the mousedown on one link and the mouseup on its replacement,
-  // and the click goes to the drawer, which runs no link's handler (B748).
+  // and the click goes to the drawer, which runs no link's handler.
   // Pressed again while the drawer is still open on the link.
   const agLink = `#bellPanel [data-bag="${en.id}"]`;
   // The Library back on its front page: the toolchain list the checks above
-  // narrowed it to is theirs (R256).
+  // narrowed it to is theirs.
   await libraryFront(page);
   let went = '';
   for (let i = 0; i < 3; i++){
     if (await page.isVisible(agLink)) await page.click(agLink, { timeout: 5000 }).catch(() => {});
-    // Since R170 the row's link opens the Library on that node, where Update is.
+    // The row's link opens the Library on that node, where Update is.
     went = await page.waitForFunction(id => libNode === id && document.getElementById('bellPanel').hidden, en.id, { timeout: patience(8000) })
       .then(() => '', async () => JSON.stringify({ want: en.id, press: i + 1,
         ...await page.evaluate(() => ({ libNode, bell: document.getElementById('bellPanel').hidden })) }));
@@ -4343,7 +4342,7 @@ await section("Claude Code on a node", async () => {
   // ...from the press, not from the job: ending the sessions comes first,
   // a round trip each, and the hold used to read nothing until the job
   // existed, so a Claude button pressed in those seconds started a
-  // session the update was about to end (the operator, 29 Sep).
+  // session the update was about to end.
   {
     const said = execFileSync('python3', ['-c', `
 import sys, json
@@ -4373,7 +4372,7 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1", "claude")
   // naming what it installed on its last line. The row and the bell read
   // the new version from that line at once: the census only rides hello,
   // every ten minutes, and the bell kept saying an update was out for that
-  // long after it had landed (B249).
+  // long after it had landed.
   {
     const AH = { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' };
     const work = await fetch(base + '/api/v1/agent/work', { method: 'POST', headers: AH,
@@ -4406,14 +4405,14 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1", "claude")
   await hello();
   ok((await napi('/api/status')).claude_code?.nodes?.[en.id]?.behind === false, 'a node on the latest is not behind');
   // None at all: the provisioner no longer installs it, and a session needs
-  // it, so the node's projects are held saying where it is installed (R145).
+  // it, so the node's projects are held saying where it is installed.
   census.session.claude = '';
   await hello();
   const none = (await napi('/api/status')).projects.find(p => p.name === 'beta')?.held || '';
   ok(/Claude Code is not installed on clbox: the Library installs it/.test(none),
      `a node with no Claude Code holds its spaces' Claude button, saying where to install it (${none.slice(0, 80)})`);
   // ...and the button is Install Claude, opening that node's Installed page
-  // on Claude Code's row, with no line under it (the operator, 21 Oct).
+  // on Claude Code's row, with no line under it.
   ok((await napi('/api/status')).projects.find(p => p.name === 'beta')?.claude_missing === en.id,
      'the row names the node with no Claude Code');
   await page.waitForFunction(() => (state?.projects || []).find(p => p.name === 'beta')?.claude_missing, null, { timeout: 15000 });
@@ -4430,8 +4429,8 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1", "claude")
   await page.waitForFunction(id => instNode === id && tabs.some(t => t.kind === 'thing')
     && !!document.querySelector(`.thingtab [data-instnode="${id}"][data-thing="agent:claude-code"]`), en.id, { timeout: 15000 });
   ok(true, '...and a press opens the Installed page on that node, Claude Code\'s row open (R95, R172)');
-  // ...and the same for whichever agent the project starts first (R95 step
-  // 18): ChatGPT's Install where the node lists no Codex, Start where it does.
+  // ...and the same for whichever agent the project starts first:
+  // ChatGPT's Install where the node lists no Codex, Start where it does.
   const other = await page.evaluate(id => {
     const p = { ...state.projects.find(x => x.name === 'beta'), claude_missing: '', session_node: id,
                 prefs: { agent_default: 'codex' } };
@@ -4482,7 +4481,7 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
      `a probe's result leaves the job revisions still even when its waiter forgets it first (${JSON.stringify(got)})`);
 });
 
-// A node un-enrolled under a project (the operator, 5 Oct): the project's
+// A node un-enrolled under a project: the project's
 // Claude button goes dead with the reason on its row, its settings keep
 // the node selected as "name (removed)" in italics, and another project's
 // picker does not offer it at all.
@@ -4492,7 +4491,7 @@ await section("A node un-enrolled under a project", async () => {
   const napi = async (path, body) => (await fetch(base + path, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   const gone = await napi('/api/v1/nodes', { action: 'enroll', name: 'oldbox' });
   // delta is archived and, in the fixture, locked by an administrator, which
-  // refuses the settings change this needs (R119): lifted here, put back below.
+  // refuses the settings change this needs: lifted here, put back below.
   writeFileSync(`${DIR}/state/locked-projects.json`, '{}');
   const was = (await (await fetch(`${base}/api/status`, { headers: H })).json()).projects.find(p => p.name === 'delta')?.prefs?.node || '';
   await napi('/api/prefs', { project: 'delta', node: gone.id });
@@ -4531,8 +4530,8 @@ await section("A node un-enrolled under a project", async () => {
   writeFileSync(`${DIR}/state/locked-projects.json`, JSON.stringify({ delta: { by: 'u_0000aaaa', admin: true } }));
 });
 
-// The controller's own machine, a bare-metal install's node of itself (R90
-// step 8): minted from a shell with --own, its row wears "this machine",
+// The controller's own machine, a bare-metal install's node of itself:
+// minted from a shell with --own, its row wears "this machine",
 // its session network is set and its box cannot be cleared (said on the
 // row), a project's node pickers say which it is, and the container
 // picker offers it, its containers being the root agent's.
@@ -4569,7 +4568,7 @@ await section("The controller's own machine, a bare-metal install's node of itse
   }, own.id);
   ok(!box || (box.checked && box.disabled && /controller's own machine/.test(box.said)),
      `its session network box is ticked and cannot be cleared, with why on the row (${JSON.stringify(box)?.slice(0, 120)})`);
-  // (The switch and its action went with R146: every session is kept to its
+  // (The switch and its action went: every session is kept to its
   // project's network on every node, so there is nothing to refuse off.)
   const opts = await page.evaluate(async () => {
     // The dialog fills its picker once the project's settings are read, and

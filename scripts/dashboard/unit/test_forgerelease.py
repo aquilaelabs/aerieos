@@ -1,4 +1,4 @@
-"""forgerelease.py (R123): Release's GitHub release, against a stand-in for
+"""forgerelease.py: Release's GitHub release, against a stand-in for
 GitHub's API and its upload host on a local port. The notes are the
 changelog's section for the version, the assets the released commit's
 builds (signed ones when there are any), and a second press makes nothing
@@ -90,7 +90,7 @@ class Release(unittest.TestCase):
 
     def test_the_trees_own_notes_for_the_version_come_before_the_changelog(self):
         # v0.9.0 went out with the changelog's list where its notes file
-        # with the mark and the screenshots was (B464).
+        # with the mark and the screenshots was.
         d = self.tmp / "ws" / "app" / "docs" / "release-notes"
         d.mkdir(parents=True)
         (d / "0.5.0.md").write_text("![mark](https://raw.githubusercontent.com/@REPO@/@TAG@/m.png)\nghcr.io/@REPO@:@VER@\n")
@@ -115,7 +115,7 @@ class Release(unittest.TestCase):
         self.assertEqual(fr.kept("app")["v0.5.0"]["url"], "https://github.com/o/app/releases/tag/v0.5.0")
 
     def test_a_pre_release_is_marked_one_with_its_own_section(self):
-        # Any name (R218): the page is made, marked a pre-release and never
+        # Any name: the page is made, marked a pre-release and never
         # the latest, its notes the section its cut wrote.
         app = self.tmp / "ws" / "app" / "CHANGELOG.md"
         app.write_text(app.read_text().replace("## Unreleased\n\n- not yet\n\n",
@@ -125,12 +125,12 @@ class Release(unittest.TestCase):
         made = [b for m, p, b in SEEN if m == "POST"][0]
         self.assertTrue(made["prerelease"])
         self.assertEqual(made["make_latest"], "false")
-        # Under the table of its files (R255), which every release opens with.
+        # Under the table of its files, which every release opens with.
         self.assertTrue(made["body"].startswith(fr.FILES_HEAD), made["body"])
         self.assertTrue(made["body"].endswith("### Fixed\n\n- The rc's fix"), made["body"])
 
     def test_a_version_cut_without_a_bump_releases_what_is_under_unreleased(self):
-        # v0.5.0 went out reading "builderbot-2 0.5.0" (B116): its changes
+        # v0.5.0 went out reading "builderbot-2 0.5.0": its changes
         # were still under Unreleased, never dated by a bump.
         r = fr.publish("app", "v0.6.0", "0.6.0", "65298e0")
         self.assertTrue(r.get("made"), r)

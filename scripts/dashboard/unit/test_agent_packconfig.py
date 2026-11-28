@@ -1,4 +1,4 @@
-"""The agent's half of a pack's configuration (R172): the hello's rows
+"""The agent's half of a pack's configuration: the hello's rows
 written as one env file per pack under the store's .bb/config, readable by
 the session account alone, a pack no longer named losing its file, and
 nothing rewritten while the rows have not changed."""

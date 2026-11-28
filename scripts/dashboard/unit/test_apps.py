@@ -1,6 +1,6 @@
 """apps: the seed file read once and put aside, the release a controller's
-version picks, and the files kept only when their sha256 matches (R272
-steps 3 and 4)."""
+version picks, and the files kept only when their sha256 matches.
+"""
 import hashlib
 import json
 import os
@@ -76,7 +76,7 @@ class Apps(unittest.TestCase):
         return {"tag_name": tag, "assets": assets}
 
     def test_the_container_edition_s_image_is_held_to_its_signed_release(self):
-        # R290 step 3 (the operator, 26 Nov): the registry's image under this
+        # The registry's image under this
         # build's version against the one its signed list names.
         digest = "sha256:" + "ab" * 32
         ref = f"ghcr.io/aquilaelabs/aerieos@{digest}"
@@ -168,7 +168,7 @@ class Apps(unittest.TestCase):
         self.assertIsNone(apps.path("android", "aerieos-app-0.6.9.apk"))
 
     def test_the_companion_and_the_extension_are_dev_features(self):
-        # The operator, 20 Oct: offered, fetched and served only with Offer
+        # Offered, fetched and served only with Offer
         # dev features on; the Android app is not one.
         rel = self.release("v0.7.0", ["aerieos-app-0.7.0.apk", "aerieos-vscode-0.7.0.vsix",
                                       "aerieos-companion-0.7.0.exe"])

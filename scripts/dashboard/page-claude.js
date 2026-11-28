@@ -63,7 +63,7 @@ function closeResumeMenu(){
   if (state) drawProjects(state.projects);
   syncResumeMenu();
 }
-// The second step of the Claude button's menu (the operator, 12 Oct): which
+// The second step of the Claude button's menu: which
 // conversation on which node was picked, and the model and effort it is to
 // start on, chosen there each time rather than kept in the project's
 // settings. Kept here as they are picked, since the menu is drawn again on
@@ -84,7 +84,7 @@ function rmHold(m, project){
 // The agent picked in the chooser's Start pulldown, kept across its redraws.
 let rmAgent = {project: "", agent: ""};
 // Your conversations on the project the chooser is open on, for its Resume
-// band (R143): the Sessions view's list, read as it opens. rows null while
+// band: the Sessions view's list, read as it opens. rows null while
 // it is on its way.
 let rmConvs = {project: "", rows: null, error: ""};
 // ...and the one its pulldown is on, the newest until another is picked.
@@ -131,7 +131,7 @@ const ago = s => {
 };
 
 // The places a Claude session of this project could run, as the chooser
-// draws them: the project's several nodes (R82), its one, or this machine
+// draws them: the project's several nodes, its one, or this machine
 // where a session runs here (id ""), which has no sign-in of a node's to ask
 // about. None where there is nowhere, and session_why says so.
 function claudeNodes(p){
@@ -178,18 +178,18 @@ async function claudeEnd(name, n, several, slot = 1){
   sessEndRead(s);
 }
 
-// Restart (the operator, 12 Oct): end the session and pick its conversation
+// Restart: end the session and pick its conversation
 // up again, which is how a session sees what changed since it started (a
 // toolchain on its node's PATH, AerieOS's briefing; the project row says
 // which). The menu turns to the model and effort first, the conversation it
 // was in already chosen; its Restart is the yes, and only then is the
 // session ended and started again (restartNow). Ended at once, it left a
 // person picking a model with no session running; asked again after that
-// step, it was a third screen for one decision (the operator, 19 Nov).
+// step, it was a third screen for one decision.
 function claudeRestart(name, n, several, agent = "claude", slot = 1){
   const p = (state?.projects || []).find(x => x.name === name);
   const claude = agent === "claude", last = claude ? p?.last_claude : p?.last_agents?.[agent];
-  // The conversation that slot is in, where its hooks have said (R143);
+  // The conversation that slot is in, where its hooks have said;
   // else the project's last, as before slots.
   const conv = mySlots(name).find(x => x.agent.id === agent && x.slot === slot)?.row?.claude?.conv;
   resumeFor = name;
@@ -205,12 +205,12 @@ function claudeRestart(name, n, several, agent = "claude", slot = 1){
 // pressed: end the session, the server answering once the node says it has
 // ended, then start the same conversation. Started while the old one was
 // still going down, the new tab attached to the dying session and showed it
-// end, and a second press was what got a session (the operator, 12 Oct).
+// end, and a second press was what got a session.
 // A node that has not said so within the server's half minute is waited on
 // here, said as it goes, for RESTART_WAIT_S in all: its agent takes the end
 // at its next poll, which after the agent's own update is over a minute
 // away (its first census), and the page said to press Restart again for a
-// restart that was about to happen by itself (the operator, 19 Nov).
+// restart that was about to happen by itself.
 async function restartNow(name, r, say = () => {}){
   const RESTART_WAIT_S = 240;
   const n = r.restart, id = r.agent || "claude", slot = r.slot || 1;
@@ -256,7 +256,7 @@ function claudeSigninFirst(name, nodeId){
 
 // A choice arises whenever there is something to choose: a running session
 // (open its tab, or end it, with the project's other nodes still offered
-// beside it: the operator, 30 Sep), a transcript to resume (which is what a
+// beside it: the operator), a transcript to resume (which is what a
 // restart leaves behind), several nodes to run on, or a node this account
 // has yet to sign in on, whose sign-in the chooser offers in place of a
 // session there.
@@ -267,7 +267,7 @@ function openClaude(name, ev){
   // Nowhere for it to run opens the reason under the row rather than a
   // tab, which is the whole of what the press can do.
   // Always the menu now: a session starts on the model and effort picked in
-  // it (the operator, 12 Oct), so even one node and nothing to resume asks.
+  // it, so even one node and nothing to resume asks.
   void ns;
   resumeFor = resumeFor === name ? null : name;
   rmSize = {project: "", w: 0, h: 0};          // opened afresh: its own size
@@ -278,10 +278,10 @@ function openClaude(name, ev){
   syncResumeMenu();
 }
 
-// One conversation picked to go on with (the notebook's Sessions view, the
-// operator, 22 Oct: the project's Claude button resumes only the last): the
+// One conversation picked to go on with (the notebook's Sessions view: the
+// project's Claude button resumes only the last): the
 // chooser opens with it picked under Resume, in the lowest slot of its
-// agent free (R143). One running in a session of yours already is
+// agent free. One running in a session of yours already is
 // opened there rather than started twice, which would write over it; with
 // every slot taken it is said, and nothing starts.
 function resumeConversation(name, id, when, ev, agent = "claude"){
@@ -299,9 +299,9 @@ function resumeConversation(name, id, when, ev, agent = "claude"){
   const slot = freeSlot(name, agent);
   if (!slot)
     return notify(`every ${agentById(agent).name} session you may run on ${projLabel(name)} is running: end one to resume this`, true);
-  // A conversation resumes in the agent it is with, and in no other (R95
-  // step 8): the chooser opens with it picked under Resume, whose press
-  // starts it at once on that agent's kept model and effort (R284 step 4).
+  // A conversation resumes in the agent it is with, and in no other:
+  // the chooser opens with it picked under Resume, whose press
+  // starts it at once on that agent's kept model and effort.
   void when;
   resumeFor = name;
   resumePick = null;
@@ -335,8 +335,8 @@ function openSentTo(project, session = ""){
   startClaude(project, null);
 }
 
-// Which of your sessions on a project a send goes to, where several run
-// (R143): asked, each by its agent and slot. "" with one or none, which the
+// Which of your sessions on a project a send goes to, where several run:
+// asked, each by its agent and slot. "" with one or none, which the
 // server answers as before; null when the asking was put away.
 async function pickSend(project){
   const s = mySlots(project);
@@ -346,8 +346,8 @@ async function pickSend(project){
                        choices: s.map(x => ({label: agentSlotName(x.agent, x.slot), value: x.name}))});
   return typeof r === "string" ? r : null;
 }
-// A button that sends something to a project's session asks first (the
-// operator, 6 Oct): what it sends arrives as a prompt and the agent starts on
+// A button that sends something to a project's session asks first:
+// what it sends arrives as a prompt and the agent starts on
 // it at once, so a stray tap is work begun. The bug and roadmap sends ask in
 // their own send box; every other Send asks here.
 async function sendSure(project, what){
@@ -367,7 +367,7 @@ function startClaude(name, sessionId, node, slot = 1){
   launchClaude(name, sessionId, node, slot);
 }
 
-// Another coding agent's session (R95 step 4): Codex CLI or Copilot CLI on
+// Another coding agent's session: Codex CLI or Copilot CLI on
 // one of the project's nodes, a new conversation in a tab of its own, named
 // for the agent. Its session is its own beside a Claude one, in a tree of
 // its own (session_dir), so one person may run both on a project at once.
@@ -379,7 +379,7 @@ function launchAgent(id, name, node, model = "", effort = "", sessionId = "", sl
   if (state) drawProjects(state.projects);
   const p = (state?.projects || []).find(x => x.name === name);
   const nn = node ? (p?.session_nodes || []).find(x => x.id === node)?.name || node : "";
-  // Its model and effort ride the argument (R95 step 9), which bb-tty
+  // Its model and effort ride the argument, which bb-tty
   // holds to the agent's own lists.
   const me = (model ? `:m:${model}` : "") + (effort ? `:e:${effort}` : "");
   openTab({kind: "term", arg: agentArg(id, name) + (sessionId ? `:r:${sessionId}` : "") + me + slotArg(slot) + (node ? `:n:${node}` : ""),
@@ -420,10 +420,10 @@ function launchClaude(name, sessionId, node, slot = 1){
 // for this account and opens the session, which takes it as its first prompt
 // as it starts; Start without it opens one that was not given it and puts the
 // brief away. Either way the brief leaves the project's tree then, and its
-// notebook keeps it. Whichever agent the session is (R95): Codex's and
+// notebook keeps it. Whichever agent the session is: Codex's and
 // Copilot's first prompt is the brief as Claude's is, with their own models.
 let briefFor = null;
-// Its form (R301): the brief over the model and effort this account's
+// Its form: the brief over the model and effort this account's
 // sessions here start on.
 function briefDrawForm(){
   const at = document.querySelector('#briefModal [data-dlgform="brief"]');
@@ -522,7 +522,7 @@ function claudeNodeFacts(n){
 }
 
 // The menu's second step: the model and effort a session starts on, picked
-// each time (the operator, 12 Oct), opening on the last ones picked here,
+// each time, opening on the last ones picked here,
 // and Start. Saved as this account's own for the project, which is what the
 // launcher reads when the session starts, so nothing else changes.
 let resumeModelNow = {project: "", model: ""};
@@ -536,7 +536,7 @@ function resumePicker(p, m, dlg, ns, several){
   // What it will do as its head, the two picks labeled above their fields
   // side by side, and Back and the press at its foot (the Perch pass).
   // The head names the agent and its product, as the other agents' does.
-  // Which of your Claude sessions it is, past the first (R143).
+  // Which of your Claude sessions it is, past the first.
   const as = (r.slot || 1) > 1 ? ` as ${agentSlotName(agentById("claude"), r.slot)}` : "";
   drawHTML(m, `${rmTitle(p)}<div class="field rmhead"><b>${r.restart ? `Restart your ${esc(agentSlotName(agentById("claude"), r.slot || 1))} session`
       : r.sessionId ? "Resume the Claude conversation" : "A new Claude conversation"}</b><span class="rmfacts">${
@@ -559,7 +559,7 @@ function resumePicker(p, m, dlg, ns, several){
     const label = r.restart ? "Restart" : "Start";
     // No question here: this step is the question (what ends, what resumes,
     // Back beside Restart), and a second one after two screens was one too
-    // many (the operator, 19 Nov).
+    // many.
     busy(e.target, r.restart ? "Restarting" : "Starting");
     if (r.model !== (p.yours?.model || "") || r.effort !== (p.yours?.effort || "")){
       const j = await postJSON("/api/prefs", {project: p.name, model: r.model, effort: r.effort});
@@ -595,7 +595,7 @@ function rmLastModel(p){
     .catch(() => {});
 }
 
-// What New and Resume start on (R284 step 4, the operator, 26 Nov): the
+// What New and Resume start on: the
 // agent picked's model and effort under it, this person's kept ones for
 // the space, saved as they change, so New and Resume start at once where
 // they turned the chooser to a step of its own. Restart keeps its step.
@@ -611,17 +611,17 @@ function rmStartOn(p, a){
   const first = claude && resumeModelNow.project === p.name && resumeModelNow.model ? rmLastSaid(resumeModelNow.model) : `${a.name}'s default`;
   const sel = (id, label, rows, v, def) => formField(id, label, `<select id="${id}" data-agent="${esc(a.id)}">${optionList([["", def], ...rows], v)}</select>`);
   const warn = a.id === "open" ? routerSays(p, cur[mk] || "") : "";
-  // Picked, kept at once (no foot): a form's fields all the same (R301).
+  // Picked, kept at once (no foot): a form's fields all the same.
   return `${formBox({cls: "rmfields rmstarton", fields: [t.models.length ? sel("rmStartModel", "Model", t.models, cur[mk] || "", first) : "",
     t.efforts.length ? sel("rmStartEffort", "Effort", t.efforts, cur[ek] || "", `${a.name}'s default`) : ""]})}${
     warn ? `<div class="rmstate warn">${esc(warn)}</div>` : ""}`;
 }
 
-// The same step for another agent's new conversation (R95 step 9): which
+// The same step for another agent's new conversation: which
 // agent, on which node, and that agent's own models and efforts, its
 // default first; Start opens it. Nothing is saved: the pick rides the
 // terminal's argument.
-// Any model's models (R144 step 3): the router's, as the project row
+// Any model's models: the router's, as the project row
 // carries them, each said with its provider, its context and its price
 // where the router knows them; none when no router allows the project.
 // A model walked with the open agent and AerieOS's tools is marked; the
@@ -672,7 +672,7 @@ function agentPicker(p, m, dlg, n, several){
   m.querySelector("[data-back]").onclick = () => { resumePick = null; drawProjects(state.projects); };
   m.querySelector("[data-start]").onclick = async e => {
     const label = r.restart ? "Restart" : "Start";
-    // Kept as this person's for the project, per agent (R95 step 9), so the
+    // Kept as this person's for the project, per agent, so the
     // step opens on it next time; the session starts on it either way.
     const mk = `${r.agent}_model`, ek = `${r.agent}_effort`;
     busy(e.target, r.restart ? "Restarting" : "Starting");
@@ -705,7 +705,7 @@ function placeResumeMenu(){
   m.id = "resumemenu";
   // The second step takes the first's place.
   if (resumePick?.project === p.name) return resumePicker(p, m, dlg, ns, several);
-  // Three bands (R143, the operator, 25 Oct): every session of yours on the
+  // Three bands: every session of yours on the
   // project, each agent's each slot on whichever node, with its state and
   // its Open, Restart and End; then Start, one line per agent installed on
   // the node picked, its New taking the lowest slot free; then Resume, your
@@ -760,7 +760,7 @@ function placeResumeMenu(){
         && !(p.prefs?.agents_off || []).includes(a.id))
       .sort((x, y) => (y.id === first) - (x.id === first));
   };
-  // One line for Start (the operator, 26 Oct): the agents installed on the
+  // One line for Start: the agents installed on the
   // node picked as a pulldown, the project's default first, and the one
   // picked's state and its press beside it; a plain name when there is one.
   const startBand = () => {
@@ -772,8 +772,8 @@ function placeResumeMenu(){
     return startLine(a, list.length > 1 ? `<select id="rmAgentSel" aria-label="the coding agent to start">${optionList(list.map(x => [x.id, x.name]), a.id)}</select>` : "")
       + (can ? rmStartOn(p, a) : "");
   };
-  // Resume: your conversations here as one pulldown (R236, the operator,
-  // 12 Nov: a list of rows with a button each was the longest thing on the
+  // Resume: your conversations here as one pulldown
+  // (a list of rows with a button each was the longest thing on the
   // card), newest first, each said by its label, or its first words where
   // it has none, its agent and when; one press beside it, the picked one's
   // note under it (its first words where it has a label, or where they
@@ -828,8 +828,8 @@ function placeResumeMenu(){
           : `<div class="field rmgroup"><label class="rmtitle">Start</label>${startBand()}</div>
              <div class="field rmgroup"><label class="rmtitle">Resume</label>${convs()}</div>`}`)
     + `<div class="foot"><span class="sp"></span><button type="button" data-rmclose>Close</button></div>`;
-  // The same menu as the one up already is left where it is (the operator,
-  // 12 Oct): drawn again on every poll, its buttons were replaced under the
+  // The same menu as the one up already is left where it is:
+  // drawn again on every poll, its buttons were replaced under the
   // pointer and its entrance played again, so a press that began on one
   // button ended on another and did nothing, and it blinked.
   const was = dlg.querySelector(":scope > .resumemenu");

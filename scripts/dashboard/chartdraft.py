@@ -1,4 +1,4 @@
-"""Draft from the compose (R281 step 4): a Helm chart written from a
+"""Draft from the compose: a Helm chart written from a
 repository's compose file, for a person or a session to read, change and
 commit; a deploy uses deploy/chart once it is committed.
 

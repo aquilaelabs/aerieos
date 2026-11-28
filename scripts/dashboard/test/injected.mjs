@@ -1,9 +1,9 @@
 // The dashboard's modules take their dependencies by injection: the server
-// calls each one's configure(), which writes names into the module with
-// globals().update(...). A name written that way and never declared at
+// calls each one's configure, which writes names into the module with
+// globals.update(...). A name written that way and never declared at
 // module level is invisible to every tool: ruff reports it undefined, and
 // a reader has to find the server's call to learn what the module needs
-// (roadmap R55, step 2: three of bugs.py's were exactly that). This holds
+// (three of bugs.py's were exactly that). This holds
 // the line: every injected name is declared where the module's own
 // constants are. No browser: it is a read of the source.
 import { ok, done } from './lib.mjs';

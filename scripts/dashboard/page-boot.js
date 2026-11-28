@@ -1,16 +1,16 @@
-// What runs as the page loads (R9 step 5): the listeners the page keeps on
+// What runs as the page loads: the listeners the page keeps on
 // the document and the window, the dialogs' wiring, the watches on the
 // revisions poll and the first reads, each part a function of its own and
-// called in order by boot(), which index.html runs once every script of the
+// called in order by boot, which index.html runs once every script of the
 // page is in. Every other script of the page is pure declarations.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load; boot() is what does.
+// pure declarations, nothing runs at load; boot is what does.
 
 "use strict";
 
 function boot(){
-  // Said for the head's watch over a page whose scripts never came (B930).
+  // Said for the head's watch over a page whose scripts never came.
   document.documentElement.dataset.booted = "1";
   bootMarkup();
   bootWaits();
@@ -44,7 +44,7 @@ function boot(){
 // ---- what a draw brings ----------------------------------------------------
 function bootMarkup(){
   // Wired by the draw that writes one (drawn, page-paint.js), with the fields
-  // a password manager leaves alone (B495), every title turned into words and
+  // a password manager leaves alone, every title turned into words and
   // every data-style applied: the markup the page loads with, here, and what a
   // draw writes later, by that draw. The space dialog's forms are part of
   // that markup, drawn first, and so are New space's, the bug report's, the
@@ -61,21 +61,21 @@ function bootMarkup(){
 // ---- what the page waits with ----------------------------------------------
 function bootWaits(){
   // Its declarations are page-docs.js (skel); what runs at load is this: the
-  // placeholders in the markup take their shapes (R218 step 15). A view's head
+  // placeholders in the markup take their shapes. A view's head
   // keeps its element and takes a bar; a .loading line becomes the shape. The
   // first pane, until the first snapshot lands, is shaped like the page the
   // address names: Home's tiles, the Projects page's cards, rows otherwise.
   // The notebook's markup is a template, so its views' heads are found there.
   // The first pane is the page the address names in its frame (bootPage): the
-  // rail, its bar and its shape, a reload included (the operator, 17 Oct).
+  // rail, its bar and its shape, a reload included.
   // The templates' first, so the first pane can be drawn from a notebook
-  // view's own template with its shapes in it (B865).
+  // view's own template with its shapes in it.
   [...[...document.querySelectorAll("template")].map(t => t.content), document].flatMap(r => [...r.querySelectorAll("[data-skel]")]).forEach(el => {
     const shape = el.dataset.skel;
     if (shape === "page"){
       // The page it will open on: the address's, else Home after a Sign
       // out, else this browser's front page (bootFront), so the placeholder
-      // is the page that comes (the operator, 22 Nov).
+      // is the page that comes.
       const pg = bootPage(bootFront(location.hash)), rl = bootRail(pg.rail);
       const id = `skboot${Math.random().toString(36).slice(2)}`;
       // Reloaded by a restart a moment ago: the page as it was, until the
@@ -119,7 +119,7 @@ function bootTabs(){
   addEventListener("scroll", () => { if (helpAt) helpHide(); }, true);
 }
 
-// ---- the shell (R218 step 2) ---------------------------------------------
+// ---- the shell ---------------------------------------------
 function bootShell(){
   // Its declarations are page-shell.js; what runs at load is this: the
   // address bar's back and forward open what they name, the search is wired,
@@ -136,7 +136,7 @@ function bootShell(){
   // The page the address names reads its own data now, on the read the head
   // began (preGets), so it is usually in hand when the first status read
   // draws the page, which then opens as itself rather than as a second
-  // placeholder (the operator, 18 Oct).
+  // placeholder.
   {
     const BOOT_LOADS = {"/api/home?light=1": homeOpen, "/api/users": loadUsers, "/api/roles": loadRoles, "/api/profile": loadProfile,
                         "/api/v1/nodes": loadNodes, "/api/storage": loadStorage, "/api/nginx": loadNginx, "/api/v1/jobs?n=100": loadJobs};
@@ -178,7 +178,7 @@ function bootMenuHeld(){
   }
 }
 
-// ---- a terminal in its own window (R8) ------------------------------------
+// ---- a terminal in its own window ------------------------------------
 function bootTermWindow(){
   // Its declarations are page-tabs.js.
 
@@ -226,8 +226,8 @@ function bootMotion(){
   pressHook();
   // ...and what a press or a draw dropped unheard is said (sayUnheard, page-bell.js).
   addEventListener("unhandledrejection", sayUnheard);
-  // A big chip already on is no change, so its press is none (B317, the
-  // operator 24 Oct): no list drawn again, no fade, as the rail does nothing
+  // A big chip already on is no change, so its press is none:
+  // no list drawn again, no fade, as the rail does nothing
   // for the group already on. Taken before any chip's own handler.
   document.addEventListener("click", e => {
     if (e.target.closest?.(".chip.on[aria-pressed='true']")){ e.stopPropagation(); e.preventDefault(); }
@@ -325,7 +325,7 @@ function bootWelcome(){
   $("bAbout").onclick = () => openAbout();
   $("aboutClose").onclick = closeAbout;
   $("aboutTours").onclick = () => pressing($("aboutTours"), () => tourReset());
-  // Escape and the backdrop mean what Close means (B229): the popup opens
+  // Escape and the backdrop mean what Close means: the popup opens
   // itself after an update, over whatever the person came to do, and every
   // other dialog on the page lets them out either way. Escape is modalKeys'.
   document.querySelectorAll(".abswitch button").forEach(b => b.onclick = () => abShow(b.dataset.ab));
@@ -356,7 +356,7 @@ function bootFindings(){
 // The log settings are the Controller page's Logs section; their functions
 // (logSection) are page-gear.js's. The gear is wired here.
 
-// One of the header's panels open at a time (the operator, 16 Oct: the
+// One of the header's panels open at a time (the
 // doctor and the gear stood open together). Each button stops its click
 // before the others' outside-click closers hear it, so each shuts the
 // other two itself.
@@ -365,7 +365,7 @@ function headerOnly(keep){
   if (keep !== "doctor" && docShown) toggleDoctor(false);
   if (keep !== "bell" && bellOpen) toggleBell(false);
 }
-// The header's three pop-outs and the keyboard (R286 step 1): opened from
+// The header's three pop-outs and the keyboard: opened from
 // the keyboard, the caret goes to the panel's first control, as a dialog's
 // does; shut with the caret inside it, the caret goes back to the button
 // that opened it, so a keyboard's place is never lost to the page's top.
@@ -421,11 +421,11 @@ function bootNotebooks(){
   // A tab closed, reloaded or navigated away says so on its way out, so the
   // other windows stop naming it at once rather than for its seat's fifty
   // seconds: "your other window" about a window that is gone is the one line
-  // presence exists to avoid (roadmap #26, B144).
+  // presence exists to avoid (roadmap #26).
   addEventListener("pagehide", () => notebooks.forEach(n => n.leave()));
   // A write still unanswered asks before the page goes (writeOut): the
   // browser's own question, in its own words. So does work typed and not
-  // saved (B1003), unless the page is the one leaving and has asked itself.
+  // saved, unless the page is the one leaving and has asked itself.
   typedWatch();
   addEventListener("beforeunload", e => {
     if (writesOut > 0 || (!leavingOnPurpose && unsavedHere())){ e.preventDefault(); e.returnValue = ""; }
@@ -487,7 +487,7 @@ function bootContainerDialogs(){
   $("cImport").onclick = () => $("cImportFile").click();
   $("cImportFile").onchange = cImportPicked;
   $("cUnder").onchange = cUnderPicked;
-  // An app's panel (R238): its file left by hand, one way, and its folders
+  // An app's panel: its file left by hand, one way, and its folders
   // suggested from the node picked.
   $("cByHand").onclick = cAppByHand;
   $("cNode").onchange = cAppNodePicked;
@@ -636,13 +636,13 @@ function bootWatches(){
     if (shown("docker")){ dmJobSettle(); dockerList = null; readMoved("docker"); loadDocker(); }
     // ...and the nginx page, whose state line is its container's: a Save's
     // rebuild ending moves this and nothing of nginx's own, and the line
-    // said "deployed, down" over a container long since up again (B65).
+    // said "deployed, down" over a container long since up again.
     if (shown("nginx")) loadNginx();
   });
   // ...and a node's containers changing outside AerieOS (one crashed, a
   // shell or a session ran docker): read again in place, the rows kept on
   // screen until the answer replaces them. This is why the page has no
-  // Refresh (the operator, 17 Oct).
+  // Refresh.
   onRev("containers", () => {
     if (shown("docker") && !readBusy("docker")) loadDocker();
   });
@@ -670,14 +670,14 @@ function bootAway(){
   onRev("prefs", () => refresh());
   // Pull to refresh on a touch screen (page-pull.js): the header's ↻ it replaced.
   wirePull();
-  // A lent phone, live (R113): a session's screenshot reaches the Phone tab.
+  // A lent phone, live: a session's screenshot reaches the Phone tab.
   onRev("phone.lease", () => { if (shown("phone")) phFetch(); });
   // Who has a session where, and whether it is working: the light fetch, so
   // the dot beside a name follows a session within seconds.
   onRev("live", () => liveRefresh());
   // This account's sign-ins as its nodes report them: one finishing after
   // the flow's own last look, or one a node says is gone, shows without a
-  // reload (the operator, 24 Nov).
+  // reload.
   onRev("signins", () => refresh());
   // The controller's own settings, which the tab draws out of `state`: another
   // window saved, or `aerie` wrote the file. The server has published this token
@@ -687,8 +687,8 @@ function bootAway(){
   // The toolchain store: an install or an uninstall finishing, or the version
   // check. The Toolchains page used to keep a timer of its own for this (half
   // a second while a job ran, eight seconds otherwise) which is a third clock
-  // for a fact the poll already carries. The Library (R170) and the Installed
-  // page (R172) read on it.
+  // for a fact the poll already carries. The Library and the Installed
+  // page read on it.
   onRev("toolchains", () => {
     if (shown("library")) loadLibrary();
     if (shown("entry")) loadEntry();
@@ -702,12 +702,12 @@ function bootAway(){
   // views refetch; node data deliberately never rides the status poll
   // (docs/nodes.md §13).
   // The nginx record moved: a route or certificate saved here, from a
-  // container's row on the Docker tab (R209), by bb or by another browser
-  // (B714). An open nginx tab re-reads around its draft; an open Docker tab
+  // container's row on the Docker tab, by bb or by another browser.
+  // An open nginx tab re-reads around its draft; an open Docker tab
   // re-reads too, since its rows say which ports are routed.
-  // The VMs page (R91): a record written, a job ended, or a node's hello
+  // The VMs page: a record written, a job ended, or a node's hello
   // carrying what its VMs are doing now.
-  // ...and read for a console tab too, which goes when its VM does (B172).
+  // ...and read for a console tab too, which goes when its VM does.
   onRev("vms", () => { if (shown("vms") || tabs.some(vmConsoleTab)) loadVms(); });
   onRev("nginx", () => {
     if (shown("nginx")) loadNginx();
@@ -723,10 +723,10 @@ function bootAway(){
     // A node's census carries its images: refetched only when they moved.
     if (shown("emulator")) emuOnNodes();
     // ...and Storage, whose walk lands with a node's census: the numbers a
-    // Measure now asked for arrive with no Refresh (the operator, 17 Oct).
+    // Measure now asked for arrive with no Refresh.
     if (shown("storage")) loadStorage();
     // ...and the Library and the Installed page, whose agents' versions ride
-    // a node's census (R95); a page that said no node yet looks again.
+    // a node's census; a page that said no node yet looks again.
     if (shown("library")) loadLibrary();
     if (shown("entry")) loadEntry();
     if (shown("installed") || shown("thing")) loadInstalled();
@@ -738,28 +738,28 @@ function bootAway(){
     // of at the next fifteen-second poll.
     refresh();
   });
-  // A heartbeat's numbers alone (R218 step 10): the Nodes page draws them,
+  // A heartbeat's numbers alone: the Nodes page draws them,
   // its meters and its hour's charts, and no other page does, so no other page
   // re-reads anything for them.
   onRev("nodes.sample", () => { if (shown("nodes")) loadNodes(); });
-  // A message between accounts (R218 step 10): the chat open on a conversation
+  // A message between accounts: the chat open on a conversation
   // reads it, and nothing is read while it is shut.
   onRev("chat", () => { if (chatWith && tabOf(panes[1])?.kind === "chat") loadChat(); });
   // The queue moved: a job taken, a step, a result, a cancel. Same rule: an
   // open Jobs tab refetches, and nothing about jobs rides the status poll.
   onRev("jobs", () => {
     if (shown("jobs")) loadJobs();
-    // ...and the Schedules page, whose last runs are jobs (R117).
+    // ...and the Schedules page, whose last runs are jobs.
     if (shown("schedules")) loadSchedules();
-    // Home's queue and node counts, its containers kept (R218 step 5).
+    // Home's queue and node counts, its containers kept.
     if (shown("home")) loadHome(true);
-    // ...and the jobs a toast is following (R218 step 6).
+    // ...and the jobs a toast is following.
     if (jobToasts.size) jobToastsCheck();
     if (shown("emulator")) loadEmulator();
     // ...and a page whose rows are a node's installs while one runs (the
     // Library, an entry's page, Installed, the node's store): each kept a
     // three-second timer of its own, which went on reading after the page
-    // was left and stacked on the entry's page (B1161; R283 step 4).
+    // was left and stacked on the entry's page.
     const busy = rows => (rows || []).some(r => r.running || r.queued);
     if ((shown("library") || shown("entry")) && busy(typeof libKnown === "function" ? libKnown() : [])) loadLibrary();
     if (shown("entry") && busy(entryLib?.rows)) loadEntry();
@@ -785,7 +785,7 @@ function bootDocs(){
   // Crossing the phone width re-judges every group's folds (oneOpen): a desk
   // this page is widened to shows them open again, and a phone it is
   // narrowed to keeps one; nothing else redraws a surface whose data has not
-  // moved (B723's fix made the phone's one-open stick on the way back up).
+  // moved (left alone, the phone's one-open stuck on the way back up).
   matchMedia("(max-width:900px)").addEventListener("change", () =>
     document.querySelectorAll(".doctab, .nbview, [data-sects]").forEach(g => oneOpen(g)));
   // Recorded for every keyed fold from one place. `toggle` does not bubble, but
@@ -812,8 +812,8 @@ function bootDocs(){
   // Every fold slides over its height (the motion rule): a press on a
   // summary that nothing of its own answered (a section's, a row's, a
   // memory's do) slides its <details> here rather than letting it snap,
-  // so a fold drawn anywhere, now or later, moves as every other does (the
-  // operator, 24 Nov: the bell's details, a finding's rule, a diff's file,
+  // so a fold drawn anywhere, now or later, moves as every other does
+  // (the bell's details, a finding's rule, a diff's file,
   // a pending change whole and the rest opened with a cut). A press on a
   // control inside the summary is that control's.
   document.addEventListener("click", e => {
@@ -861,8 +861,8 @@ function bootLast(){
   // statusLater): fifteen seconds after the last read, none while hidden. The
   // timer calls through the binding, not the function: the harness holds the
   // poll by replacing `refresh` (lib.mjs holdPoll), and a timer that captured
-  // the original kept polling under a planted row (B265).
-    // Two presses that were inline handlers (R158 step 4: no inline script).
+  // the original kept polling under a planted row.
+    // Two presses that were inline handlers (no inline script).
 
   $("bReport").onclick = () => openReport("");
   $("devEnvCancel").onclick = () => { $("devEnvModal").hidden = true; };

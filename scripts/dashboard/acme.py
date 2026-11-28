@@ -1,8 +1,8 @@
-"""An ACME client (RFC 8555) for Let's Encrypt and any ACME directory (R150):
+"""An ACME client (RFC 8555) for Let's Encrypt and any ACME directory:
 an account key and its JWS, an order for one or more names, the HTTP-01 or
 DNS-01 challenge presented by a caller's hook, the finalize with a fresh key
 and CSR, and the chain fetched. Built on the cryptography library the image
-carries (R158 step 3) and the standard library's HTTP; nothing here touches
+carries and the standard library's HTTP; nothing here touches
 nginx or DNS: nginxproxy.py presents an HTTP-01 token on a node's nginx and
 tunnel.py writes a DNS-01 record through Cloudflare's API, each handed in
 as `present` and `cleanup`.

@@ -1,5 +1,5 @@
-"""A dev build's notes are what Unreleased gained since the tag before (the
-operator, 1 Nov), where each release repeated the whole section."""
+"""A dev build's notes are what Unreleased gained since the tag before,
+where each release repeated the whole section."""
 import importlib.util
 import os
 import subprocess

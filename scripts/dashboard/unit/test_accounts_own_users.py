@@ -1,6 +1,6 @@
 """Every account a Unix user of its own on every node, and the coding
-agents' sign-ins sealed there (R125 step 11 and R126 step 6, the operator,
-26 Oct): there is no switch for either, a key an older build left reads as
+agents' sign-ins sealed there:
+there is no switch for either, a key an older build left reads as
 on, and a hosting-only node, which runs no sessions, is neither."""
 import sys
 import tempfile

@@ -1,5 +1,5 @@
 "use strict";
-// A Library entry's own page (R183, the operator, 29 Oct: view details opens
+// A Library entry's own page (view details opens
 // into a page with a back button): Details on a Library card opens that
 // catalog entry's page on the node picked, a page a press opens, with the
 // small top header's Back to where it was opened from. Its head is the
@@ -9,7 +9,7 @@
 // installed thing's page's.
 
 let entryKey = "";   // KIND:NAME on show, on libNode
-// Its own read (R256): the Library's rows are a page of a narrowed list
+// Its own read: the Library's rows are a page of a narrowed list
 // now, which may not hold this entry, so the page asks for its one row.
 let entryLib = null;
 
@@ -69,7 +69,7 @@ function renderEntryInto(i){
   // The card's head: its icon beside its name and pills, where it stands at
   // the action bar's left as on the card's foot, then its one verb.
   // Where it stands, left out when it has no words: an empty one beside the
-  // one verb kept that verb off the head's line, alone under its facts (B976).
+  // one verb kept that verb off the head's line, alone under its facts.
   const st = libState(r), said = st.replace(/<[^>]*>/g, "").trim() ? st : "";
   const head = pageHead({title: r.label, pills: libPills(r), line: [el.name ? {text: `on ${el.name}`} : null],
     actions: `${said}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);

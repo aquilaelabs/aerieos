@@ -1,4 +1,4 @@
-"""One reverse proxy per node, AerieOS's own (R171, the operator, 10 Oct).
+"""One reverse proxy per node, AerieOS's own.
 
 The nginx page lists every node's nginx instance: one nginx container per
 node, written here like a container from the Containers page (containers.py), its
@@ -43,7 +43,7 @@ _lock = threading.Lock()
 
 # The image is the one this service's entry names, by its tag and its
 # digest (services.images): a node's nginx is pinned to it when it is
-# deployed or updated (R192), so what runs is what the record says, and a
+# deployed or updated, so what runs is what the record says, and a
 # newer one arrives as a change to the entry.
 PACK = "nginx"
 # How long after a start the first look at the certificates waits.
@@ -59,7 +59,7 @@ taken_ports = None
 
 
 def pack():
-    """nginx as an official pack (R264): a service a node deploys from its
+    """nginx as an official pack: a service a node deploys from its
     Library card, as the model router is. Its settings are its own page
     (the routes, the certificates), opened from its row on Installed, so
     the entry asks nothing; what turns them into nginx's own configuration
@@ -80,7 +80,7 @@ def _file():
     return STATE / "nginx.json"
 
 
-# Read once while the same file (R228 step 1).
+# Read once while the same file.
 _store = statefile.Store(_file, write=lambda: write_json, cached=True)
 
 
@@ -88,7 +88,7 @@ def _load():
     return _store.load()
 
 
-# The token the nginx tab watches (/api/revs `nginx`, B714): moved by every
+# The token the nginx tab watches (/api/revs `nginx`): moved by every
 # write of the record and of the hostnames, so a route added from a Docker
 # row, from bb or from another browser reaches an open tab within a poll
 # rather than at its next Refresh. A counter, not an mtime: the tab stages
@@ -107,7 +107,7 @@ def _save(d):
 
 def _cert_dir(nid, host=""):
     """Where a node's certificate lives: the default at the node's own
-    directory, a hostname's own under certs/<host> (R175)."""
+    directory, a hostname's own under certs/<host>."""
     d = STATE / "nginx" / syscontainer.node_slug(nid)
     return d / "certs" / re.sub(r"[^a-z0-9.-]", "_", host.lower()) if host else d
 
@@ -119,10 +119,10 @@ def _cert_slug(host):
 
 def cert_for(rec, host, pick=""):
     """The key of the pair a server's hostname uses, or "": the route's own
-    pick where it names a pair the node holds (R188), else the hostname's
+    pick where it names a pair the node holds, else the hostname's
     own pair, else the nearest parent domain's (one wildcard pair under
     example.com covers a.example.com and b.example.com, another domain's
-    pair its own). No default (the operator, 11 Oct): a hostname nothing
+    pair its own). No default: a hostname nothing
     covers answers on 80 alone."""
     certs = rec.get("certs") or {}
     if pick and (certs.get(pick) or {}).get("set"):
@@ -170,7 +170,7 @@ def clean_routes(routes):
             return {"error": f"a route's path starts with / and names a place on the site: not {path}"}
         if not port.isdigit() or not 1 <= int(port) <= 65535:
             return {"error": f"a route goes to a port on the node (1 to 65535): not {port or 'nothing'}"}
-        # The pair it serves 443 with (R188): a key the node holds, or ""
+        # The pair it serves 443 with: a key the node holds, or ""
         # for the one its hostname resolves to (cert_for); checked for
         # shape here and against the node's list when the config is written.
         pick = str(r.get("cert") or "").strip().lower()
@@ -187,7 +187,7 @@ def nginx_conf(routes, rec=None):
     closing the connection, on 443 by refusing the handshake with no
     certificate at all (ssl_reject_handshake, nginx 1.19.4 and later; the
     image is 1.27), so the box serves nothing it was not told to and
-    needs no default pair (R188). `rec` carries the node's pairs."""
+    needs no default pair. `rec` carries the node's pairs."""
     rec = rec if rec is not None else {}
     by_host = {}
     for r in routes:
@@ -212,7 +212,7 @@ def nginx_conf(routes, rec=None):
     # servers on one port is nginx's "duplicate default server", seen on
     # bb-dev-sandbox, 10 Oct).
     any_host = "*" in by_host
-    # An ACME HTTP-01 challenge being answered (R150): the token's line on
+    # An ACME HTTP-01 challenge being answered: the token's line on
     # every port-80 server, the default one included, since the name may
     # route nowhere yet.
     tokens = rec.get("acme_tokens") or {}
@@ -266,7 +266,7 @@ def compose_text(nid, rec):
     and certificate inline as compose configs, so nothing but this file
     goes to the node."""
     routes = rec.get("routes") or []
-    # The pairs a route uses, each once (R175, R188).
+    # The pairs a route uses, each once.
     own = sorted(h for h, c in (rec.get("certs") or {}).items()
                  if (c or {}).get("set") and any(cert_for(rec, r["host"], r.get("cert", "")) == h for r in routes))
     conf = nginx_conf(routes, rec)
@@ -275,7 +275,7 @@ def compose_text(nid, rec):
            "  nginx:",
            f"    image: {image_ref(rec)}",
            # Named for the node, as the Docker tab names it, so docker logs
-           # finds it under that name (B653: compose's nginx-NODE-nginx-1 did not).
+           # finds it under that name (compose's nginx-NODE-nginx-1 did not).
            f"    container_name: {container_name(nid)}",
            "    restart: unless-stopped",
            "    network_mode: host",
@@ -340,12 +340,12 @@ def check_cert(cert, key):
 
 
 def set_cert(nid, cert, key, host=""):
-    """A pair the node holds (R188): checked, kept 0600, summarized in the
+    """A pair the node holds: checked, kept 0600, summarized in the
     record under the key it is known by: `host` when the person named one,
     else the domain its names say (domain_of), so a wildcard pair for
     *.example.com is example.com's. The same key again is a renewal and
     replaces that pair; another domain's pair stands beside it. There is
-    no default (the operator, 11 Oct)."""
+    no default."""
     host = str(host or "").strip().lower()
     if host and not HOST_RE.match(host):
         return {"error": f"a certificate is known by a name like example.com: not {host}"}
@@ -373,7 +373,7 @@ def set_cert(nid, cert, key, host=""):
 
 def wide_names(rec):
     """For each pair the node holds, the names it serves beyond the node's
-    own routes (R93): a wildcard always, and any name no route on the node
+    own routes: a wildcard always, and any name no route on the node
     is for. On a hosting-only node the key sits on a public box in the
     compose file, and a box that was taken over could pass as every one
     of them; the page says so under the pair."""
@@ -422,7 +422,7 @@ def record(nid):
     return dict(_load().get(str(nid)) or {})
 
 
-# ---- the image: the entry's, a pin per node, Update (R192) ----
+# ---- the image: the entry's, a pin per node, Update ----
 
 def latest_image():
     """The image this service's entry names: {name, tag, digest}, the
@@ -486,7 +486,7 @@ def pin_latest(nid):
 
 
 def attention(deployed):
-    """The bell's rows (R192): each node whose deployed nginx is behind the
+    """The bell's rows: each node whose deployed nginx is behind the
     image its entry names, kind nginx, keyed by bellseen on the digest it
     would move to, so a dismissal holds until the entry moves again.
     `deployed` says whether a node's nginx is on the Containers page."""
@@ -517,7 +517,7 @@ def deployed(devapp, nid):
 
 
 # The daemon half of a row (the deployed container's state and the ports
-# something else holds), kept per node for DAEMON_TTL seconds (B717). Both
+# something else holds), kept per node for DAEMON_TTL seconds. Both
 # are reads of the node's docker, one probe job on an agent node each, up to
 # 25 s on a quiet one: the tab's every poll paid them for every node, which
 # held the view 40 s through production while the operator looked at the
@@ -563,21 +563,21 @@ def view(devapp, instance_state):
         row = {"node": nid, "name": n.get("name") or nid, "host_only": bool((n.get("config") or {}).get("host_only")),
                "container": name, "deployed": is_up,
                "routes": rec.get("routes") or [],
-               # The pairs it holds (R188), and for each route the key its
+               # The pairs it holds, and for each route the key its
                # hostname resolves to with no pick of its own, for the row.
                "certs": rec.get("certs") or {},
                "resolved": {r["host"]: cert_for(rec, r["host"]) for r in (rec.get("routes") or [])},
                "wide": wide_names(rec) if (n.get("config") or {}).get("host_only") else {},
                "live": n.get("live"), "clash": [],
-               # What it is pinned to and the line it would move to (R192).
+               # What it is pinned to and the line it would move to.
                "image": image_of(rec) | {"ref": image_ref(rec)}, "behind": behind(rec),
-               # Certificates from Let's Encrypt (R150): what is being asked
+               # Certificates from Let's Encrypt: what is being asked
                # for, the email the account was made with, and whether a
                # DNS-01 challenge has a Cloudflare token to write with.
                "acme": {"pending": rec.get("acme_pending") or {}, "email": (rec.get("acme") or {}).get("email", ""),
                         "cf": bool(cf_token and cf_token()), "directory": ACME_DIRECTORY}}
         out.append((row, is_up))
-    # Each node's daemon half at once (the operator, 18 Oct: the tab took
+    # Each node's daemon half at once (the tab took
     # five seconds, the nodes' reads one after another): the view waits for
     # the slowest node rather than for all of them added up.
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(8, len(out)))) as ex:
@@ -590,7 +590,7 @@ def view(devapp, instance_state):
     return {"nodes": [row for row, _ in out], "image": f"{lt['name']}:{lt['tag']}", "latest": lt, "hostnames": hostnames()}
 
 
-# ---- certificates from an ACME directory (R150) -----------------------------
+# ---- certificates from an ACME directory -----------------------------
 # Let's Encrypt (another ACME directory for a test of the tree's own,
 # seams.py): a pair asked for on the nginx page by hostname, by an HTTP-01
 # challenge the node's nginx answers on port 80 (the token's line written
@@ -890,7 +890,7 @@ def acme_rows():
     return out
 
 
-# ---- the public hostnames (the operator, 12 Oct) ----------------------------
+# ---- the public hostnames ----------------------------
 #
 # One list for every node's nginx, so a name made once is picked from a
 # pull-down on any route, by any project's container, rather than typed again
@@ -953,7 +953,7 @@ def save_routes(nid, routes):
     got = clean_routes(routes)
     if isinstance(got, dict):
         return got
-    # A hostname typed into a route row (the operator, 13 Oct: the pulldown
+    # A hostname typed into a route row (the pulldown
     # offered no subdomain) joins the shared list, so every node's rows
     # offer it from now on.
     for r in got:
@@ -967,14 +967,14 @@ def save_routes(nid, routes):
 
 
 def add_route(nid, port, cert, containers, devactions, devapp, host=""):
-    """A route written from a container's row on the Containers page (R209): to
-    `port` on the node, at `host` (a subdomain, the operator, 13 Oct) or
+    """A route written from a container's row on the Containers page: to
+    `port` on the node, at `host` (a subdomain) or
     else at the hostname the certificate is filed under (its domain), with
     that pair, or at any hostname on 80 alone with no certificate; applied
     at once. A hostname the chosen pair does not cover is refused by name
     (cert_for's rule: a pair covers its domain and the names under it). The
     same hostname and port again is refused by name; a port already routed
-    at one hostname takes another (the operator, 14 Oct: a site at its
+    at one hostname takes another (a site at its
     domain and at www), and the rest is the nginx page's."""
     try:
         port = int(str(port).strip())
@@ -1017,12 +1017,12 @@ def deploy(nid, containers, devactions, devapp):
     the node has enrolled."""
     return syscontainer.deploy(nid, container_name(nid), lambda: compose_text(nid, record(nid)),
                                containers, devactions, devapp, node_list,
-                               # A new one is the image its entry names, pinned (R192).
+                               # A new one is the image its entry names, pinned.
                                first=lambda: pin_latest(nid))
 
 
 def claim(devapp, name):
-    """One deployed before System existed (R180) is System's from its next
+    """One deployed before System existed is System's from its next
     Save: it was no project's, which is what the deployment used to write."""
     with devapp._lock:
         d = devapp._load()
@@ -1046,7 +1046,7 @@ def apply(nid, containers, devactions, devapp):
 
 
 def update(nid, containers, devactions, devapp):
-    """Update on the nginx page's node or its Docker row (R192): the digest
+    """Update on the nginx page's node or its Docker row: the digest
     its entry names pinned on the record and the container rebuilt with it,
     so the pull is the whole of what changes."""
     name = container_name(nid)

@@ -22,7 +22,7 @@ function fxFilter(rows, st){
               .toLowerCase().includes(q)));
 }
 
-// `dead`: the page's placeholder (R218, the operator 18 Oct), the same
+// `dead`: the page's placeholder, the same
 // controls there and dead until the findings land.
 function fxBarHtml(rows, st, extra, dead = false){
   const per = {};
@@ -56,7 +56,7 @@ function fxWireBar(root, st, redraw){
   // list under the reader's cursor for nothing the last keystroke does not
   // already deliver.
   // ...and never mid-word in an input method: the list narrows when the
-  // word is finished (R244 step 4).
+  // word is finished.
   let t = null;
   const narrow = () => { clearTimeout(t); t = setTimeout(() => {
     st.find = inp.value; redraw();
@@ -80,7 +80,7 @@ function openFindingsTab(){
   // Ghosted, not silent: the button says why on hover and this is the same
   // sentence, for the paths a disabled button does not cover: a saved layout,
   // a keyboard, a restored tab.
-  // A page now (R218), which says on itself why it has nothing, rather than a
+  // A page now, which says on itself why it has nothing, rather than a
   // red toast that stood over the pages after it.
   openTab({kind: "findings", arg: "__findings", label: "Analysis"});
   if (!findingsOff()) loadFindings();
@@ -135,12 +135,12 @@ function findingsRulesHtml(rows, limit = Infinity){
   const order = Object.keys(rules).sort((a, b) =>
     (LEVEL_ORDER[rules[a][0].level] ?? 9) - (LEVEL_ORDER[rules[b][0].level] ?? 9)
     || rules[b].length - rules[a].length);
-  // A rule is a row that opens (R234, rows-you-open): closed, the level,
+  // A rule is a row that opens (rows-you-open): closed, the level,
   // the rule, how many places and the first of them; open, every place, the
   // description, the message whole and the CVEs. The whole message on every
   // closed row made a report a wall.
   // `limit`: the first so many rules alone, a list built a page at a time
-  // (pageLimit, R228 step 13).
+  // (pageLimit).
   let html = "";
   for (const rid of order.slice(0, limit)){
     const hits = rules[rid];
@@ -198,7 +198,7 @@ function renderFindingsInto(i){
     loadFindings();
   }
   if (!findings || findings.loading){
-    // Its template (R218 step 16): the bar's three narrowing controls stand
+    // Its template: the bar's three narrowing controls stand
     // where they will, their boxes shimmering; the findings are on their way.
     d.setBar(fxBarHtml([], fxState, `<select aria-label="space" disabled><option>all spaces</option></select>`, true));
     // As it lands across projects: a project's name over its card.

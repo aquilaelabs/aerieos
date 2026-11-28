@@ -1,4 +1,4 @@
-"""A person's Windows PC lent to a project (R270 steps 6 and 7): the Windows
+"""A person's Windows PC lent to a project: the Windows
 companion lends a fixed table of verbs per project, and the project's
 sessions ask for them with `aerie pc VERB`, under the project's Agents may: Use
 a lent PC (deny by default; ask puts each use in front of the person at the

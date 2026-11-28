@@ -1,4 +1,4 @@
-"""What each of a release's files is for (R255): a repository's Releases
+"""What each of a release's files is for: a repository's Releases
 settings (the gate and the described files), the table built from the files a
 release holds, put over its notes once, and a repository's own
 docs/release-notes/downloads.md standing in for it."""

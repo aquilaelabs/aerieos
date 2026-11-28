@@ -22,7 +22,7 @@ one rule:
 
 There used to be two more, about an environment block from another
 compatibility window and one merely behind inside it. Both went with the
-block (R63 step 3): what a session is told is assembled per session now, from
+block: what a session is told is assembled per session now, from
 the controller, so there is no copy of it anywhere to be stale or from another
 window.
 
@@ -61,7 +61,7 @@ def api():
     if _bbapi is False:
         try:
             # A hook runs under a timeout of its own: a call here never waits
-            # out a restarting controller (bbapi.request, R251), it says so
+            # out a restarting controller (bbapi.request), it says so
             # at once.
             os.environ["BB_CONTROLLER_WAIT"] = "0"
             import bbapi as found                                   # noqa: PLC0415
@@ -108,7 +108,7 @@ def controller_answers(project):
 
     And a slow answer counts too: the connection is made first, on its own,
     and a request that then runs out of time is a controller that is busy,
-    not one that is restarting (B719: four calls in a row refused while it
+    not one that is restarting (four calls in a row refused while it
     was up the whole time, the operator watching). Only a connection nobody
     accepts is down."""
     if api() is None:
@@ -145,8 +145,8 @@ ASK_EVERY = 4
 def turn(project, wait, conv=""):
     """0 when this session's prompt may start, 2 with the sentence on stderr
     when it waited `wait` seconds and still may not. `conv` is the
-    conversation the prompt is in, which the controller keeps per session
-    (R143)."""
+    conversation the prompt is in, which the controller keeps per session.
+    """
     if api() is None:
         return 0
     deadline = time.time() + max(0, wait)
@@ -163,7 +163,7 @@ def turn(project, wait, conv=""):
         time.sleep(ASK_EVERY)
     api().request("/api/v1/hook", {"kind": "turn-done", "agent": AGENT, "slot": SLOT}, auth=auth, timeout=10)
     if last.get("why"):
-        # Something on the node holds every turn (a store moving, R120):
+        # Something on the node holds every turn (a store moving):
         # said in its own words rather than as a limit.
         sys.stderr.write(f"{last['why']} It waited {int(wait)} seconds; send it again in a while.\n")
         return 2
@@ -177,10 +177,10 @@ def turn(project, wait, conv=""):
     return 2
 
 
-# Which coding agent's session this hook is for (R95 step 7): the launcher's
+# Which coding agent's session this hook is for: the launcher's
 # BB_AGENT, Claude's when there is none, as a session from before it had.
 AGENT = os.environ.get("BB_AGENT") or "claude"
-# ...and which of its slots on the project (R143), the first when unset.
+# ...and which of its slots on the project, the first when unset.
 SLOT = os.environ.get("BB_SLOT") or "1"
 
 
@@ -208,7 +208,7 @@ def main():
                           auth="Bearer " + token(args[1]), timeout=10)
         return 0
     if args[:1] == ["--asking"]:
-        # Claude Code is waiting on its own permission prompt (B52): said to
+        # Claude Code is waiting on its own permission prompt: said to
         # the controller, so the dock and the bell show the session needs
         # somebody, which its pane title cannot. Claude Code's own words ride
         # along, read from the hook's JSON on stdin.
@@ -222,7 +222,7 @@ def main():
         return 0
     if args[:1] == ["--prompt"]:
         # Nothing to say on a prompt any more: the block that could be behind
-        # went with R63 step 3, and what a session is told is assembled per
+        # went, and what a session is told is assembled per
         # session. Kept as a no-op verb because the hook that calls it is
         # written into settings files that outlive this change.
         return 0
@@ -231,7 +231,7 @@ def main():
         return 0
     sf = stamp_file(project)
     now = time.time()
-    # Held by the node itself before anything else (R120 step 7): a store
+    # Held by the node itself before anything else: a store
     # moving there, said in the file its agent keeps beside this bundle.
     # Read every call, no network: it holds at once and lifts at once.
     hold = node_hold(now)
@@ -263,7 +263,7 @@ def main():
                "If it stays down, write where you are and what is next to your memory or "
                "your notes (that is allowed), then end the turn: the operator checks the "
                "container, and you pick up from your note.")
-    # ...and, once a minute, said as this session's (B1009): the question
+    # ...and, once a minute, said as this session's: the question
     # above names nobody, and the controller knows a session whose hooks
     # have stopped running by hearing nothing from it while it works.
     alive = float(last.get("alive") or 0)
@@ -289,7 +289,7 @@ def main():
     return 0
 
 
-# Where this node's agent says it holds the node (R120 step 7): beside the
+# Where this node's agent says it holds the node: beside the
 # bundle this gate runs from, <store>/.bb/hold.json, which every session on
 # the node reads. A gate run from anywhere else finds none.
 HOLD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "hold.json")
@@ -312,8 +312,8 @@ def node_hold(now):
 
 
 def held_mark(sf, session, held, now):
-    """Beside the stamp, the mark that this session was held by an outage
-    (R251): its node's agent reports it, so once the controller answers again
+    """Beside the stamp, the mark that this session was held by an outage:
+    its node's agent reports it, so once the controller answers again
     the bell lists the sessions an update stopped, with a Resume each. Kept
     from the first refusal; gone with the first call let through after."""
     hf = os.path.join(os.path.dirname(sf), "held")
@@ -328,13 +328,13 @@ def held_mark(sf, session, held, now):
         pass
 
 
-# What a held session may still do (R251): keep its own notes. Its memory and
+# What a held session may still do: keep its own notes. Its memory and
 # its scratchpad are files on the machine it runs on, nothing the controller
 # serves, and refusing them left a session told to wait with nowhere to say
 # where it was.
 NOTE_TOOLS = {"Write", "Edit", "MultiEdit", "Read", "NotebookEdit"}
 # ...each agent's own list of what it is doing (Claude's TodoWrite, Codex's
-# update_plan), and each agent's own folder in the home (R95 step 18): an
+# update_plan), and each agent's own folder in the home: an
 # edit from Codex, Copilot or Grok reaches here as Edit, through bb-agent-hook.
 PLAN_TOOLS = {"TodoWrite", "update_plan"}
 NOTE_DIRS = (".claude", ".codex", ".copilot", ".grok")

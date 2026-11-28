@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the appliance image (R160 step 1): the Debian tree by mkosi, pinned
+# Builds the appliance image: the Debian tree by mkosi, pinned
 # to image/SNAPSHOT, sealed as a read-only squashfs and laid into a disk with
 # two root slots, GRUB for UEFI and BIOS, and a data partition. Root, since
 # mkosi installs packages and the disk is assembled on a loop device.
@@ -12,7 +12,7 @@
 #   aerieos-os-VERSION.qcow2          the same disk for Proxmox, libvirt and other QEMU hosts, which the boot test runs
 #   aerieos-os-VERSION.raw.xz         with --all-disks: the whole disk, for an installed machine or a VM
 #   aerieos-os-VERSION.ova            with --all-disks: the same disk for VMware and VirtualBox (a stream-optimized VMDK with its descriptor)
-#   aerieos-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot (R160 step 4)
+#   aerieos-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot
 #   aerieos-os-VERSION.vmlinuz        the slot's kernel and initrd, kept on the ESP beside it
 #   aerieos-os-VERSION.initrd
 #   aerieos-os-VERSION.release        the stamp the image carries at /usr/lib/aerieos-os/release
@@ -23,7 +23,7 @@
 # --tree-only stops after mkosi (the tree under DIR/mkosi/tree, for a look);
 # --from-tree DIR assembles the disk from a tree built before; --all-disks
 # makes the raw.xz and the OVA too, which no release carries and a tag's
-# build no longer spends its time on (R228 step 21). MKOSI_PACKAGE_CACHE
+# build no longer spends its time on. MKOSI_PACKAGE_CACHE
 # names a folder for mkosi's package cache, which the image workflow keeps
 # between runs. The disk is image/lay-disk's, its numbers
 # image/partitions.sh's, and docs/image.md says why each is so.
@@ -111,7 +111,7 @@ if [ -z "$TREE" ]; then
     TREE="$OUT/mkosi/tree"
 fi
 [ -d "$TREE/usr/lib/aerieos-os" ] || die "no AerieOS tree at $TREE"
-# What the installer on the ISO lays a disk out with (R160 step 2): the
+# What the installer on the ISO lays a disk out with: the
 # same layout script, numbers and menu this build uses, in the image.
 install -m 0755 "$HERE/lay-disk" "$TREE/usr/lib/aerieos-os/lay-disk"
 install -m 0644 "$HERE/partitions.sh" "$TREE/usr/lib/aerieos-os/partitions.sh"
@@ -140,7 +140,7 @@ DEBIAN_SNAPSHOT=${SNAPSHOT}
 BUILT=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
 REL
 cp "$TREE/usr/lib/aerieos-os/release" "$OUT/$NAME.release"
-# Every package in the image with its version (R160 step 6): what the weekly
+# Every package in the image with its version: what the weekly
 # rebuild compares against the last release's to say what moved.
 # From mkosi's manifest, recorded before CleanPackageMetadata removes the
 # package database the tree would otherwise carry; a tree that still has
@@ -178,7 +178,7 @@ SQ_MIB=$(( ($(stat -c %s "$OUT/$NAME.root.squashfs") + 1048575) / 1048576 ))
 
 # ---- the disk ---------------------------------------------------------------
 # Laid out by image/lay-disk on a loop device, the same script the installer
-# on the ISO runs on a person's disk (R160 step 2), so the two cannot differ.
+# on the ISO runs on a person's disk, so the two cannot differ.
 for t in sfdisk losetup mkfs.vfat mkfs.ext4 grub-install xz partprobe; do need "$t" "the image workflow installs it (grub-efi-amd64-bin, grub-pc-bin, dosfstools, e2fsprogs, fdisk, xz-utils)"; done
 say "the disk: ${NAME}.raw"
 RAW="$OUT/$NAME.raw"
@@ -190,7 +190,7 @@ trap 'losetup -d "$LOOP" 2>/dev/null || true' EXIT
 bash "$HERE/lay-disk" "$LOOP" "$OUT/$NAME.root.squashfs" "$OUT/$NAME.vmlinuz" "$OUT/$NAME.initrd" "$OUT/$NAME.release" "$HERE/grub.cfg" --var "$TREE/var"
 losetup -d "$LOOP"; trap - EXIT
 
-# ---- the ISO (R160 step 2) --------------------------------------------------
+# ---- the ISO --------------------------------------------------
 # The same root, kernel and initrd on a medium a machine boots from (live-boot
 # finds live/filesystem.squashfs), its menu offering the installer, which lays
 # a disk out with the copy of lay-disk the image carries. grub-mkrescue
@@ -217,7 +217,7 @@ if ! grub-mkrescue -o "$OUT/$NAME.iso" "$ISO" -- -volid BUILDERBOT_OS > "$OUT/gr
 fi
 rm -rf "$ISO"
 
-# ---- the same disk for a hypervisor (R160 step 3) ---------------------------
+# ---- the same disk for a hypervisor ---------------------------
 # qcow2 for Proxmox, libvirt and other QEMU hosts; with --all-disks an OVA (a
 # stream-optimized VMDK with its descriptor and manifest) for VMware and
 # VirtualBox. Converted from the raw disk, never laid out again, so they
@@ -237,7 +237,7 @@ sed -e "s|@NAME@|$NAME|g" -e "s|@VMDK@|$NAME-disk1.vmdk|g" \
   && tar -cf "$OUT/$NAME.ova" --owner=0 --group=0 --mtime="@$SOURCE_DATE_EPOCH" "$NAME.ovf" "$NAME.mf" "$NAME-disk1.vmdk" )
 rm -rf "$OVA"
 }
-# The USB edition (R161 steps 1 and 5): the same disk with aerie_toram=1 in
+# The USB edition: the same disk with aerie_toram=1 in
 # GRUB's environment, so a stick written from it runs from memory; the
 # stick maker (tools/aerieos-stick.py) writes this one.
 say "the stick: ${NAME}.stick.raw"

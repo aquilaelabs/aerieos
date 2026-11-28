@@ -31,7 +31,7 @@ _nb = dash.load("notebook", _here)
 _nb.configure(roadmap_mod=_roadmap, bugs_mod=bugs)
 
 proj, argv = sys.argv[2], sys.argv[3:]
-# `--format json|yaml|markdown` or `--json` on a list or a show (R167).
+# `--format json|yaml|markdown` or `--json` on a list or a show.
 fmt, argv = dash.format_flag(argv)
 op = argv[0] if argv else "list"
 rest = argv[1:]
@@ -96,7 +96,7 @@ def show(b):
             body = b[k].replace("\n", "\n" + " " * 12)
             print(f"  {k:>8}: {body}")
         if k == "repro":
-            # Beside how, whether it does (R124).
+            # Beside how, whether it does.
             print(f"  {'happens':>8}: {bugs.REPRODUCES_WORDS.get(b.get('reproduces') or 'untried', '?')}")
     when = time.strftime("%d %b %H:%M", time.localtime(b.get("at", 0)))
     print(f"  {'by':>8}: {b.get('by', '?')} · {when}"
@@ -116,7 +116,7 @@ def rows():
 
 
 def builderbot_tree(root):
-    """Whether a project's tree is AerieOS's own source (B743): there, a
+    """Whether a project's tree is AerieOS's own source: there, a
     bug that names AerieOS or aerie is this tracker's, since its readers are
     AerieOS's maintainers, and sending it to aerie report sent it to them by
     the long way round."""
@@ -227,7 +227,7 @@ elif op == "show":
         dump_records([b]); sys.exit(0)
     show(b)
 elif op == "add" and "--from" in rest:
-    # Reports from a file (R167): `aerie bug add --from FILE` files each
+    # Reports from a file: `aerie bug add --from FILE` files each
     # record as one, with its severity, area, repro and the rest; a
     # record's id and status are ignored, since a new report takes the
     # next number and opens.
@@ -250,7 +250,7 @@ elif op == "add" and "--from" in rest:
 elif op == "add":
     here = "--here" in rest
     title, flags = pull_flags([a for a in rest if a != "--here"])
-    # A diagnostics report taken into this tracker (R124 step 4): its words,
+    # A diagnostics report taken into this tracker: its words,
     # area, repro and whether it reproduces come across unless given here,
     # and the note says where it came from. bb read it through aerie diag, the
     # diagnostics' own gate, into BB_BUG_REPORTS.
@@ -285,16 +285,16 @@ elif op == "add":
     # A bug that names AerieOS, filed in another project's tracker, is
     # usually AerieOS's, which is what aerie report is for. Asked before it is
     # filed rather than said after: said after, a session filed AerieOS's
-    # bug in its own tracker anyway and the operator had to tell it (24 Sep).
+    # bug in its own tracker anyway and the operator had to tell it.
     # --here is the answer "it is this project's own". Not where the project
     # has reporting AerieOS bugs off, nor on AerieOS's own tree, whose
-    # tracker it is (B743).
+    # tracker it is.
     #
     #
     # What to do comes first in the line, and both ways on are commands to
     # copy: a session that read the first 200 bytes of the old one met
     # neither, filed nothing and reported nothing, and its containers
-    # being out of reach went unsaid (29 Sep).
+    # being out of reach went unsaid.
     import re
     import prefs
     if not here and prefs.get(proj).get("report") != "deny" \
@@ -371,7 +371,7 @@ elif op in ("fix", "wontfix", "na", "reopen"):
               + (" [--commit SHA]..." if op == "fix" else ""), file=sys.stderr); sys.exit(1)
     status = {"fix": "fixed", "wontfix": "wontfix", "na": "na",
               "reopen": "open"}[op]
-    # The commits that fixed it (R255), when it is not the one the space is
+    # The commits that fixed it, when it is not the one the space is
     # on: --commit SHA, repeated or comma-separated for several.
     commits, words = [], []
     i = 0
@@ -393,7 +393,7 @@ elif op in ("fix", "wontfix", "na", "reopen"):
         behind(n, None, None, None)
         r = bugs.set_status(proj, n, status, note=" ".join(words), by="claude", commits=commits or None)
         need(r)
-        # A sentence, not "B7 na" (B58): what the bug is now, in words.
+        # A sentence, not "B7 na": what the bug is now, in words.
         said = {"fixed": "marked fixed", "wontfix": "closed as won't fix",
                 "na": "closed as not applicable", "open": "reopened"}[status]
         fixes = (r.get("bug") or {}).get("commits") or []
@@ -401,7 +401,7 @@ elif op in ("fix", "wontfix", "na", "reopen"):
                                    ("; no commit recorded: the fix was not committed yet, so name it with "
                                     f"aerie bug fixed-in {B(n)} SHA" if status == "fixed" else "")))
 elif op == "fixed-in":
-    # A bug's fix commits (R255): listed, added, or taken off with --drop.
+    # A bug's fix commits: listed, added, or taken off with --drop.
     if not rest:
         print("usage: aerie bug fixed-in <n> [SHA...] [--drop SHA...]", file=sys.stderr); sys.exit(1)
     n = ident(rest[0])

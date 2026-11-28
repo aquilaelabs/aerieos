@@ -1,5 +1,5 @@
-"""AerieOS's own documentation, read in the dashboard (R258, the operator
-16 Oct): the Help page lists the docs, reads one, and searches them all.
+"""AerieOS's own documentation, read in the dashboard:
+the Help page lists the docs, reads one, and searches them all.
 
 The docs are docs/*.md beside scripts/ in this tree, which the image carries
 at /opt/aerieos/docs. Which of them are shown, in which groups and with
@@ -92,7 +92,7 @@ def _whole(w):
 
 
 def _rank(low, words, phrase, title, head):
-    """How well a line answers the search, highest first (B77): the phrase as
+    """How well a line answers the search, highest first: the phrase as
     typed, whole words rather than pieces of longer ones, a doc whose title
     it is, and a heading over the lines under it. A line that only holds the
     words as pieces still counts, after all of those."""

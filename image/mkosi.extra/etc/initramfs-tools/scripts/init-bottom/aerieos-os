@@ -1,5 +1,5 @@
 #!/bin/sh
-# AerieOS (R160 step 1): what persists on an immutable root, mounted
+# AerieOS: what persists on an immutable root, mounted
 # before the system starts so PID 1 sees it from its first read.
 #
 # overlayroot has just put a tmpfs over the read-only root, so anything
@@ -50,14 +50,14 @@ mount -t overlay overlay \
     || panic "AerieOS: /etc's overlay did not mount"
 # /srv on the data partition too: the projects live under it
 # (/srv/aerieos/projects, the controller's WORKSPACE), and on the root's
-# tmpfs they were gone at every boot (B437).
+# tmpfs they were gone at every boot.
 mkdir -p "${rootmnt}/var/lib/aerieos-os/srv" "${rootmnt}/srv"
 [ -z "$(ls -A "${rootmnt}/var/lib/aerieos-os/srv")" ] && [ -n "$(ls -A "${rootmnt}/srv" 2>/dev/null)" ] \
     && cp -a "${rootmnt}/srv/." "${rootmnt}/var/lib/aerieos-os/srv/"
 mount --bind "${rootmnt}/var/lib/aerieos-os/srv" "${rootmnt}/srv" \
     || panic "AerieOS: /srv did not mount from the data partition"
 
-# What the machine's own node is made of lasts too (B669): first boot's
+# What the machine's own node is made of lasts too: first boot's
 # provisioner puts the agent, bb-sandbox and bb-session under /usr/local, and
 # each account's home and the node's workspace are the sign-ins and the
 # conversations. On the root's tmpfs they were gone at the next boot, and the
@@ -77,7 +77,7 @@ for place in home workspace; do
         || panic "AerieOS: /${place} did not mount from the data partition"
 done
 
-# The USB edition (R161 step 10, the operator, 29 Oct: the stick read once
+# The USB edition (the stick read once
 # and written rarely, as Unraid's is). On a stick boot (aerietoram=1: the slot
 # runs from RAM) the stick keeps the configuration and little else: its
 # data partition flushed once a minute rather than every five seconds, the

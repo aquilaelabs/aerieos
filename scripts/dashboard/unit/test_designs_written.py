@@ -1,4 +1,4 @@
-"""Migration 0038 (R205): a design record in an older shape (a language
+"""Migration 0038: a design record in an older shape (a language
 from before themes, choices and rules kept on the language, notes from
 before rules, a page with no rules) is written in today's shape, and reads
 as design.py's reader of the old shapes read it on 27 Nov: FROZEN."""

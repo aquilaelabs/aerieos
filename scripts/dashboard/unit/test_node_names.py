@@ -1,4 +1,4 @@
-"""A node's folders and service under AerieOS's own name (R204): the agent
+"""A node's folders and service under AerieOS's own name: the agent
 answers with whichever is really there and only ever adds a link under a
 running machine, and the Enroll script is what moves a folder, leaving the
 old name a link to it, or leaving the folder where a move would break what

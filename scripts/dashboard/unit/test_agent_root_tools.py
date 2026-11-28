@@ -1,6 +1,6 @@
 """The tools root installs from the bundle are AerieOS's release where the
-node pinned the release key (R227 step 1, held by the bundle's signed list
-since R267 step 28), and a machine's console can switch off every root
+node pinned the release key (held by the bundle's signed list
+step 28), and a machine's console can switch off every root
 command the controller sends (step 2).
 
 The bundle's digest is the controller's word and moves with a person's tool

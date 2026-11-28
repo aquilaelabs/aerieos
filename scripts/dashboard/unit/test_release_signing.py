@@ -1,4 +1,4 @@
-"""Release signing (R199): a release's SHA256SUMS, signed by a key the install
+"""Release signing: a release's SHA256SUMS, signed by a key the install
 already holds, is what a file is taken on, so whoever changes the
 repository or a release can build one, attest it and put a sha256 beside
 it, and still not hand it to an install. The namespace a signer is named

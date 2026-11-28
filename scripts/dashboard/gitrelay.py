@@ -1,5 +1,5 @@
 """A node session's git push, fetch, pull and ls-remote, done on the controller
-without trusting the session's repository (B148).
+without trusting the session's repository.
 
 The project tree is the controller's, kept in step with a node's synced copy,
 and a session on a node can write every file in it, .git/config and .git/hooks included. git runs what those
@@ -44,12 +44,12 @@ STATE = None
 paths = None              # set by server.py: paths.py, where what grows is kept
 WORKSPACE = None
 push_record = None      # project -> {"repo", "host", "how"} or None
-token_helper = None     # (project, uid) -> the credential helpers, the acting account's first (R154)
+token_helper = None     # (project, uid) -> the credential helpers, the acting account's first
 parse_url = None        # forges.parse
 host_of = None          # forges.host_of: the real host behind an ssh alias
 git_env = None          # projects._git_env: the environment every git job gets
 # (project, {branch: commit}, uid) after a push that landed: what a space's
-# environments deploy on a push (R281 step 6). None in a module test.
+# environments deploy on a push. None in a module test.
 after_push = None
 
 VERBS = ("push", "fetch", "pull", "ls-remote")
@@ -426,13 +426,13 @@ def _lfs(root):
 def run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=True):
     """{code, out, err, apply?} for one relayed verb, or {error} when it
     was refused before any git ran. A push is read for secrets first
-    (pushscan, R219): `scan` True holds one with findings ({held: [...]},
+    (pushscan): `scan` True holds one with findings ({held: [...]},
     no push), "only" answers {held: [...]} and pushes nothing, and False
     pushes what a person has read and approved. `uid`: whose work it is,
-    whose own token is asked first (R154). `token_why`: what keeps the
+    whose own token is asked first. `token_why`: what keeps the
     person's token from being used now (gitcreds.usable), refused after the
     address's own refusals where the remote would need one (https).
-    `workflows` False refuses a push that changes a CI workflow file (B559)."""
+    `workflows` False refuses a push that changes a CI workflow file."""
     try:
         return _run(project, cwd, verb, [str(a) for a in args], scan=scan, uid=uid, token_why=token_why,
                     workflows=workflows)
@@ -459,8 +459,8 @@ def tree_refs(project, cwd):
 
 def tree_tags(project, cwd):
     """The tags the tree a relayed verb would run in holds: a push naming one
-    is a tag's, and is refused as one rather than as a branch the tree lacks
-    (B397)."""
+    is a tag's, and is refused as one rather than as a branch the tree lacks.
+    """
     common, _ = _tree(project, cwd)
     return {r[len("refs/tags/"):] for r in refs(common) if r.startswith("refs/tags/")}
 
@@ -471,7 +471,7 @@ def push_plan(args, head):
         {"dests": [branch, ...], "deletes": [branch, ...],
          "every": bool, "tags": bool}
 
-    The policy is about refs, not about verbs (B191): "a session may push its
+    The policy is about refs, not about verbs: "a session may push its
     branch" has to be judged against the ref the push would land on, and until
     this existed the only thing looked at was whether the word `main` appeared
     anywhere in the arguments. Everything else went through, so a session could
@@ -562,7 +562,7 @@ def _push_ranges(d, name, pos, head_ref, branch, tree_refs):
 
 
 # What a git host runs as CI: a push that changes one runs whatever it says
-# with the repository's secrets, so it is the project's to allow (B559).
+# with the repository's secrets, so it is the project's to allow.
 WORKFLOW_PATHS = (".github/workflows/", ".gitea/workflows/", ".forgejo/workflows/", ".gitlab-ci.yml")
 
 
@@ -625,7 +625,7 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=Tr
     if verb == "push" and _lfs(WORKSPACE / project):
         raise Refused("this repository stores files with Git LFS, whose uploads run as a hook the "
                       "relay does not run: push it from the Git view")
-    # A remote that takes a token, and none usable now (R159: the person
+    # A remote that takes a token, and none usable now (the person
     # signed out everywhere, their store locked, nobody's token given): said
     # here, after the address's own refusals, before git asks and fails worse.
     if token_why and kind == "net" and str(where).lower().startswith(("http://", "https://")):
@@ -660,7 +660,7 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=Tr
                               "does not let a session change them (Permissions, On the git host: Change CI "
                               "workflow files); push without them, or ask its owner to turn it on")
         if verb == "push" and scan:
-            # Read before it goes (R219): what nobody has okayed holds it.
+            # Read before it goes: what nobody has okayed holds it.
             found = _scan(d, project, name, pos, head_ref, branch, tree_refs)
             if scan == "only":
                 return {"held": found}
@@ -669,7 +669,7 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=Tr
         if verb == "push" and len(pos) <= 1 and branch and not _last(cfg, f"branch.{branch}.merge") \
                 and not any(f in net for f in ("--all", "--tags", "--delete", "-d")):
             # A branch never pushed: its first push names it and sets its
-            # upstream, as push.autoSetupRemote would (B220), rather than
+            # upstream, as push.autoSetupRemote would, rather than
             # git's refusal with a hint about a setting.
             pos = [(pos[:1] or [name])[0], branch]
             net = [*net, "-u"]

@@ -1,4 +1,4 @@
-"""Enroll node, as one file to download (R161).
+"""Enroll node, as one file to download.
 
 The Nodes page's Enroll dialog asks its questions (the name, the account jobs
 run as, whether sessions run there, how the machine reaches the controller
@@ -13,14 +13,14 @@ so the file the browser saves is the only copy of either.
 WireGuard from a config the person's router made: the router is the home
 end, so the one-way rule (the node may open the controller's port and
 nothing else; the controller and the LAN open the session ports back) is
-the router's to enforce, and home_rules() says what to put there. What the
+the router's to enforce, and home_rules says what to put there. What the
 script installs on the node is narrowed so it routes nothing but the
 controller into the tunnel (AllowedIPs), runs nothing of the config's own
 (PostUp and the like), and keeps the tunnel open from behind a cloud
 provider's NAT (PersistentKeepalive). The narrowing is hygiene, not the
 security: the node is the end not trusted, and root there can undo it.
 
-Through a public hostname (R170, the operator, 10 Oct): the controller is
+Through a public hostname: the controller is
 published at a name by a tunnel something at home dials out (Cloudflare
 Tunnel, Tailscale Funnel, ngrok, frp, a reverse SSH to a box with an
 address: any of them), set to forward /api/v1/agent/ and answer everything
@@ -43,7 +43,7 @@ import time
 import urllib.parse
 
 REACH = ("lan", "wireguard", "public")
-# The doors in for SSH (R174): a tunnel client on the node, switched from
+# The doors in for SSH: a tunnel client on the node, switched from
 # its row. cloudflared publishes port 22 at a hostname of its own with a
 # tunnel token; Tailscale joins the node to a tailnet with an auth key and
 # answers ssh there (tailscale ssh), with no public name at all.
@@ -68,7 +68,7 @@ import releasepub  # noqa: E402
 def release_keys():
     """AerieOS's release keys as this build names them (config/aerieos-release.pub:
     a line of 64 hex characters for the key the builds sign with, and a
-    second for its spare, R232), the first one first; [] while it names
+    second for its spare), the first one first; [] while it names
     none, and for a file that does not parse, which release_keys_why says
     and aerie lint fails on."""
     return releasepub.read(RELEASE_PUB)[0]
@@ -88,14 +88,14 @@ def pins(agent=None):
     """What an enrollment carries so the node's first agent is not taken on
     the word of whatever answers it: the provisioner's arguments, as a list
     of words. --release-key is AerieOS's release key, with its spare after a
-    comma (R232), so the key the builds sign with can be replaced by the
+    comma, so the key the builds sign with can be replaced by the
     spare and this node still take its updates: the node pins them as it
     enrolls and takes only agent updates the release signed after that.
     --agent-digest is the agent this controller ships now (`agent`:
-    nodes.agent_file()'s digest), which the provisioner holds the agent
+    nodes.agent_file's digest), which the provisioner holds the agent
     that arrives to before any of it runs, where it had only the digest the
     same answer named. --agent-sig is the release's signature over that
-    digest, where this controller's build made one (nodes.agent_sig()) and
+    digest, where this controller's build made one (nodes.agent_sig) and
     there is a key to check it under: the provisioner verifies it before
     the agent runs. A build with no signature (one made outside the
     release's build) carries the digest alone, and the provisioner says so.
@@ -210,7 +210,7 @@ def check(answers, again=False):
     """The answers, cleaned, or {"error": why}. `answers` is the dialog's:
     name, user, sessions (bool), reach, controller (the URL as the node
     will reach it) and, for WireGuard, wg_conf (the router's file). With
-    `again` (R177, a node enrolling once more) the secrets may be left
+    `again` (a node enrolling once more) the secrets may be left
     out: the node keeps its WireGuard config and its door's secret."""
     reach = str(answers.get("reach") or "lan")
     if reach not in REACH:
@@ -220,7 +220,7 @@ def check(answers, again=False):
     if not host:
         return {"error": "the controller's address is a URL the node dials, like http://192.168.1.10:7680"}
     out = {"reach": reach, "controller": url, "sessions": answers.get("sessions") is not False}
-    # The machine's system (R204): the built script carries that system's
+    # The machine's system: the built script carries that system's
     # provisioner family and refuses another machine by name. Vetted ones,
     # or any with dev features on; an unknown one is said back.
     import systems
@@ -230,7 +230,7 @@ def check(answers, again=False):
     if not systems.allowed(sid):
         return {"error": f"{systems.get(sid)['name']} has not been walked on a node yet: it is offered behind Offer dev features (Settings), tagged dev"}
     out["system"] = sid
-    # A door in for SSH (R174): which recipe, its name, and its secret.
+    # A door in for SSH: which recipe, its name, and its secret.
     door = str(answers.get("door") or "")
     if door:
         if door not in DOORS:
@@ -259,10 +259,10 @@ def check(answers, again=False):
         # Hosting only, whatever was ticked: the controller cannot reach
         # back through the tunnel to a session's ports.
         out.update(sessions=False, tunnel_host=host.lower())
-    # The box closed on itself (R93): for a node with no sessions, whose
+    # The box closed on itself: for a node with no sessions, whose
     # ports the controller never reaches back to.
     out["firewall"] = answers.get("firewall") is True and not out["sessions"]
-    # The features ticked (R91), each bb-sandbox's own install once the node
+    # The features ticked, each bb-sandbox's own install once the node
     # has enrolled; the firewall rides as its own flag above.
     feats = answers.get("features") if isinstance(answers.get("features"), list) else []
     bad = [str(f) for f in feats if f not in FEATURES]
@@ -292,11 +292,11 @@ def check(answers, again=False):
     return out
 
 
-# The features Enroll node offers a tick for (R91), as bb-sandbox names them.
+# The features Enroll node offers a tick for, as bb-sandbox names them.
 FEATURES = ("vmhost",)
 
 WG_BEGIN = "base64 -d > \"$dir/bb.conf\" <<'WGCONF'"
-# The door's secret, the same way (R174): in the script until it has run.
+# The door's secret, the same way: in the script until it has run.
 DOOR_BEGIN = "base64 -d > \"$dir/door-secret\" <<'DOORSECRET'"
 DOOR_AFTER = ": # the door's secret left this file once the node enrolled; the node keeps it"
 # What stands where the config was, once it has run: the tunnel's config as
@@ -313,7 +313,7 @@ def _b64(data):
 
 def filename(name, nid=""):
     """enroll-NAME-ID.sh: the id in the name, so a script on disk says
-    which row it is for (the operator, 11 Oct); the row shows the same id."""
+    which row it is for; the row shows the same id."""
     base = _NAME.sub('-', name or 'node').strip('-') or 'node'
     return f"enroll-{base}-{_NAME.sub('-', str(nid))}.sh" if nid else f"enroll-{base}.sh"
 
@@ -322,7 +322,7 @@ STORE_FLAGS = ("data", "toolchains", "cache", "artifacts", "appdata")
 
 
 def build(ans, *, name, user, token, expires, provisioner, family=b"", again=False, machine="", stores=None, agent=None):
-    """The script, as text. `ans` is check()'s answer. With `again` (R177)
+    """The script, as text. `ans` is check's answer. With `again`
     the secrets are the node's own (its WireGuard config installed from
     /etc/wireguard, its door left as it is), and `machine` binds the
     script to the machine the node enrolled from: the provisioner refuses
@@ -365,8 +365,8 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
         flags.append("--firewall")
     # A system not walked yet, picked under Offer dev features: its family
     # may be one the provisioner has never run on, which it refuses without
-    # --dev, and the script stopped there having changed nothing (R97's walk,
-    # Arch, 21 Oct).
+    # --dev, and the script stopped there having changed nothing
+    # (Arch).
     import systems
     if not (systems.get(ans.get("system") or "") or {}).get("vetted"):
         flags.append("--dev")
@@ -406,7 +406,7 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
     ]
     if family:
         # The picked system's family file, beside the core, which sources it
-        # and refuses a machine of another family by name (R204).
+        # and refuses a machine of another family by name.
         lines += ["base64 -d > \"$dir/provision-family.sh\" <<'FAMILY'", _b64(family), "FAMILY"]
     if ans["reach"] == "wireguard" and ans.get("wg_conf"):
         lines += [WG_BEGIN, _b64(ans["wg_conf"]), "WGCONF",
@@ -419,7 +419,7 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
         # The chmod stands after the block, so it outlives the block being
         # taken out of the file on success: on the next run (the repair)
         # there is no secret to chmod, and set -e ended the script on it
-        # before anything ran (the operator, 11 Oct). The provisioner keeps
+        # before anything ran. The provisioner keeps
         # the door's installed secret when none is handed to it.
         lines += [DOOR_BEGIN, _b64(ans["door_secret"]), "DOORSECRET",
                   '[ ! -f "$dir/door-secret" ] || chmod 600 "$dir/door-secret"']

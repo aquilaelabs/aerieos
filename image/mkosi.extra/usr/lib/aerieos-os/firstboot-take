@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A prepared configuration's first boot (R161 step 8), as root, before the
+"""A prepared configuration's first boot, as root, before the
 controller starts: aerieos/firstboot.json on the ESP holds, after its
 marker line, the JSON a stick maker's --config wrote (format 1, docs/image.md).
 When it does, the machine's own part is applied here (the hostname, the time
@@ -20,8 +20,8 @@ ESP = os.environ.get("BB_ESP", "/boot/efi")
 RUN = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot")
 # Where the prepared configuration is handed over: on the stick's data
 # partition, not in memory, so a reset or a failed start before the
-# controller applies it does not lose it once the stick's copy is blanked
-# (B943). The controller removes it once applied.
+# controller applies it does not lose it once the stick's copy is blanked.
+# The controller removes it once applied.
 HAND = os.path.join(os.environ.get("BB_OS_WORK", "/var/lib/aerieos-os"), "firstboot")
 ENV = os.environ.get("BB_CONTROLLER_ENV", "/etc/aerieos-controller/controller.env")
 MARK = b"AERIE-FIRSTBOOT-1\n"
@@ -97,7 +97,7 @@ ADDR = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9]{1,2}")
 
 def network(net):
     """A static address in the configuration becomes the stick's own network
-    settings (R161 step 12): BB_NET_* lines added to aerieos.env in its
+    settings: BB_NET_* lines added to aerieos.env in its
     4 KiB, so every boot's network step applies them, this one included
     (they go to its file under /run too). A line the stick already has, as
     a stick maker's --set wrote it, is kept over the configuration's."""
@@ -187,7 +187,7 @@ def features(want):
 
 
 def mirror(pw):
-    """The catalog's mirror a stick maker's --mirror wrote (R169 step 6):
+    """The catalog's mirror a stick maker's --mirror wrote:
     handed to the controller at every boot while the stick holds one, which
     imports it once per mirror. The stick keeps it: it holds nothing secret."""
     path = os.path.join(ESP, "aerieos", "catalog-mirror.bin")

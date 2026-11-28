@@ -1,4 +1,4 @@
-"""An instance's override (the operator, 17 Oct): another compose file from
+"""An instance's override: another compose file from
 the project's tree laid over its own with compose's -f after -f, for that
 one container; never one outside the tree, never the file it is built from,
 never loaded by itself, and carried to an agent node with the base file."""

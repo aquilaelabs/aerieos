@@ -1,5 +1,5 @@
 """A node's agent behind this controller inside its window is updated by the
-controller itself once the node is idle (R253); one with a job in flight is
+controller itself once the node is idle; one with a job in flight is
 left until it is idle, one from another window is the operator's press, an
 attempt is not repeated within AUTO_UPDATE_EVERY, and a node that will
 refuse the build for want of a release's signature is not sent it unasked."""
@@ -73,7 +73,7 @@ class AutoUpdate(World):
             if row:
                 self.assertFalse(row["auto"])
                 self.assertIn("signed", row["held"])
-            # Nor on a person's press (B1108): the job could only fail
+            # Nor on a person's press: the job could only fail
             # there, and what keeps it is said where the press was, and in
             # every line that says the node is behind.
             said = nodes.node_update_agent("user:test", self.nid)

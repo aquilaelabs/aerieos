@@ -1,5 +1,5 @@
 "use strict";
-// ---- a space's Discord server (R293) -------------------------------------
+// ---- a space's Discord server -------------------------------------
 // Two places, each where it lives (the connections rule): the space's
 // settings hold the connection, its bot's token given once and sealed,
 // never shown again, with Forget; the notebook's Discord view, in Ship,
@@ -39,7 +39,7 @@ function rnDrawDiscord(){
   } else if (!d.may){
     drawHTML(box, `${lbl}<div class="hint">None connected; a person with this space's settings connects one.</div>`);
   } else {
-    // One form (R301): the token and the server, Connect at its foot.
+    // One form: the token and the server, Connect at its foot.
     drawHTML(box, `${lbl}${formBox({fields: [
         formField("rnDcToken", "Bot token", `<input id="rnDcToken" type="password" autocomplete="off" spellcheck="false">`),
         formField("rnDcGuild", "Server ID", `<input id="rnDcGuild" autocomplete="off" spellcheck="false" inputmode="numeric"

@@ -1,4 +1,4 @@
-// Older installs are not broken by this build (R79): this tree's controller
+// Older installs are not broken by this build: this tree's controller
 // started on a copy of every release snapshot of /config it still migrates
 // from (test/upgrade/NAME/, written by tools/upgrade-snapshot.py; a release
 // whose snapshot was taken again at a later state keeps the earlier one
@@ -55,7 +55,7 @@ function unpack(ver, tag){
 // The port is free when asked for and taken by the server only after its
 // migrations ran, a second or more under a whole run's load, and another
 // worker could take it in that gap: the server then ended on Address
-// already in use (B931). Started again on another port when that is what
+// already in use. Started again on another port when that is what
 // ended it, three times at most; any other end is the answer.
 async function start(w, dash = DASH, build = BUILD){
   for (let tries = 1; ; tries++){
@@ -116,7 +116,7 @@ async function holds(c, m, said){
   const users = (await get('/api/users')).users || [];
   for (const n of m.accounts) if (!users.some(u => u.name === n)) missing.push(`account ${n}`);
   const roles = await get('/api/roles');
-  // A role is held on a project (R138): each repository the manifest names
+  // A role is held on a project: each repository the manifest names
   // read as the project the status read says it is in.
   const rows = (await get('/api/status')).projects || [];
   const keyOf = p => rows.find(x => x.name === p)?.project || p;
@@ -211,7 +211,7 @@ function plantOld(w, state){
 
 async function signIn(browser, c, m, said){
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  await ctx.addInitScript(() => { window.BB_NO_TOUR = true; });     // the tour is tour.mjs's (R94)
+  await ctx.addInitScript(() => { window.BB_NO_TOUR = true; });     // the tour is tour.mjs's
   const page = await ctx.newPage();
   await page.goto(c.base + '/');
   await page.waitForURL('**/login**', { timeout: patience(20000) });

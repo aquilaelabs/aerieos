@@ -1,5 +1,5 @@
-"""The move token given on the first page is kept for the landing (the
-operator, 10 Nov: the walk asked for it twice), sealed across a restart and
+"""The move token given on the first page is kept for the landing
+(the walk asked for it twice), sealed across a restart and
 dropped when the move lands; and a move to an address of the local network
 names the nodes that dial in from outside it (move.far_nodes)."""
 import os

@@ -1,5 +1,5 @@
 """The harness remembers its flakes, and the pre-push gate fails on one
-(R7 step 3; the operator's choice of 14 Nov: recorded and counted, a gate
+(recorded and counted, a gate
 fails on a flake in a suite it ran, a release's tag still counts it as
 passed).
 
@@ -56,7 +56,7 @@ class Record(unittest.TestCase):
             self.logs.append(p)
 
     def test_a_suite_run_in_each_engine_is_read_by_its_name(self):
-        # Each engine's part under a banner of its own (R263): the check that
+        # Each engine's part under a banner of its own: the check that
         # failed is found under the suite's name, the engine named in it.
         p = os.path.join(self.d, "engines.log")
         with open(p, "w") as f:
@@ -76,7 +76,7 @@ class Record(unittest.TestCase):
         self.assertEqual(got[1][1:], ("devapp", "8", "14.6", "the instance comes up (state: starting)"))
 
     def test_what_it_waited_for_is_kept_and_said_on_its_bug(self):
-        # R250 step 2: the [wait] line under the first FAIL, or the error a
+        # The [wait] line under the first FAIL, or the error a
         # suite stopped on, kept with the line; the bug that names the suite
         # found; and the note said from the last sighting.
         p = os.path.join(self.d, "worker-2.log")
@@ -171,7 +171,7 @@ class Wired(unittest.TestCase):
         self.assertIn('python3 "$BB_LIB/flakes.py" list --file "${BB_REPO:-$PWD}/.bb-map/flakes.tsv"', self.read("scripts", "aerie"))
 
     def test_a_harness_change_fails_only_on_a_flake_the_change_itself_touches(self):
-        # The operator, 14 Nov: when every suite runs only because lib.mjs
+        # When every suite runs only because lib.mjs
         # or run.sh changed, a flake in a suite the change does not touch by
         # itself is recorded and named, and does not fail the gate.
         pre = self.read("scripts", "lib", "preflight.sh")

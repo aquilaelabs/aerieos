@@ -1,6 +1,6 @@
 """A version or changelog question asked from a worktree of the project's
-own repository is answered for that tree, wherever the worktree is (B214:
-a Claude Code worktree under .claude/worktrees wrote the main checkout's
+own repository is answered for that tree, wherever the worktree is
+(a Claude Code worktree under .claude/worktrees wrote the main checkout's
 changelog)."""
 import os
 import subprocess

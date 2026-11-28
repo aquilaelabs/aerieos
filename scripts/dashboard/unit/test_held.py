@@ -1,4 +1,4 @@
-"""A held start (R56 step 9, held.py): held after an unclean shutdown or
+"""A held start (held.py): held after an unclean shutdown or
 when the next start was armed, not on a first boot or after a clean stop,
 lifted by Start, and nothing of it on a container install."""
 import json
@@ -58,7 +58,7 @@ class Held(unittest.TestCase):
         self.assertEqual(held.arm_next(False)["armed"], False)
 
     def test_a_prepared_configurations_first_start_holds_once(self):
-        # R161 step 11: armed before boot() reads the markers, this boot alone.
+        # Armed before boot reads the markers, this boot alone.
         held.arm_first()
         got = held.boot()
         self.assertTrue(got["held"])
@@ -68,7 +68,7 @@ class Held(unittest.TestCase):
         self.assertFalse(held.boot()["held"], "a later boot holds only for its own reasons")
 
     def test_safe_mode_at_the_boot_menu_holds_the_start(self):
-        # R161 step 2: GRUB's Safe mode entry puts aeriesafe=1 on the command
+        # GRUB's Safe mode entry puts aeriesafe=1 on the command
         # line, and the start is held with that said.
         from unittest import mock
         with tempfile.TemporaryDirectory() as d:

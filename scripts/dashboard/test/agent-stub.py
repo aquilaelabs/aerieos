@@ -42,7 +42,7 @@ TOKEN = os.environ["STUB_AGENT_TOKEN"]
 
 # The stub dials from 127.0.0.2, so the controller sees it at an address of
 # its own as it sees a node on the LAN, never its own 127.0.0.1: a node's
-# address is the socket's, not a header it sends (B722).
+# address is the socket's, not a header it sends.
 FROM = "127.0.0.2"
 
 
@@ -63,7 +63,7 @@ CENSUS = {"cpu": 4, "mem_mb": 8192, "arch": "x86_64", "system": "linux",
           # `info` prints, so the two agree about which daemon this is.
           "docker_id": "STUBDAEMON1",
           # Provisioned as a sandbox, so the controller offers it system
-          # jobs. The root ask (R38) is one, and it runs below as this
+          # jobs. The root ask is one, and it runs below as this
           # process rather than as root: the suite proves the asking and the
           # answering, and the real agent's own file proves the running.
           "sandbox": True,
@@ -87,11 +87,11 @@ CENSUS = {"cpu": 4, "mem_mb": 8192, "arch": "x86_64", "system": "linux",
           "network": {"interface": "ens3", "addresses": ["10.0.0.41/24"],
                       "gateway": "10.0.0.1", "dns": ["10.0.0.1"]},
           # A session half that is up, whose heartbeat reports no synced
-          # copy of any project yet (R163): what the proxy holds a session
+          # copy of any project yet: what the proxy holds a session
           # on, and the row says.
           "session": {"up": True, "term": True, "screen": 7684, "user": "bb",
                       "workspace": True, "writable": True, "boot": "1.1",
-                      # ...and the container terminal (R218 step 4), as the
+                      # ...and the container terminal, as the
                       # docker account.
                       "ctr": True}}
 
@@ -222,7 +222,7 @@ def compose(job):
 
 
 def scan(job):
-    """A scan job (R145) the way builderbot-agent.scan does it, with no
+    """A scan job the way builderbot-agent.scan does it, with no
     docker: one small SARIF per scanner naming a finding in each project,
     sent up as scan-put, so the Scanners and Analysis pages have something
     to show."""
@@ -439,21 +439,21 @@ def main():
         # Long-polled, so a queued job is picked up at once and an idle loop
         # costs one held request rather than a spin.
         sample = {"cpu_pct": 1, "mem_mb": 8192, "mem_used_mb": 2048}
-        # Each container's use, as the agent sends it once a minute (R218
-        # step 9): whatever a suite planted in ctr-stats.json, every poll.
+        # Each container's use, as the agent sends it once a minute:
+        # whatever a suite planted in ctr-stats.json, every poll.
         try:
             with open(os.path.join(CDIR_ROOT, "ctr-stats.json")) as f:
                 sample["ctr_stats"] = json.load(f)
         except (OSError, ValueError):
             pass
-        # ...and the sessions a controller outage held (R251), as planted.
+        # ...and the sessions a controller outage held, as planted.
         try:
             with open(os.path.join(CDIR_ROOT, "held.json")) as f:
                 sample["held"] = json.load(f)
         except (OSError, ValueError):
             sample["held"] = []
         # ...and its sessions' rows, where a suite planted them (the guard
-        # that went quiet, B1009): a name and a pane title each.
+        # that went quiet): a name and a pane title each.
         try:
             with open(os.path.join(CDIR_ROOT, "sessions.json")) as f:
                 sample["sessions"] = json.load(f)
@@ -467,7 +467,7 @@ def main():
             # answering the controller while a build runs. Run inline, a 30s
             # build left every poll unmade, so the light-lane exec that reads
             # the instance's containers back for a Rebuild's answer waited
-            # for the build, and the row never said building (B684).
+            # for the build, and the row never said building.
             running.add(j["id"])
             threading.Thread(target=run_job, args=(j,), daemon=True).start()
         # The census only rides hello, and the row goes stale without it;

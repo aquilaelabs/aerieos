@@ -1,5 +1,5 @@
-"""What each account has dismissed from its bell (R144, the operator, 10 Oct:
-the drawer was a wall of amber). Kept on the server, per account, so a note
+"""What each account has dismissed from its bell
+(the drawer was a wall of amber). Kept on the server, per account, so a note
 put away on the phone is put away on the desktop too.
 
 A dismissal is a key naming the thing AND its version: a toolchain's update
@@ -29,7 +29,7 @@ def configure(*, state, write_json):
 
 
 def _load():
-    d = statefile.read_json(FILE) if FILE else None   # read once while the same file (R228 step 1)
+    d = statefile.read_json(FILE) if FILE else None   # read once while the same file
     return d if isinstance(d, dict) else {}
 
 
@@ -71,8 +71,8 @@ def restore(uid):
 
 
 def blocks_work(r):
-    """Whether a bell row is about something that blocks work now (R280, the
-    operator, 24 Nov): it stands in the bell's Active section, under what
+    """Whether a bell row is about something that blocks work now:
+    it stands in the bell's Active section, under what
     waits on an answer, with no Dismiss, and leaves when it stops being
     true. A failing CI run, a session an outage held, a session whose hooks
     went quiet, a disk failing or a pool or array down, a UPS low or on
@@ -113,10 +113,10 @@ def filter_rows(uid, rows):
             # To when it failed: put away until another one fails.
             r["key"] = f"relocate:{r['id']}@{r.get('at') or 0}"
         elif r.get("kind") == "image":
-            # To the digests it would move to (R195): put away until one moves.
+            # To the digests it would move to: put away until one moves.
             r["key"] = f"image:{r['id']}@{r.get('digest') or ''}"
         elif r.get("kind") == "token-read":
-            # To the newest read (R125 step 6): put away until another one.
+            # To the newest read: put away until another one.
             r["key"] = f"tokenread:{r['id']}@{r.get('at') or 0}"
         elif r.get("kind") == "node-refused":
             # To when it began: put away until a new refusal begins.
@@ -125,7 +125,7 @@ def filter_rows(uid, rows):
             # To when it was found: put away until it happens again.
             r["key"] = f"tokenreuse:{r['id']}@{r.get('at') or 0}"
         elif r.get("kind") == "nginx":
-            # To the digest it would move to (R192): put away until the
+            # To the digest it would move to: put away until the
             # registry moves the line again.
             r["key"] = f"nginx:{r['id']}@{r.get('digest') or ''}"
         elif not r.get("window") and r.get("id") and r.get("to"):
@@ -136,7 +136,7 @@ def filter_rows(uid, rows):
         # keyed on what is missing; a space's git access gone) or the lines
         # above did, goes while that key is put away, and comes back when
         # the key moves. A row its maker keyed and no line here named was
-        # drawn with Dismiss and came back on the next read (B1146).
+        # drawn with Dismiss and came back on the next read.
         # ...and marked active or not (active above), an active row never
         # hidden, whatever was put away before it was one.
         r["active"] = blocks_work(r)

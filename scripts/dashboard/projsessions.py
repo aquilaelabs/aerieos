@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Every account's sessions on one project, for its settings dialog, and an
-administrator ending one of them (the operator, 24 Sep).
+administrator ending one of them.
 
-A session is its account's (B172, server.py _not_theirs): nobody presses a
+A session is its account's (server.py _not_theirs): nobody presses a
 key in another person's session or types into it, administrators included,
 because a key there answers a question it asked them. That stays true.
 Ending one is the single exception, and an administrator's alone: a session
@@ -51,7 +51,7 @@ def _kind(base, project):
     """The agent's id ("claude") or "shell" when a session's unprefixed name
     is this project's, else "". Exact, by the names bb-tty gives them
     (claude-<p>, shell-<p> and shell-<p>-<n>), so a project called a-b is
-    never read as a's. Which agent a name is, the agent table says (R95)."""
+    never read as a's. Which agent a name is, the agent table says."""
     t = tmux_name(project)
     a, stem = agents.of_session(base)
     if a and stem == t:
@@ -80,7 +80,7 @@ def of(project):
                      "who": (names.get(uid) or uid) if uid else owner,
                      "kind": kind,
                      "agent": (agents.get(kind).name if agents.get(kind) else ""),
-                     # Which of the person's sessions of that agent (R143).
+                     # Which of the person's sessions of that agent.
                      "slot": agents.slot_of(BASE(s["name"])) if kind != "shell" else 0,
                      "state": (s.get("claude") or {}).get("state", ""),
                      "attached": bool(s.get("attached"))})
@@ -149,7 +149,7 @@ def asking(sessions):
     """{project: [account name, ...]} for the Claude sessions on Claude
     Code's permission prompt (server.session_state's "asking"), whoever's
     they are: another account's reads asking on the card and the header
-    too, not waiting (B104)."""
+    too, not waiting."""
     by_uid = ACCOUNTS()
     owner = OWNER_NAME()
     out = {}
@@ -167,8 +167,8 @@ def where(sessions):
     """{project: [{who, node, agent, slot, working, asking, behind}, ...]}:
     every agent session running, one row per account per agent per slot per
     node, so a project row can say which machine each is on and whether it
-    is working there (the operator, 30 Sep). An account with a session on
-    two nodes is two rows, and with two of one agent's slots too (R143)."""
+    is working there. An account with a session on
+    two nodes is two rows, and with two of one agent's slots too."""
     by_uid = ACCOUNTS()
     owner = OWNER_NAME()
     out = {}
@@ -184,7 +184,7 @@ def where(sessions):
                 "working": (s.get("claude") or {}).get("state") == "working",
                 "asking": (s.get("claude") or {}).get("state") == "asking",
                 # What changed since it started that it will not see until
-                # it is started again (the operator, 12 Oct).
+                # it is started again.
                 "behind": BEHIND(s)})
     return out
 
@@ -209,14 +209,14 @@ def live_token():
     is working, so /api/revs can say "changed" and the page fetch /api/live
     only then: the dot beside a name follows a session within seconds
     without the status poll, which runs git for every project, going any
-    faster (the operator, 25 Sep)."""
+    faster."""
     rows = sorted((s["name"], (s.get("claude") or {}).get("state") or "")
                   for s in LIVE_SESSIONS())
     # A change token for the poll, not a secret: said so to hashlib.
     return hashlib.sha256(json.dumps(rows).encode()).hexdigest()[:12]
 
 
-# ---- what each session was last asked (B59) ----
+# ---- what each session was last asked ----
 # A session's task came off its pane title alone, which Claude Code names
 # from the conversation's first turn and keeps, so the Sessions page said the
 # first thing a session was asked for every turn after it. The prompt hook's
@@ -236,9 +236,9 @@ def asked(uid, project, text, now=None, agent="claude", slot=1):
         return
     if len(line) > TASK_MAX:
         line = line[:TASK_MAX - 1].rstrip() + "…"
-    # Per agent (R95 step 19): one person's Claude and Codex sessions on a
+    # Per agent: one person's Claude and Codex sessions on a
     # project are two rows, each with its own task.
-    # ...and per slot (R143): a person's two Claude sessions there, two.
+    # ...and per slot: a person's two Claude sessions there, two.
     _asked[(uid, agent or "claude", tmux_name(project), int(slot or 1))] = (time.time() if now is None else now, line)
 
 

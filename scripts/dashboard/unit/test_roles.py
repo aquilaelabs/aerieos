@@ -1,8 +1,8 @@
-"""roles.py since R152 (the operator, 7 Oct): a role is a scope (Global, or
+"""roles.py: a role is a scope (Global, or
 the user's projects) and, per area, Read or Write; owner and admin are
 built in with everything; the old user role is an ordinary role seeded with
 what it allowed; roles given on one project hold there alone; a role from
-before R152 is read as one of these."""
+an older build is read as one of these."""
 import json
 import os
 import shutil
@@ -41,13 +41,13 @@ class Model(unittest.TestCase):
         self.assertIn("error", roles.remove("owner"))
 
     def test_there_is_no_user_role(self):
-        # The operator, 7 Oct: an account on `user` holds nothing until given a role.
+        # An account on `user` holds nothing until given a role.
         self.assertIsNone(roles.get("user"))
         for cap in ("read", "work", "roadmap", "terminal"):
             self.assertFalse(self.g(USER, cap, "alpha"), cap)
 
     def test_each_action_follows_its_own_area(self):
-        # R255 step 3 (the operator, 16 Oct): what sat behind accounts write
+        # What sat behind accounts write
         # follows the area it concerns, and accounts write alone gives none of it.
         roles.set_role("ops", scope="global", perms={"controller": "write", "nodes": "write"})
         roles.set_role("rel", scope="projects", perms={"projects": "read", "releases": "write", "settings": "write"})
@@ -70,7 +70,7 @@ class Model(unittest.TestCase):
         self.assertTrue(self.g({"name": "s", "role": "user", "roles": ["seer"], "projects": []}, "containers-read"))
 
     def test_roles_are_named_for_a_person(self):
-        # R255 step 1: AerieOS's owner, an administrator, and the Owner of
+        # AerieOS's owner, an administrator, and the Owner of
         # a project told apart by name, not by their keys.
         roles.ensure_owner_role("alpha")
         self.assertEqual(roles.label("owner"), "AerieOS's owner")
@@ -79,7 +79,7 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.label("nosuch"), "nosuch")
 
     def test_what_an_account_may_do_said_once(self):
-        # R255 step 5: its roles by name and where they hold, and the areas
+        # Its roles by name and where they hold, and the areas
         # they add up to, in the Roles tab's order.
         import users
         name = roles.ensure_owner_role("alpha")
@@ -92,7 +92,7 @@ class Model(unittest.TestCase):
         self.assertNotIn("Nodes", [a for a, _ in got["may"]])
 
     def test_a_project_gone_is_not_said(self):
-        # B75: Owner of a project in the bin, or purged, is neither listed
+        # Owner of a project in the bin, or purged, is neither listed
         # nor counted toward what the account may do; the grant is kept.
         import registry
         import users
@@ -114,7 +114,7 @@ class Model(unittest.TestCase):
         self.assertEqual(got["may"], [["Spaces", "Read"]], "a gone space's grant adds nothing")
 
     def test_an_owner_role_is_named_by_the_project_s_shown_name(self):
-        # B102: a project whose folder is not its name (syncwalk-mv1bm36p,
+        # A project whose folder is not its name (syncwalk-mv1bm36p,
         # shown as syncwalk) is owned, and held on, by the name shown.
         import registry
         import users
@@ -152,7 +152,7 @@ class Model(unittest.TestCase):
                                                   "terminal": "x"})
         self.assertEqual(r["perms"], {"projects": "write", "containers": "write"}, "unknown areas and levels dropped")
         self.assertIn("space areas only", roles.set_role("bad", "projects", {"nodes": "read"})["error"])
-        # Given on a project, held there (R155); through the account's own
+        # Given on a project, held there; through the account's own
         # list a role on a project holds nowhere.
         t = {"name": "t", "role": "user", "roles": [], "projects": ["alpha"],
              "project_roles": {"alpha": ["tester"]}}
@@ -168,7 +168,7 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.summary(o), {"nodes": "write", "jobs": "read"})
 
     def test_a_global_role_may_hold_its_node_areas_on_named_nodes(self):
-        # The operator, 7 Oct: making projects on one node.
+        # Making projects on one node.
         r = roles.set_role("creator", "global", {"newprojects": "write", "install": "write", "controller": "read"},
                            only={"newprojects": {"n1": "write"}, "install": {"n1": "write"}})
         self.assertEqual(r["only"], {"newprojects": {"n1": "write"}, "install": {"n1": "write"}})
@@ -185,7 +185,7 @@ class Model(unittest.TestCase):
                          "only a Global role names nodes")
 
     def test_install_configure_and_curate_are_three_areas(self):
-        # R174 (the operator, 28 Oct): Install and Configure node by node,
+        # Install and Configure node by node,
         # Curate the catalog's, which every node shares.
         self.assertEqual(roles.CAP_AREA["toolchains-write"], ("install", "write"))
         self.assertIn("configure", roles.NODE_AREAS)
@@ -199,7 +199,7 @@ class Model(unittest.TestCase):
         self.assertTrue(roles.granted(ADMIN, "curate"), "the built-in administrator holds every area")
 
     def test_an_area_held_instance_by_instance(self):
-        # The operator, 16 Oct: an area's row opens on its nodes or runners,
+        # An area's row opens on its nodes or runners,
         # Read or Write on each.
         r = roles.set_role("ops", "global", {"nodes": "read", "runner": "read", "controller": "read"},
                            only={"nodes": {"n1": "write", "n2": "read"}, "runner": {"n1/a": "read"},
@@ -225,7 +225,7 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.level_of(o, "nodes", node="n3"), "read")
 
     def test_clusters_held_cluster_by_cluster(self):
-        # R281: Clusters asked of each cluster, as Nodes is of each node.
+        # Clusters asked of each cluster, as Nodes is of each node.
         r = roles.set_role("kube", "global", {"clusters": "read"}, only={"clusters": {"k_a": "write", "k_b": "read"}})
         self.assertEqual(r["only"], {"clusters": {"k_a": "write", "k_b": "read"}})
         k = {"name": "k", "role": "user", "roles": ["kube"], "projects": []}
@@ -259,7 +259,7 @@ def write_json(p, d, mode=0o644):
 
 class R155(unittest.TestCase):
     """A role on a project given on the project alone, and being on one is
-    holding a role there (the operator, 8 Oct)."""
+    holding a role there."""
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
@@ -291,7 +291,7 @@ class R155(unittest.TestCase):
         self.assertEqual(self.users.get("ann")["projects"], ["alpha"], "on a space is holding a role there")
 
     def test_accounts_write_through_a_role_gives_roles_but_not_admin(self):
-        # B66: Accounts and roles Write held through a role of one's own
+        # Accounts and roles Write held through a role of one's own
         # gives roles as the administrator does; the built-in admin stays
         # an administrator's.
         roles.set_role("hr", "global", {"accounts": "write"})
@@ -312,8 +312,8 @@ class R155(unittest.TestCase):
 
 
 class SessionAndAccount(unittest.TestCase):
-    """A session does no more than the account behind it (the operator,
-    7 Oct): its own rules, and its account's roles on the project."""
+    """A session does no more than the account behind it:
+    its own rules, and its account's roles on the project."""
 
     def setUp(self):
         import users
@@ -347,7 +347,7 @@ class SessionAndAccount(unittest.TestCase):
         self.assertEqual(may(self.sess("u_1", "alpha"), "work", "alpha"), "", "the owner's session as ever")
 
     def test_what_was_the_administrators_is_never_a_sessions(self):
-        # R255 step 3 gave these to roles; the owner's own session still
+        # These are roles' to give; the owner's own session still
         # reaches none of them.
         for action, project in (("settings", "alpha"), ("signing", "alpha"), ("controller", None),
                                 ("controller-read", None), ("nodes-write", None), ("containers-read", None)):

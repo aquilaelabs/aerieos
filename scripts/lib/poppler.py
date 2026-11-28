@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """pdftoppm and pdfinfo, as much of them as Claude Code's own PDF reader
-uses, drawn with PyMuPDF (R103).
+uses, drawn with PyMuPDF.
 
 Claude Code reads a PDF by asking `pdfinfo FILE` for its page count and
 `pdftoppm -jpeg -r 100 [-f N] [-l M] FILE PREFIX` for pictures of its pages,
 which it collects as PREFIX-*.jpg. No node carries poppler, so a session
-could not read a PDF it had fetched (Shebang-DevBoard, 30 Sep). The
+could not read a PDF it had fetched (Shebang-DevBoard). The
 documents toolchain installs this under both names, run with its own
 Python, which has PyMuPDF.
 

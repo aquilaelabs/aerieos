@@ -1,4 +1,4 @@
-// The Network page (R165 step 4): in the Controller group, it says how the
+// The Network page: in the Controller group, it says how the
 // controller is reached (its address and port, what it is served over, the
 // hostname), lists each node with where it dials in from, and carries the
 // Connection and Reach from outside groups, which Controller settings no

@@ -1,7 +1,7 @@
-"""Where a session's word on a container is looked for (B649): on every node
+"""Where a session's word on a container is looked for: on every node
 its project names now, the node set and the hosting nodes under Hosts its
 containers on, and on no other, so one left on a node taken off the project
-is the project's still and the session's no longer (the operator, 11 Oct).
+is the project's still and the session's no longer.
 Drives containers.session_verb with devapp's node hooks stood in for."""
 import contextlib
 import os

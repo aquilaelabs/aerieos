@@ -1,7 +1,7 @@
 """The tree a version or changelog question is asked of (version.root): a
 worktree the caller stands in when it is one of the project's, bb's own or
 one Claude Code made for an agent under the project's .claude/worktrees
-(B212: a changelog line asked for there landed in the main checkout's file),
+(a changelog line asked for there landed in the main checkout's file),
 and never another project's."""
 import os
 import shutil

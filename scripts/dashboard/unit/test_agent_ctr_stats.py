@@ -1,8 +1,8 @@
 """What each running container uses, read by the agent once a minute for the
-hour the controller keeps (R218 step 9): one docker stats, its lines read
+hour the controller keeps: one docker stats, its lines read
 into [cpu %, memory %] by name, a line it cannot read skipped, and nothing at
 all said between two minutes or where there is no docker. The read runs on a
-thread of its own (R228 step 18) and its answer rides a later turn."""
+thread of its own and its answer rides a later turn."""
 import os
 import sys
 import tempfile
@@ -58,7 +58,7 @@ class CtrStats(unittest.TestCase):
         self.assertEqual(self.handed(me), {"web-1": [1.0, 2.0]})
 
     def test_docker_is_found_on_the_path_by_its_bare_name(self):
-        # B764: DOCKER_BIN is "docker" unless the environment names a path,
+        # DOCKER_BIN is "docker" unless the environment names a path,
         # and os.access on that bare name looked in the working directory.
         self.fake_docker("web-1\t1.00%\t2.00%\n")
         d = os.path.dirname(agent.DOCKER_BIN)

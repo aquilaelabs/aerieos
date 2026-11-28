@@ -1,5 +1,5 @@
 """What the controller's signing keys need a jdk or build-tools for, done on
-the project's node (R106, the operator 22 Oct: the controller runs nothing).
+the project's node (the controller runs nothing).
 
 The sign-key job (work.py's sign_key) runs one of these with this node's own
 toolchain store: a keystore checked (inspect), a key made (generate), a key
@@ -138,7 +138,7 @@ def generate(kt, alias, cn, password, *, work, env, who=None):
 
 def wrap(kt, blob, store_pass, key_pass, alias, new_pass, *, work, env, who=None):
     """(PKCS12 bytes, error): the keystore's key under `new_pass` as its
-    store and key password both, by keytool -importkeystore (R111)."""
+    store and key password both, by keytool -importkeystore."""
     src, dst = private(work, "src", blob, who), os.path.join(work, "dst.p12")
     code, out = _run([kt, "-importkeystore", "-noprompt", "-srckeystore", src, "-srcstorepass:env", "BB_SRC_PASS",
                       "-srckeypass:env", "BB_SRC_KEY", "-srcalias", alias, "-destkeystore", dst,

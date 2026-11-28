@@ -18,7 +18,7 @@ pkg_refresh() {
 }
 # pkg NAME...: install what is named, quietly. xdotool (the capture tools)
 # is EPEL's on RHEL 9 and its rebuilds, and never installed there without it
-# (R97's walk, AlmaLinux 9, 21 Oct); Fedora carries it itself.
+# (AlmaLinux 9); Fedora carries it itself.
 pkg() {
     case " $* " in *" xdotool "*) epel_here ;; esac
     dnf -y -q install "$@"

@@ -35,7 +35,7 @@ function emuPick(){
 // The node registry moved (a heartbeat, every few seconds): the tab used to
 // fetch its whole listing for each one, though what it draws from a node
 // is the images the census reports. It reads the list the poll already
-// refetched and asks for the listing only when that slice changed (B216).
+// refetched and asks for the listing only when that slice changed.
 let emuCensus = null;
 async function emuOnNodes(){
   await loadNodes();
@@ -87,7 +87,7 @@ function emuAddRows(d, why){
   const job = d.job || {};
   const writing = job.running && job.action === "add" ? new Set(job.images || [job.image]) : new Set();
   // Adding images is an administrator's (the server's gate on /api/emulator):
-  // not offered without the grant (R137 step 4), the list above is everybody's.
+  // not offered without the grant, the list above is everybody's.
   if (state?.can?.admin === false) return "";
   return `<div class="imgadd emadd ctlrow"><label for="imgFlavor">Kind</label>
       <select id="imgFlavor">${
@@ -133,7 +133,7 @@ function emuRow(im, why){
   </div>`;
 }
 
-// The page's two lists under their heads (the operator, 18 Oct: the
+// The page's two lists under their heads (the
 // Emulator had none): the system images the node holds, and the ones to add
 // with their terms and Install selected. The page and its placeholder draw
 // them the same.
@@ -142,7 +142,7 @@ function emuSections(images, count, add){
     + docSection("emulator", "add", "Images to add", "", add);
 }
 // Install selected, and Abort while a job runs, at the foot of Images to add.
-// Each project's phones on the node (R123, the operator 23 Oct: removed on
+// Each project's phones on the node (removed on
 // the page that manages them, not on Storage), largest first: when each last
 // started, its quick-boot snapshot, and a Remove that is refused while it
 // runs. Its next aerie emu start makes it again, empty.
@@ -189,7 +189,7 @@ function renderEmulatorInto(i){
   if (!surf) return;
   const d = emu;
   if (!d){
-    // Its template (R218 step 16): the bar and the add list's label are the
+    // Its template: the bar and the add list's label are the
     // page's own; the node's images are on their way.
     surf.setBar("");
     // In the page's order: its head, its tiles, the images it holds,
@@ -214,31 +214,31 @@ function renderEmulatorInto(i){
   const held = d.wrong_platform ? `${d.name} is ${d.platform}, and the Android tools are packaged for ${d.wrong_platform}`
     : stale ? staleWhy(pnode)
     : d.sdkmanager === false ? `${d.name} needs the Android command-line tools first` : "";
-  // The node is the Build group's header's (R178).
+  // The node is the Build group's header's.
   surf.setBar("");
   patch(surf.list, `
     ${
-    // Its node as a head (the operator, 25 Oct): where the images an
-    // emulator boots are kept; its free space is the tile's (R218 step 24).
+    // Its node as a head: where the images an
+    // emulator boots are kept; its free space is the tile's.
     pageHead({
       pills: d.root && !d.wrong_platform ? "" : `<span class="pill warn">${d.wrong_platform ? "another platform" : "no store yet"}</span>`,
-      // Another platform is its notice's to say (R274); where the images
+      // Another platform is its notice's to say; where the images
       // are kept is said in their own section. The node's images at a
-      // glance (R216) on its status line, in this head as every page's is
-      // (the operator, 24 Nov): how many, the AVDs built on them, the
+      // glance on its status line, in this head as every page's is:
+      // how many, the AVDs built on them, the
       // levels its projects need and have none of, the room left.
       line: !d.wrong_platform && d.known !== false ? [
         {label: (d.images || []).length === 1 ? "image" : "images", value: (d.images || []).length},
         (n => ({label: n === 1 ? "AVD" : "AVDs", value: n, sub: (d.images || []).length === 1 ? "built on it" : "built on them"}))(
           (d.images || []).reduce((n, im) => n + (im.avds || []).length, 0)),
         {label: "levels needed", value: (d.needed || []).length, tone: (d.needed || []).length ? "warn" : "", omit: !(d.needed || []).length},
-        // Storage's reading of a size (sgb), TB past ten of them (B842).
+        // Storage's reading of a size (sgb), TB past ten of them.
         {label: "free", value: typeof d.free_mb === "number" ? sgb(d.free_mb) : "",
          sub: "on the store", omit: typeof d.free_mb !== "number"},
       ] : []})}
     ${
     // Warnings in the notice voice, an action a button beside it rather than
-    // a link in the prose (R218 step 24).
+    // a link in the prose.
     stale ? `<div class="field"><div class="notice warn">${esc(staleWhy(pnode))}. Nothing changes here until it is.</div></div>` : ""}
     ${d.wrong_platform ? `<div class="field"><div class="notice warn emneed">${esc(d.name)} is ${esc(d.platform)},
       and the Android command-line tools and the emulator are packaged for ${
@@ -316,7 +316,7 @@ function renderEmulatorInto(i){
   // finish between two revision polls, and the tab would go from idle to
   // done without ever saying "adding". The index being read is not one: its
   // landing moves the emulator revision, which reads the tab again, and a
-  // timer beside it made an open ask twice (B757).
+  // timer beside it made an open ask twice.
   clearTimeout(emuPoll);
   if (job.running) emuPoll = setTimeout(loadEmulator, 1000);
   if ((job.running || d.loading) && !tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);

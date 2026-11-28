@@ -45,7 +45,7 @@ class Table(unittest.TestCase):
         # Read from the one table, said in toolpacks' own source: the same
         # object only while no other test of the tier has reloaded services
         # (test_seams, test_features_off and test_auto_update do), which
-        # made an identity check fail in a whole run (B1110).
+        # made an identity check fail in a whole run.
         self.assertEqual(toolpacks.SERVICES, services.KINDS)
         with open(toolpacks.__file__, encoding="utf-8") as f:
             self.assertIn("\nSERVICES = services.KINDS\n", f.read())
@@ -148,7 +148,7 @@ class OnANode(unittest.TestCase):
                 self.assertEqual(json.dumps(got[0][k]), json.dumps(the_router[0][k]), f"{step}: {k}")
             self.assertEqual(got[1:], the_paged, step)
             # Each comes to whoever holds Configure on the node, a node's
-            # services all being its (R277), and none to Containers Write.
+            # services all being its, and none to Containers Write.
             self.assertEqual(self.drawn(services.rows("n1", lambda g: g == "configure")),
                              self.drawn(the_router + the_paged), step)
             self.assertEqual(services.rows("n1", lambda g: g == "docker-write"), [], step)

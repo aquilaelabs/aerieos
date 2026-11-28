@@ -1,4 +1,4 @@
-"""The Help page's docs (R258): the ones docs/README.md lists, in its
+"""The Help page's docs: the ones docs/README.md lists, in its
 groups; one read by its name and nothing else; a search that finds a line
 with the section it is under."""
 import os
@@ -60,7 +60,7 @@ class HelpDocs(unittest.TestCase):
         self.assertEqual(helpdocs.search("t")[0]["results"], [])
 
     def test_the_phrase_whole_words_and_the_doc_it_titles_rank_first(self):
-        # B77: "tool pack" listed every line with "tool" and "pack" in it in
+        # "tool pack" listed every line with "tool" and "pack" in it in
         # the docs' order, "toolchains ... packages" first, and the Tool
         # packs doc's own line screens down.
         d = Path(self.tmp.name)

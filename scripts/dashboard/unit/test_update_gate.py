@@ -1,4 +1,4 @@
-"""An agent update waits for its node to go quiet (B516). The agent refuses
+"""An agent update waits for its node to go quiet. The agent refuses
 a self-update while another job runs, and a node a session builds and tests
 on all day refused every press of Update agent. So while one is queued the
 node is handed nothing new, and the update once the node is idle; one that
@@ -92,8 +92,8 @@ class UpdateGate(Gate):
 class HeldJobs(unittest.TestCase):
     """The agent counts a job until the controller takes its end, and posts
     its log before its end. A job this side dropped had every log post
-    refused, so the agent held it forever and refused every update as busy
-    (B519)."""
+    refused, so the agent held it forever and refused every update as busy.
+    """
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -139,7 +139,7 @@ class HeldJobs(unittest.TestCase):
         self.assertIn("press Update agent again", err)
 
     def test_an_update_refused_as_busy_says_what_the_node_was_doing(self):
-        # B862: the row and the bell said "exit 75"; they say what held it,
+        # The row and the bell said "exit 75"; they say what held it,
         # and that nothing retries it.
         self.job("u1", "self-update", state="assigned")
         self.job("j_tc", "toolchain", state="running")
@@ -173,7 +173,7 @@ class AgentFlush(unittest.TestCase):
         self.assertEqual(self.flush(400), (True, []))
 
     def test_a_post_is_kept_under_the_controllers_cap(self):
-        # B520: 40 kB of batch and then a whole 32 kB chunk went over 64 kB.
+        # 40 kB of batch and then a whole 32 kB chunk went over 64 kB.
         sent = []
         class Ctl:
             def call(self, verb, body=None, timeout=30):
@@ -276,7 +276,7 @@ MOVE = '{"apply": "storage", "quiet": true, "config": {}}'
 
 class StoreMoveGate(Gate):
     """A store move waits for the node's jobs AND its sessions' turns, and
-    holds the node while it runs (R120 step 7)."""
+    holds the node while it runs."""
 
     def setUp(self):
         super().setUp()

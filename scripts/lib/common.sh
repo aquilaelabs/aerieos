@@ -56,7 +56,7 @@ on_node() {
 # them back. The one place the shell builds the path, as scopedir.scope_dir
 # is Python's, since a reader has to look where the writer wrote. The
 # account is BB_ACCOUNT_UID unless one is named, and it is in the path on
-# purpose (B159): on a node every account's ~/.cache is a link to the base
+# purpose: on a node every account's ~/.cache is a link to the base
 # home's, so the id is all that separates two accounts' files. With no home
 # to keep it under, a folder of this user's own in /tmp. Set rather than
 # printed, so aerie's token read, made by every verb that signs in, starts
@@ -72,7 +72,7 @@ die()  { printf '[builderbot] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # heavy_first: this process, and all it starts from here on, the kernel's
 # to take before the session that ran it when the machine's memory runs out
-# (R271: on 22 Nov a Gradle build, its emulator and a CI run filled a node,
+# (on 22 Nov a Gradle build, its emulator and a CI run filled a node,
 # every process at the agent's 200, and the sessions dropped with them).
 # A build, a test run, a command run through aerie and the emulator call it
 # first; a Gradle daemon, a suite's browsers and the emulator's qemu inherit
@@ -87,7 +87,7 @@ heavy_first() {
 }
 
 # mem_room_mb: the memory, in MB, this process may still take before the
-# machine or its share of it runs short (R271). The machine's MemAvailable,
+# machine or its share of it runs short. The machine's MemAvailable,
 # or less where the cgroup it runs in, or one above it, is held to less: a
 # CI runner's share of the machine, the fence a node keeps its sessions and
 # jobs in. A cgroup's room is its ceiling (the lower of where it is slowed
@@ -135,7 +135,7 @@ mem_read() {
 }
 
 # is_true VALUE: accepts true/1/yes/on in any case.
-# bb_setting KEY [DEFAULT]: a Settings-tab value (roadmap R29) out of
+# bb_setting KEY [DEFAULT]: a Settings-tab value out of
 # /config/settings.json, else the default. Booleans come out as the words
 # true/false, so is_true reads them. jq is in the image; without it, or without
 # the file, the answer is the default, never a crash at boot.
@@ -191,7 +191,7 @@ sdk_store_root() {
     # the store, which sdk_root then scopes, so taking the agent's at its word
     # scoped it twice: /mnt/SDK/linux-x86_64/linux-x86_64, a directory that
     # does not exist, and every toolchain on the node read as not installed
-    # while it sat there (B89). One name, two meanings; this is where they
+    # while it sat there. One name, two meanings; this is where they
     # meet, so this is where it is settled. Guarded on the scope directory NOT
     # containing another of the same name, so a store somebody really did call
     # linux-x86_64 is still taken at its word.
@@ -202,7 +202,7 @@ sdk_store_root() {
     # store is the agent's (root's) and the jobs account writes only its
     # node's directory, so judged on the store alone a local store read as
     # unwritable and every install went under BUILDER_HOME/.sdk, scoped
-    # again, where nothing looked (B705, Rocky Linux on the dev pair).
+    # again, where nothing looked (Rocky Linux on the dev pair).
     if [ -d "$root" ] && { [ -w "$root" ] || [ -w "$root/$(sdk_scope)" ]; }; then
         # /sdk is the image's own default and exists in the image whether or
         # not anybody mapped a share there, so it has to prove it is a mount
@@ -220,7 +220,7 @@ sdk_store_root() {
 
 # sdk_scope: this machine's directory in the store, so machines sharing one
 # never land binaries on top of each other. On a node the agent names it
-# (BB_SDK_SCOPE), its node id (R196); this container, which has no node id,
+# (BB_SDK_SCOPE), its node id; this container, which has no node id,
 # keeps its own under <os>-<arch> as uname spells them (linux-x86_64).
 sdk_scope() {
     if [ -n "${BB_SDK_SCOPE:-}" ]; then printf '%s' "$BB_SDK_SCOPE"; return; fi
@@ -290,7 +290,7 @@ sdk_removed_marker() {
 }
 
 # sdk_off NAME: whether this project's settings switch the toolchain off for
-# its sessions (R77): bb-tty exports the list, and to bb it is not there.
+# its sessions: bb-tty exports the list, and to bb it is not there.
 sdk_off() {
     case " ${BB_TOOLCHAINS_OFF:-} " in *" $1 "*) return 0 ;; esac
     return 1
@@ -311,7 +311,7 @@ sdk_find() {
 # run_as_builder CMD...: drop privileges when we happen to be root, to the
 # controller's account: the image's builder through gosu, or the account a
 # bare-metal install made through setpriv (BB_ACCOUNT and BB_DROP, set by
-# lib/boot.sh's caller, R90).
+# lib/boot.sh's caller).
 run_as_builder() {
     if [ "$(id -u)" -ne 0 ]; then
         "$@"
@@ -359,7 +359,7 @@ bb_image_log() {
 # bb_root_state: the state folder as a root helper reached through sudo
 # (deploy-key, mint-runner-token) may believe it. sudo hands it no
 # environment worth trusting, so a bare-metal install's is read from its env
-# file, and only when that file is root's and nobody else may write it (R90);
+# file, and only when that file is root's and nobody else may write it;
 # anywhere else it is the container's /config.
 BB_CONTROLLER_ENV="${BB_CONTROLLER_ENV:-/etc/aerieos-controller/controller.env}"
 bb_root_state() {
@@ -556,7 +556,7 @@ tmux_prefix() {
 # unshare_dotfiles HOME: an account's links into the base home, taken down on
 # a node (see user_home). The base home's own launchers first: one that
 # reached its target THROUGH this home's .local link (a claude installed while
-# this account's HOME was set, measured on bb-sandbox as B169) is pointed at
+# this account's HOME was set) is pointed at
 # the base home's own copy, or every account's claude would break the moment
 # this link goes. Only links that point exactly at the base home's copy are
 # removed; anything else in the home is the account's.
@@ -612,7 +612,7 @@ user_home() {
     # image does, and an account made before a name was added to it would
     # otherwise never get the link.
     #
-    # NOT ON A NODE (B157). There every account's session runs in a view and
+    # NOT ON A NODE. There every account's session runs in a view and
     # the base home is read-only in it, so a shared dotfile was either
     # unwritable (a build cache) or a way into the next account's session (a
     # .gradle distribution or jar its build runs, a .local/bin on PATH, a
@@ -644,7 +644,7 @@ user_home() {
 # node's. This is what keeps them one: the projects directory of every
 # account's home, on every machine, is a link to one directory at the same
 # path: the controller's own under /workspace/.claude, and on a node the
-# node's own there, which its agent mirrors with the controller's (B613).
+# node's own there, which its agent mirrors with the controller's.
 # The slug is the working directory with `/` turned into `-`, and path parity
 # (/workspace/<project> on both sides, worktrees included) makes it the same
 # string wherever the session ran, so the controller's Memory tab and
@@ -678,7 +678,7 @@ claude_projects_link() {
     link="$home/.claude/projects"
     # A node holding its projects as a synced copy has no share: its agent
     # makes $share on the node's own /workspace, the session account's,
-    # and mirrors it with the controller's (claudesync.py, B613). /workspace
+    # and mirrors it with the controller's (claudesync.py). /workspace
     # itself is root's there, so the share being writable is enough.
     if ! { [ -d "$share" ] && [ -w "$share" ]; } \
             && ! { [ -d "${share%/*}" ] && [ -w "${share%/*}" ]; }; then
@@ -759,7 +759,7 @@ BB_WORKTREES="${BB_WORKTREES:-${WORKSPACE:-/workspace}/.worktrees}"
 # no account at all; a worktree for anybody else, made on first use and reused
 # after, so somebody coming back to a project finds the branch they left.
 #
-# EACH AGENT ITS OWN TREE (R95, the operator, 22 Oct). One person may run a
+# EACH AGENT ITS OWN TREE. One person may run a
 # Claude session and a Codex session on one project at once, and in one tree
 # they would trample each other exactly as two people would. So an agent
 # other than Claude works in a worktree of its own on a branch of its own,
@@ -767,7 +767,7 @@ BB_WORKTREES="${BB_WORKTREES:-${WORKSPACE:-/workspace}/.worktrees}"
 # owner's project directory, so nothing that exists moves. Their work meets
 # through git, as two people's do.
 #
-# EACH SLOT ITS OWN TREE TOO (R143): a person's second session of one agent
+# EACH SLOT ITS OWN TREE TOO: a person's second session of one agent
 # on a project works in a worktree of its own on <agent>/<name>-N, the
 # owner's included, so the first slot is where it always was.
 session_dir() {
@@ -798,7 +798,7 @@ session_dir() {
     # Not a git repo: there is no worktree to make, and refusing would be worse
     # than sharing: a directory nobody can branch is one nobody can conflict
     # in through git either.
-    # (safe.directory: an account that is its own user, R125, reads a tree
+    # (safe.directory: an account that is its own user reads a tree
     # that is another's, which git otherwise refuses as dubious.)
     git -c safe.directory='*' -C "$src" rev-parse --git-dir >/dev/null 2>&1 || { printf '%s' "$src"; return 0; }
     wt="$BB_WORKTREES/$proj/$uid"
@@ -807,12 +807,12 @@ session_dir() {
     if [ -d "$wt" ]; then printf '%s' "$wt"; return 0; fi
     branch="$agent/$(account_name "$uid" || printf '%s' "$uid")"
     [ "$slot" = 1 ] || branch="$branch-$slot"
-    # An account that is its own user (R125) cannot make a folder beside the
+    # An account that is its own user cannot make a folder beside the
     # tree or run git in it as the tree's owner: bb-session makes it, as that
-    # owner, at this place and on this branch (R125 step 7). Where it does
+    # owner, at this place and on this branch. Where it does
     # not (no helper here, as under the test harness, whose every account
     # is the one user running it), the account makes it itself if it may,
-    # and the project directory is shared only when it may not (B430).
+    # and the project directory is shared only when it may not.
     case "$(id -un 2>/dev/null)" in
         bbu-*)
             local made

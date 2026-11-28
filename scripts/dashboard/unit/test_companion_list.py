@@ -1,5 +1,5 @@
 """The Windows companion's project list says a project's lock as the device
-door reports it (R128): nothing when it is not locked, locked when the lock
+door reports it: nothing when it is not locked, locked when the lock
 leaves this account in, locked against you when it holds this account out."""
 import os
 import sys

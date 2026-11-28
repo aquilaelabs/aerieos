@@ -1,4 +1,4 @@
-"""Keys sent to a session on a node are typed only while they are recent (B999).
+"""Keys sent to a session on a node are typed only while they are recent.
 
 A node that did not answer kept what was sent to its sessions (keys, a
 console's line, Send to Claude) with no age and no cap, and typed it, Enter

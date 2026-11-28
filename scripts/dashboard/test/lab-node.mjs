@@ -1,4 +1,4 @@
-// A real node, on the other end of a real agent (roadmap R54 step 4).
+// A real node, on the other end of a real agent.
 //
 // Everything the harness proves about nodes it proves against a stub: a fake
 // agent, a stub docker, a dpkg that says everything is missing. That is the
@@ -113,7 +113,7 @@ if (!others.length){
   console.log('NOTE  lab-node: one agent node here, so the shared-store half of R54 step 4 '
               + 'is not covered: it needs two nodes mounting one store.');
 } else {
-  // A second node with the SAME store is the arrangement R54 step 4 wants
+  // A second node with the SAME store is the arrangement to be
   // covered, so say which of the two this controller has rather than
   // passing an assertion that cannot fail.
   const mine = ((node.reported || {}).stores || {}).toolchains || {};

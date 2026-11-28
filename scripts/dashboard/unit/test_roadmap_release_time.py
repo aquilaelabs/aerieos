@@ -1,4 +1,4 @@
-"""A release is dated by its tag where the project's git has one (B165): an
+"""A release is dated by its tag where the project's git has one: an
 item finished later on a release's day is the next version's, not that one's.
 The CHANGELOG's day, to its end, stands in where there is no tag."""
 import os

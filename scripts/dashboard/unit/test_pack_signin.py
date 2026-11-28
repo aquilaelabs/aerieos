@@ -1,4 +1,4 @@
-"""A pack's coding agent signed in from the page (R233 step 6): the flow its
+"""A pack's coding agent signed in from the page: the flow its
 pack describes as data (toolpacks.py), the job the controller names for it
 (agents.py), how the flow reads in its job's log (signin.py), the driver
 that works the program's own screens on the node (login-flow.py), what the

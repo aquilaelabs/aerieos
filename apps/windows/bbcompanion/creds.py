@@ -1,4 +1,4 @@
-"""Where the companion app keeps its device token (R270 step 4): Windows'
+"""Where the companion app keeps its device token: Windows'
 Credential Manager, through its own API, so the token is the account's on
 this machine and no file holds it; elsewhere a file only its owner reads.
 The password is never kept anywhere: it is traded once for the token.

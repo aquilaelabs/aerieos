@@ -1,4 +1,4 @@
-"""The controller's boot as steps both installs take (R90 step 3): lib/boot.sh,
+"""The controller's boot as steps both installs take: lib/boot.sh,
 sourced by the container's entrypoint and by a bare-metal install's
 host-boot.sh, each step the same in both, in the same order; what only the
 container does (remapping builder, the timezone, gosu) stays in the
@@ -44,7 +44,7 @@ def steps(path, fn="main"):
 
 class Order(unittest.TestCase):
     def test_signing_secret_alone_is_refused_by_name_never_read(self):
-        # R295: its name before 0.8.0 was read for one release; a start that
+        # Its name before 0.8.0 was read for one release; a start that
         # read it no more and made a new key would lock what it sealed.
         r = sh('INSTALL_KEY=; SIGNING_SECRET=old-words; install_key_file; echo "went on"',
                env={"INSTALL_KEY": "", "SIGNING_SECRET": "old-words"})
@@ -118,7 +118,7 @@ class Steps(unittest.TestCase):
             self.assertNotIn("eyJ", r.stdout)
 
     def test_a_secrets_file_is_read_as_words_and_never_run(self):
-        # B779: the start is root and sourced these files whole, so a line
+        # The start is root and sourced these files whole, so a line
         # that set PATH left the controller in a restart loop ('chmod:
         # command not found') and a command in one ran as root.
         with tempfile.TemporaryDirectory() as d:
@@ -223,7 +223,7 @@ class RootState(unittest.TestCase):
 
 class KeyBeforeHooks(unittest.TestCase):
     """The install key is written before the hooks run, in both boots: hook
-    15 starts the dashboard, which reads the key as it starts (B388)."""
+    15 starts the dashboard, which reads the key as it starts."""
     def test_the_key_before_the_hooks(self):
         for f in ("entrypoint.sh", "host-boot.sh"):
             text = open(os.path.join(SCRIPTS, f), encoding="utf-8").read()
@@ -234,7 +234,7 @@ class KeyBeforeHooks(unittest.TestCase):
 
 class DashboardShielded(unittest.TestCase):
     """The hook that starts the dashboard starts it without the shielded
-    secrets the hooks run with (B389): its own lines, run here."""
+    secrets the hooks run with: its own lines, run here."""
     def test_the_dashboard_starts_without_them(self):
         hook = open(os.path.join(SCRIPTS, "startup.d", "15-dashboard.sh"), encoding="utf-8").read()
         lines = [ln for ln in hook.splitlines() if ln.startswith(("unset_args=", "for v in ${BB_SHIELDED"))]
@@ -249,7 +249,7 @@ class DashboardShielded(unittest.TestCase):
 
 class InstallKey(unittest.TestCase):
     """install_key_file under set -u (the boot's own): an install with a key
-    and no previous one starts, and one with both keeps both (R126)."""
+    and no previous one starts, and one with both keeps both."""
     def run_it(self, env):
         d = tempfile.mkdtemp()
         body = (f'eval "$(declare -f install_key_file | sed "s#/run/builderbot-key#{d}/key#")"\n'
@@ -268,7 +268,7 @@ class InstallKey(unittest.TestCase):
 
 
 class MadeKey(unittest.TestCase):
-    """No INSTALL_KEY: the install makes its own (R154), in the secrets folder
+    """No INSTALL_KEY: the install makes its own, in the secrets folder
     when it can write there, else beside the state, and moves it into the
     secrets folder once that can take it; a second start keeps it."""
     def run_it(self, secrets, state):

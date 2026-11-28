@@ -1,4 +1,4 @@
-"""The memory fence as a node's census says it (R110 step 4): the slice's
+"""The memory fence as a node's census says it: the slice's
 limit and what is in it, or None where there is no fence or no limit."""
 import os
 import shutil

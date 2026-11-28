@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# The command every terminal runs (R133): a pty of the dashboard's own on the
+# The command every terminal runs: a pty of the dashboard's own on the
 # controller (termws.local), or of a node agent's screen relay (term.py).
 #
 # The browser chooses this script's arguments, one per ?arg= of /termws.
@@ -22,10 +22,10 @@ set -euo pipefail
 # dashboard suite drive this script at all.
 . "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
-# An account's own user on a node (R125) runs this script outside every
+# An account's own user on a node runs this script outside every
 # view, with the account's home, and that home is what its sessions write.
 # So the account's terminal server starts on AerieOS's own settings alone
-# and never on ~/.tmux.conf (the operator, 13 Nov; the audit of 13 Nov): a
+# and never on ~/.tmux.conf: a
 # line in that file ran as the account outside its view. Known by the grant
 # bb-session tty hands this script when it starts it as that user, which
 # nothing else sets. A function of this shell, not its environment, so
@@ -38,7 +38,7 @@ if [ -n "${BB_TTY_GRANT:-}" ]; then
     tmux() { command tmux -f "$BB_TMUX_OWN" "$@"; }
 fi
 
-# A terminal that ends before it starts says so in its tab and waits (R132):
+# A terminal that ends before it starts says so in its tab and waits:
 # set -e ends this script at whatever failed, without a word, and the tab
 # then shows an empty terminal that ended with nothing on the screen. The
 # exec into tmux replaces this script, so a terminal that started never
@@ -111,7 +111,7 @@ for extra in "${@:2}"; do
     esac
 done
 
-# ---- on a node, the controller says whose this is (B166) --------------------
+# ---- on a node, the controller says whose this is --------------------
 #
 # Everything above is what the URL claimed. On the controller that is the
 # account /termws proved, since the dashboard is the one way to start this
@@ -123,7 +123,7 @@ done
 # the name and ownership come from its answer. No answer, no terminal: a node
 # that cannot reach the controller cannot start a session anyway.
 grant=""
-# Started by bb-session tty as the account's own user (R125), the controller
+# Started by bb-session tty as the account's own user, the controller
 # has already answered, as root, and the answer came along: believed only by
 # a process that IS that account's user, which only root could have made it.
 if on_node && [ -n "${BB_TTY_GRANT:-}" ] \
@@ -134,7 +134,7 @@ if on_node && [ -n "${BB_TTY_GRANT:-}" ] \
 fi
 unset BB_TTY_GRANT
 if on_node && [ -z "${grant:-}" ]; then
-    # A terminal opening does not wait out a restarting controller (R251):
+    # A terminal opening does not wait out a restarting controller:
     # the tab says so at once. Set on this call alone, so the session it
     # starts keeps bb's own wait.
     grant="$(BB_CONTROLLER_WAIT=0 BB_TTY_TARGET="$target" BB_URL_TOKEN="$url_tok" python3 - "$(dirname "$(readlink -f "$0")")/../lib" 2>&1 <<'GRANT'
@@ -174,26 +174,26 @@ if on_node && [ -n "${grant:-}" ]; then
     # into the view read-only, and Claude's walls let it read them.
     BB_READS="$(printf '%s' "$grant" | jq -r '(.reads // []) | join(" ")')"
     export BB_READS
-    # The other repositories of its project (R136), worked in by a coding
+    # The other repositories of its project, worked in by a coding
     # agent's session as its own is, each with its token kept where bb in
     # that tree reads it.
     BB_WORKS="$(printf '%s' "$grant" | jq -r '(.works // []) | join(" ")')"
     export BB_WORKS
-    # Held here and written once the session's folders are made (B329):
+    # Held here and written once the session's folders are made:
     # this runs before the functions that place them are defined.
     BB_WORK_TOKENS="$(printf '%s' "$grant" | jq -r '(.tokens // {}) | to_entries[] | "\(.key) \(.value)"')"
     # ...and the places on this node it is shown besides (prefs.sees): a
     # share the view would otherwise leave out with every other.
     BB_SEES="$(printf '%s' "$grant" | jq -r '(.sees // []) | join(" ")')"
     export BB_SEES
-    # Whether this session may compute on the node's NVIDIA card (R102):
+    # Whether this session may compute on the node's NVIDIA card:
     # off on the node's row, or in the project's settings. CUDA is told
     # there is no device, so a program falls back to its CPU path with a
     # plain answer, and the view covers the device CUDA cannot start
     # without. BB_GPU says why to aerie gpu and aerie status.
     BB_GPU="$(printf '%s' "$grant" | jq -r '.gpu // "on"')"
     export BB_GPU
-    # ...and whether its Gradle builds on the node's disk (B439, on unless
+    # ...and whether its Gradle builds on the node's disk (on unless
     # the project's settings say otherwise): gradle_local_build reads it.
     BB_BUILD_LOCAL="$(printf '%s' "$grant" | jq -r 'if .build_local == false then "off" else "on" end')"
     export BB_BUILD_LOCAL
@@ -203,10 +203,10 @@ if on_node && [ -n "${grant:-}" ]; then
     BB_NODE_ID="$(printf '%s' "$grant" | jq -r '.node // ""')"
     export BB_NODE_ID
     # The container a ctr: terminal goes into, as the controller checked it
-    # against the instance's running ones (R218 step 4): the URL's own word
+    # against the instance's running ones: the URL's own word
     # for it is never taken here, where anything on the node can write one.
     grant_ctr="$(printf '%s' "$grant" | jq -r '.ctr // ""')"
-    # ...and the VM a vm: console opens (R91), by its libvirt name from the
+    # ...and the VM a vm: console opens, by its libvirt name from the
     # controller's record.
     grant_vm="$(printf '%s' "$grant" | jq -r '.vm // ""')"
     if [ "$(printf '%s' "$grant" | jq -r '.owner // false')" = true ]; then
@@ -219,7 +219,7 @@ fi
 # tmux_settings: AerieOS's tmux settings (lib/tmux.conf: the status line,
 # PgUp's scrollback, the history kept) given to the tmux server this runs
 # under. The controller's own reads the copy its start writes; a node's, an
-# account's own and the docker account's have no such copy (B283).
+# account's own and the docker account's have no such copy.
 tmux_settings() {
     tmux source-file "$(dirname "$(readlink -f "$0")")/../lib/tmux.conf" 2>/dev/null || true
 }
@@ -230,7 +230,7 @@ tmux_keys() {
     tmux source-file "$(dirname "$(readlink -f "$0")")/../lib/tmux-keys.conf" 2>/dev/null || true
 }
 
-# ---- a container's shell on a node (R218 step 4) -----------------------------
+# ---- a container's shell on a node -----------------------------
 #
 # The agent's container terminal (its ctr kind) runs this as the docker account, which is
 # kept apart from the session account (that one is in no docker group on
@@ -242,7 +242,7 @@ tmux_keys() {
 if [ "${BB_TTY_CTR:-}" = 1 ]; then
     ctr_no() { for line in "$@"; do echo "$line" >&2; done; if [ -t 2 ]; then sleep 10; fi; exit 1; }
     on_node || ctr_no "A container terminal server runs on a node and nowhere else."
-    # A VM's serial console (R91): virsh console as this account, which the
+    # A VM's serial console: virsh console as this account, which the
     # VM host feature put in the libvirt group, into the domain the grant
     # names. Ctrl+] leaves it, as virsh says.
     if [ "${target%%:*}" = vm ]; then
@@ -257,7 +257,7 @@ if [ "${BB_TTY_CTR:-}" = 1 ]; then
         tmux_keys
         exec tmux attach-session -t "$s"
     fi
-    # A container's log in a dock tab (R133 step 12): docker logs followed,
+    # A container's log in a dock tab: docker logs followed,
     # its last lines first, in no tmux, so a reconnect shows them again.
     # Nothing typed reaches it.
     case "$target" in
@@ -293,7 +293,7 @@ if [ -n "$account" ]; then
     export HOME
 fi
 
-# On a node the toolchain store is read-only in a session's view (B163), and
+# On a node the toolchain store is read-only in a session's view, and
 # two things a session does were writes into it. Rust's crate cache is
 # CARGO_HOME, which the store's layout puts at rust/cargo: it is the
 # account's own now, and the store's cargo/bin stays on PATH for the proxies,
@@ -306,12 +306,12 @@ fi
 # Java's home is not $HOME. It is the passwd entry's, and every account's
 # session runs as the one session user, so Gradle, the Android tools and the
 # Kotlin compile daemon all wrote under the base home, which the view makes
-# read-only: an Android build in a session died on Gradle's wrapper lock
-# (B182). Each is pointed at the account's own home by the variable it
+# read-only: an Android build in a session died on Gradle's wrapper lock.
+# Each is pointed at the account's own home by the variable it
 # honors: GRADLE_USER_HOME for Gradle's caches and wrapper, ANDROID_USER_HOME
 # for the debug keystore and the SDK tools' settings, and XDG_DATA_HOME,
 # which is where the Kotlin daemon keeps its run files on Linux. Per account,
-# as the crate cache is: the operator's call for B157.
+# as the crate cache is.
 if on_node && [ -n "$account" ]; then
     [ -z "${CARGO_HOME:-}" ] || export CARGO_HOME="$HOME/.cargo"
     export GRADLE_USER_HOME="$HOME/.gradle" ANDROID_USER_HOME="$HOME/.android" \
@@ -336,7 +336,7 @@ sess() {
     printf '%s%s' "$(tmux_prefix "$account")" "$1"
 }
 
-# Projects their owner has locked (R119): nobody else starts a session in
+# Projects their owner has locked: nobody else starts a session in
 # one. Shared with the dashboard, which writes the list; enforced here,
 # because a rule only the UI honors is a suggestion: a terminal's URL can be
 # asked for directly.
@@ -355,7 +355,7 @@ is_locked() {
         return
     fi
     if [ -f "$LOCKS_FILE" ]; then
-        # A lock is its project's (R138): asked by the repository's name, the
+        # A lock is its project's: asked by the repository's name, the
         # project it is in is looked up and either name holds.
         local key=""
         [ -f "$REPOS_FILE" ] && key="$(jq -r --arg n "$1" '(.projects // {}) | to_entries
@@ -383,12 +383,12 @@ siblings_of() {
 # agent_models AGENT, agent_efforts AGENT: the models and efforts an agent
 # other than Claude takes, one list each (agents.py MODELS and EFFORTS, held
 # to it by unit/test_agents.py): what Start may pass and what a launcher
-# reads back from a person's kept pick at exec (R95 steps 9 and 19).
+# reads back from a person's kept pick at exec.
 agent_models() {
     case "$1" in
         codex) printf %s "gpt-6.1-sol gpt-6-sol gpt-6-astra gpt-6-luna gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5" ;;
         copilot) printf %s "auto claude-sonnet-5.5 claude-opus-5.5 claude-haiku-5.5 gpt-6.1-sol gpt-6-sol gpt-5.6-sol gpt-5-mini gemini-4-argon gemini-3.8-flash grok-4.7" ;;
-        # A pack agent's, from its adapter (R169 step 10).
+        # A pack agent's, from its adapter.
         "${PACK_AGENT:-//}") jq -r '(.models // []) | join(" ")' <<<"$PACK_ADAPTER" 2>/dev/null ;;
     esac
 }
@@ -430,7 +430,7 @@ walls_around() {
 # tree_slug DIR - the folder Claude Code keeps a tree's conversations in, under
 # ~/.claude/projects: the path with every character that is not a letter or a
 # digit a dash, as Claude Code names it (claudesync.slug). Its slashes alone
-# missed a worktree's .worktrees and u_ (B348).
+# missed a worktree's .worktrees and u_.
 tree_slug() {
     printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g'
 }
@@ -438,8 +438,8 @@ tree_slug() {
 # cache_project_dir PROJECT - this account's AerieOS cache folder for one
 # project, made if it is missing: its launcher, its scope, its token and its
 # session's environment. A folder per project, so that a session's view can
-# keep its own and leave every other project's out (R35).
-# THE ACCOUNT IN THE PATH IS NOT DECORATION (B159). On a node every account's
+# keep its own and leave every other project's out.
+# THE ACCOUNT IN THE PATH IS NOT DECORATION. On a node every account's
 # ~/.cache is a symlink to the base home's (common.sh shares the tool folders),
 # so without the uid this is ONE folder for everybody: two accounts with a
 # session on one project shared a token file and the last to start owned it,
@@ -465,14 +465,14 @@ home_project_dir() {
     printf '%s' "$_bb_scope"
 }
 
-# THE SESSION'S VIEW (R35). Every session on a node runs as one account and
+# THE SESSION'S VIEW. Every session on a node runs as one account and
 # the node holds every project bound to it, so the scope file below is all that
 # stands between a session and another project, and Bash is not under it.
 # Where the node can build one, a project's session runs inside a view of the
 # machine that holds only that project: bb-session, root, and the one command
 # the session account may run through sudo. The agent installs both.
 SESSION_BIN="${BB_SESSION_BIN:-/usr/local/sbin/bb-session}"
-# What only a controller installed bare metal leaves on a machine (R90, the
+# What only a controller installed bare metal leaves on a machine (the
 # same as bb-session's CONTROLLER_MARKS): where one is, a session runs in
 # its view or not at all.
 CONTROLLER_MARKS=(/etc/bb-session.wall /etc/aerieos-controller /var/lib/aerieos-controller)
@@ -496,7 +496,7 @@ in_view() {
     shift 2
     RUN=("$@")
     if ! isolating; then
-        # ...but never on the controller's own machine (R90): there a
+        # ...but never on the controller's own machine: there a
         # session runs inside the wall bb-session keeps around the
         # controller, or not at all, and the check says what is missing.
         local m
@@ -509,9 +509,9 @@ in_view() {
         return 0
     fi
     [ $# -gt 0 ] || set -- "${SHELL:-/bin/bash}" -l
-    # The project's own Gradle home (B438), here too: an isolated session's
+    # The project's own Gradle home, here too: an isolated session's
     # environment is this file, which the helper loads over what tmux was
-    # handed, so start()'s per-project value never reached it and every such
+    # handed, so start's per-project value never reached it and every such
     # session built in the account's ~/.gradle, where another project's idle
     # daemon held the journal lock (report #54).
     if [ -n "${GRADLE_USER_HOME:-}" ] && [ -n "$account" ]; then
@@ -521,12 +521,12 @@ in_view() {
     envf="$(cache_project_dir "$proj")/session.env"
     # Through a temporary of this launch's own: two terminals of one
     # account in one space starting at once shared one fixed name, and the
-    # second's mv found the first had moved it already (B901).
+    # second's mv found the first had moved it already.
     ( umask 077; t="$(mktemp "$envf.XXXXXX")" && { env -0 > "$t" && mv -f "$t" "$envf" || { rm -f "$t"; false; }; } ) \
         || bad "Could not write this session's environment to $envf, so its view cannot start."
     # Where what Claude Code keeps in /tmp between the turns of a
     # conversation lives, so a session started again on the same
-    # conversation finds it (B376): the view binds this over
+    # conversation finds it: the view binds this over
     # /tmp/claude-<uid>. Made here, as the session account. A conversation's
     # folder nothing has written to in two weeks goes, so it does not grow
     # for good; one still in use is written to on every turn.
@@ -537,7 +537,7 @@ in_view() {
     fi
     # ...and Claude Code's register of running sessions, which it names by
     # pid: every view is its own pid namespace, so every session was pid 9
-    # and an account's sessions on one node shared one file (B522). The view
+    # and an account's sessions on one node shared one file. The view
     # binds this over ~/.claude/sessions, so each project keeps its own.
     ( umask 077; mkdir -p "$(cache_project_dir "$proj")/claude-sessions" ) 2>/dev/null || true
     # The projects this one reads, one --reads each: the helper binds their
@@ -548,7 +548,7 @@ in_view() {
     for r in ${BB_WORKS:-}; do reads+=(--works "$r"); done
     # ...and the places it is shown, one --sees each,
     for r in ${BB_SEES:-}; do reads+=(--sees "$r"); done
-    # ...the toolchains it may not use left out of its view of the store (R77),
+    # ...the toolchains it may not use left out of its view of the store,
     for r in ${BB_TOOLCHAINS_OFF:-}; do reads+=(--off "$r"); done
     # ...and the card's compute device covered where it is not this session's.
     [ "${BB_GPU:-on}" = on ] || reads+=(--cuda off)
@@ -637,36 +637,36 @@ claude_scope() {
     # others sharing it know what is being worked on before they start the
     # same thing. bb-check-relay runs, when the session is about to stop, the
     # checks of the house rules whose files it changed, and refuses the stop
-    # while one fails (roadmap R31). bb-rule-hook guard refuses a Bash call
+    # while one fails. bb-rule-hook guard refuses a Bash call
     # that runs a command a rule refuses, and bb-rule-hook recall says again,
     # after Claude Code summarizes the conversation, the named rules it had
-    # been told (R200). bb-gate --turn holds a prompt until the
+    # been told. bb-gate --turn holds a prompt until the
     # node's limit on sessions working at once has a turn free (turns.py),
     # and --turn-done on Stop hands it back. bb-gate --asking, on Claude
     # Code's own permission prompt, marks the session as waiting on a person,
-    # which the dock and the bell show (B52). Its timeout is its own: a
+    # which the dock and the bell show. Its timeout is its own: a
     # UserPromptSubmit hook gets thirty seconds otherwise, and one that runs
     # out lets the prompt through uncounted. All of them swallow every failure
     # of their own: a note is never worth an edit and a line is never worth a
     # turn. Their headers have the arguments.
-    # The hooks by a name that outlives this bundle (B120). On a node bb-tty
+    # The hooks by a name that outlives this bundle. On a node bb-tty
     # runs from .bb/<digest>, and the settings file is read once, when claude
     # starts, so a path resolved there kept a session on the hooks it began
     # with for as long as it stayed open, however many deliveries followed.
     # Through .bb/current each hook call runs whatever was delivered last, the
-    # way B66 put bb on PATH. A checkout has no current link and keeps the
+    # way bb is put on PATH. A checkout has no current link and keeps the
     # path it always had.
     hooks="$(lasting_dir)"
     # A project this one reads is a wall to Edit and not to Read: its tree
     # is in the view read-only, and the deny list says the same.
     local readsq worksq
     readsq="$(for r in ${BB_READS:-}; do printf '%s\n' "$WORKSPACE/$r"; done | jq -R . | jq -s .)"
-    # ...and its project's other repositories (R136) are no wall at all:
+    # ...and its project's other repositories are no wall at all:
     # their trees and this session's worktrees of them are its to write,
     # each one's VERSION held as its own is.
     # Both lists into the one pipe: the first loop's paths went out bare in
     # front of the second's JSON, which jq refused, and a session of a project
-    # of several repositories started with no scope at all (B380).
+    # of several repositories started with no scope at all.
     worksq="$({ for r in ${BB_WORKS:-}; do printf '%s\n' "$WORKSPACE/$r"; done
                for r in ${BB_WORK_DIRS:-}; do printf '%s\n' "$r"; done; } | jq -R . | jq -s .)"
     if walls_around "$proj" "$here" | jq -R . \
@@ -762,7 +762,7 @@ PY
     dir="$(cache_project_dir "$proj")"
     # Named for its agent (claude-run.sh, codex-run.sh), which is what the
     # session-is-really-this-agent check reads off the pane, and for its
-    # slot past the first (claude-2-run.sh, R143), so a second session's
+    # slot past the first (claude-2-run.sh), so a second session's
     # start never rewrites the file the first one respawns through.
     out="$dir/$ag-run.sh"
     [ "${BB_SLOT:-1}" = 1 ] || out="$dir/$ag-${BB_SLOT}-run.sh"
@@ -794,11 +794,11 @@ PY
         # direction: bb then says it has no credential rather than falling
         # back to the operator's.
         printf 'unset DASHBOARD_AUTH\n'
-        # Which coding agent this session is (R95): what bb reads to know a
+        # Which coding agent this session is: what bb reads to know a
         # session asked, whichever agent it is (Claude Code also sets its
         # own CLAUDECODE), and what a held change names as its asker.
         printf 'export BB_AGENT=%q\n' "$ag"
-        # ...and which of its slots on the project (R143), which its hooks
+        # ...and which of its slots on the project, which its hooks
         # say with every report so each slot's state is its own.
         printf 'export BB_SLOT=%q\n' "${BB_SLOT:-1}"
         # ...and whose, for the hooks another agent runs (bb-agent-hook),
@@ -838,7 +838,7 @@ PY
             "$account" "$proj" '.users[$u][$n].model // empty' "$PREFS_FILE"
         printf '  e="$(jq -r --arg u %q --arg n %q %q %q 2>/dev/null)"\n' \
             "$account" "$proj" '.users[$u][$n].effort // empty' "$PREFS_FILE"
-        # Another agent's are its own keys (R95 steps 9 and 19), read at exec
+        # Another agent's are its own keys, read at exec
         # as Claude's are, so a respawn picks up a change for every agent.
         if [ "$ag" != claude ]; then
             printf '  am="$(jq -r --arg u %q --arg n %q %q %q 2>/dev/null)"\n' \
@@ -869,7 +869,7 @@ PY
             printf 'case " %s " in *" ${am:-} "*) ;; *) am="" ;; esac\n' "$(agent_models "$ag")"
             printf 'case " %s " in *" ${ae:-} "*) ;; *) ae="" ;; esac\n' "$(agent_efforts "$ag")"
         fi
-        # Any model's (R144): the model as the router lists it, held to the
+        # Any model's: the model as the router lists it, held to the
         # list handed over at this session's start, and OpenCode's config
         # beside this file (opencode_config wrote it), with the router's
         # key in the environment the config reads it from and the plugin's
@@ -881,7 +881,7 @@ PY
             printf 'export BB_ROUTER_KEY=%q OPENCODE_CONFIG=%q BB_TRANSCRIPT_DIR=%q\n' "${BB_ROUTER_KEY:-}" "$dir/opencode.json" "$tdir/open"
             printf 'export OPENCODE_DISABLE_AUTOUPDATE=1\n'
         fi
-        # A pack agent's own lines (R169 step 10), quoted by bb-agent-hook
+        # A pack agent's own lines, quoted by bb-agent-hook
         # from its adapter: its environment words, the briefing its way from
         # its file, the model after its flag, its resume on a respawn.
         if [ -n "${PACK_AGENT:-}" ] && [ "$ag" = "$PACK_AGENT" ]; then
@@ -898,8 +898,8 @@ PY
         # Codex trusts a hook by its hash, after a person reviews it.
         # AerieOS's own are its guards: trusted for this launch by the
         # hashes this Codex reports for them (bb-codex-trust), and only where
-        # it cannot say, run under the bypass flag, which it then warns of
-        # (B284). Embedded, said so (--no-daemon): a session's Codex is its
+        # it cannot say, run under the bypass flag, which it then warns of.
+        # Embedded, said so (--no-daemon): a session's Codex is its
         # own, never a server another account's shares, and the -c arguments
         # need it, which Codex otherwise warns of too.
         if [ "$ag" = codex ]; then
@@ -943,7 +943,7 @@ PY
         # Only when the base command does not already name one: a session
         # opened from the resume chooser carries its own --resume, and claude
         # would be handed the flag twice.
-        # Every agent's the same way (R95 step 19): Codex CLI's newest
+        # Every agent's the same way: Codex CLI's newest
         # conversation in this folder (resume --last keeps to the working
         # directory), Copilot CLI's newest in this tree (below), Grok Build's
         # newest in its folder (-c).
@@ -956,7 +956,7 @@ PY
                     printf 'fi\n' ;;
                 codex)   printf 'if [ "${1:-}" = --respawn ]; then extra+=(resume --last); fi\n' ;;
                 # Copilot's --continue is its newest anywhere, which with
-                # two slots on a project is either's (R143): the newest its
+                # two slots on a project is either's: the newest its
                 # Stop hook kept for this tree instead, by its id.
                 copilot)
                     printf 'if [ "${1:-}" = --respawn ]; then\n'
@@ -1050,7 +1050,7 @@ lasting_dir() {
     # starts from since each account became its own user. Only .bb was
     # known here, so a session's hooks named root's copy by its digest
     # again, and when that copy was pruned every hook of the session failed
-    # as a program that could not be run (19 Nov; B120 was the same thing
+    # as a program that could not be run (as had happened
     # for .bb).
     case "$here" in
         */scripts/dashboard)
@@ -1061,8 +1061,8 @@ lasting_dir() {
     printf '%s' "$here"
 }
 
-# agent_hooks AGENT: AerieOS's guards as the agent's own hooks (R95 step
-# 6), in the account's home for it, where its every session reads them:
+# agent_hooks AGENT: AerieOS's guards as the agent's own hooks,
+# in the account's home for it, where its every session reads them:
 # Codex CLI's hooks.json, Copilot CLI's hooks/builderbot.json. Each hook is
 # bb-agent-hook with the agent and the event; it takes the project and the
 # account from the session's environment (BB_PROJECT, BB_AGENT_WHO, which
@@ -1104,7 +1104,7 @@ agent_hooks() {
               def ours(ev; t): [{hooks: [{type: "command", command: "\($c) \(ev)", timeout: t}]}];
               {hooks: (reduce $evs[] as [$n, $ev, $t] ({}; .[$n] = ours($ev; $t)))}' \
                 > "$f.new" 2>/dev/null && mv -f "$f.new" "$f" ;;
-        # OpenCode's guards are a plugin of AerieOS's (R144 step 2) in
+        # OpenCode's guards are a plugin of AerieOS's in
         # the account's global plugins folder, which every session of its
         # loads: each hook runs bb-agent-hook with the agent and the event,
         # a tool refused by exit 2 thrown so OpenCode does not run it, and
@@ -1199,11 +1199,11 @@ agent_allow() {
 }
 
 # agent_first_run AGENT DIR: another coding agent's "trust this folder?",
-# answered for the session's own tree where it is not answered already (R95),
+# answered for the session's own tree where it is not answered already,
 # the way claude_first_run answers Claude Code's. Codex CLI keeps it in its
 # config.toml ([projects."DIR"] trust_level), Copilot CLI in its config.json
 # (trustedFolders); appended or merged, never replacing what is there.
-# Checked against Codex CLI 0.163.0 and Copilot CLI 1.0.102 (22 Oct).
+# Checked against Codex CLI 0.163.0 and Copilot CLI 1.0.102.
 # Sets AGENT_TRUST_ADDED=1 and AGENT_TRUST_FILE when the answer was missing
 # and has just been written, as CLAUDE_TRUST_ADDED says for Claude Code.
 AGENT_TRUST_ADDED=0
@@ -1221,13 +1221,13 @@ agent_first_run() {
             f="${COPILOT_HOME:-$HOME/.copilot}/config.json"
             ( umask 077; mkdir -p "${f%/*}" ) 2>/dev/null || return 1
             [ -s "$f" ] || printf '{}\n' > "$f"
-            # Read past the // lines 1.0.103 opens it with, and kept (B282).
+            # Read past the // lines 1.0.103 opens it with, and kept.
             local head body
             head="$(grep '^[[:space:]]*//' "$f" 2>/dev/null)"
             grep -v '^[[:space:]]*//' "$f" | jq -e --arg d "$dir" '(.trustedFolders // []) | index($d)' >/dev/null 2>&1 && return 0
             body="$(grep -v '^[[:space:]]*//' "$f" | jq --arg d "$dir" '.trustedFolders = ((.trustedFolders // []) + [$d])')" || return 1
             # Written through the file, never moved over it: where sign-ins
-            # are sealed (R126) config.json is a link into the account's
+            # are sealed config.json is a link into the account's
             # opened copy, and a move would leave a plain file in the home.
             { [ -z "$head" ] || printf '%s\n' "$head"; printf '%s\n' "$body"; } > "$f.new" \
                 && cat "$f.new" > "$f" && rm -f "$f.new" || return 1 ;;
@@ -1308,8 +1308,8 @@ no_credential_here() {
     export GIT_CONFIG_COUNT=2
     export GIT_CONFIG_KEY_0=credential.helper
     export GIT_CONFIG_VALUE_0='!f() { echo "[builderbot] no git credential is on this machine, by design: the controller holds the keys. Use aerie git push, fetch, pull or ls-remote, which relay through it" >&2; exit 1; }; f'
-    # ...and every tree taken as its own where an account is its own user
-    # (R125 step 7): its view maps its trees to it, and a tree the map could
+    # ...and every tree taken as its own where an account is its own user:
+    # its view maps its trees to it, and a tree the map could
     # not reach (a share) is still another's, which git refuses as dubious.
     # Command scope, which git honors for safe.directory.
     export GIT_CONFIG_KEY_1=safe.directory GIT_CONFIG_VALUE_1='*'
@@ -1347,7 +1347,7 @@ git_identity() {
     email="$(printf '%s' "$s" | jq -r '.git_email // empty' 2>/dev/null)"
     name="$(printf '%s' "$s" | jq -r '.git_name // empty' 2>/dev/null)"
     git_ready="$(printf '%s' "$s" | jq -r 'if has("git_ready") then (.git_ready | tostring) else empty end' 2>/dev/null)"
-    # The toolchains this project's sessions may not use (R77): its settings'
+    # The toolchains this project's sessions may not use: its settings'
     # Toolchains group. Out of PATH here, out of the view in in_view, and
     # sdk_find answers "not installed" for them, so aerie tool refuses them too.
     BB_TOOLCHAINS_OFF="$(printf '%s' "$s" | jq -r '(.toolchains_off // []) | join(" ")' 2>/dev/null)" || BB_TOOLCHAINS_OFF=""
@@ -1356,7 +1356,7 @@ git_identity() {
     [ -n "$name" ] || return 0
     export GIT_AUTHOR_NAME="$name" GIT_COMMITTER_NAME="$name"
     [ -z "$email" ] || export GIT_AUTHOR_EMAIL="$email" GIT_COMMITTER_EMAIL="$email"
-    # ...and the same pair as git's own user.name and user.email (B5), beside
+    # ...and the same pair as git's own user.name and user.email, beside
     # the credential helper no_credential_here set, so `git config user.name`
     # and what reads it (Claude Code's status line) name the author a commit
     # carries rather than a home's .gitconfig from before the Profile had one.
@@ -1380,14 +1380,14 @@ boot_id() {
     [ -n "$start" ] && [ -n "$first" ] && printf '%s.%s' "$first" "$start"
 }
 
-# A Gradle project's build folders on the node's own disk (B439): the init
+# A Gradle project's build folders on the node's own disk: the init
 # script lib/gradle-local-build.gradle in the project's Gradle home, and the
 # place it builds into, BB_LOCAL_BUILD, under the account's cache on this
 # machine. Off in the project's settings, both go. Only on a node.
 gradle_local_build() {
     [ -n "${GRADLE_USER_HOME:-}" ] && [ -n "${account:-}" ] && on_node || return 0
     # A space's build folder: a bare shell, a named scratch session and
-    # sh:N: with no space have none, and set -u ended them on proj (B906).
+    # sh:N: with no space have none, and set -u ended them on proj.
     local p="${BB_PROJECT:-${proj:-}}"
     [ -n "$p" ] || return 0
     local init="$GRADLE_USER_HOME/init.d/builderbot-local-build.gradle"
@@ -1418,9 +1418,9 @@ forget_history() {
 # start() makes, and its build folders on the node's disk set up or taken
 # away to match (gradle_local_build).
 start_gradle_home() {
-    # Gradle's cache per project (B438). Gradle hands a cache lock over by
+    # Gradle's cache per project. Gradle hands a cache lock over by
     # asking its owner on localhost, and each session has a network of its
-    # own (R79), so the ask never arrived: one project's idle daemon held the
+    # own, so the ask never arrived: one project's idle daemon held the
     # account's ~/.gradle and another project's build timed out on it. A
     # home per project keeps two projects' builds out of each other's locks;
     # a project's first build there fetches its own dependencies once. It is
@@ -1438,7 +1438,7 @@ start_gradle_home() {
 start_account_envs() {
     local v
     # BB_TREE_OWNER with them: kept out of the server's environment below as
-    # one account's, it reached no pane at all on a node (B430), so bb never
+    # one account's, it reached no pane at all on a node, so bb never
     # knew the owner there.
     for v in HOME BB_TOKEN BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_LOCAL_BUILD BB_WORKS BB_WORK_DIRS \
              GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL CARGO_HOME \
@@ -1447,7 +1447,7 @@ start_account_envs() {
              GIT_CONFIG_KEY_2 GIT_CONFIG_VALUE_2 GIT_CONFIG_KEY_3 GIT_CONFIG_VALUE_3 GIT_TERMINAL_PROMPT BB_TOOLCHAINS_OFF; do
         [ -n "${!v:-}" ] && envs+=(-e "$v=${!v}")
     done
-    # No history on disk (the operator, 27 Oct): a person's shell and their
+    # No history on disk: a person's shell and their
     # coding agents' sessions run as the same user, so a history file in the
     # home was one any of their agents could read, a token typed on a command
     # line among it. Each shell keeps its own in memory, which no other
@@ -1469,14 +1469,14 @@ start_tmux_server() {
     # holds that bare server up until new-session below: a server with no
     # session exits as soon as the command that started it is done, so every
     # setting made here reached nothing on an account's first terminal, and
-    # with no default-shell a pane on nologin ended at once (B608).
+    # with no default-shell a pane on nologin ended at once.
     tmux start-server \; set-option -g exit-empty off 2>/dev/null || true
     # Every pane's command runs through tmux's default shell, which is the
     # login shell where nothing set it, and an account's own user has
-    # nologin for one (B277): bash, whoever this runs as.
+    # nologin for one: bash, whoever this runs as.
     tmux set-option -g default-shell "$(command -v bash)" 2>/dev/null || true
     # A pane whose command fails stays, with what it said and a line saying
-    # so (R132): it closed with the reason in it, and the tab reconnected to
+    # so: it closed with the reason in it, and the tab reconnected to
     # the same failure in a loop with nothing on the screen. One that ends
     # cleanly still goes, and so does its tab.
     tmux set-option -g remain-on-exit failed 2>/dev/null || true
@@ -1543,7 +1543,7 @@ start_new_session() {
     # this runs on one, less the rows the status line takes: made at tmux's
     # own 80 by 24 and attached from a shorter terminal, a pane that had
     # already ended lost its top lines, which say why it ended, into its
-    # history, and the tab showed only that it had (B787).
+    # history, and the tab showed only that it had.
     local tsz=() trc tst
     trc="$(stty size 2>/dev/null || true)"
     if [[ "$trc" =~ ^([0-9]{1,3})\ ([0-9]{1,4})$ ]] && [ "${BASH_REMATCH[1]}" -ge 6 ] && [ "${BASH_REMATCH[2]}" -ge 20 ]; then
@@ -1563,12 +1563,12 @@ start_mouse() {
     # takes the drag and the text reaches a tmux buffer the browser cannot see.
     # Shells want the clipboard; a coding agent's interface wants the mouse,
     # whoever's session it is: the name read past the account's prefix
-    # (u_...~), which a second person's Claude session missed (R95 step 19).
+    # (u_...~), which a second person's Claude session missed.
     # Plain name, not tmux's `=exact` prefix: set-option rejects that form
     # ("no such session: =shell"), and the session was just created here, so an
     # exact match is the one it resolves to anyway.
-    # Only the account's prefix comes off: a second slot's name ends in ~2
-    # (R143), which ${s#*~} took for the prefix on the owner's own name.
+    # Only the account's prefix comes off: a second slot's name ends in ~2,
+    # which ${s#*~} took for the prefix on the owner's own name.
     local b="$s"
     [[ "$s" =~ ^u_[0-9a-f]{8}~ ]] && b="${s#*~}"
     case "$b" in
@@ -1644,12 +1644,12 @@ agent_named() {
         codex)   agent_name=ChatGPT; agent_product="Codex CLI" ;;
         copilot) agent_name=Copilot; agent_product="Copilot CLI" ;;
         grok)    agent_name=Grok;    agent_product="Grok Build" ;;
-        # Any model (R144 step 2): OpenCode, pointed at a node's router.
-        # Its program is opencode, as agents.py names it (B907: the check
+        # Any model: OpenCode, pointed at a node's router.
+        # Its program is opencode, as agents.py names it (the check
         # looked for a command called open, which Linux has not and a Mac
         # has for another reason).
         open)    agent_name="Any model"; agent_product="OpenCode"; agent_cmd=opencode ;;
-        # A pack's (R169 step 10), as its adapter names it.
+        # A pack's, as its adapter names it.
         *)       agent_name="$(jq -r '.name // empty' <<<"$PACK_ADAPTER")"
                  agent_product="$(jq -r '.product // empty' <<<"$PACK_ADAPTER")"
                  agent_cmd="$(jq -r '.command // empty' <<<"$PACK_ADAPTER")"
@@ -1668,7 +1668,7 @@ agent_argument() {
     case "$rest" in
         *:b:*) want_boot="${rest##*:b:}"; rest="${rest%:b:*}" ;;
     esac
-    # ...:s:N                         its slot on the project (R143): a
+    # ...:s:N                         its slot on the project: a
     # second session of this agent there, its own name (claude-P~2), tree
     # and conversation; the first when the argument names none.
     case "$rest" in
@@ -1683,7 +1683,7 @@ agent_argument() {
     [ "$slot" = 1 ] || slot_tail="~${slot}"
     export BB_SLOT="$slot"
     # ...:m:MODEL:e:EFFORT            another agent's model and effort,
-    # picked at Start (R95 step 9), each passed on only when it is one
+    # picked at Start, each passed on only when it is one
     # of that agent's own (agents.py MODELS, EFFORTS): a table lookup.
     case "$rest" in
         *:e:*) want_effort="${rest##*:e:}"; rest="${rest%:e:*}" ;;
@@ -1759,7 +1759,7 @@ agent_reattach() {
     # at once. What follows (the sign-in checks, the briefing assembled
     # again, the identity, the launcher written) is all for STARTING one,
     # and cost a tab about two seconds before it showed a conversation
-    # that was there all along (the operator, 6 Oct: the Claude tab took
+    # that was there all along (the Claude tab took
     # a long time to load though it was running). Not for a resume, which
     # names a transcript, nor on a locked project, which says so below.
     local fast
@@ -1800,7 +1800,7 @@ logged_in() {
         # Copilot CLI 1.0.102 has no status verb: a token in the
         # environment, or the login its config remembers. Since
         # 1.0.103 that config opens with // lines, which jq refuses,
-        # so they are left out of what it reads (B282).
+        # so they are left out of what it reads.
         copilot)
             [ -n "${COPILOT_GITHUB_TOKEN:-}${GH_TOKEN:-}${GITHUB_TOKEN:-}" ] \
                 || grep -v '^[[:space:]]*//' "${COPILOT_HOME:-$HOME/.copilot}/config.json" 2>/dev/null \
@@ -1814,7 +1814,7 @@ logged_in() {
         open) [ -n "${BB_ROUTER_URL:-}" ] ;;
         # A pack agent's: the variable its adapter names, or its
         # file under the home; one that names neither signs in to
-        # nobody (R169 step 11).
+        # nobody.
         *)
             local se sf
             se="$(jq -r '.signin.env // empty' <<<"$PACK_ADAPTER")"
@@ -1829,7 +1829,7 @@ logged_in() {
 agent_router() {
     local rk
     # The router's address, this project's own key and the models it
-    # offers (R144): asked of the controller as this account, before
+    # offers: asked of the controller as this account, before
     # the sign-in check reads it; none means no router allows the
     # project, said the way a missing sign-in is.
     if [ "$agent" = open ]; then
@@ -1850,11 +1850,11 @@ agent_router() {
 agent_signin() {
     local tf
     # EACH MACHINE KEEPS ITS OWN LOGIN, and opening a tab is when this
-    # one says so (R47). `aerie login --check` carries one sentence and no
+    # one says so. `aerie login --check` carries one sentence and no
     # secret: which Anthropic account this account is signed in as here.
     # Nothing is copied from another machine, because a refresh ROTATES
     # the refresh token and two machines holding one grant sign each
-    # other out, which is what bug #64 and B100 were.
+    # other out.
     #
     # So signing in on one node does NOT sign in another: each is signed
     # in from its own row on the Nodes tab, and a tab opened here before
@@ -1865,10 +1865,10 @@ agent_signin() {
         aerie login --check >/dev/null 2>&1 || true
     fi
     # Installed on purpose, from the node's Agents page, never by the
-    # provisioner (R145): without it there is nothing for a session to run.
+    # provisioner: without it there is nothing for a session to run.
     if ! command -v "${agent_cmd:-$agent}" >/dev/null 2>&1; then
         # A pack's agent is its pack's program, and a pack is off for a
-        # space until that space's settings switch it on (R77): said as
+        # space until that space's settings switch it on: said as
         # that, where it is why the program is not on this session's
         # PATH, never as a node that does not hold it.
         if [ -n "$PACK_AGENT" ]; then
@@ -1882,7 +1882,7 @@ agent_signin() {
             "${agent_name}; then open this again."
     fi
     if ! logged_in; then
-        # Sealed here (R126) and not open: the home's file links into the
+        # Sealed here and not open: the home's file links into the
         # tmpfs, which holds nothing until a person opens a terminal.
         case "$agent" in claude) tf="$HOME/.claude/.credentials.json" ;; codex|grok) tf="$HOME/.$agent/auth.json" ;; *) tf="" ;; esac
         if [ "$agent" = open ]; then
@@ -1938,7 +1938,7 @@ agent_resume_id() {
     fi
     if [ -n "$resume" ] && [ "$agent" != claude ]; then
         # Another agent's conversation resumes below, once its tree is
-        # known: its log is kept in that tree's folder (R95 step 8).
+        # known: its log is kept in that tree's folder.
         case "$resume" in
             *[!0-9A-Za-z-]*|"") bad "Not a session id: ${resume}" ;;
         esac
@@ -1950,11 +1950,11 @@ agent_resume_id() {
             *[!0-9a-fA-F-]*|"") bad "Not a session id: ${resume}" ;;
         esac
         # A node keeps its own copy of the
-        # account's conversations (B613): one started elsewhere, or
+        # account's conversations: one started elsewhere, or
         # carried on elsewhere since, comes down first. Asked only of a
         # node; on the share the file is the controller's own.
         # In the folder of the tree it will run in, which is where Claude
-        # Code looks for it (B348: the project directory's was checked,
+        # Code looks for it (the project directory's was checked,
         # and a worktree's session found nothing to resume).
         rtd="$HOME/.claude/projects/$(tree_slug "$(session_dir "$proj" "$account" "$agent" "$slot")")"
         if on_node; then
@@ -1962,10 +1962,10 @@ agent_resume_id() {
                   --into "$rtd" >/dev/null 2>&1 ) || true
         fi
         # ...and from another of this account's trees when it was had
-        # there: another slot's (R143), or the project directory's.
+        # there: another slot's, or the project directory's.
         if [ ! -f "$rtd/${resume}.jsonl" ]; then
             # With no projects folder find fails, and under pipefail that
-            # ended the terminal before the refusal below could say why (B908).
+            # ended the terminal before the refusal below could say why.
             rf="$(find "$HOME/.claude/projects" -mindepth 2 -maxdepth 2 -name "${resume}.jsonl" 2>/dev/null | head -1)" || rf=""
             [ -z "$rf" ] || { ( umask 077; mkdir -p "$rtd" ) && cp -p "$rf" "$rtd/"; } 2>/dev/null || true
         fi
@@ -2000,7 +2000,7 @@ agent_briefing() {
     # answering makes this fail, which is caught here so the session still
     # starts; the else below is what says so, because an empty answer used
     # to be an ordinary state (a project with nothing on its lists) and
-    # since the briefing joined it, empty means the fetch failed (B160).
+    # since the briefing joined it, empty means the fetch failed.
     pre="$(BB_PROJECT="$proj" BB_UID="$account" BB_AGENT="$agent" aerie preamble --json 2>/dev/null || true)"
     roadmap_block="$(printf '%s' "$pre" | jq -r '.text // ""' 2>/dev/null || true)"
     # Named as the dashboard shows the project, with its id, not by its
@@ -2023,13 +2023,13 @@ agent_briefing() {
     # own list did not fit. `--append-system-prompt-file` has no such
     # ceiling, so the list a project keeps is the list its sessions get.
     # Beside session.env in this project's cache folder, which is the one
-    # place a session's view keeps (R35), written 0600 like the token.
+    # place a session's view keeps, written 0600 like the token.
     prompt=()
     if [ -n "$roadmap_block" ]; then
         pref="$(cache_project_dir "$proj")/preamble.txt"
         if ( umask 077; printf '%s\n' "$roadmap_block" > "$pref.new" ) && mv -f "$pref.new" "$pref"; then
-            # Each agent takes it the way it reads instructions (R95
-            # step 5), never written into the project's tree: Claude
+            # Each agent takes it the way it reads instructions,
+            # never written into the project's tree: Claude
             # Code as a system prompt file; Codex CLI as developer
             # instructions, which add to its own rather than replace
             # them, read from the file by the launcher at exec; Copilot
@@ -2070,7 +2070,7 @@ agent_trees() {
     # their own, so two people on one project cannot overwrite each other,
     # commit each other's half-finished work, or share a dist/.
     dir="$(session_dir "$proj" "$account" "$agent" "$slot")"
-    # ...and in each other repository of its project (R136), the same:
+    # ...and in each other repository of its project, the same:
     # its own tree for the owner, a worktree on the same branch name for
     # anybody else, so one session's work is one branch everywhere.
     BB_WORK_DIRS=""
@@ -2089,8 +2089,8 @@ agent_trees() {
 # brought to where that agent looks for it and named on its command.
 agent_resume_other() {
     local kd cs cd_ sd
-    # Another agent's conversation, resumed in that agent and no other
-    # (R95 step 8): its log is the copy its Stop hook keeps in the tree's
+    # Another agent's conversation, resumed in that agent and no other:
+    # its log is the copy its Stop hook keeps in the tree's
     # folder of the account's transcripts (bb-agent-hook keep), fetched
     # first on a node that has not got it, and put back where the agent
     # itself looks for it when it is not there (a node it never ran on).
@@ -2163,7 +2163,7 @@ agent_trust() {
         # The other agents ask whether to trust the folder too; the
         # session's own tree is answered for them the same way.
         agent_first_run "$agent" "$dir" || true
-        # ...and its project's other repositories (R136), trusted and
+        # ...and its project's other repositories, trusted and
         # writable to it as Claude's settings make them; a pack agent
         # names no such option, so it works in its own tree alone.
         for wd in ${BB_WORK_DIRS:-}; do
@@ -2198,7 +2198,7 @@ agent_project_env() {
 agent_guards() {
     local scope
     if [ "$agent" = open ]; then
-        # Its config for this session (R144): the router as its one
+        # Its config for this session: the router as its one
         # provider with the models handed over, the briefing as its
         # instructions, and what it may do without asking.
         if ! opencode_config "$proj" "$(cache_project_dir "$proj")"; then
@@ -2207,11 +2207,11 @@ agent_guards() {
     fi
     if [ -n "$PACK_AGENT" ]; then
         # A pack agent's guards are its hooks or nothing: it does not
-        # start without them (R169 step 10).
+        # start without them.
         BB_HOOKS_DIR="$(lasting_dir)" python3 "$(dirname "$(readlink -f "$0")")/bb-agent-hook" --pack-hooks "$agent" \
             || bad "Could not write ${agent_product}'s hooks, so it would run without AerieOS's guards: it does not start."
     elif [ "$agent" != claude ]; then
-        # Its guards are its own hooks, holding Claude's (R95 step 6).
+        # Its guards are its own hooks, holding Claude's.
         if ! agent_hooks "$agent"; then
             echo "WARNING: could not write ${agent_product}'s hooks; this session is held by" >&2
             echo "its view and bb's own checks alone, not by AerieOS's guards." >&2
@@ -2365,7 +2365,7 @@ agent_session() {
     agent_launch
 }
 
-# A coding agent a vetted pack brings (R169 step 10): its id is the
+# A coding agent a vetted pack brings: its id is the
 # argument's prefix when this bundle's config/toolpacks.json carries its
 # adapter, which bb-agent-hook reads; the agents' branch below takes it.
 # The names passed over first are the shipped agents' ids, the one list of
@@ -2414,7 +2414,7 @@ case "$target" in
         ;;
 
     claude:*|codex:*|copilot:*|grok:*|open:*|"${PACK_AGENT:-//}":*)
-        # The coding agent this session runs (R95): the argument's prefix,
+        # The coding agent this session runs: the argument's prefix,
         # by the agent table's ids (scripts/dashboard/agents.py), each with
         # what a person reads it as. Claude's is the path this branch has
         # always been; the others share its checks, its launcher and its
@@ -2423,7 +2423,7 @@ case "$target" in
         agent_session
         ;;
     # ctr:NAME:INSTANCE:CONTAINER: a shell inside one container of a dev
-    # instance on this controller's own daemon (R218 step 4), the container
+    # instance on this controller's own daemon, the container
     # the URL's, since on the controller only the dashboard, which checked
     # it, starts this. bash when the image has one, sh otherwise; the session ends
     # when it does. A node's is the block near the top.

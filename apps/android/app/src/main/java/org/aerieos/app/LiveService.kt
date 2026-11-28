@@ -1,4 +1,4 @@
-// Hearing an ask at once (R125, the operator 4 Oct). The watch asks on
+// Hearing an ask at once. The watch asks on
 // Android's alarm, which an idle phone stretches to nine minutes or more
 // against a fifteen-minute window to answer. This keeps one request open
 // to the dashboard instead (GET /api/phone/wait), which answers the moment
@@ -63,7 +63,7 @@ class LiveService : Service() {
         if (Build.VERSION.SDK_INT >= 34)
             startForeground(Live.ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING)
         else startForeground(Live.ID, note)
-        // One listener per pairing (R132), started over on every start so
+        // One listener per pairing, started over on every start so
         // a pairing added or forgotten is heard from, or not, at once.
         job?.cancel()
         job = scope.launch { listenAll() }

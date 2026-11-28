@@ -1,21 +1,21 @@
-"""Copying or moving a dev instance to another node, its data with it (the
-operator, 10 Oct): the Containers page's Copy or move. A fresh container is Send
+"""Copying or moving a dev instance to another node, its data with it:
+the Containers page's Copy or move. A fresh container is Send
 to Docker's; this one carries what the old one had.
 
 Three jobs, one after another, each started when the one before succeeds
-(done(), called from devactions.compose_done):
+(done, called from devactions.compose_done):
 
   out    on the old node: the instance stopped, its named volumes and its
          data directory packed into one file and sent to the controller;
          a copy starts the original again, a move leaves it stopped.
-  in     on the new node: that file fetched and, as the dialog chose (the
-         operator, 14 Oct), either unpacked at once (the volumes made again
+  in     on the new node: that file fetched and, as the dialog chose,
+         either unpacked at once (the volumes made again
          under the new instance's name and filled, the data directory
          filled, anything already in a volume of that name written over)
          or kept as the archive it came as, data.tar in the instance's
          compose directory there, for the row's Unpack later.
   build  the new instance's ordinary rebuild there, which is a shipped one
-         (R166) when the new node is not one of its project's nodes.
+         when the new node is not one of its project's nodes.
 
 A move then takes the old node's containers down (`down`, volumes kept: the
 old node still holds a copy of the data until somebody removes it). A move
@@ -78,12 +78,12 @@ print(f"packed {len(vols)} volume(s)" + (" and the data directory" if has_data e
 # labels its own, so compose takes them as its), filled, and the data
 # directory filled. A volume already there with anything in it is written
 # over, file by file, and the log says so: the dialog warned before the
-# press (the operator, 14 Oct: unpack it for me, but say it could write
+# press (unpack it for me, but say it could write
 # over what is there), and a move back to a node that held this instance
 # before is exactly when the newer data should win. Neither script may spell the plan's {cdir}
 # placeholder in its text: the agent rewrites that wherever it stands in
 # argv, the python included, and the helper's mount pointed at the compose
-# directory while the tar had gone into in/ (B659).
+# directory while the tar had gone into in/.
 UNPACK_PY = r"""
 import json, os, re, subprocess, sys, tarfile
 pname, old, src, data, helper = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
@@ -130,7 +130,7 @@ subprocess.run(["rm", "-rf", work, src])
 print("unpacked", flush=True)
 """
 
-# What goes of its data (the operator, 14 Oct): unpacked into its volumes
+# What goes of its data: unpacked into its volumes
 # on arrival, kept there as the archive for the row's Unpack later, or
 # nothing at all (the container alone, starting on empty volumes; this
 # node keeps its volumes and data directory).
@@ -178,12 +178,12 @@ def _set(project, instance, **fields):
                 rec[k] = v
     devapp._bump()
 
-# Run on the node when a written container is renamed while down (the
-# operator, 11 Oct: the name is editable in the Edit dialog once the
+# Run on the node when a written container is renamed while down
+# (the name is editable in the Edit dialog once the
 # container is down): each volume of the old compose project made again
 # under the new name with compose's labels and filled through the helper,
 # the old one removed, and the data directory moved. Nothing in it spells
-# the plan's {cdir} placeholder (B659).
+# the plan's {cdir} placeholder.
 RENAME_PY = r"""
 import os, subprocess, sys
 old, new, data_old, data_new, helper = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
@@ -358,7 +358,7 @@ def builds_image(project, instance):
 
 # The instances whose copy or move is being started now: the check that one
 # is relocating and the mark that it is were apart, with a question to the
-# old node between them, so two presses at once both started (B555).
+# old node between them, so two presses at once both started.
 _starting, _starting_lock = set(), threading.Lock()
 
 
@@ -412,7 +412,7 @@ def start_(project, instance, mode, node, name="", env=None, data="unpack"):
     # builds an image: the build needs the context the file names, which is
     # on the node it was written for and never on a hosting node. Built on
     # arrival instead, BuildKit refused the context on a node with no code
-    # and the move went back with both down (turinglens, B716). One that
+    # and the move went back with both down (turinglens). One that
     # only pulls images still rebuilds wherever it lands.
     ship = target not in (devapp.nodes_of(owner) or []) and (rec.get("source") != "file" or builds_image(project, instance))
     if mode == "copy":
@@ -454,7 +454,7 @@ def start_(project, instance, mode, node, name="", env=None, data="unpack"):
     # starts it again), one that is down or stopped is left as it is. A
     # `start` on one with no containers (a Down before the move) exited 1
     # and failed the whole job, the data already sent, and the way back
-    # after a failed move left turinglens-registry down at home (B725).
+    # after a failed move left turinglens-registry down at home.
     with devapp.on_node(old_node):
         was_up = bool(_a()._running(project, instance))
     plan = {"mode": mode, "from": instance, "to": dest, "old": old_node, "new": target,
@@ -578,8 +578,8 @@ def unpack_start(project, instance):
     try:
         with devapp.on_node(nid):
             spec = _a()._plan_spec(project, instance, "stop")
-            # Stopped around the unpack only when it runs (B725's lesson:
-            # start on no containers fails the job).
+            # Stopped around the unpack only when it runs
+            # (start on no containers fails the job).
             up = bool(_a()._running(project, instance))
             stop = _a()._plan(project, instance, "stop") if up else []
             start_ = _a()._plan(project, instance, "start") if up else []
@@ -629,7 +629,7 @@ def _undo(project, plan, why):
          ship=True if plan.get("was_ship") else None, relocate_why=why or None,
          relocate_at=int(time.time()) if why else None)
     # Back up as it was: `up`, which starts what is there and makes what
-    # a Down took away (B725: `start` on no containers exited 1 and left
+    # a Down took away (`start` on no containers exited 1 and left
     # it down at home); one that was down stays down.
     if plan.get("was_up"):
         _queue_on(project, dest, plan["old"], "up")
@@ -637,8 +637,8 @@ def _undo(project, plan, why):
 
 def _last_said(job):
     """The last line a failed job wrote, for the row to carry: 'the Jobs
-    tab has why' sent a person to a tab that then showed them nothing
-    (B658), and the why is usually the log's last line (a tar's refusal, a
+    tab has why' sent a person to a tab that then showed them nothing,
+    and the why is usually the log's last line (a tar's refusal, a
     volume already there)."""
     try:
         text = (devapp.queue.job((job or {}).get("id"), with_log=True) or {}).get("log") or ""
@@ -727,7 +727,7 @@ def data_put(nid, q, stream, length):
     if length <= 0 or length > 256 * 1024 ** 3:
         return {"error": "the data is between 1 byte and 256 GB"}, 413
     dest = _data_file(sp.get("project", ""), rel.get("to") or "")
-    # In pieces (R170): a node behind Cloudflare may send at most 100 MB a
+    # In pieces: a node behind Cloudflare may send at most 100 MB a
     # request, so the agent sends `offset` and `total`, each piece appended
     # to one part file, and the file is whole when the last piece lands.
     # One body is offset 0 of its own length, the way it always was.
@@ -742,7 +742,7 @@ def data_put(nid, q, stream, length):
     have = tmp.stat().st_size if tmp.is_file() else 0
     # Room for the whole of it before the first byte, with DATA_KEEP_FREE
     # left over: the old node says how big it is, and a box that was taken
-    # over would otherwise fill the controller's disk (R92).
+    # over would otherwise fill the controller's disk.
     if offset == 0:
         free = shutil.disk_usage(dest.parent).free + have
         if total + DATA_KEEP_FREE > free:
@@ -813,8 +813,8 @@ def view(project, instance):
                 "line": f"its data came as an archive (data.tar in its compose directory on {where}) and is not unpacked: "
                         "it runs on empty volumes until it is"}
     # Why the last one did not happen is the bell's (attention below), where
-    # it can be put away, and not the row's for ever (the operator, 11 Oct:
-    # a failure from hours before still sat on a row renamed since).
+    # it can be put away, and not the row's for ever
+    # (a failure from hours before still sat on a row renamed since).
     return None
 
 

@@ -1,4 +1,4 @@
-"""aerie roadmap lists an item a line (B993).
+"""aerie roadmap lists an item a line.
 
 The bare verb, where the briefing and the roadmap's own guard send a
 session, printed every item's details and every step, finished ones too:

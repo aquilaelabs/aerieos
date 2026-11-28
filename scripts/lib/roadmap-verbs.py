@@ -30,7 +30,7 @@ _nb = dash.load("notebook", _here)
 _nb.configure(roadmap_mod=roadmap, bugs_mod=_bugs)
 
 proj, argv = sys.argv[2], sys.argv[3:]
-# `--format json|yaml|markdown` or `--json` on a list or a show (R167): the
+# `--format json|yaml|markdown` or `--json` on a list or a show: the
 # records whole, from records.py, in place of the text printed here.
 fmt, argv = dash.format_flag(argv)
 op = argv[0] if argv else "list"
@@ -107,15 +107,15 @@ def ident(word):
 
 
 def show(target=None, full=False):
-    """The list, an item a line with how many of its steps are open (B993:
-    every item's details and every step, finished ones included, were 557 KB
+    """The list, an item a line with how many of its steps are open
+    (every item's details and every step, finished ones included, were 557 KB
     for 121 items, and an agent keeps only the start of an answer that long,
     while the listing marked the whole of it read). `full` prints each whole,
     as `aerie roadmap show N` prints one."""
     rows = roadmap.items(proj)
     # `aerie roadmap --target 0.6.0`: the items meant for one release, and
     # `--target none` the ones meant for none yet.
-    # An item is for a release by its own target or by any step's (R108).
+    # An item is for a release by its own target or by any step's.
     want = None if target is None else (target.lstrip("vV") if target.lower() != "none" else "")
     if target is not None:
         rows = [r for r in rows if roadmap.for_release(r, want)] if want else [r for r in rows if not r.get("target")]
@@ -145,7 +145,7 @@ def show(target=None, full=False):
               + ("" if full or not steps else f"  ({left} of {len(steps)} steps open)"))
         if not full:
             # Listed for a release, the steps that carry that release of
-            # their own (R108) are named under it: they are why it is here.
+            # their own are named under it: they are why it is here.
             for i, st in enumerate(steps):
                 if want and str(st.get("target") or "").lstrip("vV") == want:
                     print(f"          {i + 1}. {st['text']}  [for {st['target']}]"
@@ -216,7 +216,7 @@ elif op == "show":
     # exactly N, the same reason `aerie bug show` exists.
     if not rest:
         print("usage: aerie roadmap show <n>[.<step>] [<step>]", file=sys.stderr); sys.exit(1)
-    # One step by the number it was first given (R168): `show R56.9` or
+    # One step by the number it was first given: `show R56.9` or
     # `show R56 9` finds it wherever it is now, moved, split away or not.
     head, _, dot = rest[0].partition(".")
     stepno = dot or (rest[1] if len(rest) > 1 and rest[1].isdigit() else "")
@@ -235,7 +235,7 @@ elif op == "show":
         sys.exit(0)
     n = ident(rest[0])
     r = next((x for x in roadmap.items(proj) if x.get("id") == n), None)
-    # A finished item is shown as the Finished section shows it (B766):
+    # A finished item is shown as the Finished section shows it:
     # finished is how it reads, not a door that shuts on it.
     if r is None:
         r = next((x for x in roadmap.finished(proj) if x.get("id") == n), None)
@@ -255,7 +255,7 @@ elif op == "show":
     if r.get("info"):
         print("  details: " + r["info"].replace("\n", "\n           "))
     for i, st in enumerate(r.get("steps") or []):
-        # A step from another item says so (R168): the number it answers
+        # A step from another item says so: the number it answers
         # to there is its sid's.
         sid = st.get("sid") if isinstance(st.get("sid"), list) and len(st["sid"]) == 2 else None
         came = (f"  (was {R(sid[0])} step {sid[1]})" if sid and sid[1] else f"  (was {R(sid[0])}, folded in)") if sid and sid[0] != r["id"] else ""
@@ -264,7 +264,7 @@ elif op == "show":
               + ("  (done)" if st.get("done") else "  (sent)" if st.get("sent") else "") + came)
         if st.get("info"):
             print("       details: " + st["info"].replace("\n", "\n                "))
-    # ...and where each step that left went (R168), with its place now.
+    # ...and where each step that left went, with its place now.
     for m in r.get("moved") or []:
         got = roadmap.resolve(proj, m["sid"][0], m["sid"][1]) if isinstance(m.get("sid"), list) else {}
         now = (f"{R(got['item']['id'])} step {got['index'] + 1}" if got.get("item") and got.get("index", -1) >= 0
@@ -275,7 +275,7 @@ elif op == "show":
 elif op == "--prompt":
     sys.stdout.write(roadmap.prompt(proj))
 elif op == "add" and "--from" in rest:
-    # Records from a file (R167): `aerie roadmap add --from FILE` (or `-` for
+    # Records from a file: `aerie roadmap add --from FILE` (or `-` for
     # stdin) adds each as one item with its steps, details and target, in
     # any of the formats bb prints; a record's id is ignored, since a new
     # item takes the next number.
@@ -304,7 +304,7 @@ elif op == "add" and "--from" in rest:
                 need(roadmap.set_step_target(proj, nid, i, str(st["target"]), by="claude", who=_who))
         print(f"added {R(nid)}: {r['item']['text']}" + (f" ({len(steps)} steps)" if steps else ""))
 elif op == "apply":
-    # An edited show back (R167): `aerie roadmap show N --format yaml > f`,
+    # An edited show back: `aerie roadmap show N --format yaml > f`,
     # edit, `aerie roadmap apply f`. Each record's words, details and target,
     # and each step's by its id, are written where they differ; a step
     # with no id is added; nothing is removed. Refused when the list moved
@@ -384,7 +384,7 @@ elif op == "done":
     n = ident(rest[0]); behind(n, None, None, None); fresh()
     r = roadmap.tick(proj, n, by="claude", who=_who)
     # Its last step done finished it already: that is the end asked for, not
-    # a failure, and it says so (R289: eleven runs exited 1 here).
+    # a failure, and it says so (eleven runs exited 1 here).
     if r.get("error") and "is done already" in r["error"]:
         print(f"{R(n)} was finished already, by its last step; aerie roadmap info {R(n)} still adds to it")
         sys.exit(0)
@@ -452,9 +452,9 @@ elif op in ("mv", "move"):
     need(r)
     print(f"moved {R(n)} {rest[1]}")
 elif op == "target":
-    # The release an item is meant to ship in (the operator, 21 Oct):
+    # The release an item is meant to ship in:
     # `aerie roadmap target N 0.6.0`, and `none` takes it off.
-    # One step's (R108): `aerie roadmap target N.M X.Y.Z` or `target N M X.Y.Z`,
+    # One step's: `aerie roadmap target N.M X.Y.Z` or `target N M X.Y.Z`,
     # and `none` sends the step back to its item's release.
     usage = "usage: aerie roadmap target <n>[.<step>] [<step>] X.Y.Z|none"
     if len(rest) < 2:
@@ -493,7 +493,7 @@ elif op == "shelve":
     r = roadmap.shelve(proj, n, True, by="claude", who=_who); need(r)
     print(f"shelved {R(n)}; say in your reply why. `aerie roadmap unshelve {R(n)} WHY` asks for it back")
 elif op == "unshelve":
-    # The other direction is a request, not a change (R78): taking one off
+    # The other direction is a request, not a change: taking one off
     # the shelf reverses a decision the operator made for reasons the session
     # was not told, so it is held with the reason for a person on the
     # project, whatever the gate says, and lands when they approve it.
@@ -525,7 +525,7 @@ elif op == "info":
     # The technical half, attached where the work is: which files, which
     # functions, the approach. `aerie roadmap info N "..."` for an item,
     # `aerie roadmap info N M "..."` for step M of it; "" clears. Attached is
-    # added to (B817): the text goes in as a new paragraph under what is
+    # added to: the text goes in as a new paragraph under what is
     # there, and --replace sets the details outright; replacing them was
     # how a status note wiped four items' details in one pass.
     replace = "--replace" in rest
@@ -586,7 +586,7 @@ elif op == "step":
                   file=sys.stderr)
             sys.exit(1)
         return n - 1
-    # `N.M` names a step by its old number (R168), parsed by the verb that
+    # `N.M` names a step by its old number, parsed by the verb that
     # takes it; everything else names the item first.
     item = ident(srest[0]) if srest and not ("." in srest[0] and sub in ("mv", "move")) else None
     if sub == "add" and len(srest) >= 2:
@@ -609,7 +609,7 @@ elif op == "step":
         r = roadmap.remove(proj, item,
                         step=step_index(srest[1]),
                         by="claude", why=" ".join(srest[2:]), who=_who); need(r)
-        # The steps after it move up a number, said so (B818): a fold that
+        # The steps after it move up a number, said so: a fold that
         # removed one then named the old numbers in nine reasons.
         left = len(next((x.get("steps") or [] for x in roadmap.items(proj) if x.get("id") == item), []))
         gone = step_index(srest[1]) + 1
@@ -632,20 +632,20 @@ elif op == "step":
               + (f", the last one, so {R(item)} is done and off the list"
                  if r.get("finished") else ""))
     elif sub in ("undone", "undo") and len(srest) >= 2:
-        # A done mark taken back (the operator, 17 Oct): the wrong step
+        # A done mark taken back: the wrong step
         # ticked, or one found not finished. See roadmap.step_undone.
         behind(item, None, None, None)
         r = roadmap.step_undone(proj, item, step_index(srest[1]),
                                 by="claude", note=" ".join(srest[2:]), who=_who); need(r)
         print(f"step {srest[1]} of {R(item)} is to do again")
     elif sub in ("mv", "move") and len(srest) >= 3 and srest[2] not in ("up", "down"):
-        # To another item (R168): `step mv N M TO [POSITION]`, or `step mv
+        # To another item: `step mv N M TO [POSITION]`, or `step mv
         # N.M TO`; the step goes whole, and N says where it went.
         to = ident(srest[2])
         pos = srest[3] if len(srest) > 3 and srest[3].isdigit() else None
         behind(item, None, None, None); behind(to, None, None, None); fresh()
         if to == item:
-            # Within its own item, to the place named (B1181).
+            # Within its own item, to the place named.
             if pos is None:
                 sys.exit("[builderbot] ERROR: within its own item a step goes to a place: step mv N M N PLACE, or up|down")
             r = roadmap.step_to(proj, item, step_index(srest[1]), pos, by="claude", who=_who); need(r)
@@ -680,7 +680,7 @@ elif op == "step":
               file=sys.stderr)
         sys.exit(1)
 elif op == "split":
-    # An item's steps into new items, one change (R168): `aerie roadmap split
+    # An item's steps into new items, one change: `aerie roadmap split
     # N --into "TITLE" 3 4 5 --into "TITLE" 7`; each new item carries
     # those steps whole and points back at N's details. Under the roadmap
     # gate as an add is: a session's may be held.
@@ -711,7 +711,7 @@ elif op == "split":
     print(f"{R(n)} keeps {left} step{'' if left == 1 else 's'} and says where each went; "
           f"aerie roadmap show {R(n)}.N finds a step by its old number")
 elif op == "fold":
-    # One item into another (R168): `aerie roadmap fold N INTO M` makes N a
+    # One item into another: `aerie roadmap fold N INTO M` makes N a
     # step of M, its steps following; `fold N INTO M.K` adds N's words to
     # step K's details and puts its steps after it. N leaves the list with
     # where it went, and restore brings it back.
@@ -723,7 +723,7 @@ elif op == "fold":
                      by="claude", who=_who, why=" ".join(rest[3:])); need(r)
     print(f"folded {R(n)} into {R(m)} step {r['folded'][1]}; aerie roadmap restore {R(n)} undoes it")
 elif op == "refs":
-    # The list's own words checked (R168): every R number and step they
+    # The list's own words checked: every R number and step they
     # name that no longer finds anything, and a moved one's place now.
     rs = roadmap.refs(proj)
     bad = [x for x in rs if not x.get("moved")]

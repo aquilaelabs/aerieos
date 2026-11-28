@@ -2,8 +2,8 @@
 words are JavaScript's own, an expression arrow is a function that ends
 where its expression does and holds its calls, a shell function ends at
 its own `}` and calls what the files around it define, quoted shell text
-calls nothing, a selector is read part by part (B576), a file of closures
-lists them (B577), and Astro, Vue and Svelte files are read (B578)."""
+calls nothing, a selector is read part by part, a file of closures
+lists them, and Astro, Vue and Svelte files are read."""
 import os
 import sys
 import tempfile
@@ -37,7 +37,7 @@ class JavaScript(unittest.TestCase):
         self.assertIn(("select", 1, "open"), calls(s))
 
     def test_an_arrow_in_a_conditionals_else_branch_is_no_key(self):
-        # B922: `? null : e => {` is no key `null` holding an arrow; the
+        # `? null: e => {` is no key `null` holding an arrow; the
         # arrow's calls are the enclosing function's.
         s = scan("function wire(grid){\n  grid.forEach(c => c.onclick = !c.x ? null : e => {\n"
                  "    openCard(e);\n  });\n}\nconst t = {\n  open: () => {\n    load();\n  },\n};\n")
@@ -187,14 +187,14 @@ class OtherProjects(unittest.TestCase):
             self.assertIn(want, got)
 
     def test_a_kotlin_expression_body_holds_its_own_calls(self):
-        # B810: `fun a(v) = quote(v)` gave the call to the class around it
+        # `fun a(v) = quote(v)` gave the call to the class around it
         s = scan("class K {\n fun a(v: String) = quote(v)\n fun quote(v: String) = v\n}\n"
                  "fun b(v: String): String = quote(v)\nfun c() { b(\"x\") }\n", "K.kt")
         self.assertTrue({("a", 2, 2), ("quote", 3, 3), ("b", 5, 5)} <= defs(s), defs(s))
         self.assertTrue({("quote", 2, "a"), ("quote", 5, "b"), ("b", 6, "c")} <= calls(s), calls(s))
 
     def test_a_typed_function_is_a_definition_and_a_control_word_is_not_a_type(self):
-        # B809: Dart's `String quote(v) => v;` and Java's typed methods were calls
+        # Dart's `String quote(v) => v;` and Java's typed methods were calls
         d = scan("String a(v) => 'x';\nString quote(v) => v;\nclass A {\n  @override\n"
                  "  Future<List<int>> load(int n) async { return await quote(n); }\n}\n"
                  "void main() { a(quote(1)); }\n", "a.dart")
@@ -238,7 +238,7 @@ class OtherProjects(unittest.TestCase):
 
 class Caution(unittest.TestCase):
     """The answers a session deletes by say to grep first, and a plan says
-    how much of it the map guessed (the operator, 8 Oct)."""
+    how much of it the map guessed."""
 
     def test_nothing_calls_and_unused_say_grep_first(self):
         with tempfile.TemporaryDirectory() as d:
@@ -260,7 +260,7 @@ class Caution(unittest.TestCase):
 
 class Shadowing(unittest.TestCase):
     """A parameter, a local or a named argument that takes a function's name
-    is not that function passed by name (B590, report #95)."""
+    is not that function passed by name (report #95)."""
 
     def test_parameters_locals_and_named_arguments_do_not_pass_the_function(self):
         src = ("object G {\n    fun reach(s: FloatArray?): Float = 1f\n"
@@ -338,7 +338,7 @@ class FourthPass(unittest.TestCase):
     """The fourth pass (9 Oct)."""
 
     def test_a_call_in_an_arrows_default_parameter_is_the_arrows(self):
-        # B871: `const asset = (n, sum = createHash(...).digest()) => {...}`
+        # `const asset = (n, sum = createHash(...).digest) => {...}`
         # gave its default's calls to the top level, babel to asset; a
         # parenthesized expression before another arrow keeps its own.
         s = scan("const asset = (name, sum = hash(name).hex()) => {\n  write(name);\n  return sum;\n};\n"
@@ -353,7 +353,7 @@ class FourthPass(unittest.TestCase):
         self.assertEqual({d[0] for d in defs(s)} - {"(anonymous)"}, {"pick", "mock", "f"})
 
     def test_a_call_in_a_template_in_a_default_is_the_functions(self):
-        # B761: `${Math.round(v)}` in a default parameter's arrow was read as
+        # `${Math.round(v)}` in a default parameter's arrow was read as
         # called from the scope around the function, at file scope and inside
         # another function alike; a call outside a template there already was f's.
         s = scan("function chart(id, fmt = v => `${Math.round(v)}%`){\n  return fmt(id);\n}\n"
@@ -364,7 +364,7 @@ class FourthPass(unittest.TestCase):
         self.assertNotIn(("round", "(top level)"), got)
 
     def test_a_template_in_a_template_s_expression_is_taken_whole(self):
-        # B1193: a ${} holding a template whose own ${} holds templates was
+        # A ${} holding a template whose own ${} holds templates was
         # skipped to the next backtick, a deeper template's; the braces after
         # it were miscounted and the calls below given the function outside.
         s = scan("function outer(){\n  function rows(xs){\n"
@@ -460,7 +460,7 @@ class Markup(unittest.TestCase):
 
 
 class Interpolation(unittest.TestCase):
-    """B808: a call inside a Kotlin string template or a Swift interpolation
+    """A call inside a Kotlin string template or a Swift interpolation
     was blanked with the string, so who-calls said nothing called FreshBoot's
     quote, which three lines use."""
 
@@ -468,7 +468,7 @@ class Interpolation(unittest.TestCase):
         s = scan('class K {\n  fun a(v: String) = "t=${quote(v)} n=$v"\n'
                  '  fun b() = """raw\n ${quote("}")}"""\n  fun c() { d() }\n'
                  '  private fun quote(v: String) = v\n}\n', "K.kt")
-        # (the caller of a call in an expression body is the class's, B810)
+        # (the caller of a call in an expression body is the class's)
         self.assertEqual({(n, ln) for n, ln, _ in calls(s)}, {("quote", 2), ("quote", 4), ("d", 5)})
 
     def test_swift_interpolation(self):

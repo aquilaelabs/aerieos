@@ -1,5 +1,5 @@
 """A shipped toolchain's recipe, read from the catalog when the catalog's is
-newer (R234 step 4).
+newer.
 
 Every toolchain AerieOS ships is a row of config/toolchains.json, and each
 is also an official pack in the catalog, written from that row

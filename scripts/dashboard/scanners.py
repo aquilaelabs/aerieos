@@ -1,13 +1,13 @@
-"""AerieOS's own scanners on each node (R145, the operator, 26 Oct).
+"""AerieOS's own scanners on each node.
 
-The Scanners page, a service's page opened from Installed (R264), deploys one
+The Scanners page, a service's page opened from Installed, deploys one
 compose project of the three static analysis scanners (Semgrep, Trivy,
 mobsfscan) to each node that holds projects and runs them there on a
 schedule. A run scans the projects whose node it is, never a project's
 extra nodes, so nothing is scanned twice, and a project moved to another
 node is scanned on its new node next run. The agent sends each SARIF up
 to the controller over its own API, as sync's put sends files, so nothing
-of the controller's is mounted on a node (R163); the controller keeps them
+of the controller's is mounted on a node; the controller keeps them
 in its state beside the folder a host scanner may still write to
 (SCANNER_REPORTS_PATH, deprecated in 0.9.0), and findings.py reads both.
 
@@ -24,7 +24,7 @@ read-only at /src/NAME, and the SARIF lands in ./reports beside the file.
 Each scanner is an image its entry names by its tag and its digest
 (services.images), the tool already in it: nothing is installed at a scan.
 A node is pinned to those images when it is deployed or updated (as nginx's
-is, R192), and a newer one arrives as a change to the entry.
+is), and a newer one arrives as a change to the entry.
 """
 import json
 import os
@@ -62,7 +62,7 @@ PACK = "scanners"
 
 
 def pack():
-    """The Scanners as an official pack (R264): a service a node deploys from
+    """The Scanners as an official pack: a service a node deploys from
     its Library card. Their schedule, their runs and what they found are
     their own page, opened from Installed; the entry asks nothing."""
     return services.entry({"name": PACK, "label": "Scanners", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],

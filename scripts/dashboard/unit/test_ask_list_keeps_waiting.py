@@ -1,4 +1,4 @@
-"""A burst of asks keeps the ones still waiting (B997).
+"""A burst of asks keeps the ones still waiting.
 
 The ask list kept the newest twenty whatever their state, and every phone
 use is an ask, auto-allowed ones too: twenty phone operations from one

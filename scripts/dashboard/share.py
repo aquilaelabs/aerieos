@@ -3,15 +3,15 @@
 A project only grows, and the block in front of every session is paid for
 on every conversation. The notebook used to protect it by keeping less (a
 31st roadmap item was refused) and the block by cutting its own tail at a
-fixed size, blind to what the tail was. Both gave up the wrong thing (the
-operator, 29 Sep): the record is what must be whole, and the block is an
+fixed size, blind to what the tail was. Both gave up the wrong thing:
+the record is what must be whole, and the block is an
 index into it.
 
 So a part that grows (the rules) has a share, and one over its share says
 LESS before it drops a row: its rows in full, then with less said of
 each. The part is always there, whatever the others hold, and what it
 left out is said in it, where the session reading it will see it. The
-roadmap and the bugs are counts in the block (R202) and need no share.
+roadmap and the bugs are counts in the block and need no share.
 
 No imports from the rest of the dashboard, so a module bb loads by path
 can use it too.

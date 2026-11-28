@@ -1,6 +1,6 @@
 """What a relayed verb's apply does to this tree (scripts/lib/relay.py): a
 ref the controller moved that is the branch checked out here moves by a
-fast-forward, the index and the files with it (B711: update-ref moved the
+fast-forward, the index and the files with it (update-ref moved the
 branch alone, and the next commit carried the old CHANGELOG.md back over the
 section a release had committed). Proven against a stand-in controller."""
 import json
@@ -94,7 +94,7 @@ class RelayApply(unittest.TestCase):
         self.git("config", "branch.topic.merge", "refs/heads/topic")
 
     def test_a_push_that_left_a_commit_here_behind_says_so_and_fails(self):
-        # B805: the controller pushed its copy, a commit short of this tree.
+        # The controller pushed its copy, a commit short of this tree.
         self.upstream()
         with open(os.path.join(self.repo, "new.txt"), "w") as f:
             f.write("made here\n")

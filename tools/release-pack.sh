@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A release's controller bundle, packed the one way a tag's run and the
-# rehearsal both pack it (R190 step 2): the tree at REF as the release
+# rehearsal both pack it: the tree at REF as the release
 # carries it, with the commit's hash where the installer reads it
 # (tree_stamp's .release-rev), and the agent's signature this run made,
 # which is in no commit, beside the agent's sources where the controller

@@ -2,7 +2,7 @@
 words sent to the controller's /api/v1/bb with the session's token, the
 controller's own aerie run in this project's tree, and what it printed printed
 here, with its exit code. A git verb's network half ran there, in a
-repository of its own (B148), and what this tree needs from it is applied
+repository of its own, and what this tree needs from it is applied
 here, as this session.
 
 Arguments: the auth header, then the bb words. BB_RELAY_PROJECT is the
@@ -18,17 +18,17 @@ auth, *argv = sys.argv[1:]
 auth = auth or os.environ.get("BB_AUTH_HEADER", "")
 project = os.environ.get("BB_RELAY_PROJECT", "")
 # A verb that reads or changes the project's tree, which on the controller is
-# its own copy: on a node holding a synced copy (R163), what was saved here
+# its own copy: on a node holding a synced copy, what was saved here
 # goes up first, and what the verb changed comes back down before it is used.
-# A bug's close names the commit that fixed it (R255): the one asked for,
+# A bug's close names the commit that fixed it: the one asked for,
 # or the tree's own when it is clean, read off the controller's copy, which
 # a commit made here a moment ago had not reached.
 TREE = {"git", "version", "changelog"}
 # How long this side waits for the controller's answer: past the longest it
 # can take, a slot's wait (bbrelay.SLOT_WAIT_S) and the verb's own limit
 # (bbrelay.RELAY_S, RELAY_LONG_S for a release or a rehearsal), so its own
-# sentence comes back. This side gave up at 200 s and 960 s, before it did
-# (B995): a write that landed was reported as timed out with exit 1, and
+# sentence comes back. This side gave up at 200 s and 960 s, before it did:
+# a write that landed was reported as timed out with exit 1, and
 # asked again it was made twice.
 WAIT_S = 120 + 180 + 30
 WAIT_LONG_S = 120 + 900 + 30
@@ -41,7 +41,7 @@ if tree:
                  "goes on catching up by itself, so run the same command again in a few minutes")
 # The tree a tree verb is about: where the caller stands, or, standing in the
 # project's own directory, the tree BB_REPO names, as preflight and the test
-# runner read it (B233, B274).
+# runner read it.
 here = os.getcwd()
 _repo = os.environ.get("BB_REPO", "")
 if tree and _repo and os.path.isdir(_repo) and os.path.realpath(here) == os.path.realpath(
@@ -50,7 +50,7 @@ if tree and _repo and os.path.isdir(_repo) and os.path.realpath(here) == os.path
 # A records file (aerie bug add --from FILE, aerie roadmap add --from FILE)
 # is read here, where the session wrote it, and sent as the verb's stdin: the
 # controller's copy of the tree holds no file in dist/ or /tmp, and the read
-# there said No such file for one that was here (B962).
+# there said No such file for one that was here.
 stdin = None
 if argv[:1] in (["bug"], ["roadmap"]) and "add" in argv and "--from" in argv:
     i = argv.index("--from")
@@ -67,7 +67,7 @@ if argv[:1] in (["bug"], ["roadmap"]) and "add" in argv and "--from" in argv:
 r = bbapi.call("/api/v1/bb", {"argv": argv, "project": project,
                               "cwd": here,
                               **({"stdin": stdin} if stdin is not None else {}),
-                              # A session of any coding agent (R95): Claude
+                              # A session of any coding agent: Claude
                               # Code sets CLAUDECODE, bb-tty's launcher sets
                               # BB_AGENT for every agent, and which one rides
                               # along for the record to name.
@@ -77,10 +77,10 @@ r = bbapi.call("/api/v1/bb", {"argv": argv, "project": project,
                # so its sentence comes back rather than this side's timeout.
                auth=auth, timeout=WAIT_LONG_S if argv[:1] == ["version"] and any(a in ("release", "rehearse") for a in argv[1:]) else WAIT_S)
 if r.get("error") and "code" not in r:
-    # The controller's own sentence, and nothing of how it traveled (B58).
+    # The controller's own sentence, and nothing of how it traveled.
     sys.exit(f"[builderbot] ERROR: {r['error']}")
 if r.get("held"):
-    # A push held for a person (R219): the flagged lines wait on the bell,
+    # A push held for a person: the flagged lines wait on the bell,
     # and this waits on the answer the way aerie root run does; an approval
     # ran the push on the controller, and its outcome is what to print and
     # apply here.
@@ -94,7 +94,7 @@ if tree and r.get("sync_rev"):
 sys.stdout.write(r.get("out") or "")
 sys.stderr.write(r.get("err") or "")
 # A verb the controller ended (its time limit) printed nothing of its own:
-# the controller's sentence is the only word of why (B717).
+# the controller's sentence is the only word of why.
 if r.get("error") and not (r.get("out") or r.get("err")):
     sys.stderr.write(f"[builderbot] ERROR: {r['error']}\n")
 sys.stdout.flush()
@@ -102,8 +102,8 @@ sys.stderr.flush()
 code = int(r.get("code") or 0)
 ap = r.get("apply") if code == 0 else None
 if isinstance(ap, dict):
-    # git's network half ran on the controller, in a repository of its own
-    # (B148); what this tree needs from it happens here, as this session:
+    # git's network half ran on the controller, in a repository of its own;
+    # what this tree needs from it happens here, as this session:
     # the objects a fetch brought, the refs that moved, an upstream a push -u
     # set, and the merge or rebase that finishes a pull.
     import contextlib, subprocess                               # noqa: E401
@@ -120,7 +120,7 @@ if isinstance(ap, dict):
     # The branch this tree has checked out moves by a fast-forward, which
     # brings the index and the files with it: update-ref moved the branch
     # alone, and the next commit carried the files as they were back over
-    # what the controller committed (B711: a release's changelog section
+    # what the controller committed (a release's changelog section
     # undone by the commit after).
     here = git("symbolic-ref", "-q", "HEAD", text="").stdout.strip()
     ff = [v for n, v in ap.get("refs") or [] if n == here and v]
@@ -149,7 +149,7 @@ if isinstance(ap, dict):
         code = subprocess.run(["git", *step], check=False).returncode
 # A push sends the controller's copy of this tree, so a commit made here that
 # had not reached it was left out, and pushed again said "Everything
-# up-to-date" (B805). A plain push (no refspec) of the branch checked out is
+# up-to-date". A plain push (no refspec) of the branch checked out is
 # held to this tree's HEAD: behind it, said and failed.
 pos = [a for a in argv[2:] if not a.startswith("-")] if argv[:2] == ["git", "push"] else None
 if tree and code == 0 and pos is not None and len(pos) <= 1:

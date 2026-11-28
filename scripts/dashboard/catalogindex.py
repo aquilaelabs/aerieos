@@ -1,4 +1,4 @@
-"""The vetted catalog's index (R169 step 2): index.json and index.sig
+"""The vetted catalog's index: index.json and index.sig
 fetched from the catalog's address, the signature checked against the
 maintainers' public key this install ships (config/catalog.pub) before a
 single entry is read, so a tampered index is refused and the one before
@@ -27,7 +27,7 @@ mirror_index = None      # catalogmirror.index: the imported mirror's index, for
 write_json = None
 PUB_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "config", "catalog.pub")
 DEFAULT_URL = "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/"
-# Which signed index is current (R290 step 7): the catalog's fresh workflow
+# Which signed index is current: the catalog's fresh workflow
 # says it weekly in fresh.json, signed by a key that can say nothing else,
 # on its branch `fresh`; a mirror at another address keeps the pair beside
 # its index. Held only by an install that ships that key's public half.
@@ -37,8 +37,8 @@ FRESH_GRACE_S = 14 * 86400
 FRESH_MOST_S = 60 * 86400
 KEEP_S = 3600
 MISS_S = 300
-# An index as big as a catalog of tens of thousands of entries gets (R256):
-# past either, what it lists beyond is said, never dropped unsaid (B975).
+# An index as big as a catalog of tens of thousands of entries gets:
+# past either, what it lists beyond is said, never dropped unsaid.
 MAX_BYTES = 16 << 20
 ENTRIES_MOST = 20000
 _lock = threading.RLock()
@@ -53,7 +53,7 @@ def configure(**deps):
 
 def _pubkeys(path=None):
     """The maintainers' public keys as the install ships them: the key the
-    index is signed with, and on a second line its spare (R232), whose
+    index is signed with, and on a second line its spare, whose
     private half is kept apart so the first can be lost or replaced with no
     install cut off. [] when the file is not that, and then nothing is
     trusted and the catalog says so."""
@@ -167,7 +167,7 @@ def _pin(p, own=True):
     as it always was; an older pin's is always said."""
     if not re.fullmatch(r"[0-9a-f]{40}", str(p.get("commit") or "")) or not re.fullmatch(r"[0-9a-f]{64}", str(p.get("sha256") or "")):
         return None
-    # The format its manifest is written in (R234), which the entry
+    # The format its manifest is written in, which the entry
     # repeats: one past this build's is listed and says so, and is not
     # fetched. An entry whose format is no number is no entry.
     fmt = packformat.of(p)
@@ -175,8 +175,8 @@ def _pin(p, own=True):
         return None
     out = {"commit": str(p["commit"]), "sha256": str(p["sha256"]),
            "platforms": [str(x)[:20] for x in (p.get("platforms") or []) if isinstance(x, str)][:8]}
-    # A shipped coding agent's entry says its install recipe's rev (R169
-    # step 13), so an install fetches the pack only when that is higher
+    # A shipped coding agent's entry says its install recipe's rev,
+    # so an install fetches the pack only when that is higher
     # than the recipe its release carries.
     rev = p.get("install_rev")
     if isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999:
@@ -185,7 +185,7 @@ def _pin(p, own=True):
     # it before the pack is fetched, as it does once it is kept.
     if isinstance(p.get("label"), str) and p["label"].strip():
         out["label"] = p["label"].strip()[:60]
-    # A shipped toolchain's entry says its recipe's rev (R234 step 4), so
+    # A shipped toolchain's entry says its recipe's rev, so
     # an install fetches the pack only when that is past its own row's.
     rev = p.get("shipped_rev")
     if isinstance(rev, int) and not isinstance(rev, bool) and 2 <= rev <= 9999:
@@ -200,7 +200,7 @@ def _pin(p, own=True):
         out["framework"] = packformat.said(fw)
     # The AerieOS release lines its manifest says it works with, where
     # the entry repeats them: an install on another line does not list
-    # the entry at all (the operator, 12 Nov), which it could only learn
+    # the entry at all, which it could only learn
     # after fetching the pack before.
     ww = p.get("works_with")
     if isinstance(ww, list) and 0 < len(ww) <= 12 and all(isinstance(x, str) and re.fullmatch(r"\d{1,3}\.\d{1,3}", x) for x in ww):
@@ -235,13 +235,13 @@ def parse(index_bytes):
         pin = _pin(p)
         if not re.fullmatch(r"[a-z][a-z0-9-]{1,39}", name) or pin is None or not str(p.get("url") or "").startswith("https://"):
             continue
-        # A pack kept in a folder of one repository (R170 step 6: the shipped
+        # A pack kept in a folder of one repository (the shipped
         # packs live in the catalog's own): its path, held to a plain
         # relative folder; the sha256 is then of the archive of that folder.
         path = str(p.get("path") or "")
         if path and (not re.fullmatch(r"[a-z0-9][\w./-]{0,120}", path) or ".." in path.split("/")):
             continue
-        # What the entry is (R170 step 7, R172): a tool pack, a Docker app or a service.
+        # What the entry is: a tool pack, a Docker app or a service.
         kind = p.get("kind") if p.get("kind") in ("app", "service") else "pack"
         out.append({"name": name, "url": str(p["url"])[:300], "path": path, "kind": kind,
                     "tier": packformat.tier_of(p.get("tier")), "withdrawn": p.get("withdrawn") is True,
@@ -254,7 +254,7 @@ def parse(index_bytes):
         # its card with the agents before it is installed as after.
         if p.get("agent") is True:
             out[-1]["agent"] = True
-        # What it is about (R256): the catalog's topics this build knows,
+        # What it is about: the catalog's topics this build knows,
         # and the day it was added, for the Library's Topic and Recently
         # added. A build from before either leaves them out.
         topics = packformat.topics_of(p)
@@ -309,7 +309,7 @@ def named(index, name, kind="pack", tier=""):
 def official(index, name):
     """The index's official pack entry of this name at a pin this build
     reads, or None: where a shipped coding agent's newer install recipe is
-    read (R169 step 13). An entry whose every pin is in a format past this
+    read. An entry whose every pin is in a format past this
     build's names no recipe it could run, and is not answered."""
     e = named(index, name, tier="official")
     return e if e and not too_new(e, index) else None
@@ -318,7 +318,7 @@ def official(index, name):
 def pinning(index, url, commit, sha256, path=""):
     """The index's pack entry that pins exactly this address, commit,
     sha256 and folder at the pin this build takes, withdrawn ones left
-    out, or None (B440): the tier of what a page asks to add is this
+    out, or None: the tier of what a page asks to add is this
     entry's, never the request's."""
     return next((e for e in packformat.taken(index)
                  if e.get("kind", "pack") == "pack" and not e.get("withdrawn") and e["url"] == url and e["commit"] == commit
@@ -398,8 +398,8 @@ def _path():
 
 def _fallback(base):
     """What answers when the catalog does not: the index kept from this
-    address, or the imported mirror's when it is as new or newer (R169
-    step 6), or None."""
+    address, or the imported mirror's when it is as new or newer,
+    or None."""
     k = _kept(base)
     m = mirror_index() if mirror_index else None
     if m and not older(m, k):
@@ -427,7 +427,7 @@ def _newest(idx):
 
 def _kept(base=None):
     """The index kept under the state, None when there is none or it was
-    read from another address than `base` (B443)."""
+    read from another address than `base`."""
     try:
         with open(_path(), encoding="utf-8") as f:
             d = json.load(f)
@@ -460,7 +460,7 @@ def fetch(url=None, opener=None):
         return {"error": why, "index": _fallback(base)}
     idx["fetched_at"] = int(time.time())
     idx["url"] = base
-    # Until when it is current (R290 step 7), where this install ships the
+    # Until when it is current, where this install ships the
     # freshness key: the statement beside the catalog's, or the fresh
     # branch's for the catalog's own address.
     if _fresh_keys():
@@ -496,7 +496,7 @@ def index(url=None, fresh=False, opener=None):
     """The index as kept, fetched when it is older than an hour or asked
     fresh: {index, error}."""
     # Each answer is the address asked's: a catalog moved under Controller
-    # settings is read at once, not after the old one's hour (B443).
+    # settings is read at once, not after the old one's hour.
     base = (url or DEFAULT_URL).rstrip("/") + "/"
     with _lock:
         if not fresh and _cache["index"] and _cache["index"].get("url", base) == base and time.time() - _cache["at"] < KEEP_S:
@@ -511,7 +511,7 @@ def index(url=None, fresh=False, opener=None):
         if not fresh and miss.get("base") == base and time.time() - miss.get("at", 0) < MISS_S:
             return {"index": _fallback(base), "error": miss["error"]}
         # One kept from before, or a mirror, answers now while the catalog
-        # is asked behind it (B1000): the read waited on the network, two
+        # is asked behind it: the read waited on the network, two
         # fetches of 20 seconds each with the host down, so the Library
         # stalled every few minutes on a box with no way out. Only a first
         # read, with nothing to answer, and a press asking fresh wait.

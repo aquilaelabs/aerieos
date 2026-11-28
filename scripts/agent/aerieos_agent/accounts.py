@@ -1,4 +1,4 @@
-"""Accounts as their own users on a node (R125).
+"""Accounts as their own users on a node.
 
 Every account's sessions ran as one Unix user, the session account, so its
 homes were one uid's: a shell as that user read every account's coding-agent
@@ -35,8 +35,8 @@ TTY_ENV = "/run/bb-session/tty-env.json"
 NOT_GROUPS = frozenset(("docker", "sudo", "wheel", "adm", "systemd-journal", "root", "lxd", "libvirt"))
 EVERY_S = 60
 
-# Who is in which group, and which account users there are, kept a minute
-# (R228 step 18): the session list every turn read every account, and each
+# Who is in which group, and which account users there are, kept a minute:
+# the session list every turn read every account, and each
 # job and terminal started as an account read every group. Forgotten the
 # moment this agent makes or changes an account (accounts_moved).
 KEPT_S = 60
@@ -67,7 +67,7 @@ class AccountsMixin:
     accounts_at = 0.0
 
     def account_users_on(self):
-        """The node's setting (R125), and only where the agent is root."""
+        """The node's setting, and only where the agent is root."""
         return bool(self.state.get("account_users")) and os.geteuid() == 0
 
     def account_users_pass(self):
@@ -100,7 +100,7 @@ class AccountsMixin:
             return
         # Each account's user has to pass through the session account's home
         # and users/ to reach its own: search alone (o+x), never a listing,
-        # so the names of the other homes stay unread (B270).
+        # so the names of the other homes stay unread.
         for d in (sa_pw.pw_dir, users_dir):
             with contextlib.suppress(OSError):
                 st = os.lstat(d)
@@ -126,7 +126,7 @@ class AccountsMixin:
                     moved += 1
                     self._own_share(name, pw)
                     # Its token files held at 600, and who else opens one
-                    # said (R125 step 6).
+                    # said.
                     self.token_watch().watch(home, pw)
         SESSION["accounts"] = {"users": users, "moved": moved, "waiting": waiting}
         self.tty_env_write()
@@ -171,7 +171,7 @@ class AccountsMixin:
                                   if sa in g.gr_mem and g.gr_name not in NOT_GROUPS})
         with contextlib.suppress(KeyError):
             have = pwd.getpwnam(name)
-            # One made for its SMB password first (shares.py, R164 step 1)
+            # One made for its SMB password first (shares.py)
             # has the bbu group alone: the session's groups are added.
             missing = [g for g in extra if name not in (grp.getgrnam(g).gr_mem if g in {x.gr_name for x in grp.getgrall()} else [name])]
             if missing:
@@ -202,7 +202,7 @@ class AccountsMixin:
         user's too, made where it is missing: on a node's own disk (a synced
         copy) the session account's 0700 folder was one the account's user
         could not write, so its conversations stayed in its home and the
-        controller listed none (R125, the dev pair's walk of 24 Oct). On a
+        controller listed none (the dev pair's walk of 24 Oct). On a
         share squashed to one owner the change is refused and not needed:
         the server takes the write as that owner."""
         root = os.path.join(SHARE, ".claude")
@@ -246,7 +246,7 @@ class AccountsMixin:
     def drop_for(self, env, account):
         """How to run something for one account here: (who, the base home,
         the bundle to run bb from). The account's own user, from the
-        root-owned bundle, once its home is that user's (R125); the session
+        root-owned bundle, once its home is that user's; the session
         account and its bundle on the store otherwise, as before."""
         sa = self.session_account()
         base = ""

@@ -1,7 +1,7 @@
-"""The home tunnel, run by the controller itself (R176, the operator, 11 Oct).
+"""The home tunnel, run by the controller itself.
 
 A node off the LAN reaches the controller at a public hostname a tunnel from
-home publishes (R170). Rather than a cloudflared somebody sets up beside
+home publishes. Rather than a cloudflared somebody sets up beside
 AerieOS, the controller carries cloudflared in its own image and runs it
 from two settings: the tunnel's token, pasted once from Zero Trust, and the
 hostname. The process is this module's child, started when the settings
@@ -171,7 +171,7 @@ def _read(p):
 # Registered is cloudflared's word, not the route's: a tunnel whose rule for
 # /api/v1/agent/ pointed at a fixed status answered 200 with nothing, the
 # tab said "reaches this controller", and a node enrolled with an empty
-# agent (the operator, 11 Oct). So the name is asked, off the request's
+# agent. So the name is asked, off the request's
 # thread and at most once a minute: an agent path that is not one answers
 # 405 with this server's JSON, and anything else is somebody else.
 ROUTE_EVERY = 60
@@ -223,7 +223,7 @@ def _redact(line):
 def running():
     """Whether the install's own tunnel is up: its process is this
     machine's, so what reaches the page through it comes from loopback
-    (the wrong-password hold counts the address it passes on, R243)."""
+    (the wrong-password hold counts the address it passes on)."""
     return _proc is not None and _proc.poll() is None
 
 

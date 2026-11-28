@@ -1,4 +1,4 @@
-"""The ACME client (R150) against a directory of its own: an account made,
+"""The ACME client against a directory of its own: an account made,
 an order placed, the HTTP-01 and DNS-01 challenges presented through the
 caller's hooks and polled valid, the order finalized with a CSR for the
 names, the chain fetched; a refused order says what the server said; and

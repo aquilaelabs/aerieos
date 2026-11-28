@@ -1,4 +1,4 @@
-"""The trash says when a project was deleted (B41): the time the registry
+"""The trash says when a project was deleted: the time the registry
 recorded the move, not the directory's mtime, which is when its contents
 last changed. A folder put in the bin by hand has only its mtime."""
 import json

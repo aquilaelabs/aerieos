@@ -1,4 +1,4 @@
-"""Migrations 0034 and 0035 (R295): a space's `devtest` boolean written as
+"""Migrations 0034 and 0035: a space's `devtest` boolean written as
 `tests_in`, and the favorites' flat list from before 27 Sep written by
 account, once each, so the readers take one shape."""
 import importlib

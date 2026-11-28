@@ -11,7 +11,7 @@ const ws = require('./ws');
 
 // The Files API version this extension speaks, said on every call with the
 // extension's own release; the server says its own in the projects answer,
-// and refuses one older than it keeps (426) in words this shows (R79 step 8).
+// and refuses one older than it keeps (426) in words this shows.
 const API = 1;
 let RELEASE = '';
 try { RELEASE = require('../package.json').version || ''; } catch { RELEASE = ''; }
@@ -163,7 +163,7 @@ class Client {
   }
 
   // The dashboard's status, as the page reads it, for what opening an agent's
-  // session needs of it (R128): the boot of the machine a new session starts
+  // session needs of it: the boot of the machine a new session starts
   // on, without which bb-tty attaches to a running session and starts none,
   // and which of this account's sessions run.
   async status() {
@@ -177,7 +177,7 @@ class Client {
     return j;
   }
 
-  // A session's terminal: the dashboard's own at /termws (R133), so the same
+  // A session's terminal: the dashboard's own at /termws, so the same
   // checks decide whose terminal it is and whether it may be typed into. A
   // refusal is the socket closing with why.
   async terminal(arg, cols, rows) {

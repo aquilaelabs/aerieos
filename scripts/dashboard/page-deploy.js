@@ -1,5 +1,5 @@
 "use strict";
-// ---- a space's Deploy section (R281 step 3) --------------------------------
+// ---- a space's Deploy section --------------------------------
 // Where the space's software goes: its Kubernetes environments, each a
 // cluster from the Clusters page, a namespace on it that AerieOS makes ready
 // (the namespace, and a deployer confined to it), the registry its builds

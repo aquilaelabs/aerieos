@@ -1,4 +1,4 @@
-// The Clusters page (R281 step 2), under Machines beside Nodes: the
+// The Clusters page, under Machines beside Nodes: the
 // Kubernetes clusters a space may deploy to, each added once from a
 // kubeconfig, its credential kept sealed on the controller and never shown
 // again. Each cluster a section of its own that folds open (rows you open):
@@ -7,7 +7,7 @@
 // form under them, or the page itself while there is none; a node running
 // k3s from the Library is a press of its own beside it.
 //
-// Chrome from docSurface(); data from GET /api/clusters, read when the page
+// Chrome from docSurface; data from GET /api/clusters, read when the page
 // opens and after each change.
 
 "use strict";

@@ -1,4 +1,4 @@
-"""The node agent's sign job (R106 step 2), with the store's real jarsigner
+"""The node agent's sign job, with the store's real jarsigner
 where one is installed: an .aab signed with the kept key and delivered as
 NAME-signed, the work directory gone after, and the refusals: a node whose
 jobs and sessions share an account, and a key handed over that is not the
@@ -117,7 +117,7 @@ class KeyCtl:
 
 
 class SignKey(unittest.TestCase):
-    """The controller's key work on this node (R106, the operator 22 Oct):
+    """The controller's key work on this node:
     refused where a session could read the key, the missing toolchain named
     back to the controller, and a keystore checked and a key made with the
     store's keytool, the answer sent over the channel, nothing of the

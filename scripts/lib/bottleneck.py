@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What bounded a run of the dashboard suites (R130), from its own numbers.
+"""What bounded a run of the dashboard suites, from its own numbers.
 
 A run on more workers is only faster where the workers were waiting on each
 other's share of the work; where one suite is the whole of a worker's time,

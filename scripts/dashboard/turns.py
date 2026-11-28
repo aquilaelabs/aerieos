@@ -155,7 +155,7 @@ def watch(node, present, heart, now=None):
     """A heartbeat of `node`: `present` the coding agents' sessions there (by
     tmux name), `heart` the ones working.
 
-    THE GUARD THAT WENT QUIET (B1009). A session's hooks speak to the
+    THE GUARD THAT WENT QUIET. A session's hooks speak to the
     controller at every turn: the prompt's before it starts, a stop's when it
     ends, and several between. A coding agent passes over a hook that cannot
     be run, so a session whose hooks are gone works on with no gate and says

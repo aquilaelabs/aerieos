@@ -1,5 +1,5 @@
 """What a compose file asks of the host past the binds, privileges and
-namespaces the check read before (R227): the other host namespaces, another
+namespaces the check read before: the other host namespaces, another
 container's, volumes_from, device rules, a loosened profile under any name,
 a build that reaches the host, a named volume bound to a host path, and a
 path in the tree that is a link out of it."""

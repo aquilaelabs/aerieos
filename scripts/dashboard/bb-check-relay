@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Claude Code Stop hook: a rule's check has to pass before a session hands
-back (roadmap R31, step 2).
+back.
 
     bb-check-relay PROJECT SESSION        # JSON on stdin, the way Claude Code calls a Stop hook
 
@@ -17,7 +17,7 @@ paying for the same answer. The set of changed files with their sizes and
 mtimes is hashed; a stamp beside the token file remembers the last hash
 that passed, and an unchanged tree is let go without a word.
 
-Never holds the person up where a new ask cuts a test run (B824): with the
+Never holds the person up where a new ask cuts a test run: with the
 project's Claude setting "While a test runs: a change asked for" at restart,
 the checks run detached and the stop goes through at once, so what the
 person sends meanwhile lands rather than queuing behind the suite. A newer
@@ -95,7 +95,7 @@ def _alive(pid):
 def verdict(project, stamp, out, rc):
     """What a finished run says: None to let the stop go (passed, or could
     not run), else the refusal's reason. Stamps the tree when it passed."""
-    # A check that could not run is not a check that failed (B232): the
+    # A check that could not run is not a check that failed: the
     # harness runs one suite at a time on a box, and a session that has a
     # suite going in the background, which the stay-responsive rule asks for,
     # would otherwise be refused its hand-back over the harness's own
@@ -104,7 +104,7 @@ def verdict(project, stamp, out, rc):
         return None
     # ...nor are rules that could not be read, which is the controller
     # restarting: aerie rules check says so with 75, and the session was told
-    # to fix a check that never ran (B412).
+    # to fix a check that never ran.
     if rc == 75:
         return None
     if rc == 0:
@@ -117,7 +117,7 @@ def verdict(project, stamp, out, rc):
             pass
         return None
     # The failing checks first, by name: the tail alone was the lint's
-    # passing lines, and the FAIL lines above them were cut off (B759).
+    # passing lines, and the FAIL lines above them were cut off.
     fails = [ln for ln in out.splitlines() if ln.lstrip().startswith("FAIL")][:20]
     tail = out.strip()[-1500:]
     return ("A house rule's check failed on what you changed. Fix it, or "
@@ -128,23 +128,22 @@ def verdict(project, stamp, out, rc):
 # The checks, as one shell line: with the toolchain store's environment as it
 # is now, not as the session's was when it started: a toolchain installed
 # since (node and playwright, for the design check) was not on its PATH, and
-# the check failed on the session's age rather than on the change (the
-# operator, 12 Oct).
+# the check failed on the session's age rather than on the change.
 CHECK = 'eval "$(bash "$0" toolchains env 2>/dev/null)"; exec bash "$0" rules check'
 
 
 def check_env(project):
-    # Never waiting for a run that holds the test lock (B759): a session's
+    # Never waiting for a run that holds the test lock: a session's
     # own suites are what holds it, and waiting then running the whole suite
     # behind them blocked the hand-back on its flakes. Refused, it is skipped
-    # and runs on the next one. A fresh world, never a kept one (B785): what
+    # and runs on the next one. A fresh world, never a kept one: what
     # a probe left in a kept fixture (a scheme, a layout) is not the change,
     # and a verdict measured it.
     return {**os.environ, "BB_PROJECT": project, "BB_TEST_WAIT_LOCK": "0", "BB_TEST_FRESH": "1"}
 
 
 def detached(project, cwd, bb, stamp):
-    """The checks for a project whose new asks cut a run (B824): served from
+    """The checks for a project whose new asks cut a run: served from
     the run already made for this tree, else started in the background, and
     the stop let go meanwhile. Returns a refusal's reason or None."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))

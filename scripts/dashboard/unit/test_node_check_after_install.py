@@ -1,5 +1,5 @@
 """A toolchain installed on a node after its last check reads as current,
-not as the update the check found (the operator, 6 Oct: an updated JDK sat
+not as the update the check found (an updated JDK sat
 unticked with 'update available' until somebody checked again)."""
 import os
 import sys

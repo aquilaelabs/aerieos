@@ -1,4 +1,4 @@
-"""A container given the machine's GPU (R207 step 4): a setting of the
+"""A container given the machine's GPU: a setting of the
 instance, nvidia or amd, laid over its compose as a file AerieOS writes
 naming every service, last of the -f files; never kept as text a person
 edits."""

@@ -1,5 +1,5 @@
 """A sign-in still going on a node is its account's flow again after the
-controller restarts (R227 step 13): the flow is a job there, which a restart
+controller restarts: the flow is a job there, which a restart
 does not end, and the page reads it from the job's log; kept in memory
 alone, a person half-way through had a job running and a page saying none."""
 import os

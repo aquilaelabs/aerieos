@@ -1,4 +1,4 @@
-"""A node short of room says so on the bell (R110, the operator, 22 Oct):
+"""A node short of room says so on the bell:
 a disk or store under the floor, said once where a store shares the root
 filesystem's numbers, and memory judged over ten minutes, not one sample."""
 import os
@@ -22,7 +22,7 @@ class Room(unittest.TestCase):
             return nodes.room_attention(10, 92, label=lambda r: {"root": "root"}.get(r, r))
 
     def test_a_node_s_own_room_over_the_install_s(self):
-        # R294 step 7: a node's page sets its own floor and memory warning,
+        # A node's page sets its own floor and memory warning,
         # the install's values the default for the rest.
         smp = {"disks": {"root": [15 * 1024, 500 * 1024]}}
         big = node("big", smp)
@@ -72,7 +72,7 @@ class Room(unittest.TestCase):
 
     def test_a_build_wants_what_the_last_one_took(self):
         # 20 GB free is over the floor, but not enough for a build that
-        # took 30 GB last time (R110 step 7).
+        # took 30 GB last time.
         smp = {"disks": {}, "stores": {"data": 20 * 1024}, "store_totals": {"data": 500 * 1024}}
         with mock.patch.object(nodes, "node", lambda nid: node("n1", smp)):
             self.assertEqual(nodes.room_short("n1", 10, roles=("data",)), "")
@@ -113,7 +113,7 @@ class Room(unittest.TestCase):
         self.assertEqual(short({}), "", "a node that said neither is not refused")
 
     def test_a_project_build_is_held_to_the_data_store(self):
-        # R110 step 7: the data store's room, then the cache's, then the root's.
+        # The data store's room, then the cache's, then the root's.
         n = node("n1", {"disks": {"root": [50 * 1024, 100 * 1024]}, "stores": {"data": 3 * 1024, "cache": 80 * 1024},
                         "store_totals": {"data": 200 * 1024, "cache": 200 * 1024}})
         with mock.patch.object(nodes, "node", lambda nid: n):
@@ -127,8 +127,8 @@ class Room(unittest.TestCase):
 
 
 class Prune(unittest.TestCase):
-    """The prunes the Containers page and the hourly room keeper run (R110
-    step 3): docker's own words for each, and nothing else asked of it."""
+    """The prunes the Containers page and the hourly room keeper run:
+    docker's own words for each, and nothing else asked of it."""
 
     def test_each_kind_is_its_docker_command_and_no_other_is_run(self):
         import devapp

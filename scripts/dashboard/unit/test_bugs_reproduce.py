@@ -1,4 +1,4 @@
-"""Whether a bug reproduces (R124): always, sometimes, once or untried, kept
+"""Whether a bug reproduces: always, sometimes, once or untried, kept
 beside How to reproduce. A session that gives the steps says how often they
 showed it; a person's report is untried until somebody says; an edit moves
 it; the page's older edits leave it alone; a held report keeps it. Every

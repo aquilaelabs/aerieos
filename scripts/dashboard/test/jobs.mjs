@@ -134,7 +134,7 @@ await section("The tab at a glance", async () => {
     if (c?.classList.contains('closed')) c.querySelector('h2').click(); });
   await page.evaluate(() => openJobsTab());
   await page.waitForSelector('.jobstab .jbrow', { timeout: 15000 });
-  // The tab at a glance (R216, R274): its status line in its head says what
+  // The tab at a glance: its status line in its head says what
   // its chips do not, how many run and wait and the failures of today, each
   // only where there are any, and only the failures in a tone.
   const glance = await page.evaluate(() => {
@@ -148,7 +148,7 @@ await section("The tab at a glance", async () => {
   const expect = Object.entries(glance.want).filter(([, n]) => n).map(([w, n]) => `${n} ${w}`);
   ok(glance.said.join('|') === expect.join('|') && glance.inHead && glance.toned.every(x => /failed today/.test(x)),
      `the Jobs page's head says what runs, waits and failed today, never a chip's count again (${JSON.stringify(glance)})`);
-  // By names an account without its prefix, and a job AerieOS asked for in words (B31).
+  // By names an account without its prefix, and a job AerieOS asked for in words.
   const by = await page.evaluate(() => [jobBy({ requested_by: 'user:alice' }),
     jobBy({ requested_by: 'system:auto-update' })]);
   ok(by[0] === 'alice' && by[1] === 'automatic',
@@ -166,7 +166,7 @@ await section("The tab at a glance", async () => {
   // unfold a log: ONE THIS FILE QUEUED, by id, not the newest succeeded row.
   // `mine` is the set of job ids these tests submitted; the box runs other
   // jobs, and the newest succeeded row was once an `adb devices` probe whose
-  // log says "List of devices attached" (B86). The probe is a forgotten job
+  // log says "List of devices attached". The probe is a forgotten job
   // now and lists nowhere, but a phone push or a build still can be newest.
   const ids = [...mine];
   let logRow = null;
@@ -179,7 +179,7 @@ await section("The tab at a glance", async () => {
   await page.waitForSelector(`.jobstab .jbrow[data-job="${logRow.id}"] .jblog`, { timeout: 10000 });
   const log = await page.$eval(`.jobstab .jbrow[data-job="${logRow.id}"] .jblog`, e => e.textContent);
   ok(/placed on local|hi from local/.test(log), `a press on the row unfolds what the job wrote (${log.trim().slice(0, 40)})`);
-  // The row is what opens (rows-you-open, R218 step 25): no Log button, the
+  // The row is what opens (rows-you-open): no Log button, the
   // line says it is open, and Enter on it folds the log away again.
   const opened = await page.$eval(`.jobstab .jbrow[data-job="${logRow.id}"]`, r => ({
     btn: !!r.querySelector('[data-jb="log"]'), exp: r.querySelector('.jbopen').getAttribute('aria-expanded') }));
@@ -192,7 +192,7 @@ await section("The tab at a glance", async () => {
      `...the row itself opens it, with no Log button, says it is open, and Enter folds it away (${JSON.stringify({ ...opened, shut })})`);
   // ...and on a FAILED row too: the job's own error sentence was read as a
   // failed request and its log kept out, so every failed job read "(this
-  // job wrote nothing)" (B658, the operator, 11 Oct).
+  // job wrote nothing)".
   let failRow = null;
   for (const id of ids){
     const b = await page.$(`.jobstab .jbrow[data-job="${id}"][data-state="failed"] > .jbopen > .td:nth-child(3)`);
@@ -223,7 +223,7 @@ await section("The tab at a glance", async () => {
                              { timeout: 15000 });
   ok(true, 'Cancel on the row stops it, and the row follows the revision to canceled');
 
-  // The chips (B74): one per way a job stands, Failed among them, each
+  // The chips: one per way a job stands, Failed among them, each
   // narrowing the list to its own; the address says which.
   await page.waitForSelector('.jobstab [data-jbshow="failed"]', { timeout: 10000 });
   await page.click('.jobstab [data-jbshow="failed"]');
@@ -240,13 +240,13 @@ await section("The tab at a glance", async () => {
   await page.evaluate(() => { location.hash = '#/jobs/failed'; });
   await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed"].on'), null, { timeout: 10000 });
   ok(true, '#/jobs/failed opens the page narrowed to the failed jobs');
-  // B113: Home's "N failed today" opens on what it counted, not on every
+  // Home's "N failed today" opens on what it counted, not on every
   // failure: a failure from yesterday is under Failed and not here.
   await page.evaluate(() => { location.hash = '#/jobs/failed-today'; });
   await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
   // Put in once a read of the list already out has landed, then drawn and
   // read in the same task: a read landing after it took it out again, and
-  // Failed counted one fewer (B739).
+  // Failed counted one fewer.
   const today = await page.evaluate(async () => {
     await readingOf('jobs').busy;
     const y = { id: 'j_yesterday', type: 'exec', state: 'failed', queued: jobsToday() - 7200, ended: jobsToday() - 3600, spec: {} };
@@ -264,18 +264,18 @@ await section("The tab at a glance", async () => {
   await page.evaluate(() => { jobsList = jobsList.filter(j => j.id !== 'j_yesterday'); readMoved('jobs'); jobsShowSet(''); drawPanes(); shellSync(); });
 
   // A kind with no command of its own says what it did, where a storage
-  // walk read as a bare "exec" (B70).
+  // walk read as a bare "exec".
   const titles = await page.evaluate(() => ['storage', 'claude-update', 'claude-login']
     .map(type => jobTitle({ type, spec: { timeout: 900 } })));
   ok(titles.every(t => !/exec/.test(t)) && titles[0] === 'measure the disks',
      `a storage job's row is titled what it did, not "exec" (${titles.join(' | ')})`);
   // ...and every agent's sign-in, sign-out and install in that agent's name
-  // (B291: ChatGPT's and Copilot's read as a bare "exec").
+  // (ChatGPT's and Copilot's read as a bare "exec").
   const agj = await page.evaluate(() => [['codex-login', {}], ['copilot-logout', {}], ['codex-update', {}],
     ['copilot-update', { action: 'remove' }], ['claude-login', {}]].map(([type, spec]) => jobTitle({ type, spec })));
   ok(agj.join(' | ') === 'sign ChatGPT in | sign Copilot out | update Codex CLI | remove Copilot CLI | sign Claude in',
      `each agent's jobs are named for it (${agj.join(' | ')})`);
-  // B112: a tell names the session by its project, not by its tmux name.
+  // A tell names the session by its project, not by its tmux name.
   const tell = await page.evaluate(() => [
     jobTitle({ type: 'tell', spec: { session: 'u_525cbd90~claude-hello', text: 'Polish the header' } }),
     jobTitle({ type: 'tell', spec: { session: 'claude-hello', text: 'go' } })]);
@@ -310,7 +310,7 @@ await section("The tab at a glance", async () => {
 
 // aerie jobs reads the same listing the tab does, through the API as the
 // caller: an administrator sees every job, and a session its own project's
-// and no other, by name or by id (B317: it read the store directly, which
+// and no other, by name or by id (it read the store directly, which
 // on the machine holding the controller's state showed a session every
 // project's jobs).
 await section("aerie jobs reads the same listing the tab does, through the API as the", async () => {
@@ -353,7 +353,7 @@ await section("aerie jobs reads the same listing the tab does, through the API a
      `a session's aerie jobs lists its own space's jobs and answers "no such job" for another space's (${
         theirs.length} of others' kept out; ${mineOut.trim().split('\n')[0].slice(0, 70)})`);
   // A container written for alpha (aerie container new --for alpha) carries
-  // its own name as its jobs' project, and those are alpha's to see (B321):
+  // its own name as its jobs' project, and those are alpha's to see:
   // its record says whose it is. And -n counts what the session sees, not
   // the node's last n before the filter: three of beta's queued after
   // alpha's used to leave aerie jobs -n 2 with nothing of alpha's.
@@ -378,7 +378,7 @@ await section("aerie jobs reads the same listing the tab does, through the API a
 await section("An address set by hand while a draw runs before its hashchange", async () => {
   // An address set by hand while a draw runs before its hashchange (a poll
   // landing between them) still opens its page, not the one being left
-  // (B303: #/jobs opened Build > Phone on the dev pair).
+  // (#/jobs opened Build > Phone on the dev pair).
   for (const to of ['#/home', '#/jobs']) {
     await page.evaluate(t => { location.hash = t; render(); }, to);
     await page.waitForFunction(t => routeOf(tabOf(panes[0])) === t, to, { timeout: 10000 }).catch(() => {});

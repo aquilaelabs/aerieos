@@ -1,5 +1,5 @@
-"""Taking a retired node's directory off a toolchain store (R196) works on
-the node (R246; the audit of 13 Nov): the controller queues a toolchain job
+"""Taking a retired node's directory off a toolchain store works on
+the node: the controller queues a toolchain job
 with action clean and the agent refused every action outside install,
 remove, sysdeps and check before it reached the branch that does it."""
 import os

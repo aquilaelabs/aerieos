@@ -1,6 +1,6 @@
 // Every account's sessions on a project, at the foot of its settings dialog,
-// and an administrator ending one (projsessions.py; the operator, 24 Sep).
-// A session is its account's (B172): nobody presses a key or types into
+// and an administrator ending one (projsessions.py).
+// A session is its account's: nobody presses a key or types into
 // another person's, administrators included, and that still holds. Ending
 // one is the single exception, and an administrator's alone.
 import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser, section, REPO } from './lib.mjs';
@@ -37,7 +37,7 @@ const beat = async () => {
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + agent.token },
     body: JSON.stringify({ sample: { cpu_pct: 1, mem_mb: 4096, mem_used_mb: 512,
       sessions: [{ name: nodeShell, attached: false, cwd: '/workspace/alpha', title: '' }],
-      // ...with each project's synced copy there (R163), as an agent says.
+      // ...with each project's synced copy there, as an agent says.
       sync: { alpha: { ready: true, rev: 1 }, beta: { ready: true, rev: 1 }, gamma: { ready: true, rev: 1 }, delta: { ready: true, rev: 1 } } },
       running: [], wait: 0 }) });
   return r.status === 200 ? r.json() : {};
@@ -84,7 +84,7 @@ ok(!((await call('/api/project-sessions?project=alpha')).sessions || []).some(r 
 // The owner's node sessions are drawn bare, by this container's rule, and by
 // the bare name the status read them as unowned: an account given the
 // project listed the owner's Claude as one of its own, on Sessions and in
-// Sign out's count (the operator, 16 Oct).
+// Sign out's count.
 await section("the owner's Claude on a node is the owner's alone", async () => {
   const ustate = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users;
   const ownerUid = Object.values(ustate).find(u => u.role === 'owner').uid;
@@ -112,7 +112,7 @@ await page.waitForFunction(() => !document.getElementById('rnSessField').hidden
 const drawn = await page.$$eval('#rnSessList .rnsess', rs => rs.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
 ok(drawn.some(t => /w\.sess/.test(t) && /Claude/.test(t)) && drawn.some(t => /w\.sess/.test(t) && /shell/.test(t)),
    `the space's settings list its sessions, whose and what (${drawn.join(' | ')})`);
-// Another agent's session is called by its agent's name, not a shell (B1023).
+// Another agent's session is called by its agent's name, not a shell.
 const other = await page.evaluate(() => {
   rnSessionsDraw('alpha', [{ name: 'x', who: 'w.sess', kind: 'codex', agent: 'Codex CLI', node: 'box', state: 'working' }]);
   const said = document.querySelector('#rnSessList .rnsess .sub')?.textContent || '';
@@ -126,8 +126,8 @@ await page.waitForFunction(() => [...document.querySelectorAll('#rnSessList .rns
 const last = await page.$eval('#rnmodal .box', b => [...b.querySelectorAll('.field:not([hidden]):not(.rnhead)')]
   .filter(f => f.offsetParent).pop()?.id);
 ok(last === 'rnSessField', `...at the foot of the dialog (${last})`);
-// Its row goes once the question is answered, before the server has (the
-// operator, 22 Nov); the session itself is looked for once it has.
+// Its row goes once the question is answered, before the server has;
+// the session itself is looked for once it has.
 const endAnswer = page.waitForResponse(r => r.url().endsWith('/api/project-sessions') && r.request().method() === 'POST', { timeout: 15000 });
 await page.evaluate(() => [...document.querySelectorAll('#rnSessList .rnsess')]
   .find(r => /w\.sess/.test(r.textContent) && /Claude/.test(r.textContent))
@@ -148,7 +148,7 @@ await plainPage.goto(URL);
 await ready(plainPage);
 await plainPage.evaluate(() => renameProject('alpha'));
 await plainPage.waitForFunction(() => !document.getElementById('rnmodal').hidden, null, { timeout: 15000 }).catch(() => {});
-// The section is not drawn for it (R255 step 4; the operator, 21 Oct: what
+// The section is not drawn for it (what
 // a role does not give is not shown), so nobody's sessions and no End:
 // read once everything the dialog asked for at its opening has landed,
 // which is when the section would have been drawn.
@@ -161,8 +161,8 @@ ok(!plainSess.shown && plainSess.ends === 0,
 // The administrator's page only: a plain account's settings dialog asks for
 // the remote's credentials and is refused by design, which the browser logs.
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
-// A project with a session open on a node cannot be deleted from under it
-// (B242): Delete read only this container's tmux, where no session runs now.
+// A project with a session open on a node cannot be deleted from under it:
+// Delete read only this container's tmux, where no session runs now.
 await section("A project with a session open on a node cannot be deleted from under it", async () => {
   const onNode = `${uid}~codex-gamma`;
   const r = await fetch(base + '/api/v1/agent/work', { method: 'POST',

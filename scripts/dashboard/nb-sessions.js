@@ -1,11 +1,11 @@
 // The notebook's Sessions view: your own conversations on this project,
-// newest first, each to go on with, read here, or keep as a text file (the
-// operator, 22 Oct: out of Profile and into the project they were had on,
+// newest first, each to go on with, read here, or keep as a text file
+// (out of Profile and into the project they were had on,
 // and any one of them resumed, where the Claude button resumes the last). Beside
 // Overview in the Overview group. Only the signed-in account's: the
 // controller lists them (transcripts.mine), never another account's.
 // One classic script beside index.html, the shape tab-*.js has (docs/nodes.md
-// §13): same page, same global scope, one file per notebook view (R60).
+// §13): same page, same global scope, one file per notebook view.
 //
 // A factory rather than a script that runs: makeNotebook calls it per
 // notebook with the notebook's element lookup, its state object and its
@@ -18,12 +18,12 @@
 // Download, and behind its ⋯ Make visible (to every session on the project)
 // and Delete. An anchor for the download, since a download is a link the
 // browser saves. Its time is said once, as how long ago, the date and time
-// on its title (the sweep, 7 Nov: both read as the same fact twice). Another
+// on its title (both read as the same fact twice). Another
 // account's, made visible, is read and downloaded
 // only, with whose it is.
 //
-// A conversation is named by the label its person gave it (R236, the
-// operator, 12 Nov), its first words under that, and by its first words
+// A conversation is named by the label its person gave it,
+// its first words under that, and by its first words
 // alone where it has none; its note is a line under them, and one kept past
 // its agent's own cleanup says so. Edit on the row swaps its label, its
 // note and Keep in, as a row that opens does (rows-you-open); `editing` is
@@ -93,7 +93,7 @@ function nbSessionsView({$, nb, project, root}){
       {label: "visible to every session", value: open, omit: !open}] : [],
       mine.length ? "yours alone unless you make one visible: each is the whole exchange" : "");
     // Found by label, note, first words or agent, once there are enough to
-    // look through; the patch (R244) keeps the field, its focus and its
+    // look through; the patch keeps the field, its focus and its
     // caret across the redraw it causes.
     const shown = mine.filter(matches);
     const finder = mine.length > 5 ? `<div class="field cvfindrow"><input type="search" class="cvfind" maxlength="80" autocomplete="off" spellcheck="false"
@@ -155,7 +155,7 @@ function nbSessionsView({$, nb, project, root}){
     await loadSessions();
   }
   // Delete, Make visible and Make private: a person's, on the press. Each is
-  // drawn at once from the view's own rows (the operator, 22 Nov: the press
+  // drawn at once from the view's own rows (the press
   // is under a menu that shuts on it, so a word on its button was never
   // seen), and put back saying why if the controller refuses.
   async function act(id, action){

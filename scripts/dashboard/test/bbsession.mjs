@@ -1,4 +1,4 @@
-// A session's view (R35, B156). bb-session builds a mount, PID and IPC
+// A session's view. bb-session builds a mount, PID and IPC
 // namespace per session that holds only its own project. The suite has no
 // root, so it proves the half that decides everything: the plan. Every path
 // `enter` binds, covers or hides is a step of `plan`, which reads the layout
@@ -17,7 +17,7 @@ const L = join(DIR, 'viewlayout');
 const ws = join(L, 'workspace'), homeRoot = join(L, 'home'), users = join(homeRoot, 'users');
 const data = join(L, 'data'), art = join(L, 'artifacts'), runner = join(L, 'runner'), devdata = join(L, 'devdata');
 // The scoped toolchain store: the .bb bundle a session and the agent run, and a
-// toolchain beside it a build writes to (B157).
+// toolchain beside it a build writes to.
 const pkg = join(L, 'toolchains', 'linux-x86_64');
 const me = 'u_0000abcd', other = 'u_1111abcd';
 const myHome = join(users, me);
@@ -83,7 +83,7 @@ const plan = (over = {}) => {
 };
 
 const myCache = join(myHome, '.cache', 'builderbot'), rootCache = join(homeRoot, '.cache', 'builderbot');
-// The GPU display's socket (R20): where the machine has /tmp/.X11-unix, it
+// The GPU display's socket: where the machine has /tmp/.X11-unix, it
 // is staged before /tmp becomes the session's own and bound back into it.
 // Made here when the box has none, since the plan reads the machine.
 const x11 = '/tmp/.X11-unix';
@@ -96,7 +96,7 @@ ok(!existsSync(x11) && !madeX11 ? true
    'the X server\'s socket directory is staged and bound back into the session\'s own /tmp');
 const has = (...s) => steps.some(x => JSON.stringify(x) === JSON.stringify(s));
 const at0 = (...s) => steps.findIndex(x => JSON.stringify(x) === JSON.stringify(s));
-// A tree of the session's is a bindmap (R125 step 7: its owner read as the
+// A tree of the session's is a bindmap (its owner read as the
 // account's own user where it is one); a bind otherwise.
 const bound = t => steps.some(x => (x[0] === 'bind' || x[0] === 'bindmap') && x[2] === t);
 const hidden = t => steps.some(x => (x[0] === 'hide' || x[0] === 'hidefile') && x[1] === t);
@@ -106,7 +106,7 @@ ok(has('tmpfs', ws, 'mode=0755') && bound(join(ws, 'alpha')) && bound(join(ws, '
    && bound(join(ws, '.claude', me)) && !bound(join(ws, 'beta')) && !bound(join(ws, 'alpha-two'))
    && !bound(join(ws, '.claude', other)),
    'the spaces share in the view holds the space, its worktrees and the account\'s Claude share, and no other space or account');
-// Not there at all, not even by name (B379): the account's transcripts are
+// Not there at all, not even by name: the account's transcripts are
 // covered and only this project's are put back over the cover.
 const back = t => steps.some(x => x[0] === 'bindmine' && x[2] === t);
 const coverAt = at0('tmpfs', tr, 'mode=0755,owned');
@@ -160,7 +160,7 @@ print(json.dumps({'made': os.path.isdir(target), 'mounts': len(calls), 'onto': c
 ok(has('tmpfs', users, 'mode=0755') && has('bind', `${STAGE}/home`, myHome),
    'the account\'s home is the only home');
 // The base home is another's, and every session runs as the account that
-// owns it, so its permissions keep nothing back (B378): a session listed
+// owns it, so its permissions keep nothing back: a session listed
 // its .ssh, its shell history and a private key beside them. In the view
 // it is new, and holds what a session runs from it and nothing else.
 await section("The base home is another's, and every session runs as the account that", async () => {
@@ -188,7 +188,7 @@ ok(has('tmpfs', data, 'mode=0755') && bound(join(data, 'emu', 'alpha')) && !boun
    'the agent\'s stores keep its own emulator folder, its own CI logs and artifacts; another space\'s emulator, jobs, compose files, the runner and dev data are gone');
 ok(has('bindro', pkg, pkg) && !bound(join(pkg, 'jdk')) && !steps.some(x => x[0] === 'bindrw' && x[1] === join(pkg, 'jdk')),
    'the whole toolchain store is read-only in the view, the bundle and every toolchain, so a session cannot plant a command a job or another session runs (B157, B163)');
-// A toolchain the project's settings switch off (R77): its directory hidden
+// A toolchain the project's settings switch off: its directory hidden
 // after the store and its writable parts are bound, so nothing covers the
 // hide; a name that is not a toolchain's is refused by name.
 await section("A toolchain the project's settings switch off", async () => {
@@ -206,7 +206,7 @@ const at = (...s) => steps.findIndex(x => JSON.stringify(x) === JSON.stringify(s
 const fl = join(pkg, 'flutter');
 // Flutter writes its own tree on every run: a session gets a layer of its own
 // over the read-only tree, in its own /tmp, and nothing of the tree is bound
-// writable (B888: a session that changed bin/cache's dart had others run it).
+// writable (a session that changed bin/cache's dart had others run it).
 ok(at('bindro', pkg, pkg) >= 0 && !steps.some(x => x[0] === 'bindrw' && String(x[1]).startsWith(fl))
    && at('overlay', fl, '/tmp/.bb-flutter') > at('tmpfs', '/tmp', 'mode=1777'),
    '...but flutter, which writes its own tree on every run, gets a layer of its own over the read-only tree, in the session\'s own /tmp');
@@ -310,7 +310,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
    && steps[steps.length - 1][0] === 'detach',
    'the view starts private with its own /proc, gets its own /tmp, and lets the staging copy of the machine go last');
 // What Claude Code keeps in /tmp for a conversation outlives a restart of
-// the session (B376): /tmp is made new with every start, and a session
+// the session: /tmp is made new with every start, and a session
 // started again on the same conversation after a controller update found
 // its scratchpad empty, twice in a day. The launcher makes a folder for it
 // in the project's cache, and the view binds that over /tmp/claude-<uid>.
@@ -331,7 +331,7 @@ await section("What Claude Code keeps in /tmp for a conversation outlives a rest
   rmSync(scratch, { force: true });
   // Claude Code's register of running sessions is named by pid, and every
   // view is a pid namespace of its own, so every session was pid 9 and an
-  // account's sessions on one node shared ~/.claude/sessions/9.json (B522).
+  // account's sessions on one node shared ~/.claude/sessions/9.json.
   const reg = join(myCache, 'u', me, 'project', 'alpha', 'claude-sessions');
   const home = steps.find(x => x[0] === 'bind' && x[1] === `${STAGE}/home`)?.[2];
   ok(!steps.some(x => /\/\.claude\/sessions$/.test(x[2] || '')),
@@ -350,7 +350,7 @@ await section("everything a cover would hide is bound aside before the first cov
   ok(lastStage < firstCover, 'everything a cover would hide is bound aside before the first cover');
 });
 
-// The rest of the machine (B378). The view used to cover what it was told to
+// The rest of the machine. The view used to cover what it was told to
 // (the projects share, the two stores, what HIDE named) and show the rest
 // as the node has it: on the dev node a session on a project that reads
 // nothing listed the other projects' container data and build caches, and
@@ -372,7 +372,7 @@ await section("The rest of the machine", async () => {
     mkdirSync(d, { recursive: true });
   symlinkSync('usr/bin', join(M, 'bin'));
   writeFileSync(join(M, 'swap.img'), '');
-  // The daemon's socket, at /run and through /var/run's link to it (B308).
+  // The daemon's socket, at /run and through /var/run's link to it.
   mkdirSync(join(M, 'run'), { recursive: true });
   symlinkSync('run', join(M, 'var', 'run'));
   const sock = createServer();
@@ -400,7 +400,7 @@ await section("The rest of the machine", async () => {
     } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
   };
   // On a machine like a node the store sits under a cover and is bound back:
-  // a toolchain switched off (R77) is hidden all the same, after that bind.
+  // a toolchain switched off is hidden all the same, after that bind.
   {
     mkdirSync(join(mstore, 'hexkit'), { recursive: true });
     const o = on('--off', 'hexkit');
@@ -447,7 +447,7 @@ await section("The rest of the machine", async () => {
   ok(st.filter(x => x[0] === 'hidefile' && x[1] === join(M, 'run', 'docker.sock')).length === 1
      && !st.some(x => x[x.length - 1] === join(M, 'var', 'run', 'docker.sock')),
      'the container daemon\'s socket is covered, once, where /var/run\'s link to /run really puts it (B308)');
-  // Computing on the NVIDIA card switched off for this session (R102): the
+  // Computing on the NVIDIA card switched off for this session: the
   // device CUDA cannot start without is covered, and the card's other nodes
   // are not, since the emulator's rendering opens those. A character device
   // cannot be made here without root, so the fake root's nvidia-uvm is a
@@ -521,7 +521,7 @@ await section("The shape a real node has", async () => {
      `...and a cache that is itself a link is refused, never left untrimmed with other spaces' tokens in it (${refused.out.trim().slice(0, 60)})`);
 });
 
-// A network of its own (R79). Where the agent has turned it on, the view
+// A network of its own. Where the agent has turned it on, the view
 // also puts the agent's resolver file over the node's (whose resolver sits on
 // the node's loopback, out of a namespace of its own's reach) and covers the
 // agent's folder, which says which project every other session's address is.

@@ -114,7 +114,7 @@ sdk_meta_file() {
 sdk_checkable() {
     local f names; f="$(sdk_meta_file)"
     [ -f "$f" ] || die "no toolchain catalog at ${f}: is this an older image?"
-    # ...with the tool packs added beside it (R77), through sdkmeta's reader.
+    # ...with the tool packs added beside it, through sdkmeta's reader.
     names="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[2]); import sdkmeta
 print(" ".join(r["name"] for r in sdkmeta.catalog_at(sys.argv[1])))' "$f" "$BB_LIB" 2>/dev/null)"
     # Empty means the file is there and unreadable, which is worth saying:
@@ -161,7 +161,7 @@ sdkmgr() {
     if [ "${1:-}" = --install ]; then sdk_android_licenses; fi
     # Taking a package off needs no sdkmanager: without the command-line
     # tools (removed, or never installed) the trash bin on an Android row
-    # could not remove it (the operator, 12 Oct). Its directory is the
+    # could not remove it. Its directory is the
     # package; deleted directly.
     if [ "${1:-}" = --uninstall ] && ! sdk_store command -v sdkmanager >/dev/null 2>&1; then
         local root d
@@ -223,7 +223,7 @@ sdk_env_snippet() {
 import os, shlex, sys
 sys.path.insert(0, sys.argv[3])
 import sdkmeta
-# The tool packs beside the catalog are rows like any other (R77).
+# The tool packs beside the catalog are rows like any other.
 rows = sdkmeta.catalog_at(sys.argv[1])
 root = sys.argv[2]
 
@@ -237,7 +237,7 @@ def where(entry_dir, rel):
 for p in rows:
     lay = p.get("layout") or {}
     d = sdkmeta.layout_dir(p)
-    # A path where it is there; `=VALUE`, the value itself (B548), where
+    # A path where it is there; `=VALUE`, the value itself, where
     # its row is installed and nowhere else: one a pack sets reaches no
     # shell on a machine that does not hold that pack.
     here = os.path.isdir(where(d, ""))
@@ -435,7 +435,7 @@ sdk_status_local() {
             # Asked of the STORE and not only of PATH: the tools can be
             # installed and unreachable, since a link left pointing at the
             # flat store the scope was moved out of takes the PATH entry with
-            # it (B105), while "no cmdline-tools" beside a store that has them
+            # it, while "no cmdline-tools" beside a store that has them
             # sends somebody to install what is already there.
             printf '  %-11s %s\n' android "$(
                 if sdk_store command -v sdkmanager >/dev/null 2>&1; then
@@ -460,7 +460,7 @@ sdk_status_local() {
     # by name; ffmpeg, the document readers or pytorch installed from the
     # Library were on PATH and in the store and missing from here,
     # so a session asking what this machine has was told they were not
-    # (B435, a session that went looking for PyTorch).
+    # (a session that went looking for PyTorch).
     local meta; meta="$(sdk_meta_file)"
     if [ -f "$meta" ]; then
         SDK_ROOT_NOW="$root" SDK_LISTED="$SDK_TOOLCHAINS android-tools" python3 - "$meta" "$BB_LIB" <<'PY' 2>/dev/null || true
@@ -491,7 +491,7 @@ PY
 }
 
 # Where the NVIDIA driver stands on this machine, in a line, or nothing
-# with no NVIDIA card (R102). The machine's and not the store's, so read
+# with no NVIDIA card. The machine's and not the store's, so read
 # here from sysfs and modinfo: which driver has the card, the version
 # loaded, the version installed for this kernel. BB_SYS_ROOT is the tests'.
 sdk_nvidia_line() {
@@ -546,13 +546,13 @@ sdk_names_in() {
     find "$1" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null
 }
 
-# What a build here can use, said as a build reads it (R100): the newest
+# What a build here can use, said as a build reads it: the newest
 # platform is the compileSdk ceiling, and a library that wants a newer one
 # fails checkDebugAarMetadata before anything compiles; and what the Gradle
 # cache already holds, since a build offline or in a hurry uses that. A
 # session dug through platforms/ and ~/.gradle by hand for these, asked
-# dl.google.com for versions, and hit the ceiling anyway (Shebang-DevBoard,
-# 30 Sep). Read from the directories, never from sdkmanager or Gradle: a
+# dl.google.com for versions, and hit the ceiling anyway (Shebang-DevBoard).
+# Read from the directories, never from sdkmanager or Gradle: a
 # status is instant.
 sdk_builds_with() {
     local sdk="$1" plats tools newest
@@ -915,7 +915,7 @@ sdk_check_one() {
         # 21.0.12.1+1 against java's own 21.0.12.1) is the same release, and
         # so is one written with and without its trailing zero (Swift 6.4
         # as the compiler prints it against swift-6.4.0-RELEASE, the tag the
-        # resolver reads: the row offered that update forever, B715).
+        # resolver reads: the row offered that update forever).
         elif [ "$(sdk_vnorm "${inst%%+*}")" = "$(sdk_vnorm "${latest%%+*}")" ]; then status=current
         else status=update
         fi
@@ -936,11 +936,11 @@ sdk_versions() {
     local names="$*"
     [ -n "$names" ] || names="$(sdk_checkable)"
     local n
-    # Each row its own, as sdk_check's are (B549): the first versioned
+    # Each row its own, as sdk_check's are: the first versioned
     # Android row on a machine with no SDK (find on a missing folder under
     # pipefail) ended the list after two rows, and the node's every other
     # version came from the census's summary, Swift's as the first 40
-    # characters of its banner (B1107).
+    # characters of its banner.
     for n in $names; do sdk_check_one "$n" local || true; done
 }
 
@@ -973,7 +973,7 @@ sdk_check() {
     # Each recipe's answer is its own: one whose probe fails under set -e
     # (rust's grep finding no "stable" line in rustup's answer) ended the
     # run there, so every row after it went unasked and the node's check
-    # job failed, exit 1 or git's 128, and was queued again (B549). In an
+    # job failed, exit 1 or git's 128, and was queued again. In an
     # || its probe runs to its row whatever one command in it says.
     for n in $names; do sdk_check_one "$n" || true; done
 }
@@ -1028,8 +1028,8 @@ sdk_update() {
 # Installing an SDK is the operator's call, not a session's.
 #
 # CLAUDECODE is in the environment of anything a Claude session runs, and
-# BB_AGENT in anything any coding agent's session runs (bb-tty's launcher,
-# R95), and both are absent from the dashboard's, which is the whole
+# BB_AGENT in anything any coding agent's session runs (bb-tty's launcher),
+# and both are absent from the dashboard's, which is the whole
 # distinction: these are
 # gigabytes on somebody else's disk, and the decision belongs to the person
 # who pays for it. The CLAUDE.md template has always said "offer the command,
@@ -1135,8 +1135,8 @@ sdk_mark_partial() {
         SDK_PARTIAL="$d"
         # ...and a marker beside it until the install has finished, which no
         # kill can leave unsaid: an Abort that cut the cleanup short left half
-        # of flutter on the share, and a directory read as installed (the
-        # operator, 12 Oct). The agent does not list a directory with its
+        # of flutter on the share, and a directory read as installed.
+        # The agent does not list a directory with its
         # marker, and the next install clears what the marker names.
         mkdir -p "$(dirname "$d")" && : > "$(sdk_partial_marker "$d")"
     fi
@@ -1268,8 +1268,8 @@ sdk_step_env() {
 # with the system's own folders for its PATH (SDK_SYS_PATH), so each tool
 # sdk.sh calls by name itself (mkdir, rm, mv, cp, find, sed, timeout and the
 # rest, beside the ones sdk_sys already runs) is the system's: on the
-# caller's PATH a pack's bin folder stands ahead of /usr/bin for every job
-# (R267 step 27). The caller's PATH is kept as SDK_STEP_PATH, which a
+# caller's PATH a pack's bin folder stands ahead of /usr/bin for every job.
+# The caller's PATH is kept as SDK_STEP_PATH, which a
 # recipe's step is handed (sdk_step_env) and the store's own tools are found
 # on (sdk_store), so a step sees what it saw before: the official recipes
 # run npm from the node pack. aerie sources this file for every verb, so the
@@ -1427,7 +1427,7 @@ sdk_install_android() {
 }
 
 # sdk_verified_said DIR: how the toolchain in DIR was checked when it was
-# installed (R137), as a few words after its row: "; checked: sha256 matched
+# installed, as a few words after its row: "; checked: sha256 matched
 # go.dev's download index", "; not checked: why", nothing for one installed
 # before AerieOS checked.
 sdk_verified_said() {
@@ -1451,7 +1451,7 @@ sdk_verified_digest() {
 }
 
 # sdk_verify_download WHAT FILE URL VERSION DIR: the download held to what
-# its publisher says it is (R137), before anything unpacks or runs it: the
+# its publisher says it is, before anything unpacks or runs it: the
 # catalog row's source.checksum, answered by sdkmeta.py. A mismatch removes
 # the file and stops the install in one line, each digest on a line of its
 # own before it. A row whose publisher
@@ -1626,7 +1626,7 @@ sdk_install_git() {
     commit="$(sdk_meta field "$what" source.commit)"
     [ -n "$url" ] || die "no clone URL in the catalog for ${what}"
     if [ -n "$commit" ]; then
-        # Pinned (a tool pack, R77): exactly the commit somebody approved,
+        # Pinned (a tool pack): exactly the commit somebody approved,
         # whatever the branch has moved on to since, and checked to be it.
         # safe.directory for this command alone: a store on a share that
         # maps every owner to one account (a node's NFS mount) is another
@@ -1663,7 +1663,7 @@ sdk_install_git() {
             "${g[@]}" config "branch.${branch}.remote" origin
             "${g[@]}" config "branch.${branch}.merge" "refs/heads/${branch}"
         fi
-        # The commit's hash is the check on what was fetched (R137): what the
+        # The commit's hash is the check on what was fetched: what the
         # Installed page says of a pack's row, and of a shipped row's whose
         # entry pins the commit.
         local held="the git commit an administrator approved"
@@ -1929,8 +1929,8 @@ sdk_inside() {
 # again (nodes/bb-netcut, through the one sudo rule the agent writes for
 # it). A node that can do none of these (a container that forbids
 # namespaces, a node whose agent is not root) installs the pack all the
-# same, its steps with the network, and says so here and on its receipt
-# (the operator, 13 Nov). DIR/.bb-net keeps which, for the receipt.
+# same, its steps with the network, and says so here and on its receipt.
+# DIR/.bb-net keeps which, for the receipt.
 #
 # A cut of the network alone leaves the step every socket on the disk: the
 # system bus's and systemd-resolved's under /run, which any account may
@@ -2104,7 +2104,7 @@ sdk_net_cut() {
 }
 
 # sdk_receipt WHAT DIR COMMIT: what a pinned install left behind, written
-# down (R234; the operator, 13 Nov): the commit pins the pack's own files,
+# down: the commit pins the pack's own files,
 # and what its install steps fetched from somewhere else had no trail. Every
 # file's sha256 and one hash over them all go into DIR/.bb-receipt and the
 # store's log (sdkmeta.py receipt), which the Installed page reads. A
@@ -2118,7 +2118,7 @@ sdk_receipt() {
     fi
 }
 
-# The programs a tool pack runs by path, marked executable (B83): what its
+# The programs a tool pack runs by path, marked executable: what its
 # verbs, steps and verify name and what is in its bin directories
 # (toolpacks.recipe lists them). A file committed through a forge's web
 # editor carries no executable bit, and every run of it was 'Permission
@@ -2165,7 +2165,7 @@ sdk_install_command() {
     link_at="$(sdk_meta field "$what" source.link.as)"
     if [ -n "$find_at" ] && [ -n "$link_at" ]; then
         exe="$(find "$d" -path "$find_at" -type f 2>/dev/null | head -1)"
-        # RELATIVE to the link's own directory (B170): the store is mounted at
+        # RELATIVE to the link's own directory: the store is mounted at
         # /sdk in the controller and at /mnt/... on a node, so an absolute
         # target written by one is a dangling link on the other. realpath -s
         # does not resolve links on the way; where it has no --relative-to
@@ -2235,12 +2235,12 @@ sdk_install() {
     [ -n "$kind" ] || case "$what" in android:*\;*) kind=sdkmanager ;; esac
     [ -n "$kind" ] || { sdk_image_flavor "$what" >/dev/null && kind=sdkmanager; }
     [ -n "$kind" ] || die "unknown toolchain: ${what} (aerie toolchains list names them)"
-    # The internet before anything is touched (R82): a machine with none was
+    # The internet before anything is touched: a machine with none was
     # told by a urllib traceback, or curl's "Could not resolve host", cut
     # short in the row's red line. A versioned android id has no catalog row
     # to ask, and its host is sdkmanager's, which the row for it names.
     # Reach answers 1 exactly when it has the sentence, which set -e took for
-    # a failure and ended the install on, silently (B144).
+    # a failure and ended the install on, silently.
     local why=""
     case "$what" in android:*\;*) why="$(sdk_meta reach android:platform-tools 2>/dev/null)" || true ;;
                     *)            why="$(sdk_meta reach "$what" 2>/dev/null)" || true ;; esac
@@ -2264,7 +2264,7 @@ sdk_install() {
     # A versioned android id (a platform a project pins, an emulator image)
     # has no catalog row to carry an `after`, and asking printed "no
     # toolchain named ... in the catalog" into the job's log after a
-    # successful install (B712).
+    # successful install.
     case "$what" in android:*\;*) ;; *) sdk_meta_into after argv "$what" source.after ;; esac
     local line; for line in "${after[@]}"; do log "$line"; done
     case "$kind" in

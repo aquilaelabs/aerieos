@@ -1,4 +1,4 @@
-"""The LAN card in a bridge on AerieOS (R219): what is written, when it is
+"""The LAN card in a bridge on AerieOS: what is written, when it is
 done at all, and VMs given a port on it, which reaches the host where
 macvtap did not."""
 import os
@@ -58,7 +58,7 @@ class Bridge(unittest.TestCase):
         self.assertIsNone(files[self.lb.page_path("enp3s0")])
 
     def test_the_sticks_static_address_is_the_bridges(self):
-        # B944: the stick's static address was for the wired cards, and the
+        # The stick's static address was for the wired cards, and the
         # card, a port of br0, answers on none: the server took a DHCP lease.
         stick = "[Match]\nName=en* eth*\n\n[Network]\nAddress=192.168.1.15/24\nGateway=192.168.1.1\nDNS=192.168.1.1\nDNS=1.1.1.1\n"
         br = self.lb.plan("enp3s0", stick_text=stick)[self.lb.bridge_path()]
@@ -134,7 +134,7 @@ class Ensure(unittest.TestCase):
 
 class Picked(unittest.TestCase):
     """A VM's network source, model and MAC as the old system's form picks
-    them (R219 step 4): written into the domain and read back."""
+    them: written into the domain and read back."""
     XML = ("<domain><name>v</name><memory unit='KiB'>1048576</memory><currentMemory unit='KiB'>1048576</currentMemory>"
            "<vcpu>1</vcpu><devices><interface type='network'><mac address='52:54:00:01:02:03'/>"
            "<source network='bbvm-n1'/><model type='virtio'/></interface></devices></domain>")
@@ -166,7 +166,7 @@ class Picked(unittest.TestCase):
     def test_the_names_are_checked(self):
         for good in ("project", "lan", "br:br1", "net:default"):
             self.assertTrue(self.hw.net_ok(good), good)
-        # ...and never a container network's bridge picked by name (R247 step 5).
+        # ...and never a container network's bridge picked by name.
         for bad in ("br:", "net:bbvm-n2", "br:a b", "host", "net:../x", "br:docker0", "br:br-08a7d334e448"):
             self.assertFalse(self.hw.net_ok(bad), bad)
 

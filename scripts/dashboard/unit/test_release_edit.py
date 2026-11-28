@@ -1,4 +1,4 @@
-"""An edit of a published release (R139): what may be attached is checked
+"""An edit of a published release: what may be attached is checked
 before anybody is asked (a build in dist/ or a committed file, inside the
 project, of a kind a release carries), the edit goes to the project's owner
 as its own ask with the notes whole, and on each forge the notes are
@@ -125,7 +125,7 @@ class Plan(Base):
         self.assertEqual(p["files"][0]["size"], 1200)
 
     def test_a_tracked_file_changed_since_its_commit_is_refused(self):
-        # B564: a committed screenshot changed since was attached as it is
+        # A committed screenshot changed since was attached as it is
         # now, which no commit holds.
         (self.app / "docs" / "shot.png").write_bytes(b"changed")
         self.assertIn("not committed", fr.edit_plan("app", "v0.5.4", None, ["docs/shot.png"]).get("error", ""))
@@ -187,7 +187,7 @@ class Edit(Base):
         self.assertNotIn("error", r, r)
         self.assertEqual((r["attached"], r["replaced"]), (["shot.png"], ["shot.png"]))
         self.assertTrue([1 for m, p, b in SEEN if m == "DELETE"], "the old file of that name went")
-        # B560: the new file was in before the old one went.
+        # The new file was in before the old one went.
         verbs = [m for m, p, b in SEEN if m in ("POST", "PUT", "DELETE") and "links" not in p or m == "DELETE"]
         self.assertLess(verbs.index("POST" if "PUT" not in verbs else "PUT"), verbs.index("DELETE"), SEEN)
         notes = [b for m, p, b in SEEN if m == notes_verb and p == notes_path][0][notes_key]
@@ -204,7 +204,7 @@ class Edit(Base):
 class Remove(Edit):
     """A file off the release: its own ask, the name checked against the
     forge's own list before anybody is asked, and the forge's delete made at
-    the Allow, on each forge (the operator, 5 Oct)."""
+    the Allow, on each forge."""
 
     def removes(self, path):
         plan = fr.remove_plan("app", "v0.5.4", ["shot.png"])

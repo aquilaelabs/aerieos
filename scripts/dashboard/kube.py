@@ -1,4 +1,4 @@
-"""A space's Kubernetes environments (R281 step 3): where its software goes.
+"""A space's Kubernetes environments: where its software goes.
 
 An environment is a name (staging, production, any), one of the clusters an
 administrator added on the Clusters page (clusters.py), a namespace on it,

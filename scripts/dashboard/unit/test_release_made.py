@@ -1,6 +1,6 @@
 """A pushed release's tag is handed on whichever channel it is on, so what
 CI builds for it (the APK the controller signs) is looked for at once: a dev
-release's was left to the hourly look (B469)."""
+release's was left to the hourly look."""
 import os
 import sys
 import unittest
@@ -25,7 +25,7 @@ class Made(unittest.TestCase):
         return made, forged
 
     def test_a_dev_release_is_handed_on_beside_its_forge_page_marked_a_pre_release(self):
-        # R218: a pre-release's page is made too (publish leaves it to CI
+        # A pre-release's page is made too (publish leaves it to CI
         # where the space's CI makes its releases).
         made, forged = self.run_release(True)
         self.assertEqual(made, [("app", "v1.2.3-dev.7")])

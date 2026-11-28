@@ -1,5 +1,5 @@
 """aerie settings names a project's nodes as the Nodes page does, not by the ids
-the record keeps (B58); an id with no node left behind it is printed as it is."""
+the record keeps; an id with no node left behind it is printed as it is."""
 import json
 import os
 import shutil
@@ -37,7 +37,7 @@ class NodeNames(unittest.TestCase):
                              capture_output=True, text=True, check=False).stdout
         self.assertIn("  node     bigbox\n", out)
         self.assertIn("  nodes    bigbox, n_gone\n", out)
-        # B712: the hosting-only nodes ticked under Also works on, said too.
+        # The hosting-only nodes ticked under Also works on, said too.
         self.assertIn("  hosts    bigbox (hosting only: its containers, never a session)\n", out)
 
 

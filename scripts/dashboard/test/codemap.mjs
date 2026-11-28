@@ -1,4 +1,4 @@
-// aerie map (roadmap R75): the code map a session asks instead of grepping.
+// aerie map: the code map a session asks instead of grepping.
 // No browser: the map is a python module over the tree, and what it says
 // is checked against facts the tree holds for certain: a function's callers
 // this repository's own code makes, a definition's file and line, the ids a
@@ -21,7 +21,7 @@ const def = map('find', 'openDocker');
 // A page-level let, var or const that is not a function is a definition
 // too: find said nothing defines `active`, which page-state.js declares
 // on its line 30, and the answer to where a page variable lives was a
-// grep (B299). It names the file, the line and the kind, and points a
+// grep. It names the file, the line and the kind, and points a
 // let at aerie map state for where it is assigned.
 await section("A page-level let, var or const that is not a function is a definition", async () => {
   const at = (name, re) => re.test(map('find', name));
@@ -105,7 +105,7 @@ ok(/checks:\s+lint voice design/.test(pre('scripts/dashboard/index.html'))
    'a change to the stylesheet or the design language plans the design check');
 // ...a stylesheet alone too (page-*.css, out of index.html since 16 Nov),
 // which planned no suite at all; and the check is uniform's three parts,
-// run among the suites, where it had been part a alone after them (B987).
+// run among the suites, where it had been part a alone after them.
 const css = pre('scripts/dashboard/page-surfaces.css');
 ok(/checks:\s+lint voice design/.test(css) && /suites:\s+uniform uniform-b uniform-c\s*$/m.test(css),
    `a change to a stylesheet alone plans the design check as uniform's three parts (${css.match(/suites:.*/)?.[0]})`);
@@ -115,7 +115,7 @@ ok(/suites:\s+none/.test(pre('README.md')) && /checks:\s+lint voice$/m.test(pre(
 // A file named with --files is asked of the map whole, never by its changed
 // lines: with a covered run on record, scripts/lib/preflight.sh asked
 // coverage which suites reach the lines changed, and a named file with
-// none changed placed nothing (B472, page-bell.js). The copy here has no
+// none changed placed nothing (page-bell.js). The copy here has no
 // covered run, so this holds the answer, and the dry runs on the fix hold
 // the branch.
 ok(/suites:.*\bphone\b/.test(pre('scripts/dashboard/page-bell.js')),
@@ -129,13 +129,13 @@ await section("A file no browser suite reaches but a unit file runs", async () =
   const prov = pre('nodes/provision-macos.sh');
   ok(/unit:\s+nodes\/provision-macos\.sh is run by .*test_provision_rerun\.py/.test(prov) && !/no suite reaches/.test(prov),
      `a change only the unit tier runs is placed by the unit file that names it (${prov.match(/unit:.*/)?.[0].slice(0, 80)})`);
-  // ...and one a unit file and a suite both name is the suite's too (B1104:
-  // config/toolchains.json, which a unit test names, planned no suite).
+  // ...and one a unit file and a suite both name is the suite's too
+  // (config/toolchains.json, which a unit test names, planned no suite).
   const both = pre('config/toolchains.json');
   ok(/suites:.*\btoolchains\b/.test(both) && /suites:.*\bplugins\b/.test(both),
      `a file a unit test names is planned with the suites that name it too (${both.match(/suites:.*/)?.[0]})`);
   // ...and a state migration, which no suite names, is the upgrade suite's
-  // (B1155: a new migration planned design alone).
+  // (a new migration planned design alone).
   const mig = pre('scripts/dashboard/statemigrations/0033_owners_deploy.py');
   ok(/suites:.*\bupgrade\b/.test(mig), `a state migration is planned with the upgrade suite (${mig.match(/suites:.*/)?.[0]})`);
 });
@@ -149,7 +149,7 @@ const pill = map('who-calls', 'Pill');
 ok(/ProjectScreen\.kt:\d+  from Roadmap\b/.test(pill) && /Screens\.kt:\d+  from HomeScreen\b/.test(pill) && !/from Row\b/.test(pill),
    'a Compose call is attributed to the composable it sits in, not to the Row whose lambda holds it');
 
-// Dead code by measurement (R76 step 1): a function nothing calls AND
+// Dead code by measurement: a function nothing calls AND
 // nothing passes by name. A handler handed to onclick without a call is a
 // use; only a function no token anywhere names is unused. Proved on a file
 // written into this copy, since the tree's own page has none.
@@ -161,7 +161,7 @@ await section("Dead code by measurement", async () => {
   ok(/neverUsedAnywhere/.test(un) && !/handedOver/.test(un) && !/onSend/.test(un),
      `unused lists the function no token names, and not the one passed by name nor an object's async key (${un.split('\n').slice(1).join('; ')})`);
   // ...and who-calls says where it was passed, rather than "nothing calls"
-  // and silence (B222): the answer that read a live handler as dead.
+  // and silence: the answer that read a live handler as dead.
   const wc = map('who-calls', 'handedOver');
   ok(/^nothing calls handedOver directly; it is passed by name:/m.test(wc)
      && /zz-probe-dead\.js:3  passed by name in \(top level\)  \| const pick = handedOver;/.test(wc),
@@ -172,11 +172,11 @@ await section("Dead code by measurement", async () => {
 });
 
 // A name as code reads it, module.name or Class.method, is that module's or
-// that class's own (R289: users.may and the like said nothing defines it).
+// that class's own (users.may and the like said nothing defines it).
 ok(/^scripts\/dashboard\/users\.py:\d+/.test(map('find', 'users.may')) && /server\.py:\d+ .* in Handler/.test(map('find', 'Handler._who')),
    `a dotted name is found in its module or its class (${map('find', 'users.may').split('\n')[0]})`);
 
-// ...and in python (B227): devactions.py hands its compose job runner to the
+// ...and in python: devactions.py hands its compose job runner to the
 // jobs module by name, which read as nothing passing it.
 ok(/devactions\.py:\d+  passed by name in configure  \| .*runner\.register\("compose", run_compose_job\)/.test(map('who-calls', 'run_compose_job')),
    'a python function passed by name is seen where it is passed, in the function that passes it');
@@ -199,8 +199,8 @@ await section("A plan keeps its words and its addresses move under it", async ()
   execFileSync('rm', ['-f', txt]);
 });
 
-// An arrow with an expression body is a function too (B224): `const
-// isPhone = () => window.matchMedia(...)` was in no answer at all, so a
+// An arrow with an expression body is a function too: `const
+// isPhone = => window.matchMedia(...)` was in no answer at all, so a
 // refactor read it as nothing. Found; and a function handed over by its
 // name is seen passed by name.
 ok(/^scripts\/dashboard\/page-tabs\.js:\d+  arrow$/m.test(map('find', 'isPhone')),
@@ -208,9 +208,9 @@ ok(/^scripts\/dashboard\/page-tabs\.js:\d+  arrow$/m.test(map('find', 'isPhone')
 ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("doctor", drawDoctor\)/.test(map('who-calls', 'drawDoctor')),
    '...and who-calls sees a function handed to the card draw');
 
-// The page's mutable state (B223): every page-level `let`, where it is
+// The page's mutable state: every page-level `let`, where it is
 // assigned and from what. A binding fed from `state` is a copy of the poll
-// kept by hand, which is how B213 and B215 happened; the view puts those
+// kept by hand, which goes stale; the view puts those
 // first so a sweep starts there. Proved on a file written into this copy.
 await section("The page's mutable state", async () => {
   const st = `${REPO}/scripts/dashboard/zz-probe-state.js`;
@@ -232,7 +232,7 @@ await section("The page's mutable state", async () => {
   execFileSync('rm', ['-f', st]);
 });
 
-// Coverage (R76 steps 2 to 4): the instrumenter puts a counter at the head
+// Coverage: the instrumenter puts a counter at the head
 // of every function body it knows the position of, and a merged count file
 // answers which suites reached a function.
 await section("Coverage (R76 steps 2 to 4)", async () => {
@@ -254,7 +254,7 @@ await section("Coverage (R76 steps 2 to 4)", async () => {
   map('coverage-ingest', counts);
   ok(/loadDocker: reached by \d+ suites?: .*probe-suite \(3\)/.test(map('covered', 'loadDocker')),
      'covered NAME names the suite that ran it and how often');
-  // ...and a change measured by it (the operator, 29 Sep): the lines a
+  // ...and a change measured by it: the lines a
   // change touched, the function they fall in, the suites that reached it.
   const ldLine = readFileSync(`${REPO}/scripts/dashboard/tab-docker.js`, 'utf8').split('\n').findIndex(l => /^function loadDocker\(/.test(l)) + 2;
   const aff = map('affected', '--ranges', `scripts/dashboard/tab-docker.js:${ldLine}-${ldLine}`);
@@ -273,7 +273,7 @@ await section("Coverage (R76 steps 2 to 4)", async () => {
 // A file by its sections: the unit a cleanup moves, with what reaches in
 // from outside and what runs at load, which is what decides whether a
 // section can leave the page whole. What runs at load is page-boot.js's,
-// a section a part (R9 step 5).
+// a section a part.
 const sec = map('sections', 'scripts/dashboard/page-boot.js');
 ok(/^scripts\/dashboard\/page-boot\.js: \d+ sections, \d+ top-level definitions$/m.test(sec)
    && /^\s+\d+  the welcome panel: the guide, and the changelog: \d+ functions?, \d+ callers? from outside/m.test(sec)
@@ -286,7 +286,7 @@ ok(/^\d+-\d+  function nbBugsView$/m.test(defs) && /^  \d+-\d+  function drawBug
    && /^  \d+-\d+  arrow onclick  \(in drawBugs\)/m.test(defs),
    'defs lists a file top down, a function under the closure it lives in and a callback under its function');
 
-// The index is two files (R228 step 16): what each file calls and passes by
+// The index is two files: what each file calls and passes by
 // name, most of its bytes, beside the rest, and a definition is found with
 // the calls file out of reach; several names are one ask.
 await section("A definition is found without the calls, and several names are one ask", async () => {
@@ -347,7 +347,7 @@ await section("A tree the map cannot write into", async () => {
 ok(/nothing defines noSuchFunctionAnywhere/.test(map('find', 'noSuchFunctionAnywhere')),
    'an unknown name gets a sentence, not an empty screen');
 
-// ---- the index stays out of git (B247) --------------------------------------
+// ---- the index stays out of git --------------------------------------
 // Every build keeps .bb-map/ out of git through the repository's own exclude
 // file, wherever it is built: a repository nothing ignores it in, which is
 // any project the dashboard did not create, and a worktree of one. It used

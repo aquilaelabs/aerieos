@@ -52,7 +52,7 @@ class Seat(unittest.TestCase):
         self.assertEqual(env.get("BB_ACCOUNT_UID"), "u_1234abcd")
 
     def test_a_persons_relayed_verb_runs_as_that_person(self):
-        # R277 (the audit of 24 Nov): minted for nobody, it ran held to the
+        # Minted for nobody, it ran held to the
         # space's dials alone, never to the person's own roles.
         env = self.run_as({"name": "ann", "uid": "u_aaaa1111"})
         self.assertEqual(self.principal(env["BB_TOKEN"])["seat"], "u_aaaa1111")

@@ -1,4 +1,4 @@
-"""Wrong passwords counted at every door (B721): an address past its quarter
+"""Wrong passwords counted at every door: an address past its quarter
 hour's allowance is held without the password being looked at, an account
 is only slowed, and a name with no account costs what a wrong password does."""
 import os

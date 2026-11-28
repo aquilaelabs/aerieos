@@ -1,5 +1,5 @@
-"""Behind `aerie tool search` and `aerie tool install` (cmd_tool in bb, R169 step
-5): the vetted catalog looked through, and one tool asked for by name, to be
+"""Behind `aerie tool search` and `aerie tool install` (cmd_tool in bb):
+the vetted catalog looked through, and one tool asked for by name, to be
 installed on the node this session runs on: a toolchain AerieOS ships, or a
 tool pack of the vetted catalog, which is added here first at the commit the
 signed index pins. The project's Install a tool pack dial says what happens:

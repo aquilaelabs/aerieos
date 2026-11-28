@@ -61,9 +61,9 @@ class Usage(unittest.TestCase):
 
 class Poppler(unittest.TestCase):
     """The pdftoppm and pdfinfo the documents toolchain puts on a node for
-    Claude Code's own PDF reader (R103): what it answers before PyMuPDF is
+    Claude Code's own PDF reader: what it answers before PyMuPDF is
     needed. Drawing pages was walked with Claude Code itself reading a PDF
-    through them (30 Sep)."""
+    through them."""
 
     def exits(self, *argv):
         err = io.StringIO()

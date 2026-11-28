@@ -1,12 +1,12 @@
-"""A release is of the commit that is pushed, read from that commit (R206
-step 4). The tag was judged by the controller's copy of the tree, where a
+"""A release is of the commit that is pushed, read from that commit.
+The tag was judged by the controller's copy of the tree, where a
 node's sync lands: files a session keeps out of git and a changed mode bit
-refused every tag (B628). The release now asks origin where the branch is,
+refused every tag. The release now asks origin where the branch is,
 which must be the commit the tree is on; reads the version, the changelog
 and the branch's line from a tree of that commit made for the purpose;
 writes the changelog's commit there and pushes it; and cuts a stable
 release or a named pre-release only from a commit on the branch builds come
-from (the operator, 14 Nov). In scratch repositories with a remote."""
+from. In scratch repositories with a remote."""
 import os
 import shutil
 import subprocess
@@ -106,7 +106,7 @@ class Pushed(unittest.TestCase):
 
     def test_the_branchs_line_and_channel_are_read_though_the_tree_is_on_none(self):
         # A branch named for the release it works toward tags that line's dev
-        # build (R112), and is a dev release unasked (R190): both read the
+        # build, and is a dev release unasked: both read the
         # branch, which a tree of the bare commit does not have.
         self.git("checkout", "-q", "-b", "claude/1.3.0")
         self.commit("toward 1.3.0")

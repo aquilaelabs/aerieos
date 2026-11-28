@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """bb-ftpd: one project's file tree over FTPS, for the people its settings
-name (R151, the operator, 7 Oct).
+name.
 
 The node agent starts one of these per project that has file access turned
 on, as the session account, with the project's directory as the root.
@@ -88,7 +88,7 @@ class Asker:
                 # Its agent is gone (an exec keeps the pid, so the parent
                 # watch below never sees it): nobody can answer a login
                 # again, so the port goes back for the agent's next server
-                # rather than refusing everyone (B573).
+                # rather than refusing everyone.
                 sys.stderr.write("bb-ftpd: the agent's pipe closed; ending\n")
                 sys.stderr.flush()
                 os._exit(0)

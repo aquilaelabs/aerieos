@@ -43,7 +43,7 @@ await section("an administrator", async () => {
   const one = await call('/api/diag', { sections: ['nodes'] });
   ok(one.status === 200 && Array.isArray(one.body.nodes) && !('audit' in one.body),
      '...or only the sections asked for');
-  // An unknown one is said, not quietly answered with everything (B675).
+  // An unknown one is said, not quietly answered with everything.
   const bad = await call('/api/diag', { sections: ['nodes', 'nosuch'] });
   ok(bad.status === 400 && /no section nosuch: the sections are/.test(bad.body.error || ''),
      `...and an unknown one is refused, naming the sections there are (${bad.status}: ${(bad.body.error || '').slice(0, 60)})`);
@@ -105,7 +105,7 @@ print(uid)`);
   const asOwner = bearer(tok(ownerUid)), asPlain = bearer(tok(plainUid)), asAdmin = bearer(tok(adminUid));
   await call('/api/prefs', { project: 'alpha', diag: false, log_from: [] });
 
-  // Debug mode is DEBUG_MODE's (the operator, 26 Oct): on here, since the
+  // Debug mode is DEBUG_MODE's: on here, since the
   // harness starts the controller with it, and not a setting to save.
   const saved = await call('/api/settings', { set: { debug_mode: false } });
   ok(/started with DEBUG_MODE=1/.test(saved.body.error || '')
@@ -119,7 +119,7 @@ print(uid)`);
   r = await call('/api/diag', {}, asOwner);
   ok(r.status === 200 && Array.isArray(r.body.nodes) && r.body.nodes.some(n => n.name === node.name),
      `...then the owner's session on alpha reads the report (${r.status})`);
-  // The node's own jobs the report lists open for the same reader (B547):
+  // The node's own jobs the report lists open for the same reader:
   // a system job by its id and in the listing, through the redactor, and
   // for nobody without the grant. Queued straight into the harness's store.
   const sysJob = execFileSync('python3', ['-c', `
@@ -143,8 +143,8 @@ print(json.dumps(m.job_add('system', {'node': '${node.id}'}, 'exec', {'argv': ['
   ok(r.status === 404, `...nor the owner's session once alpha's grant is off (${r.status})`);
   await call('/api/prefs', { project: 'alpha', diag: true });
   await call('/api/v1/jobs', { action: 'cancel', id: jid });
-  // Admin is built in with everything the owner may do since R152 (the
-  // operator, 7 Oct), the debug options included; a plain account is not.
+  // Admin is built in with everything the owner may do,
+  // the debug options included; a plain account is not.
   r = await call('/api/diag', {}, asAdmin);
   ok(r.status === 200, `an administrator's session reads it too: admin holds everything the owner does (${r.status} ${r.body.error || ''})`);
   r = await call('/api/diag', {}, asPlain);

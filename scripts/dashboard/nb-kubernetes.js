@@ -1,5 +1,5 @@
 "use strict";
-// ---- the notebook's Kubernetes view (R281 step 5) ---------------------------
+// ---- the notebook's Kubernetes view ---------------------------
 // What runs in the space's Kubernetes environments: an environment a
 // section, its status the workloads ready of all; on its bar Deploy (a
 // branch, tag or commit) and Roll back; its workloads as a table, each with

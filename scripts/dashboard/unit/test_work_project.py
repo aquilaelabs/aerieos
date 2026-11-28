@@ -1,4 +1,4 @@
-"""R208: a project with no repository is a place to run an agent that
+"""A project with no repository is a place to run an agent that
 builds containers and VMs: its folder, its briefing, its guard and its
 dials, with no git and no notebook."""
 import json

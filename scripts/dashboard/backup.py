@@ -1,7 +1,7 @@
-"""The configuration backed up and found again (R161 step 4): the same
+"""The configuration backed up and found again: the same
 bundle a move carries (move.pack: the state without its logs, the stores,
-the secrets, and the install key what they are sealed under opens with:
-R227 step 10), sealed under a key the backup password derives, written after
+the secrets, and the install key what they are sealed under opens with),
+sealed under a key the backup password derives, written after
 every change to the state (a quiet quarter of an hour after the last) onto
 every pool of the controller's own machine (/mnt/POOL/.builderbot/backup)
 and under the state, the five newest kept in each, and downloadable. A new
@@ -117,15 +117,15 @@ def make(principal, why="asked"):
                 "salt": base64.b64encode(salt).decode(), "host": _host(), "counts": counts, "why": why, "by": str(principal)[:80],
                 "carries_key": bool(counts.get("install_key"))}
     # Packed once, as it is sealed, into the first folder that takes it
-    # (never whole in memory, B558), and copied from there to the rest.
+    # (never whole in memory), and copied from there to the rest.
     written, failed, first, size = [], [], None, 0
     for d in where():
         try:
             d.mkdir(parents=True, exist_ok=True, mode=0o700)
             tmp = d / (name + ".partial")
             if first is None:
-                # With the install key inside, sealed like the rest (the
-                # operator, 15 Nov): the password alone then restores what
+                # With the install key inside, sealed like the rest:
+                # the password alone then restores what
                 # the state keeps sealed, the sign-ins and the tokens too,
                 # where a copy without it brought them back locked.
                 _bundle(tmp, move_header(), manifest_of, key_from(pw, salt), carry_key=True)
@@ -181,7 +181,7 @@ def status():
 
 
 def found(dirs):
-    """What a fresh install finds on its disks (R161 step 4): the copies
+    """What a fresh install finds on its disks: the copies
     under each pool's .builderbot/backup, newest first, with their versions,
     before anybody owns it."""
     out = []

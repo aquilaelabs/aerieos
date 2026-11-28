@@ -1,5 +1,5 @@
 """What a node says of a VM's network and its host's networks reaches the
-page (R219 step 4): the controller's cleaning kept net to lan or project,
+page: the controller's cleaning kept net to lan or project,
 so a VM on a bridge read as its space's and its Hardware dialog would have
 moved it back on Save."""
 import os

@@ -1,5 +1,5 @@
 """The node agent's sdk_env: a toolchain's layout env is a path under its
-directory, set only when it exists, or `=VALUE`, set as given (B548: the
+directory, set only when it exists, or `=VALUE`, set as given (the
 playwright toolchain says PLAYWRIGHT_SKIP_BROWSER_GC=1, so a project's own
 Playwright installing into the shared store adds its browsers without
 sweeping the store's own)."""

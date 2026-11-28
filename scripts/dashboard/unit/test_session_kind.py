@@ -1,6 +1,6 @@
-"""A session is a caller of its own kind (R227 step 4): its token answers a
+"""A session is a caller of its own kind: its token answers a
 principal with no role's rights and no account's id. What keeps something by
-a caller's id keeps nothing for a session unless it asked whose() by name;
+a caller's id keeps nothing for a session unless it asked whose by name;
 the person it works for is its seat, and the account behind it is found by
 that seat where a route means the person."""
 import os

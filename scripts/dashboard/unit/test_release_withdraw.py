@@ -1,5 +1,5 @@
 """A release withdrawn takes its tag with it, on GitHub, and a tag whose
-release is already gone goes alone (R190 step 3): the 0.9.0 dev release
+release is already gone goes alone: the 0.9.0 dev release
 left a tag GitHub would not delete beside its release, and a tag with no
 release, each deleted by hand."""
 import os
@@ -77,7 +77,7 @@ class Withdraw(unittest.TestCase):
         self.assertNotIn(("GET", f"{API}/git/refs/tags/v1.0.0-dev.5"), f.calls)
 
 
-    # B1159: the release and its tag went, and the image its build pushed
+    # The release and its tag went, and the image its build pushed
     # stayed pullable by its version.
     PKGS = [{"name": "r", "repository": {"full_name": "o/r"}}, {"name": "x", "repository": {"full_name": "o/x"}}]
 
@@ -123,7 +123,7 @@ class Withdraw(unittest.TestCase):
 
 class GitLabPackages(unittest.TestCase):
     def test_a_withdrawn_release_takes_its_builds_from_the_package_registry(self):
-        # B561: the release and its tag went, and the package registry went
+        # The release and its tag went, and the package registry went
         # on serving the build.
         calls = []
         class F:

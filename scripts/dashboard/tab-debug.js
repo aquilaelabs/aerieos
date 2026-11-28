@@ -1,13 +1,13 @@
-// The Debug page (R147): beside Controller settings, and drawn only on a
+// The Debug page: beside Controller settings, and drawn only on a
 // controller started with DEBUG_MODE=1 for an account with the debug grant
-// (railAllows). Not an advertised feature (the operator, 26 Oct): no tour,
+// (railAllows). Not an advertised feature: no tour,
 // and nothing of it in the changelog. Its head says debug mode is on and
 // why; Dev features holds Offer dev features; What sessions may read holds
 // every project's grants, the controller's diagnostics and each node's
 // machine logs, which a project's settings held before (prefs diag and
 // log_from, the project's own).
 //
-// Chrome from docSurface(); drawn from the status read and the node list,
+// Chrome from docSurface; drawn from the status read and the node list,
 // so it follows the poll; what is ticked and not saved is held here.
 
 "use strict";

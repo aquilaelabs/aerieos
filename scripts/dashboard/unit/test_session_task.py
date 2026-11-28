@@ -1,4 +1,4 @@
-"""A session's task follows its latest turn (B59): the pane title Claude names
+"""A session's task follows its latest turn: the pane title Claude names
 from the first turn and keeps, so the Sessions page said the first thing it
 was asked for every turn after. The prompt hook's `seen` trip notes what was
 typed, and the row reads the newest line asked since the session began."""

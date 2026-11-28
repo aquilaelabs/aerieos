@@ -1,5 +1,5 @@
-"""The shipped agents signed in by the one driver a pack's agent is (R234
-step 6): each row of the agents' table says its sign-in as the data a
+"""The shipped agents signed in by the one driver a pack's agent is:
+each row of the agents' table says its sign-in as the data a
 manifest carries, held by the manifest's own validator, and
 scripts/lib/login-flow.py runs each program from it. The programs here are
 stand-ins that draw the screens the real ones drew on 12 Nov (Claude Code,

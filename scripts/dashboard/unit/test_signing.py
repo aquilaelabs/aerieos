@@ -1,4 +1,4 @@
-"""signing.py (R106): a project's Android keys kept by the controller and
+"""signing.py: a project's Android keys kept by the controller and
 worked on by a sign-key job on the project's node (signnode.py runs the real
 agent's side against a toolchain store here), skipped where there is none: a
 key is checked before it is kept, the listing carries no password, the files
@@ -121,7 +121,7 @@ class Signing(unittest.TestCase):
         self.assertEqual(signing.mapping("app"), {})
 
     def test_a_backup_made_with_the_password_is_wrapped_under_it(self):
-        # R111: Download backup with the project's backup password wraps the
+        # Download backup with the project's backup password wraps the
         # keystore under that password, password.txt holding none, so a
         # copy of the zip is no key without it; Import takes it typed in.
         import io
@@ -153,7 +153,7 @@ class Signing(unittest.TestCase):
         self.assertEqual(signing.listing("other")[0]["keys"]["watch"]["sideload"]["sha256"], sha)
 
     def test_a_backup_imports_into_another_project(self):
-        # R103: Download backup's zip goes into a second project as the same
+        # Download backup's zip goes into a second project as the same
         # key, its password and alias read from password.txt.
         signing.generate("app", "sideload", "watch")
         sha = signing.listing("app")[0]["keys"]["watch"]["sideload"]["sha256"]
@@ -221,7 +221,7 @@ class Signing(unittest.TestCase):
 
 class NodeState(unittest.TestCase):
     """What keeps the project's node from a key's work is said naming the
-    node and what it lacks (B232), before any job is queued."""
+    node and what it lacks, before any job is queued."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -311,7 +311,7 @@ class Start(unittest.TestCase):
         self.assertNotIn("SECRET", repr(spec))
 
     def test_a_node_whose_agent_is_behind_is_said_before_the_ask(self):
-        # B515: allowed by the owner, then refused by the node.
+        # Allowed by the owner, then refused by the node.
         self.addCleanup(setattr, signing, "node_refuses", signing.node_refuses)
         signing.node_refuses = lambda nid: "n_1 runs agent 0.7.133 and this controller ships 0.7.134: press Update agent on its row first"
         r, st = signing.start("u", "app", "app-release.apk", "sideload")
@@ -329,8 +329,8 @@ class Start(unittest.TestCase):
 
 
 class KeyChoice(unittest.TestCase):
-    """With no key named and none called default (B509, AerieOS's own app,
-    5 Oct): the project's only key for the route signs an unmapped build,
+    """With no key named and none called default (AerieOS's own app):
+    the project's only key for the route signs an unmapped build,
     and when several could and none is mapped, the signing is refused
     before anybody is asked to allow it."""
 
@@ -390,7 +390,7 @@ class Rotate(unittest.TestCase):
 
 
 class BackupPassword(unittest.TestCase):
-    """A project's backup password (the operator, 1 Oct): set, changed only
+    """A project's backup password: set, changed only
     with the current one, needed for every download, held after five misses."""
 
     def setUp(self):

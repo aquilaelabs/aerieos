@@ -1,4 +1,4 @@
-"""bb waits out a restarting controller (R251): a refused connection is asked
+"""bb waits out a restarting controller: a refused connection is asked
 again with backoff for up to BB_CONTROLLER_WAIT seconds, since the request
 never reached a server; the session's gate is told at once; a hook, at 0,
 is answered at once; and a POST the server may have read is never sent
@@ -77,7 +77,7 @@ class Wait(unittest.TestCase):
         self.assertFalse(self.gate()["ok"], "the gate was told the moment nothing answered")
 
     def test_the_whole_budget_is_waited_not_only_the_steps(self):
-        # B772: the steps add up to 95s, and a longer budget was cut there.
+        # The steps add up to 95s, and a longer budget was cut there.
         os.environ["BB_CONTROLLER_WAIT"] = "2"
         bbapi.WAIT_STEPS = (0.2, 0.2)
 
@@ -89,7 +89,7 @@ class Wait(unittest.TestCase):
         self.assertEqual(bbapi.request("/api/status"), (200, {"ok": True}))
 
     def test_no_route_to_the_host_is_waited_out_too(self):
-        # B771: the gap while builderbot-dev's container was replaced answered
+        # The gap while builderbot-dev's container was replaced answered
         # EHOSTUNREACH, and every call in it failed at once.
         os.environ["BB_CONTROLLER_WAIT"] = "5"
         self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", self.port), Ok)
@@ -142,14 +142,14 @@ class Wait(unittest.TestCase):
         self.assertGreater(len(seen), 2, "a GET it hung up on is asked again")
         # shutdown wakes the accept the thread is blocked in, which close
         # alone does not: the listener lived on into the next module's tests
-        # and test_ciwatch's look then missed a finding (B287).
+        # and test_ciwatch's look then missed a finding.
         lst.shutdown(socket.SHUT_RDWR)
         lst.close()
 
 
 
 class AgentBehind(unittest.TestCase):
-    """R253: a job refused only because its node's agent is behind waits for
+    """A job refused only because its node's agent is behind waits for
     the agent's update, which the controller queues itself, and is sent again;
     nothing was done, so asking again does nothing twice."""
     def setUp(self):

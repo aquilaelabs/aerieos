@@ -1,4 +1,4 @@
-"""A newer release for a bare-metal install (R90 step 5, releasecheck.py):
+"""A newer release for a bare-metal install (releasecheck.py):
 the newest published release read, said as newer than the build running
 only when it is, on the bell only on a bare-metal install, and nothing of
 it on a container install."""
@@ -37,7 +37,7 @@ class ReleaseCheck(unittest.TestCase):
         releasecheck.RELEASES_URL = "file://" + path
         self.addCleanup(setattr, releasecheck, "RELEASES_URL", self.was)
         # What the check keeps is the module's, shared with any test that ran
-        # before in this process (B731): set to nothing before, as after.
+        # before in this process: set to nothing before, as after.
         clear = lambda: releasecheck._latest.update(version="", tag="", at=0, error="", url="",  # noqa: E731
                                                     dev={"version": "", "tag": "", "url": ""})
         clear()
@@ -57,7 +57,7 @@ class ReleaseCheck(unittest.TestCase):
         self.assertEqual(releasecheck.attention("n_own"), [])
         releasecheck.configure(version=lambda: "0.9.1-dev.12+abc", bare_metal=lambda: True)
         self.assertEqual(releasecheck.newer(), "", "a dev build past the release is not behind it")
-        # B618: a dev build heading for the release stands below it on the
+        # A dev build heading for the release stands below it on the
         # normal channel too, so one that picked Releases again moves to it.
         releasecheck.configure(version=lambda: "0.9.0-dev.4400+abc", bare_metal=lambda: True, channel=lambda: "normal")
         self.assertEqual(releasecheck.newer(), "0.9.0", "a dev build moves to the release it was heading for")
@@ -125,7 +125,7 @@ class ReleaseCheck(unittest.TestCase):
 
 
     def test_the_dev_channel_takes_pre_releases_and_debug_mode_picks_any(self):
-        # R179: the normal channel passes a pre-release over; the dev
+        # The normal channel passes a pre-release over; the dev
         # channel takes the newest dev build's and ranks it against the releases.
         releasecheck.configure(version=lambda: "0.9.0", bare_metal=lambda: True, channel=lambda: "dev")
         got = releasecheck.check()
@@ -148,7 +148,7 @@ class ReleaseCheck(unittest.TestCase):
         self.assertEqual(releasecheck.rank("0.9.0"), (0, 9, 0, 10 ** 9))
         self.assertEqual(releasecheck.rank("v0.9.0-dev.12+abcdef0"), (0, 9, 0, 12))
         # Any name is a pre-release on the dev channel, ordered by the
-        # commit's ordinal it carries, whatever it is called (R218).
+        # commit's ordinal it carries, whatever it is called.
         self.assertEqual(releasecheck.rank("v0.9.0-rc.14"), (0, 9, 0, 14))
         self.assertGreater(releasecheck.rank("0.9.0-rc.14"), releasecheck.rank("0.9.0-dev.13"))
         self.assertLess(releasecheck.rank("0.9.0-rc.14"), releasecheck.rank("0.9.0"))
@@ -157,7 +157,7 @@ class ReleaseCheck(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("ssh-keygen"), "no ssh-keygen here")
 class SignedImage(unittest.TestCase):
-    """The container image a release names as its own (R199): one line in
+    """The container image a release names as its own: one line in
     the release, in its signed list of files, read from the newest release
     whose list this install takes. Real keys and ssh-keygen; the releases
     and their files are a folder's."""

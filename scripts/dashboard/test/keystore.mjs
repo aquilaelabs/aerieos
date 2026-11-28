@@ -1,5 +1,5 @@
-// An unlock that gives up less (R158 step 5) and a key of the person's own
-// (R157), on the page: Profile's Your key store shows who holds the key and
+// An unlock that gives up less and a key of the person's own,
+// on the page: Profile's Your key store shows who holds the key and
 // the window, a token given to a project is opened per use and listed under
 // Uses of your tokens, Hold the key yourself with a key the person keeps
 // locks the store until that key unlocks it (the Git view says so while it

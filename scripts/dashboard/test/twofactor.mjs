@@ -1,4 +1,4 @@
-// Two-factor sign-in (R127): an account adds an authenticator on Profile and
+// Two-factor sign-in: an account adds an authenticator on Profile and
 // signs in through it, through a recovery code once, through a remembered
 // browser and through a passkey (Chrome's virtual authenticator over CDP);
 // its password alone opens nothing, Basic auth included; the bell asks an
@@ -119,7 +119,7 @@ ok(dev2.ok && (await dev2.json()).token, '...and signs in with it');
 
 // ---- a passkey: added on Profile, used to sign in -----------------------
 // A virtual authenticator is Chromium's own protocol: the other engines
-// say this part skipped (R263 step 6).
+// say this part skipped.
 if (ENGINE !== 'chromium') skip('a passkey added on Profile signs in at the second step', "a virtual authenticator is Chromium's protocol");
 else {
   // WebAuthn takes no IP address for its site, so this part is on localhost.
@@ -135,7 +135,7 @@ else {
   await page.evaluate(() => openProfileTwoFactor());
   await page.waitForSelector('.doc [data-tf="passkey-add"]', { timeout: 20000 });
   // With a factor on, adding another takes one of it first, as a removal
-  // does (R288): a bare begin is refused, and the press asks for a code.
+  // does: a bare begin is refused, and the press asks for a code.
   const bare = await page.evaluate(() => postJSON('/api/profile', { action: '2fa-passkey-begin' }));
   ok(bare.fresh === true && /second factor now/.test(bare.error || ''), `adding a factor beside one asks for one of it first (${bare.error})`);
   await page.click('.doc [data-tf="passkey-add"]');

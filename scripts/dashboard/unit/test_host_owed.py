@@ -1,4 +1,4 @@
-"""What the git host owes a repository's own workflows (R267 step 29): read
+"""What the git host owes a repository's own workflows: read
 from the workflows as text (version.host_wants), asked of GitHub
 (forgeaccess.owed), and a release refused while any is owed
 (version.host_owed). Nothing in it names an environment or a secret: each

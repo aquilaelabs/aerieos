@@ -1,4 +1,4 @@
-"""Enroll node as one script (R161): a router's WireGuard config read,
+"""Enroll node as one script: a router's WireGuard config read,
 narrowed to the controller, carried in a script that runs the provisioner;
 and the controller answering a tunnel address on the agent's API alone."""
 import base64
@@ -174,7 +174,7 @@ class Script(unittest.TestCase):
 
 
 class PublicHostname(unittest.TestCase):
-    """Through a public hostname (R170): a name over https, hosting only
+    """Through a public hostname: a name over https, hosting only
     whatever was ticked, the agent told to verify by CA, and the home end
     told the rule, with cloudflared's config as the example."""
     def test_the_controller_is_an_https_hostname(self):
@@ -199,7 +199,7 @@ class PublicHostname(unittest.TestCase):
 
 
 class HostingFirewall(unittest.TestCase):
-    """A hosting-only box closed on itself (R93): the flag rides only with
+    """A hosting-only box closed on itself: the flag rides only with
     no sessions, the provisioner refuses it on a session node before it
     changes anything, and the rules it writes drop what Docker publishes
     as well as what reaches the host."""
@@ -246,7 +246,7 @@ class HostingFirewall(unittest.TestCase):
 
 
 class Door(unittest.TestCase):
-    """A door in for SSH (R174): the recipe's answers checked, the secret in
+    """A door in for SSH: the recipe's answers checked, the secret in
     the script until it has run and out of it after, the flags to the
     provisioner."""
     def test_the_answers_are_checked(self):
@@ -279,7 +279,7 @@ class Door(unittest.TestCase):
                 after = fh.read()
             # Run again, the repair: the secret is out of it, and the script
             # still runs rather than dying on a chmod of a file it no longer
-            # writes (the operator, 11 Oct).
+            # writes.
             p2 = subprocess.run(["bash", f], capture_output=True, text=True, timeout=30)
         finally:
             shutil.rmtree(d, ignore_errors=True)
@@ -295,7 +295,7 @@ class Door(unittest.TestCase):
 
 
 class Again(unittest.TestCase):
-    """A node enrolling again (R177): the script bound to its machine, with
+    """A node enrolling again: the script bound to its machine, with
     no secret in it, the node's own WireGuard config and door left as they
     are."""
     def test_the_script_is_bound_and_carries_no_secret(self):
@@ -350,7 +350,7 @@ class TunnelGate(unittest.TestCase):
 
 
 class RetiredTunnel(unittest.TestCase):
-    """A removed box's hostname and address stay refused (R92)."""
+    """A removed box's hostname and address stay refused."""
 
     def setUp(self):
         self.was = nodes.node_list
@@ -372,7 +372,7 @@ if __name__ == "__main__":
 
 
 class StoreFlags(unittest.TestCase):
-    """A node's stores ride in a script made again for it (B658), as the
+    """A node's stores ride in a script made again for it, as the
     provisioner's flags; a first enrollment names none."""
     def test_the_nodes_stores_ride_as_flags(self):
         ans = es.check({"reach": "lan", "controller": "http://192.168.1.16:7680", "name": "shed"}, again=True)

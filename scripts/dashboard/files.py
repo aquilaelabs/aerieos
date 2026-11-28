@@ -1,4 +1,4 @@
-"""A project's files, one request at a time, for a person's own editor (R159).
+"""A project's files, one request at a time, for a person's own editor.
 
 The VS Code extension opens a project as a folder of its own and reads and
 writes it through here, with no share mounted on the person's machine. The
@@ -28,7 +28,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-# The API's version (R79 step 8): the extension says the one it speaks in
+# The API's version: the extension says the one it speaks in
 # X-BB-Api and which release it is in X-BB-App ("vscode/0.1.0"); the
 # projects answer says API and API_MIN, and one older than API_MIN is
 # refused with the way to update. API moves with a change an older extension
@@ -155,7 +155,7 @@ def _write(p, raw):
         tmp.unlink(missing_ok=True)
 
 
-on_change = None          # (project) -> None: wssync.changed, so a synced node hears at once (R162)
+on_change = None          # (project) -> None: wssync.changed, so a synced node hears at once
 
 
 def _changed(project, by, action, rel, **more):

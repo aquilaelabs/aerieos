@@ -1,4 +1,4 @@
-"""B448: compose config is asked with the node's own variables, so a compose
+"""Compose config is asked with the node's own variables, so a compose
 that requires BB_DOCKER_GID (${BB_DOCKER_GID:?...}) can be read for its
 ports and mounts, and one that still cannot says what compose said."""
 import os

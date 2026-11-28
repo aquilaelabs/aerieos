@@ -1,4 +1,4 @@
-"""What an agent may do on a project's git host (R188), and the doing of it.
+"""What an agent may do on a project's git host, and the doing of it.
 
 Three things, each built on the one before:
 
@@ -41,8 +41,8 @@ write_json = None
 target_of = None
 # prefs.get, for the project's override.
 prefs_of = None
-# Told a measure's expiry (project, expires), for Connected services (R294
-# step 9); set by the server.
+# Told a measure's expiry (project, expires), for Connected services;
+# set by the server.
 on_measured = None
 
 
@@ -152,7 +152,7 @@ def _call(t, method, path, data=None, raw=False):
         with forges._OPENER.open(req, timeout=30) as r:
             if raw:
                 # A log's end is where it says why: the last 4 MB of it kept,
-                # where the first 4 MB's end was taken for the tail (B563).
+                # where the first 4 MB's end was taken for the tail.
                 got, cut = b"", False
                 while (chunk := r.read(1_000_000)):
                     got = (got + chunk)[-4_000_000:]
@@ -180,7 +180,7 @@ def _receive_pack_probe(t, r):
     a push (GET REPO.git/info/refs?service=git-receive-pack, nothing
     written): a fine-grained token an organization has not approved passes
     the API's write probes (a 422 for a missing field) and is refused here,
-    as the push itself is (B462). True, False, or None where the host did
+    as the push itself is. True, False, or None where the host did
     not say either way."""
     url = f"{t['scheme']}://{t['host']}/{r}.git/info/refs?service=git-receive-pack"
     cred = base64.b64encode(f"x-access-token:{t['token']}".encode()).decode()
@@ -289,7 +289,7 @@ def measure(project, t=None):
             write("issues_write", "POST", f"/repos/{r}/issues", {})
             write("releases_write", "POST", f"/repos/{r}/releases", {})
             write("actions_write", "POST", f"/repos/{r}/actions/workflows/builderbot-access-probe.yml/dispatches", {})
-            # ...and the push asked of the git door itself (B462): a token
+            # ...and the push asked of the git door itself: a token
             # the organization has not approved reads as allowed above.
             if has["push"] and _receive_pack_probe(t, r) is False:
                 has["push"] = False
@@ -376,7 +376,7 @@ def override(project):
     """{ability: allow|deny}: what the project lets an agent do, over what
     the token allows."""
     pol = ((prefs_of(project) or {}).get("forgepol") if prefs_of else None) or {}
-    # An ability another setting governs has no switch here (B559): a deny
+    # An ability another setting governs has no switch here: a deny
     # kept from before it was taken away changed nothing, and said it did.
     return {k: (pol.get(k) if pol.get(k) in ("allow", "deny") and not BY_ID[k].get("fixed") else v)
             for k, v in defaults().items()}
@@ -577,7 +577,7 @@ def v_issue_list(t, a):
         c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}&type=issues&limit=30")
         return _ok(c, b, lambda x: [_row_issue(i) for i in x])
     # GitHub lists pull requests among its issues, so thirty asked for could
-    # be thirty pull requests and no issue said (B562): pages of a hundred,
+    # be thirty pull requests and no issue said: pages of a hundred,
     # up to five, until thirty issues are in hand.
     got = []
     for page in range(1, 6):
@@ -660,7 +660,7 @@ def v_run_log(t, a):
         want = [n]
     else:
         # Every page of a big matrix, so a failure past the first fifty jobs
-        # is found rather than the first jobs' passing logs shown (B563).
+        # is found rather than the first jobs' passing logs shown.
         jobs = []
         for page in range(1, 4):
             c, j, _h = _call(t, "GET", f"/repos/{t['repo']}/actions/runs/{n}/jobs?per_page=100&page={page}")
@@ -693,7 +693,7 @@ def v_run_rerun(t, a):
 
 def _fields(a):
     """A dispatch's NAME=VALUE fields: a list, or one given as a plain
-    string, never read a character at a time (B1062)."""
+    string, never read a character at a time."""
     f = (a.get("flags") or {}).get("field") or []
     return [f] if isinstance(f, str) else list(f)
 
@@ -901,7 +901,7 @@ def gl_run_log(t, a):
     if (a.get("flags") or {}).get("job"):
         want = [n]
     else:
-        # As on GitHub (B563): every page until a failure is found.
+        # As on GitHub: every page until a failure is found.
         jobs = []
         for page in range(1, 4):
             c, j, _h = _call(t, "GET", f"{_gl(t)}/pipelines/{n}/jobs?per_page=100&page={page}")
@@ -989,9 +989,9 @@ def dispatch(project, workflow, ref, inputs=None):
 
 
 def rehearsed(project, sha, workflow="release-rehearsal.yml"):
-    """Whether a run of `workflow` passed on the commit `sha` (R190 step 6):
+    """Whether a run of `workflow` passed on the commit `sha`:
     True, False, or a sentence why it cannot be told. The controller's own
-    question, asked with the space's token as dispatch() is, never under
+    question, asked with the space's token as dispatch is, never under
     the space's override. GitHub alone lists a workflow's runs by commit;
     another host says so."""
     t = target_of(project)
@@ -1013,7 +1013,7 @@ wants_of = None
 
 def owed(project, wants):
     """What the person owes on the git host for what this repository's own
-    workflows ask of it (R267 step 29): [{"what", "state", "why"}], state
+    workflows ask of it: [{"what", "state", "why"}], state
     ok, owed or unknown. Worked out from `wants` (version.host_wants), never
     from a list of names: each environment a job is gated by has a required
     reviewer, no repository-level secret stands in for one an environment
@@ -1021,7 +1021,7 @@ def owed(project, wants):
     approval), a tag is made only under a ruleset where a workflow runs on
     one, and an outside contributor's pull request runs only once approved
     where a workflow runs on pull requests. The controller's own question,
-    asked with the space's token as rehearsed() is; what the token may not
+    asked with the space's token as rehearsed is; what the token may not
     read is said as unknown, with the permission it lacks."""
     t = target_of(project)
     if t.get("error"):

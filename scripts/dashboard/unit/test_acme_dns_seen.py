@@ -1,5 +1,5 @@
 """A DNS-01 record is looked for where a resolver reads it before Let's
-Encrypt is asked (R226): seen, the order goes on; not seen within the wait,
+Encrypt is asked: seen, the order goes on; not seen within the wait,
 it says so, rather than sleeping fifteen seconds and hoping."""
 import io
 import json

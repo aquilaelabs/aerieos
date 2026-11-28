@@ -1,4 +1,4 @@
-"""Apps a NAS runs (R164 step 2, R238): ready containers (a media server,
+"""Apps a NAS runs: ready containers (a media server,
 photos, files, home automation, a download client, syncing), each a
 compose file and the fields its panel asks for (where its data and media
 live, who it runs as, the time zone, its port), filled from the New
@@ -7,11 +7,11 @@ is: on the node picked, reached on its port, and put behind a node's nginx
 with a certificate from that node's nginx page.
 
 None is shipped in this file. An app is offered because the vetted
-catalog's signed index lists it (R169, R238 step 1): its folder is fetched
+catalog's signed index lists it: its folder is fetched
 at the commit the index pins and kept here (add_catalog), and an app is
 added, fixed or re-pinned by a commit to the catalog, with no release of
-AerieOS (refresh). Beside those, the apps a person added (R170 step 3,
-the Library's Add your own): a compose file of their own, checked before
+AerieOS (refresh). Beside those, the apps a person added
+(the Library's Add your own): a compose file of their own, checked before
 it is kept, held at tier sideloaded. Both are kept in sideapps.json under
 the state. From pack format 5 an app names every image by its digest; one
 of an earlier format pins each to a tag, never latest.
@@ -35,7 +35,7 @@ ID_RE = re.compile(r"[a-z][a-z0-9-]{1,31}")
 BLANKS = ("DATA", "MEDIA", "PUID", "PGID", "TZ", "PORT")
 COMPOSE_MAX = 64 * 1024
 
-# An app's own fields (R238 step 2, pack format 4): in place of the six
+# An app's own fields (pack format 4): in place of the six
 # blanks every app shared, bbapp.json declares what its form asks for,
 # each a variable its compose reads. AerieOS's own four stay its own, drawn
 # in the same words for every app whose compose reads them: who it runs as,
@@ -73,7 +73,7 @@ OWN_LABELS = {"PUID": "Runs as", "PGID": "Runs as", "TZ": "Time zone", "PORT": "
 def extra_env(a, text):
     """The other variables a person typed for an app (its Environment tab):
     (text, why). One the app's panel sets is refused by name, so a value is
-    set in one place and never two (R238 step 3)."""
+    set in one place and never two."""
     mine, own = (a.get("fields"), a.get("own")) if "own" in a else app_fields(a)
     taken = {f["var"]: f["label"] for f in mine} | {f["key"]: f["label"] for f in mine if f.get("key")} | {v: OWN_LABELS[v] for v in own}
     lines = [ln for ln in str(text or "").splitlines() if ln.strip()]
@@ -107,7 +107,7 @@ def ports_taken(a, values, node, keep=None, held=()):
 
 def snapshot(a):
     """What a container made from an app keeps of it beside its compose
-    file (R238 step 3): which app, at which pin, and the fields it was made
+    file: which app, at which pin, and the fields it was made
     with, so Configure opens on them whatever the Library holds later."""
     keys = ("id", "name", "maker", "tier", "fields", "own", "network", "port", "commit", "at")
     return {k: a.get(k) for k in keys if k in a}
@@ -137,15 +137,15 @@ def catalog():
     """The list the dialog and the Library show: [{id, name, what, port,
     media, secrets, tier, by, at, icon, fields, own, network, going,
     commit, compose, held}], `icon` the address of its own picture when it has
-    one (R182), `fields` what its panel asks for and `own` which of
-    AerieOS's own it asks for too (R238)."""
+    one, `fields` what its panel asks for and `own` which of
+    AerieOS's own it asks for too."""
     out = []
     for k, v in _all().items():
         mine, own = app_fields({**v, "id": k})
         out.append({"id": k, "name": v["name"], "what": v["what"], "port": v["port"], "media": v.get("media", False),
                     "secrets": v.get("secrets", []) or [f["var"] for f in mine if f["kind"] == "secret"],
                     "tier": v["tier"], "by": v.get("by", ""), "at": v.get("at", 0),
-                    # Who the app itself is by (the operator, 12 Nov), where it says.
+                    # Who the app itself is by, where it says.
                     "maker": str(v.get("maker") or ""), "credits": list(v.get("credits") or []),
                     "icon": f"/api/pack-icon?app={k}&v={v.get('at', 0)}" if icon_of(k) else "",
                     "fields": mine, "own": own, "network": v.get("network", ""), "going": v.get("going", ""),
@@ -155,7 +155,7 @@ def catalog():
     return out
 
 
-# An app's own icon (R182): the file bbapp.json names in the catalog's
+# An app's own icon: the file bbapp.json names in the catalog's
 # folder, checked as a pack's is (toolpacks.icon_refused), kept under the
 # state by the app's id and served as an image alone.
 def _icon_dir():
@@ -257,7 +257,7 @@ def fields_of(raw, errors):
         elif kind == "secret":
             d = ""
         elif kind == "router":
-            # The model router (R238 step 7): its address in `var`, a key of
+            # The model router: its address in `var`, a key of
             # the container's own in `key`, the router picked on the panel.
             key, path = str(f.get("key") or ""), str(f.get("path") or "")
             if not VAR_RE.fullmatch(key) or key in OWN or key == var or key in seen:
@@ -318,7 +318,7 @@ def check_app(meta, compose):
         errors.append('network is "host", the machine\'s own network, or left out')
     # The card and New container keep 200 characters of it, as a person's
     # own app is held to; said here, where the catalog's check hears it,
-    # rather than cut mid-word on the card (B932).
+    # rather than cut mid-word on the card.
     if len(" ".join(str(meta.get("about") or "").split())) > 200:
         errors.append("about says what the app is in a line of up to 200 characters")
     going = " ".join(str(meta.get("going") or "").split())
@@ -547,14 +547,14 @@ def add(app, name, what, port, compose, by="", replace=False):
 
 
 def add_catalog(entry, by="", fetch=None):
-    """Keep an app the vetted catalog offers (R170 step 7): its folder at the
+    """Keep an app the vetted catalog offers: its folder at the
     commit the signed index pins, bbapp.json and compose.yml read from it and
     the compose held to what a person's own is held to, kept with the
     entry's tier and pin so New container offers it. `entry` is the index's,
     never the page's. {app} or {error}."""
     if not entry or entry.get("kind") != "app":
         return {"error": "no app by that name in the catalog"}
-    # One written in a format this build has not met is not fetched (R234).
+    # One written in a format this build has not met is not fetched.
     past = packformat.too_new(packformat.of(entry) or 1)
     if past:
         return {"error": f"{entry['name']} {past}"}
@@ -571,7 +571,7 @@ def add_catalog(entry, by="", fetch=None):
     fmt = packformat.of(meta)
     if fmt is None or packformat.too_new(fmt):
         return {"error": f"{app}'s bbapp.json says a format that is no number" if fmt is None else f"{app} {packformat.too_new(fmt)}"}
-    # ...and what it uses is in the framework version it says (R234 step 7).
+    # ...and what it uses is in the framework version it says.
     late = packformat.needs(meta, packformat.uses_of(meta))
     if late:
         return {"error": f"{app}'s bbapp.json: {late[0]}"}
@@ -582,7 +582,7 @@ def add_catalog(entry, by="", fetch=None):
         port = int(meta.get("port"))
     except (TypeError, ValueError):
         return {"error": f"{app}'s bbapp.json names no port"}
-    # Its own icon, when bbapp.json names one in its folder (R182): read at
+    # Its own icon, when bbapp.json names one in its folder: read at
     # the same pin and under the same sha256, refused whole when it is not
     # the image its name says.
     import toolpacks  # noqa: PLC0415
@@ -605,7 +605,7 @@ def add_catalog(entry, by="", fetch=None):
                  "media": seen["media"], "compose": compose, "secrets": [], "by": str(by or ""), "at": int(time.time()),
                  "tier": packformat.tier_of(entry.get("tier")),
                  # Who it is by, its own fields, the network it runs on and
-                 # whether it is going (R238), as its manifest says them.
+                 # whether it is going, as its manifest says them.
                  "maker": packformat.maker_of(meta), "credits": packformat.credits_of(meta),
                  **{k: seen[k] for k in ("fields", "network", "going") if k in seen},
                  "pin": {k: entry[k] for k in ("url", "commit", "sha256")} | {"path": entry.get("path", "")}}
@@ -613,7 +613,7 @@ def add_catalog(entry, by="", fetch=None):
     return {"app": app, **seen}
 
 
-# A kept app's newer definition (R238): an app is fixed or re-pinned by a
+# A kept app's newer definition: an app is fixed or re-pinned by a
 # commit to the catalog, and the signed index then pins that commit. One
 # kept here from the same repository and folder takes it, fetched and held
 # as its first keep was, so a container made from it is offered the images

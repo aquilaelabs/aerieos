@@ -10,7 +10,7 @@
 #      stays alive so you can `docker exec` in and run Claude Code)
 #
 # The steps themselves are lib/boot.sh's, which a controller installed bare
-# metal runs too (host-boot.sh, R90 step 3); remapping `builder`, the
+# metal runs too (host-boot.sh); remapping `builder`, the
 # timezone and gosu are the container's, and stay here.
 #
 set -euo pipefail
@@ -81,7 +81,7 @@ main() {
     # hint file" into "the container does not start". What reads the marker
     # falls back to the container's age when it is missing.
     rm -f "$BOOT_READY_FILE" 2>/dev/null || true
-    # /config's state version, before anything writes to it (R79).
+    # /config's state version, before anything writes to it.
     state_gate
     setup_logging
     banner
@@ -103,7 +103,7 @@ main() {
 
     # The one secret the dashboard itself needs, as a file only it reads
     # (lib/boot.sh), before the hooks: hook 15 starts the dashboard, which
-    # reads the key as it starts (B388).
+    # reads the key as it starts.
     install_key_file
     load_deploy_keys
     run_hooks

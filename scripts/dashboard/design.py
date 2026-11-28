@@ -14,7 +14,7 @@ tab, `aerie design` and the file cannot drift:
 
   * the prose a session reads piece by piece with `aerie design show`: the
     language, one page, one theme or one rule. The tab shows none of it
-    (the operator, 29 Sep: a whole dump is not how a session should read
+    (a whole dump is not how a session should read
     a design), and nothing on the view reaches into a session;
   * docs/design-language.md in the project's tree, the same shape as
     AerieOS's own, written on request from the saved state. A session
@@ -34,7 +34,7 @@ from pathlib import Path
 import pending
 import statefile
 # A rule's and a page's names, which a node's aerie design edit reads too
-# (B934: a node's bundle carries records.py, not this).
+# (a node's bundle carries records.py, not this).
 from records import design_page_key as page_key  # noqa: E402
 from records import design_rules as scoped_rules  # noqa: E402
 from records import design_slug as _slug  # noqa: E402
@@ -53,7 +53,7 @@ NOTES_MAX = 20000
 # file or is asked about a word the rule names (rules.matching, through the
 # hooks), never the whole text at once: AerieOS's own design language is
 # thirty thousand characters, and a dump of it on every design question is
-# what nobody reads (the operator, 28 Sep). One without triggers stands in
+# what nobody reads. One without triggers stands in
 # every briefing, as a house rule does.
 RULES_MAX = 500
 RULE_TEXT_MAX = 20000
@@ -277,14 +277,14 @@ def _luma(hexcol):
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
-# A design nobody has touched chooses nothing (the operator, 29 Sep): no
+# A design nobody has touched chooses nothing: no
 # theme, and no type, corners, space or motion either. Each of those four
 # carries a sentence a session holds the work to, and while "quiet" was
 # here by default a project's stylesheet was reported as falling short of
 # a promise nobody had made.
 # A language is its themes and what it governs; the choices (type, corners,
 # space, motion), the font families, the custom rule each choice may name
-# and the rules are each THEME's (the operator, 29 Sep). The first theme is
+# and the rules are each THEME's. The first theme is
 # the default, and its choices and rules are the design's: said bare, as
 # the design's own; another theme's are said under it, where they differ.
 LANGUAGE_DEFAULT = {"themes": [], "scope": ""}
@@ -330,7 +330,7 @@ def _open_line(lang):
               "rules say it better than a choice can).")
 
 # Six hex digits, or eight when a color carries its alpha: a glass theme's
-# tokens do (B342), and a stylesheet reads #rrggbbaa as it reads #rrggbb.
+# tokens do, and a stylesheet reads #rrggbbaa as it reads #rrggbb.
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$")
 
 
@@ -364,7 +364,7 @@ def _record(d, project):
     """The stored record, read the forgiving way a save is checked: a
     problem in it is noted and a stand-in used, never raised. Read strictly,
     a record saved under the build before, valid then, took every aerie design
-    verb down with it once the shape moved (B386), and nothing from a
+    verb down with it once the shape moved, and nothing from a
     session could get past it: schema could not even say the new shape."""
     rec = d.get(project)
     if not isinstance(rec, dict):
@@ -463,7 +463,7 @@ def _clean_theme(t, n):
     if mode not in MODES:
         bg = _role({"colors": colors}, "bg")
         mode = "light" if bg and _luma(bg) > 0.5 else "dark"
-    # The other half (R216): a theme may carry a second palette of the same
+    # The other half: a theme may carry a second palette of the same
     # tokens for the opposite mode, so one name is one scheme with a dark
     # half and a light one, and a switch beside the picker chooses the half.
     # Empty when the theme has one palette only.
@@ -506,7 +506,7 @@ def _clean_language(lang):
             continue
         names.add(t["name"].lower())
         themes.append(t)
-    # None is a language too (the operator, 29 Sep): a project designed by
+    # None is a language too: a project designed by
     # its first session starts empty, and the session fills it in.
     out["themes"] = themes
     out["scope"] = _line(lang.get("scope"), NAME_MAX, "what the language governs")
@@ -575,7 +575,7 @@ def _clean_rules(raw, whose):
     raw = raw if isinstance(raw, list) else []
     # A rule that is not an object is refused by what it is, not dropped: a
     # session that sent ["some rule"] found its rules gone with no word
-    # said (B342).
+    # said.
     for r in raw:
         if not isinstance(r, dict):
             _bad(f"a rule of {whose} is an object with a name and a text, not {str(r)[:60]!r}")
@@ -598,7 +598,7 @@ def saved(project):
     """The project's record when somebody saved one (the briefing's line),
     None when the design is still the default nobody touched. Asked of a
     store nobody configured, it says so: the answer None there read as
-    "nothing designed", and a briefing said that of a designed project (B355)."""
+    "nothing designed", and a briefing said that of a designed project."""
     if FILE is None:
         raise RuntimeError("the design store is not configured")
     rec = _record(_load(), project)
@@ -721,7 +721,7 @@ def _inside_parents(blocks, places, what, where):
         if not k:
             continue
         # ...and is drawn over it: a later block draws over an earlier one,
-        # so a child comes after its parent in the list (the operator, 29 Sep).
+        # so a child comes after its parent in the list.
         if k - 1 > i and not where:
             _bad(f"{what} {i + 1} is inside block {k} but comes before it, so it would draw under it: "
                  "a block comes after the one it is inside")
@@ -798,7 +798,7 @@ def _clean_page(p, pid):
 
 def _clean_layouts(raw, frame, blocks, called):
     """Where the page's blocks sit on the other frames it has: per frame,
-    one place per block, in the blocks' order (B348). A layout that is not
+    one place per block, in the blocks' order. A layout that is not
     that is refused and says why: one about another number of blocks was
     dropped whole, and the save said it had saved. One for a frame the
     page's platform has not is kept and not said: a page moved to Android
@@ -1039,7 +1039,7 @@ def page_text(page):
             what = f": {b['label']}" if b["label"] else ""
             par = blocks[b["in"] - 1] if b.get("in") else None
             # The parent by its number and the first clause of its label:
-            # six children of one parent said its whole label six times (B384).
+            # six children of one parent said its whole label six times.
             first = re.split(r"[:;,.] ", par["label"], maxsplit=1)[0][:40] if par and par["label"] else ""
             inside = (f", inside block {b['in']} ({_label(KINDS, par['kind'])}"
                       f"{': ' + first if first else ''})") if par else ""
@@ -1072,7 +1072,7 @@ def prompt(lang, page=None):
     a page and `aerie design show` prints. The language alone when no page."""
     scope = lang.get("scope") or "the space's user interface"
     # Whose the file is, said outright: a session read "keep it in step",
-    # found no file in the tree, and had to guess whether to make one (B344).
+    # found no file in the tree, and had to guess whether to make one.
     keep = (f"{FILE_PATH} is yours to write and commit with the work, from what is saved here: "
             f"`aerie design file > {FILE_PATH}`; the notebook never writes it into the tree by itself.")
     if page is None:
@@ -1166,7 +1166,7 @@ def _file_rules(rules, scope, head, level):
 # ---- writes ----------------------------------------------------------------------
 def problems(lang, pages):
     """Everything wrong with a record, in one pass, so a save is corrected
-    once rather than one refusal at a time (B342): every validator notes
+    once rather than one refusal at a time: every validator notes
     what it meets and goes on (_bad)."""
     found = _collecting.found = []
     try:
@@ -1188,7 +1188,7 @@ def problems(lang, pages):
 
 def schema_text():
     """aerie design schema: the record's shape and every limit, so a session
-    writes a record that saves the first time (B342)."""
+    writes a record that saves the first time."""
     kinds = ", ".join(k for k, _, _ in KINDS)
     return "\n".join([
         "The record aerie design save takes (and aerie design json prints), as JSON:",
@@ -1246,7 +1246,7 @@ def save(project, req, who=""):
         d = _load()
         rec = _record(d, project)
         # A new page's id is past every id on the list as well as the
-        # counter (B408): a page saved with an id of its own, past the
+        # counter: a page saved with an id of its own, past the
         # counter, left the next new page colliding with it.
         nxt = max(rec["next"], 1 + max([p["id"] for p in raw if isinstance(p, dict) and isinstance(p.get("id"), int)] + [0]))
         pages = []
@@ -1283,8 +1283,8 @@ def write_file(project, who=""):
 def render(req):
     """aerie design file --from FILE: docs/design-language.md from a record
     given rather than the saved one, so a branch writes the file from its own
-    design without taking in what other branches saved to the notebook
-    (B227). Checked as a save is, and nothing is stored. (payload, status)."""
+    design without taking in what other branches saved to the notebook.
+    Checked as a save is, and nothing is stored. (payload, status)."""
     raw = req.get("pages") if isinstance(req.get("pages"), list) else []
     bad = problems(req.get("language") or {}, raw)
     if bad:

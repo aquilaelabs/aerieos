@@ -1,4 +1,4 @@
-"""Reporting for the controller's own machine (R164 step 4): what every
+"""Reporting for the controller's own machine: what every
 heartbeat samples (CPU, memory, the network's bytes in and out, the disks'
 bytes read and written, the CPU's and the disks' temperature) kept for
 weeks at falling resolution, where the samples ring (nodes._samples) holds

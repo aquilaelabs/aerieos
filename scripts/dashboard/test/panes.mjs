@@ -22,10 +22,10 @@ await page.waitForFunction(() => tabs.filter(t => t.kind === 'term').length >= 3
                            { timeout: 20000 });
 const ids = await page.evaluate(() => tabs.filter(t => t.kind === 'term').map(t => t.id));
 
-// A terminal is the dock's (R218 step 4): shown there, the dock up.
+// A terminal is the dock's: shown there, the dock up.
 const show = id => page.evaluate(id => { panes[1] = id; dockUp = true; render(); }, id);
 // The terminals the pane keeps: its slots. A page opens on the Projects tab
-// now (R119), whose document is in the same stack and is not a terminal.
+// now, whose document is in the same stack and is not a terminal.
 const seen = () => page.evaluate(() => [...document.querySelectorAll('#pane1 .stack > .slot')]
   .map(c => ({ key: c.dataset.key, on: c.classList.contains('on') })));
 
@@ -58,7 +58,7 @@ ok(await page.$eval('#pane1 .slot.on', el => el.dataset.mark === 'first'),
 ok(await page.$$eval('#pane1 .slot.on.ownterm', f => f.length === 1),
    '...and exactly one terminal is on screen');
 
-// No ceiling below the strip's own (the operator, 6 Oct): every terminal tab
+// No ceiling below the strip's own: every terminal tab
 // on the strip stays attached, and Minimize is what detaches one.
 await show(ids[2]);
 const fourth = await page.evaluate(() => { newShell('gamma'); return null; });
@@ -85,7 +85,7 @@ await page.waitForSelector('#pane0 .doc.on');
 // One #docN per pane is the invariant: the element of a tab shown before is
 // kept behind, unnamed, so bringing it back is its own painted ground on the
 // first frame (uniform.mjs holds that), and a page opening on the Projects
-// tab (R119) leaves its document there.
+// tab leaves its document there.
 ok(await page.$$eval('#pane0 .stack > .doc', d => d.filter(x => x.id === 'doc0').length === 1
      && d.find(x => x.id === 'doc0').classList.contains('on')),
    `a document tab is one per pane, and keeps the id that renders into it (${
@@ -156,11 +156,11 @@ ok(await kindCount('notebook') >= 2,
 // happened, and is invisible until somebody reloads. Compared against the
 // files rather than trusted, because the two are in different languages and
 // nothing else makes them agree.
-// Every script the page is made of: TABKINDS is page-tabs.js's since R77.
+// Every script the page is made of: TABKINDS is page-tabs.js's.
 const html = ['index.html', ...readdirSync(new globalThis.URL('..', import.meta.url))
     .filter(f => /^(page|tab|nb)-.*\.js$/.test(f))]
   .map(f => readFileSync(new globalThis.URL('../' + f, import.meta.url).pathname, 'utf8')).join('\n');
-// The server's half is layout.py's since R77: what a saved layout may carry.
+// The server's half is layout.py's: what a saved layout may carry.
 const py = readFileSync(new globalThis.URL('../layout.py', import.meta.url).pathname, 'utf8');
 const inPage = [...html.matchAll(/^ {2}([a-z]+):\s*\{ multi:/gm)].map(m => m[1]).sort();
 const inServer = (py.match(/^TAB_KINDS = \{([^}]*)\}/m) || [, ''])[1]
@@ -168,12 +168,11 @@ const inServer = (py.match(/^TAB_KINDS = \{([^}]*)\}/m) || [, ''])[1]
 ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
    `every tab kind the page has is one the server keeps (page: ${inPage}, server: ${inServer})`);
 
-// The limit is on terminals, per account (R78): a shell past it is refused
+// The limit is on terminals, per account: a shell past it is refused
 // with a toast that says so, and a document tab opens past it, because it
 // costs no terminal. The strip counted is this account's own layout.
 // Each in one round trip: a status poll landing between setting the limit
-// and opening the tab put the server's limit back, and the shell opened
-// (B289).
+// and opening the tab put the server's limit back, and the shell opened.
 await section("The limit is on terminals, per account", async () => {
   const shell = await page.evaluate(() => {
     state.max_tabs = tabs.filter(t => t.kind === 'term').length;
@@ -195,7 +194,7 @@ await section("The limit is on terminals, per account", async () => {
   await page.evaluate(() => { state.max_tabs = 12; });
 });
 
-// A terminal in its own window (R8): the pop-out opens the terminal's own
+// A terminal in its own window: the pop-out opens the terminal's own
 // URL in a window, the tab stays as a placeholder with Reattach and its
 // frame is torn down (a second client on the session is the size fight),
 // the layout carries the flag, and the window closing brings the tab back.
@@ -243,7 +242,7 @@ await section("The tab on show, pressed, puts the dock down on the first press, 
 
 // The dock's line with more tabs than fit has an arrow at the end with more
 // past it on a desk, as a row of big chips has, and a press on it moves the
-// line along (the operator, 24 Oct).
+// line along.
 await section("The dock's line with more tabs than fit has an arrow at the end with more", async () => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(() => { for (let n = 0; n < 14; n++) openTab({ kind: 'term', arg: `sh:${40 + n}:alpha`, label: `many ${n}` });
@@ -285,7 +284,7 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
     if (await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 5000 }).then(() => true, () => false)) { hit = ''; break; }
   }
   // Its smooth scroll come to rest, read twice the same a frame apart,
-  // rather than a fixed pause a loaded gate outran (B420).
+  // rather than a fixed pause a loaded gate outran.
   const still = () => page.waitForFunction(() => new Promise(res => {
     const l = document.querySelector('.dockline'), a = l.scrollLeft;
     requestAnimationFrame(() => requestAnimationFrame(() => res(l.scrollLeft === a)));
@@ -294,7 +293,7 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
   const now = await page.$eval('.dockline', l => ({ left: l.scrollLeft, chl: l.classList.contains('chl') }));
   ok(was.chr && was.left === 0 && now.left > 0 && now.chl,
      `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })}${hit ? '; under the press: ' + hit : ''})`);
-  // The arrow is never under the fade (the operator, 24 Nov): the circle the
+  // The arrow is never under the fade: the circle the
   // row's mask keeps open is the whole disc, and its ring is drawn inside it
   // with room to spare, where a ring on the circle's soft edge read faded.
   const disc = await page.$eval('.dockline', l => {
@@ -309,7 +308,7 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
      `an end's arrow is never under the row's fade: the circle kept open is its whole disc and its ring sits inside it (${JSON.stringify(disc)})`);
   // Drawn again (something on the line moved, as a session's dot does), the
   // line stays where the press put it rather than going back to the tab in
-  // front (B322). Chat's unread count, since a terminal's label is its
+  // front. Chat's unread count, since a terminal's label is its
   // session's once that answers, and a label set here was drawn only when it
   // beat the session.
   await settled();

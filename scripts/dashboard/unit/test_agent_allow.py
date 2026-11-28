@@ -1,4 +1,4 @@
-"""What a coding agent need not ask about (R231): the aerie verbs the
+"""What a coding agent need not ask about: the aerie verbs the
 controller decides, said to each agent the way its manifest says it is told,
 and nothing that runs a command of the session's own."""
 import json

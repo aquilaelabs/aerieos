@@ -1,5 +1,5 @@
 "use strict";
-// An installed thing's own page (R181 step 2, the operator, 29 Oct): a coding
+// An installed thing's own page: a coding
 // agent, a toolchain, a tool pack or a service on one node, opened by Open or
 // Configure on its Installed row (or Configure on the router's container),
 // never by a tab of its own. A page a press opens: the small top header with
@@ -53,7 +53,7 @@ const THING_SECTS = {
   pack: [
     ["about", "What it is", r => instAboutLines(r)],
     // A pack's coding agent whose pack says how it signs in is signed in
-    // here as a shipped one is (R233 step 6); one that does not signs in in
+    // here as a shipped one is; one that does not signs in in
     // its own session's terminal, said here, where every agent's sign-in is
     // looked for.
     ["signin", "Your sign-in", r => {
@@ -96,7 +96,7 @@ function renderThingInto(i){
   const pills = `${packVersionPill(r)}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""}`;
   const head = pageHead({title: r.label, pills, line: [inst.name ? {text: `on ${inst.name}`} : null], actions: `<span class="irow" data-irow="${esc(thingKey)}" data-style="display:contents">${instState(r)}${instActs(r, may)}</span>`})
     // Its glyph or its own icon beside its name, as a Library entry's page
-    // draws it (the operator, 29 Oct: the two pressed pages one shape).
+    // draws it (the two pressed pages one shape).
     .replace('<div class="name">', `<div class="name">${libIcon(r)}`);
   const bad = packJobErr(r, inst?.job), err = bad && `<div class="field">${bad}</div>`;
   const sects = (THING_SECTS[r.kind] || THING_SECTS.toolchain).map(([k, title, body]) => {

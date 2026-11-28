@@ -1,5 +1,5 @@
 """prefs.py's Also sees setting: which paths a project may be shown on its
-node (B378). test/reads.mjs proves the dialog; this proves the rule."""
+node. test/reads.mjs proves the dialog; this proves the rule."""
 import os
 import sys
 import unittest
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
 
 class Gpu(unittest.TestCase):
-    """The project's GPU setting (R102): on unless somebody said otherwise,
+    """The project's GPU setting: on unless somebody said otherwise,
     and stored only when it is not the default."""
 
     def setUp(self):
@@ -63,7 +63,7 @@ class Gpu(unittest.TestCase):
         self.assertIn("error", prefs.set_prefs("alpha", gpu="maybe"))
 
     def test_coding_agents_are_allowed_until_switched_off(self):
-        # R95: every live agent beside Claude may run until the project
+        # Every live agent beside Claude may run until the project
         # says otherwise; Claude is not one to switch off.
         self.assertEqual((prefs.get("alpha") or {}).get("agents_off", []), [])
         self.assertNotIn("error", prefs.set_prefs("alpha", agents_off="copilot,codex"))
@@ -73,7 +73,7 @@ class Gpu(unittest.TestCase):
         self.assertEqual((prefs.get("alpha") or {}).get("agents_off", []), [])
 
     def test_start_opens_claude_unless_the_project_names_another_it_allows(self):
-        # R95 step 4: the default agent is Claude's and is never written.
+        # The default agent is Claude's and is never written.
         self.assertEqual(prefs.get("alpha")["agent_default"], "claude")
         self.assertNotIn("error", prefs.set_prefs("alpha", agent_default="codex"))
         self.assertEqual(prefs.get("alpha")["agent_default"], "codex")
@@ -89,7 +89,7 @@ class Gpu(unittest.TestCase):
             self.assertNotIn("agent_default", f.read(), "Claude is the default and is never written")
 
     def test_each_agent_keeps_its_own_model_and_effort_per_person(self):
-        # R95 step 9: Codex's and Copilot's picks beside Claude's, each from
+        # Codex's and Copilot's picks beside Claude's, each from
         # its own list, and a word on no list read as unset.
         got = prefs.set_for_user("u_0000aaaa", "alpha", {"codex_model": "gpt-5.5", "codex_effort": "high",
                                                          "copilot_model": "opus"})
@@ -114,7 +114,7 @@ class Gpu(unittest.TestCase):
 
 
 class NodeChanged(unittest.TestCase):
-    """B488: the dialog sends every field on every save, so only a change
+    """The dialog sends every field on every save, so only a change
     to the node is a node change; and the primary counts on its own, not
     only the set (a move onto a node already in the set is a move, seen on
     the dev instance). The stored record is stubbed in the dev instance's
@@ -135,8 +135,8 @@ class NodeChanged(unittest.TestCase):
 
 
 class BuildLocal(unittest.TestCase):
-    """Gradle builds on the node's disk unless the project says otherwise
-    (B439): on by default, and stored only when turned off."""
+    """Gradle builds on the node's disk unless the project says otherwise:
+    on by default, and stored only when turned off."""
 
     def test_on_unless_turned_off(self):
         self.assertTrue(prefs._clean({})["build_local"])
@@ -145,7 +145,7 @@ class BuildLocal(unittest.TestCase):
 
 
 class Reaches(unittest.TestCase):
-    """Also reaches (the operator, 7 Oct): the addresses a project's sessions
+    """Also reaches: the addresses a project's sessions
     may still reach where their node filters, each on the nodes it names."""
 
     def test_an_address_or_an_address_and_port(self):

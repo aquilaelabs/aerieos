@@ -1,7 +1,7 @@
-// patch(): a surface's new markup brought into what is there, the one way
-// every list on this page is drawn again; and newShell(), a terminal opened
+// patch: a surface's new markup brought into what is there, the one way
+// every list on this page is drawn again; and newShell, a terminal opened
 // in the dock. What was the tab strip around them (its drag, its picker, its
-// arrows and pin menu) went with R218 step 4: terminals are the dock's line
+// arrows and pin menu) went: terminals are the dock's line
 // (page-dock.js) and every other tab is a page on the rail.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
@@ -17,7 +17,7 @@
 // a difference touches the DOM.
 const painted = new WeakMap();
 
-// The same rule for the frame's small writes (R218 step 10): a text, an
+// The same rule for the frame's small writes: a text, an
 // attribute, a whole class list or a hidden flag set only when it differs.
 // Written unconditionally, each status poll rewrote the header's words, the
 // doctor's dot, the dock's and the panes' classes and the phone bar's flags
@@ -35,7 +35,7 @@ function setDisabled(el, off){ if (el && el.disabled !== !!off) el.disabled = !!
 // element's description or name, so it is compared against what was kept.
 function setTitle(el, s){ if (el && saidOf(el) !== String(s)){ el.title = String(s); untitle(el); } }
 
-// ---- what a draw brings (R9 step 6) ------------------------------------------
+// ---- what a draw brings ------------------------------------------
 // What an element a draw writes needs once it is there, done by the draw
 // itself and at once rather than by observers watching the whole document
 // after it: its data-style applied through the CSSOM (the page's content
@@ -66,7 +66,7 @@ function runShow(el){
 }
 
 // A field's placeholder in its short words where the full ones are cut off
-// (the operator, 22 Nov: text in a field should have a shorter version when
+// (text in a field should have a shorter version when
 // the field is not long enough for the full one), as barSaid does for a
 // button's: `placeholder` is the full words, `data-ph-short` the short (or
 // several, longest first, between bars), and the longest that fits the
@@ -108,7 +108,7 @@ const WAITING = /class="(loading|empty)[ "]|loading…/;
 // before its first section), which the page's code puts in beside them and
 // which make the markup no staler. Counted with them, the Git view's jump
 // bar at the top of its list read as another writer's every time, and the
-// list was written whole, a commit message being typed with it (R244).
+// list was written whole, a commit message being typed with it.
 const paintedKids = el => { let n = 0;
   for (const c of el.childNodes) if (!patchOwn(c)) n++;
   return n; };
@@ -116,12 +116,12 @@ const paintedFirst = el => { let c = el.firstChild;
   while (patchOwn(c)) c = c.nextSibling;
   return c; };
 
-// The new markup patched into what is there rather than written over it
-// (R244): every element the new markup can be matched to is kept and brought
+// The new markup patched into what is there rather than written over it:
+// every element the new markup can be matched to is kept and brought
 // up to date, so a redraw from the poll leaves a person's typing, its caret
 // and an open IME composition, a fold they turned, a menu and a dialog they
 // have open where they were. Measured on the Containers and Nodes pages
-// before it was chosen (R244 step 1): replacing lost all of those, lifting a
+// before it was chosen: replacing lost all of those, lifting a
 // form region out and back still ended the composition and shut the folds,
 // and this kept every one for about twice replace's time, four milliseconds
 // at today's sizes, paid only when the markup changed. Returns whether it
@@ -136,10 +136,10 @@ function patch(el, html, quiet = false){
   // is nothing of the last draw's to keep. A fold opened or a box ticked
   // since replaces nothing and still reads as unchanged.
   const was = rec && rec.first === paintedFirst(el) && rec.n === paintedKids(el) ? rec.html : undefined;
-  // ...unless a button in it was marked busy since (busy(): "Asking..."):
+  // ...unless a button in it was marked busy since (busy: "Asking..."):
   // the press rewrote it in place, and the same markup drawn again is what
-  // takes the mark off. Skipped, Measure now said Asking until a reload (the
-  // operator, 23 Oct). A mark the markup carries itself (Abort's Stopping)
+  // takes the mark off. Skipped, Measure now said Asking until a reload.
+  // A mark the markup carries itself (Abort's Stopping)
   // is not a press's.
   if (rec && was === html && (html.includes('aria-busy="true"') || !el.querySelector('[aria-busy="true"]'))) return false;
   const arriving = !rec || WAITING.test(rec.html);
@@ -383,7 +383,7 @@ function pressBack(btn){
 // press a role does not give, a field a locked space keeps): hidden or dead,
 // and marked so that a draw for somebody it does give has it back. A patch
 // keeps what code did to an element its markup does not mention, so giving
-// it back is the code's as well (R244): giveBack first, then takeAway what
+// it back is the code's as well: giveBack first, then takeAway what
 // this look takes, on every draw.
 function takeAway(el, hide = false){
   if (!el) return;
@@ -392,7 +392,7 @@ function takeAway(el, hide = false){
 }
 // What is typed into a find box acts once a word is whole: never in the
 // middle of an input method's composition, whose keys are not letters yet,
-// and once at its end (R244 step 4). Set, so a draw that keeps the box may
+// and once at its end. Set, so a draw that keeps the box may
 // set it again.
 function onTyping(inp, fn){
   if (!inp) return;
@@ -402,8 +402,8 @@ function onTyping(inp, fn){
 // A Revert's fields as the markup draws them. A patch keeps what is typed
 // wherever the markup says what it said before, and a field typed into with
 // no draw since was drawn with the saved value then and now, so a Revert
-// that only drops its drafts and draws again would leave the typing there
-// (R244). Called after that draw.
+// that only drops its drafts and draws again would leave the typing there.
+// Called after that draw.
 function fieldsBack(root){
   root?.querySelectorAll("input, select, textarea").forEach(f => {
     if (f.type === "checkbox" || f.type === "radio"){ if (f.checked !== f.defaultChecked) f.checked = f.defaultChecked; }

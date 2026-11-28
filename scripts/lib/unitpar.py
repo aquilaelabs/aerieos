@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""aerie tests unit, across the machine's cores (R130).
+"""aerie tests unit, across the machine's cores.
 
 The unit tier ran as one unittest process, 1460 tests in about 155 s on
 bb-sandbox's eight cores with seven of them idle; its slowest module alone
@@ -12,7 +12,7 @@ already reads.
 
 A module that fails in the whole run is run once more, alone, in a process
 of its own; one that passes then is said as flaky and does not fail the
-tier, as a browser suite that passes alone does not (the operator, 14 Nov).
+tier, as a browser suite that passes alone does not.
 The tier gates every release's tag, and a module can fail for the company
 it kept: the modules of a bucket share a process, so what one leaves set is
 there for the next, and a test bound to a clock loses to sixteen at once.
@@ -173,7 +173,7 @@ def main(argv):
         parts += [f"errors={errors}"] if errors else []
         # The modules on the last line, which is the one a reader piping
         # through tail keeps: a FAILED with no name left a failure nobody
-        # could find again (B785).
+        # could find again.
         print(f"FAILED ({', '.join(parts) or 'a bucket ended without its report'})"
               + (f": {', '.join(still)}" if still else ""))
         return 1

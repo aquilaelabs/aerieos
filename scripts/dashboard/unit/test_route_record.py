@@ -113,7 +113,7 @@ class Record(unittest.TestCase):
 
 class Quiet(unittest.TestCase):
     """What is left out of the audit: a route whole, or its hook kinds or
-    actions by name (R228 step 7, B998)."""
+    actions by name."""
 
     def quiet_post(self):
         ns = {"QUIET_POSTS": NOW["QUIET_POSTS"]}

@@ -1,4 +1,4 @@
-"""What a person is told when a container cannot be asked for (B309, B329):
+"""What a person is told when a container cannot be asked for:
 one sentence each, naming the way forward, with no command in it."""
 import os
 import sys

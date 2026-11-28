@@ -1,4 +1,4 @@
-"""Reporting (R164 step 4): the own machine's samples kept for weeks at
+"""Reporting: the own machine's samples kept for weeks at
 falling resolution: five-minute means closed into points, a closed hour
 folded into one, the rates from the agent's counters (a counter back to
 zero skipped, never a spike), the spans read back with the open bucket as

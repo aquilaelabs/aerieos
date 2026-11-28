@@ -75,7 +75,7 @@ def runner():
 # A hosted runner named by a moving label: GitHub repoints ubuntu-latest at a
 # new release on its own date (Ubuntu 26 from 19 Oct 2026), and a workflow
 # that built yesterday fails tomorrow with nothing in the repository changed.
-# A pinned image moves only when somebody moves it, in a commit (R116).
+# A pinned image moves only when somebody moves it, in a commit.
 PINNED = {"ubuntu": "ubuntu-24.04", "windows": "windows-2025", "macos": "macos-15"}
 
 
@@ -100,8 +100,8 @@ def hosted():
 
 
 def pinned():
-    """Every action a workflow uses is named by its commit (R206; the audit of
-    13 Nov): `uses: owner/action@v4` runs whatever its publisher points v4 at
+    """Every action a workflow uses is named by its commit:
+    `uses: owner/action@v4` runs whatever its publisher points v4 at
     that day, in jobs that hold the release key and may write packages and
     releases. A note in any project, a failure in this one (--strict)."""
     strict = "--strict" in args
@@ -132,7 +132,7 @@ def xml_():
 
 
 def layout():
-    """docs/layout.md names every tracked file (R91): a row is a path, a
+    """docs/layout.md names every tracked file: a row is a path, a
     directory (which covers what is under it only when nothing beneath it
     is listed) or a glob, and a tracked file no row names fails. A tree
     that grows a module the page does not name is a newcomer's dead end."""
@@ -213,7 +213,7 @@ def settings():
             bad.append(f"{v}: compose defaults to {d!r}, docs/reference.md to {readme[v]!r}")
     for v in sorted(set(tmpl) - set(env)):
         bad.append(f"{v} is in the Unraid template and compose does not pass it")
-    # A bare-metal install's env file (R90): every setting compose passes is
+    # A bare-metal install's env file: every setting compose passes is
     # in its template, at the same default, but those the template names as
     # the container's alone; and every name the template sets is in the
     # reference, as compose's are.
@@ -265,14 +265,14 @@ SHINGLE = 8
 
 def channels():
     """CLAUDE.md describes the tree, the briefing the machine and the shipped
-    rules the obligations (R202): a sentence CLAUDE.md shares with the
+    rules the obligations: a sentence CLAUDE.md shares with the
     briefing or a shipped rule reaches every session twice, and history in
     either is paid for on every conversation."""
     bad = []
     claude = open("CLAUDE.md").read()
     brief = re.sub(r"<!--.*?-->", "", open("config/templates/briefing.md").read(), flags=re.S)
     # The tree being linted, not the copy of bb this runs from: on a node
-    # that copy is the bundle, which carries no rules.py (B696).
+    # that copy is the bundle, which carries no rules.py.
     sys.path.insert(0, os.path.join(os.getcwd(), "scripts", "dashboard"))
     import rules                                                    # noqa: E402
     sources = [("the briefing", brief)] + [(f"the shipped rule {r['name']}", r["text"])
@@ -300,7 +300,7 @@ def channels():
     sys.exit(1 if bad else 0)
 
 
-# What a release has run on somebody's /config (R79): the database's schema
+# What a release has run on somebody's /config: the database's schema
 # files and the JSON stores' migrations. An install that ran one never runs
 # it again, so an edit reaches only the installs that had not, and the two
 # kinds then differ in a way no later migration can know about.
@@ -315,7 +315,7 @@ def _state_floor():
 
 
 def formats():
-    """Every manifest kept for a pack format (R234) that the newest release
+    """Every manifest kept for a pack format that the newest release
     tag carried is in the tree byte-for-byte: a manifest a release read is
     what later builds must still read, so the proof is never rewritten to
     fit a change. A new manifest, and a new format's folder, are free."""
@@ -361,7 +361,7 @@ def shipped():
         print("  [ok]   no release tag yet, so no migration has shipped")
         sys.exit(0)
     bad = []
-    # migrations/ is the schema every supported install has (R295): a later
+    # migrations/ is the schema every supported install has: a later
     # change to it is a numbered migration in statemigrations/, in the one
     # sequence with /config's.
     for f in sorted(pathlib.Path("scripts/dashboard/migrations").glob("*.sql")):
@@ -382,7 +382,7 @@ def shipped():
         if now != then:
             bad.append(f"{path} shipped in {tag} and has changed: a shipped migration is never edited; "
                        "put the change in a new one")
-    # A patch carries no migration (R113): migrations number in one sequence
+    # A patch carries no migration: migrations number in one sequence
     # across releases, and a 0.6.2 taking the next number would collide with
     # the one the 0.7.0 branch already holds. The branch's line is aerie version
     # line's (its git config, else a branch named for a version).
@@ -406,8 +406,8 @@ def shipped():
 
 
 def unraid():
-    """The word Unraid stays where its XML files are the subject (the
-    operator, 28 Oct): the app template and its icon script, the VM XML and
+    """The word Unraid stays where its XML files are the subject:
+    the app template and its icon script, the VM XML and
     the module that writes it, the walkthrough of installing from the
     template, and any line that names one of those; everywhere else public
     a feature is said as what it is, never by comparison."""
@@ -436,7 +436,7 @@ def unraid():
 
 
 def changelog():
-    """The changelog names no bug or roadmap number (the operator, 3 Nov):
+    """The changelog names no bug or roadmap number:
     B655 and R209 are the notebook's, which a reader of the public
     repository cannot open; a line points at the commit it landed in, as
     the others do, and at nothing otherwise."""
@@ -470,7 +470,7 @@ def changelog():
 
 def packs():
     """The official packs under packs/ are the shipped tables in bbtool.json's
-    format (R169 step 1): tools/packs-export.py --check holds them to it."""
+    format: tools/packs-export.py --check holds them to it."""
     import subprocess
     r = subprocess.run([sys.executable, "tools/packs-export.py", "--check"], check=False)
     sys.exit(r.returncode)
@@ -478,10 +478,10 @@ def packs():
 
 def dupes():
     """A name defined twice where the second silently wins: a function or
-    method twice in one python class or module (B734: the server's Handler
+    method twice in one python class or module (the server's Handler
     lost a handler to a later one of the same name), and a top-level name
     declared in two of the page's classic scripts, which share one global
-    scope, so the later script fails to load whole (B733)."""
+    scope, so the later script fails to load whole."""
     import ast
     bad = []
     for f in sorted(pathlib.Path("scripts").rglob("*.py")):
@@ -567,10 +567,10 @@ def releasesigners():
 
 
 def selectors():
-    """A selector no browser reads: :has() anywhere inside another :has()'s
+    """A selector no browser reads: :has anywhere inside another :has's
     argument. A browser drops the whole rule for it, every selector in its
     list with it, and says nothing; the read-only Scanners page drew every
-    button it meant to hide until a picture showed it (R278, 24 Nov)."""
+    button it meant to hide until a picture showed it."""
     bad = []
     for f in sorted(pathlib.Path("scripts/dashboard").glob("page-*.css")):
         text = f.read_text(encoding="utf-8", errors="replace")
@@ -602,7 +602,7 @@ _NOT_A_FIELD = re.compile(r'type=\\?["\'](checkbox|radio|hidden|file|search|rang
 def _raw_fields(text):
     """The fields a page file writes itself: every input, textarea and select
     not on a line that hands it to formField, which is where a form's control
-    is written (R301)."""
+    is written."""
     n = 0
     for line in text.splitlines():
         if "formField(" in line:
@@ -612,7 +612,7 @@ def _raw_fields(text):
 
 
 def forms():
-    """A form is formBox and formField (R301, the operator 27 Nov: a form's
+    """A form is formBox and formField (a form's
     buttons touched its field and hung past it, pointed out many times): the
     part owns the form's layout, so a page cannot write one its own way. The
     fields page code writes outside it are counted per file against
@@ -638,7 +638,61 @@ def forms():
     return 1 if bad else 0
 
 
-CHECKS = {"runner": runner, "selectors": selectors, "forms": forms, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
+CITES_BASELINE = pathlib.Path("tools/cites-baseline.json")
+# A tracker's number as it is written (R12, B340), and a dated word of the
+# operator's. A linter's rule code after noqa is neither.
+_CITE_ID = re.compile(r"(?<![A-Za-z0-9_#/.-])[BR][0-9]{1,4}(?![0-9A-Za-z_-])")
+_CITE_DATED = re.compile(r"[Oo]perator[^)\n]{0,40}?\b[0-9]{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)")
+_CITE_NOT = re.compile(r"(?:noqa|nosemgrep)[:=]?[ \t]*[A-Za-z0-9_.,\[\] =-]*")
+_CITE_ROOTS = ("scripts", "tools", "nodes", "image", "lab", "platforms", "apps")
+_CITE_SKIP = (".png", ".jpg", ".ico", ".svg", ".woff2", ".zip", ".gz", ".json", ".lock", ".jar", ".keystore", ".pdf", ".md", ".txt", ".xml")
+
+
+def _cites_in(text):
+    text = _CITE_NOT.sub("", text)
+    return len(_CITE_ID.findall(text)) + len(_CITE_DATED.findall(text))
+
+
+def cites():
+    """A comment says what the code does and why. Who asked for it and on
+    which day is the commit's to say, and a roadmap item's or a bug's number
+    is the notebook's, which a reader of the repository cannot open. Each
+    tracked source file's count of such numbers and dated citations is held
+    to tools/cites-baseline.json, where a file not named has none, and a
+    count only falls: what is left there is a number that is the code's own
+    subject (the ids' own module, a test's sample item). A migration that
+    shipped is never edited, so those are not counted."""
+    import json
+    import subprocess
+    base = json.loads(CITES_BASELINE.read_text(encoding="utf-8")) if CITES_BASELINE.exists() else {}
+    listed = subprocess.run(["git", "ls-files", *_CITE_ROOTS], capture_output=True, text=True, check=False).stdout.split("\n")
+    bad, seen = [], set()
+    for f in listed:
+        if not f or f.endswith(_CITE_SKIP) or "/statemigrations/" in f:
+            continue
+        try:
+            n = _cites_in(pathlib.Path(f).read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+        seen.add(f)
+        was = int(base.get(f, 0))
+        if n > was:
+            bad.append(f"{f}: {n} tracker numbers or dated citations, {was} allowed: say what the code does and why, "
+                       "and leave who asked and when to the commit")
+        elif n < was:
+            bad.append(f"{f}: {n} tracker numbers or dated citations, {was} in {CITES_BASELINE}: lower it to {n}, so it stays down")
+    for f in sorted(set(base) - seen):
+        bad.append(f"{f} is in {CITES_BASELINE} and is no tracked source file: take its line out")
+    for b in bad[:40]:
+        print(f"  [FAIL] {b}")
+    if len(bad) > 40:
+        print(f"  [FAIL] ...and {len(bad) - 40} more")
+    if not bad:
+        print(f"  [ok]   no source file cites a tracker number or a dated instruction past {CITES_BASELINE.name} ({sum(base.values())} left in {len(base)} files)")
+    return 1 if bad else 0
+
+
+CHECKS = {"runner": runner, "selectors": selectors, "forms": forms, "cites": cites, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
           "changelog": changelog, "dupes": dupes, "releasekey": releasekey, "releasesigners": releasesigners}
 

@@ -18,7 +18,7 @@ const isBroken = p => p.issues.some(i => i.level === "error");
 
 // Why no Claude session may run on this project right now, from the server:
 // its own node's agent from another compatibility window than this
-// AerieOS (the briefing is assembled per session since R63 step 3, so
+// AerieOS (the briefing is assembled per session so
 // nothing in the tree can be). Drift INSIDE the window (the agent behind
 // on a build) is not here: the row offers the update and the button stays
 // live. Across a window the promise was never
@@ -42,12 +42,12 @@ const heldWhy = p => p.held || (!gitReadyFor(p) && !myLiveSession(p.name)
 function wireProjectRows(root){
   root.querySelectorAll("[data-c]").forEach(b => b.onclick = e => openClaude(b.dataset.c, e));
   root.querySelectorAll("[data-s]").forEach(b => b.onclick = () => newShell(b.dataset.s));
-  // Install opens the Library on the node at that agent's card, where it is installed (R95, R170).
+  // Install opens the Library on the node at that agent's card, where it is installed.
   root.querySelectorAll("[data-tcinst]").forEach(b => b.onclick = () => openLibraryOn(b.dataset.tcinst, b.dataset.agent || "claude"));
   // The chain is the remote, whichever state the project is in: linking one
   // that has no remote, and for one that has, its Settings view's Repository
-  // section, where its credentials and the way off it are (the operator,
-  // 23 Nov: a dialog of its own, opened from a section that was one line).
+  // section, where its credentials and the way off it are
+  // (a dialog of its own, opened from a section that was one line).
   root.querySelectorAll("[data-l]").forEach(b => b.onclick = () => {
     const p = (state?.projects || []).find(x => x.name === b.dataset.l);
     if (p?.linked) openProjectSettings(b.dataset.l, "repo");
@@ -62,8 +62,8 @@ function wireProjectRows(root){
     setProjectPinned(b.dataset.p, b.dataset.on === "1"));
   root.querySelectorAll("[data-pgroup]").forEach(b => b.onclick = () => askProjectGroup(b));
   root.querySelectorAll("[data-pcolor]").forEach(b => b.onclick = () => pickProjectColor(b));
-  // On a card, the project's own settings as a dialog (R208, the operator,
-  // 3 Nov): what is the project's as a whole, with each repository's own
+  // On a card, the project's own settings as a dialog:
+  // what is the project's as a whole, with each repository's own
   // left to its notebook's Settings view.
   root.querySelectorAll("[data-rn]").forEach(b => b.onclick = () =>
     b.closest(".pcard") ? renameProject(b.dataset.rn, "project") : openProjectSettings(b.dataset.rn));
@@ -75,7 +75,7 @@ function wireProjectRows(root){
     deleteProject(b.dataset.del));
 }
 
-// ---- a phone, from a project's row (R120) -----------------------------------
+// ---- a phone, from a project's row -----------------------------------
 // A phone is the person's who connected it, and only they lend it to a
 // project: the row's Phone button is live for exactly them, on a project
 // whose node their phone is on. Lent here, it takes it back. Everybody else
@@ -128,11 +128,11 @@ function openPhoneLend(name, lend){
 }
 
 // Projects by name, as a person reads a list: case aside and numbers as
-// numbers (the operator, 7 Oct). The server's order is the directory's, in
+// numbers. The server's order is the directory's, in
 // which every capitalised name came before every lower-case one.
 function byProjectName(a, b){ return String(a.label || a.name).localeCompare(String(b.label || b.name), undefined, {sensitivity: "base", numeric: true}); }
 // The projects in this account's groups, in the one order every page that
-// shows them keeps (the Projects page and Home, R273): the ones in no group
+// shows them keeps (the Projects page and Home): the ones in no group
 // first, then each group by name, each list in the order it was handed.
 function byProjectGroup(list){
   const named = [...new Set(list.map(p => p.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -157,7 +157,7 @@ function projectJobHtml(){
   const after = (pJob?.waiting || []).length ? ` · then ${esc(pJob.waiting.join(", "))}` : "";
   // The server takes no Dismiss while a job runs (projects.dismiss), so the
   // row's is drawn dead then, saying why beside it in the muted voice, and
-  // live again once the job has ended (the operator, 22 Nov).
+  // live again once the job has ended.
   const earlier = (pJob?.earlier || []).map(e => `<div class="row jobfail">
          <div class="grow">
            <div class="name">${esc(e.name)}</div>
@@ -210,7 +210,7 @@ function pJobWire(){
   // card animates whether or not a page of toolchains has ever been opened.
   if (stop && !tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
   // A press while a job runs queues behind it, so nothing is held for it;
-  // a row's link stays dead without the grant (R137 step 4).
+  // a row's link stays dead without the grant.
   document.querySelectorAll(".pgrid [data-l]").forEach(b => setDisabled(b, state?.can?.["git-auth"] === false));
 }
 
@@ -242,13 +242,13 @@ function pJobSeen(j){
 async function pJobPoll(landed){
   // A press reads it at once (Abort, a new create): the read the timer was
   // waiting to make goes with it, or the two chains ran side by side, each
-  // reading every second until the job ended (B1162).
+  // reading every second until the job ended.
   clearTimeout(pJobTimer); pJobTimer = null;
   try{ const j = await getJSON("/api/project-job"); landed?.(); pJobSeen(j); }
   catch{ landed?.(); pJobTimer = setTimeout(pJobPoll, 3000); }   // a blip, not a finish
 }
 
-// Abort and Dismiss are drawn on the press (the operator, 22 Nov: a press
+// Abort and Dismiss are drawn on the press (a press
 // must never look as if nothing happened), held over the reads until the
 // job's own read after the answer, which the row then draws from; a refusal
 // puts the row back and says why.
@@ -283,7 +283,7 @@ async function setLocked(name, on){
   const key = reposOf(name) || name, p = state?.repos?.[key] || {};
   // An administrator who is not its owner locks its owner out too.
   const held = on ? !p.owner_mine : !!p.locked_admin;
-  // The project's sessions run on its first repository (R136).
+  // The project's sessions run on its first repository.
   const who = withMe(p.members?.[0] || name);
   name = projectName(key);
   const running = !who.length ? "No session is running here."
@@ -339,7 +339,7 @@ async function askProjectGroup(btn){
 
 // ---- a project's color ----------------------------------------------------
 
-// The color this account gives a project (the operator, 18 Oct: a person's
+// The color this account gives a project (a person's
 // own, not the project's), picked from the dot beside its name on its card:
 // the swatches unroll under the name, and a press on one wears it at once,
 // as a scheme is (it is looked at, not decided). Escape, a press
@@ -348,7 +348,7 @@ function pickProjectColor(btn){
   const name = btn.dataset.pcolor, key = reposOf(name) || name, cur = projectColor(name);
   btn.closest(".actmenu")?.setAttribute("hidden", "");
   const card = btn.closest(".pcard, .phead") || btn.closest("[data-row]");
-  // The face on show, on a card that turns over (R138).
+  // The face on show, on a card that turns over.
   const line = card?.querySelector(".pcface:not([inert]) .pcname, .pname");
   const open = line?.nextElementSibling?.classList.contains("pcpop");
   document.querySelectorAll(".pcpop").forEach(x => x.__done?.());
@@ -356,7 +356,7 @@ function pickProjectColor(btn){
   const pop = document.createElement("div");
   pop.className = "pcpop pcpick";
   // The page's own while it is open, which a redraw of the card or the
-  // header it is in leaves where it is (R244).
+  // header it is in leaves where it is.
   pop.setAttribute("data-own", "");
   pop.setAttribute("role", "radiogroup");
   pop.setAttribute("aria-label", `your color for ${projectName(key)}`);
@@ -425,7 +425,7 @@ function setProjectPinned(name, on){
 // poll still runs and still wins in the end; this only removes the wait
 // between a click and the thing it clicked moving.
 // Each repository's row and each project's card, by the project's key: the
-// marks are the project's (R138).
+// marks are the project's.
 function applyNow(fn){
   adoptSeq++;                      // a poll already out is older than this
   (state?.projects || []).forEach(p => fn(p, p.project || p.name));
@@ -434,7 +434,7 @@ function applyNow(fn){
   drawPanes();                     // the Projects page shows the same rows
 }
 
-// ...and a press's own change, before any answer (the operator, 22 Nov: a
+// ...and a press's own change, before any answer (a
 // press must never look as if nothing happened). A mark set on a space (a
 // favorite, an archive, a lock, a group, a color, a name) is drawn on the
 // click and held over every read of the spaces until the server answers: a

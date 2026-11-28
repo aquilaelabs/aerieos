@@ -1,13 +1,13 @@
-"""A held start (R56 step 9): on a controller installed bare metal, the
+"""A held start: on a controller installed bare metal, the
 dashboard, its agent and the network come up, and no agent session starts
 until a person presses Start on This controller; the pools, shares, apps,
-VMs and containers set up before come up as they were (B949: none of them
+VMs and containers set up before come up as they were (none of them
 reads this yet, and the page says so). Not by default: held only after an
 unclean shutdown (a clean-shutdown marker written on the way down and
 missing on the way up), or when the next start was asked to hold (This
 hold the next start checkbox beside Restart and Shut down, that one boot). Safe mode at the boot menu
-and a disk the array names gone missing are the installed OS's reasons
-(R161, R162), added here as they land.
+and a disk the array names gone missing are the installed OS's reasons,
+added here as they land.
 
 The record is STATE/held.json; the markers beside it are the install's
 own: clean-shutdown (the last stop was clean), booted (this install has
@@ -55,12 +55,12 @@ def _marker(name):
 
 
 def safe_mode():
-    """Whether this boot is Safe mode (the hello carries no pool key in it, R162 step 3)."""
+    """Whether this boot is Safe mode (the hello carries no pool key in it)."""
     return _safe_mode()
 
 
 def _safe_mode():
-    """Safe mode on AerieOS (R161 step 2): aeriesafe=1 on the kernel's
+    """Safe mode on AerieOS: aeriesafe=1 on the kernel's
     command line, which GRUB's Safe mode entry adds."""
     try:
         with open(seams.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
@@ -156,7 +156,7 @@ def start(principal=""):
 
 def arm_first():
     """This start held, from a stick's prepared configuration that asks for
-    it (R161 step 11, firstboot.py), set before boot() reads the markers."""
+    it (firstboot.py), set before boot reads the markers."""
     if not _bare():
         return
     with _lock:

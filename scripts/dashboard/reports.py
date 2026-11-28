@@ -4,9 +4,9 @@ A session working on somebody's app meets AerieOS's own faults along the
 way: a `aerie` verb that misbehaves, a briefing that says something untrue, a
 node that will not answer. Filed in that project's own tracker they were
 lost to AerieOS: the operator read them second hand, if at all, and the
-session maintaining AerieOS never saw them (the operator, 24 Sep, after
+session maintaining AerieOS never saw them (after
 another project's session filed "aerie test runs inside the container" as its
-own B4). So they come here instead: `aerie report "what happened"` from any
+own bug). So they come here instead: `aerie report "what happened"` from any
 session, one store on the controller, read where AerieOS's own work reads
 the controller's state, the diagnostics (`aerie diag reports`), and cleared
 from Controller settings.
@@ -15,7 +15,7 @@ A log and nothing more: no report is filed, closed or answered from here,
 and no session follows one up. That loop worked only where AerieOS's own
 project sits on the same controller as the sessions reporting to it, which
 is this one install and no other, and a clear left sessions reading
-answers to reports that were gone (the operator, 8 Oct).
+answers to reports that were gone.
 
 Everything a report says goes through the diagnostics' redaction before it
 is stored: a session pasting an error line pastes whatever was in it.
@@ -75,7 +75,7 @@ def _clean(text, n):
 
 
 # How much of a reporter's conversation a report keeps: its end, where the
-# problem is (the operator, 2 Oct). A whole one is often tens of megabytes.
+# problem is. A whole one is often tens of megabytes.
 CONVERSATION_MAX = 400 * 1024
 
 
@@ -96,7 +96,7 @@ def _view(r):
                                   "area", "repro", "reproduces", "conversation")}
 
 
-# Whether its steps reproduce it (R124): the tracker's words (bugs.REPRODUCES),
+# Whether its steps reproduce it: the tracker's words (bugs.REPRODUCES),
 # so a report taken into a tracker carries the answer across.
 REPRODUCES = ("always", "sometimes", "once", "untried")
 
@@ -178,7 +178,7 @@ def counts():
 
 def clear():
     """Every report deleted, with the conversations they carry: the
-    operator's Clear in Controller settings (24 Sep). The sequence is kept,
+    operator's Clear in Controller settings. The sequence is kept,
     so a report made afterwards never takes a number a bug's repro already
     names."""
     with _lock:
@@ -192,7 +192,7 @@ def clear():
 
 def delete(ids):
     """The reports named deleted, with the conversations they carry: one
-    taken out before the diagnostics are downloaded (the operator, 26 Oct).
+    taken out before the diagnostics are downloaded.
     The sequence is kept, as clear keeps it."""
     want = set()
     for x in ids if isinstance(ids, list) else [ids]:
@@ -235,7 +235,7 @@ def diag_verb(act, req, *, by, principal):
         r = get(req.get("id"))
         return (r, 200) if r else ({"error": "no such report"}, 400)
     if act == "conversation":
-        # The reporter's conversation a report carries (the operator, 2 Oct):
+        # The reporter's conversation a report carries:
         # aerie report conversation N, behind the diagnostics' gate like get.
         text = conversation(req.get("id"))
         return ({"text": text}, 200) if text else ({"error": "that report carries no conversation"}, 400)

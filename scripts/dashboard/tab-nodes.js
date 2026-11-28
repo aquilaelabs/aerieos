@@ -13,11 +13,11 @@
 "use strict";
 
 // Why a node's verbs are dead while its agent is not dialing in: one
-// sentence for every section of its page and of Storage (R287).
+// sentence for every section of its page and of Storage.
 const ND_UNREACHED = "Its agent is not dialing in, so nothing from here reaches the machine.";
 
 let nodesList = null;            // last answer, or null before the first
-let ndHistory = {};              // the own machine's reporting per node: {span, data} (R164 step 4)
+let ndHistory = {};              // the own machine's reporting per node: {span, data}
 // ...and stale when the nodes token moved while no page that draws the list
 // was on show (index.html's watch): the next page to read it loads a fresh
 // one, and meanwhile draws the last, so a picker drawn in the same tick as
@@ -27,9 +27,9 @@ let nodesStale = false;
 const NODE_READERS = ["nodes", "toolchains", "agents", "library", "entry", "installed", "thing", "emulator", "docker", "projects", "settings", "debug"];
 let nodesErr = "";
 let nodesAgent = null;           // the agent this controller ships: {digest, version}
-let nodesMove = null;            // after a move landed here (R175): {arrived, not_here: [{id, name, line}]}
+let nodesMove = null;            // after a move landed here: {arrived, not_here: [{id, name, line}]}
 let nodesDefault = "";           // the node work nobody bound to one lands on
-let nodesSystems = [];           // what Enroll node's System pulldown offers (R204)
+let nodesSystems = [];           // what Enroll node's System pulldown offers
 let nodesPick = "";              // which node the tab is showing, "" until the first draw
 // The configuration plane's editor state, per node (docs/nodes.md §12): the
 // fold's open flag and the DRAFT the operator is typing. Kept here and not in
@@ -43,8 +43,7 @@ const nodesUpdating = {};
 // `nid`, when given, is the node to show, and `what` the part of it the
 // caller is about: "agent" for the head bar where Update agent is, or a
 // section's id ("claude"), opened. A bell row about a node goes straight
-// to that node's control, not to whichever node the tab was on (the
-// operator, 4 Oct).
+// to that node's control, not to whichever node the tab was on.
 let nodesReveal = null;
 function openNodesTab(nid, what){
   if (nid){
@@ -61,7 +60,7 @@ function openNodesTab(nid, what){
 
 // One read at a time (reading), so an answer asked for before a later one (a
 // poll's, in flight when a save asked again) cannot land after it and stay
-// drawn until the nodes next move (B849). Every answer lands, in order: the
+// drawn until the nodes next move. Every answer lands, in order: the
 // list is polled, and on a controller whose reads take seconds an answer
 // left unlanded for each newer ask kept every page that waits on the list on
 // its shapes. A caller asking while a read is out waits for the read made
@@ -106,8 +105,8 @@ function nodeAct(body){ return poster("/api/v1/nodes", {reload: () => loadNodes(
 // (nodes.CAPABILITIES); repeated here only as labels, and an unknown one
 // coming back in a record still renders: data wins over this table.
 // What a node can do for a project is what is INSTALLED on it, not a set of
-// toggles: a project names one node and that node does all of its work (the
-// operator's decision, 2 Sep). So the row shows the toolchains the census
+// toggles: a project names one node and that node does all of its work.
+// So the row shows the toolchains the census
 // found, and the Library is where they are added. The capability field
 // still exists underneath; it is the vocabulary of the node-side refusal,
 // §15 door 7, and every node now carries the full set.
@@ -121,18 +120,18 @@ const TOOL_LABELS = {java: "java", "android-sdk": "android sdk", emulator: "emul
 // owner's, so upgrading it is not the controller's to do. Being able to see
 // it, and to be told when one is too old, is what is owed instead.
 const GIT_FLOOR = [2, 38];
-// The GPU (R20): the NVIDIA card the census names by its PCI id, what the
+// The GPU: the NVIDIA card the census names by its PCI id, what the
 // display's unit last said, and the press that sets the display up on a
 // sandbox node. The reason is on the line, in the state's own words.
 function nodeGpu(n){
   const card = n.reported?.gpu_card;
-  // An AMD card or APU (R207 step 1): the kernel's own amdgpu drives it,
+  // An AMD card or APU: the kernel's own amdgpu drives it,
   // and a container is given it from its settings; no display switch here.
   const amd = n.reported?.gpu_amd ? `<div class="actbar ndgpu"><span class="state note">gpu: ${esc(n.reported.gpu_amd)} · amdgpu, the kernel's own; a container is given it from its settings on the Containers page</span></div>` : "";
   if (!card) return amd;
   const st = n.reported?.gpu_display || "";
   const up = /^up/.test(st), reboot = /^reboot/.test(st);
-  // The display runs on NVIDIA's driver and does not install it (R102): the
+  // The display runs on NVIDIA's driver and does not install it: the
   // driver is a card in the Library, and until it is on the
   // machine this line says so and opens the Library on this node. What the card is used
   // for is the GPU section's two switches, below.
@@ -150,7 +149,7 @@ function nodeGpu(n){
       title="the driver is installed from the Library">Install the driver</button>` : ""}
   </div>${amd}`;
 }
-// The sound this node has (R107), in a line: the card ALSA sees, or a
+// The sound this node has, in a line: the card ALSA sees, or a
 // virtual one, and the sound server an emulator's audio would go through.
 // Today an emulator here runs with -no-audio whatever this says; the line is
 // what the steps after it need, said before anybody reaches for them.
@@ -164,7 +163,7 @@ function nodeSound(n){
     : "none: no sound card and no sound server";
   return `<div class="actbar ndsound"><span class="state ${card && s.server ? "ok" : ""}">sound: ${esc(word)}</span></div>`;
 }
-// Whether this node reaches the internet (R82), said only when it does not:
+// Whether this node reaches the internet, said only when it does not:
 // a toolchain, an image or a system image is a download, and each install
 // here refuses with this before it starts.
 function nodeInternet(n){
@@ -180,7 +179,7 @@ function nodeInternet(n){
   if (n.reported?.internet !== false) return noexec + filework;
   return noexec + filework + `<div class="actbar ndnet"><span class="state warn">no internet: toolchains, images and updates cannot download here</span></div>`;
 }
-// What this node's NVIDIA card is for (R102): two switches and one Apply.
+// What this node's NVIDIA card is for: two switches and one Apply.
 // The emulator renders on it or does not, which is the headless X server
 // the display needs; and sessions and jobs may compute on it or not, which
 // decides whether a session started here finds CUDA a device. Neither is a
@@ -201,7 +200,7 @@ function nodeGpuSection(n){
   const busy = !!pending;
   // While the emulator's job runs the box shows where it is going, not
   // where the machine still is: it read as unticked under "Applying" until
-  // the node's next report (the operator, 30 Sep).
+  // the node's next report.
   if (pending){ c.draft.gpuEmu = pending.apply === "gpu"; }
   const managed = !!n.reported?.sandbox;
   const name = n.reported?.gpu || (String(card).match(/\[([^\]]*(?:GeForce|RTX|Quadro|Tesla|TITAN)[^\]]*)\]/)?.[1]) || card;
@@ -247,7 +246,7 @@ function nodeTools(n){
   if (n.kind !== "agent") return "";
   if (!names.length)
     return `<div class="sub ndtools dim">no toolchains yet: install them from the ${pageLink("library", "Library")}</div>`;
-  // Held recipes whose system libraries this machine lacks (roadmap R51),
+  // Held recipes whose system libraries this machine lacks,
   // said here rather than left for a build to fail on: the store is shared,
   // the libraries are each machine's own, and the Installed page installs them.
   const unmet = Object.entries(n.reported?.sysdeps?.unmet || {});
@@ -322,13 +321,13 @@ function mountState(m, reported){
 // here. Install and Remove are system jobs like the rest of the plane.
 const RUN_COLS = [{label: "Repository or organization"}, {label: "State", w: "9rem"}, {label: "Registered as", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
 function nodeRunnerSection(n, c, between = "", acts = ""){
-  // One runner per git host on a node (R53): the record's asks and the
+  // One runner per git host on a node: the record's asks and the
   // census's reports, joined by slot, each a row with its own state and
   // buttons; the addbar at the top takes a new one, host, address and
   // token, the way every view adds.
   const recs = n.services?.runners || {};
   const reps = n.reported?.services?.runners || [];
-  // Runner by runner (R260): one this account may not read is left out, one
+  // Runner by runner: one this account may not read is left out, one
   // it may only read keeps its row with its buttons dead and why.
   const mayOn = slot => n.runner_may ? (n.runner_may[slot] ?? "write") : "write";
   const slots = [...new Set([...Object.keys(recs), ...reps.map(r => r.slot).filter(Boolean)])].filter(sl => mayOn(sl));
@@ -346,7 +345,7 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
     const job = ap ? (want.want ? "installing" : "removing") : "";
     const failed = n.runner_failed && (n.runner_failed.slot || slot) === slot ? n.runner_failed : null;
     // Its state a pill on its name line, its facts one mono line, and what
-    // is wrong or worth knowing a notice under it (R218 step 28, the voices
+    // is wrong or worth knowing a notice under it (the voices
     // rule). "Installed" and "will actually pick up a job" are different
     // states: a runner registered with no listener reads as healthy right
     // up until a workflow sits in "Waiting for a runner".
@@ -371,11 +370,11 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
       // and what went wrong follows it.
       failed && rep.installed ? [`reinstall failed ${when(failed.ended)}: ${failed.why || "its job on the Jobs page says why"}`, "bad"] : null,
       !stored ? [`no token stored: Add runner with this address stores one, to ${rep.installed ? "reinstall or remove it" : "install it"}`, "warn"] : null,
-      // On a public repository a stranger's pull request runs here (B761).
+      // On a public repository a stranger's pull request runs here.
       exposedOf(n.id, slot) ? [exposedOf(n.id, slot), "warn"] : null,
     ].filter(Boolean);
     const ro = mayOn(slot) !== "write";
-    // A record (the record-lists rule; the operator, 17 Nov): its address,
+    // A record (the record-lists rule): its address,
     // state and registration read-only in the table's columns, what is wrong
     // under its line, and Edit opening it in place: a new token and its
     // labels, Install or Reinstall, Forget token, and Remove at the left.
@@ -424,11 +423,11 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
     foot: [`<button type="button" class="stop" data-nrunnercancel>Cancel</button>`,
       `<button type="button" class="primary" data-nrunneradd ${busyNow ? "disabled" : ""} title="save the token and add the runner to this node">Add runner</button>`]})}</div>`
     : "";
-  // No head (the operator, 29 Oct: a head of a state pill and a count over
+  // No head (a head of a state pill and a count over
   // a lone button said again what the header and each runner's row say):
   // `between`, every node's runner at a glance (runnerRows) where there
-  // are several, then this node's runners as a list of their own, a card
-  // (the operator, 18 Oct), the add band, Add runner under the list it adds
+  // are several, then this node's runners as a list of their own, a card,
+  // the add band, Add runner under the list it adds
   // to, and at the foot what a workflow does to reach this node.
   return `${between}
       ${addbar ? `<div class="field">${addbar}</div>` : ""}
@@ -442,9 +441,9 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
 // session there gets, and which are open right now. The reasons a project
 // cannot be sent here are the proxy's (server.session_target), repeated in
 // the same words so the row and the refusal agree.
-// A node holds its projects as a copy kept in step through the controller
-// (R162), the one way it holds them (R163): each project's state, and the
-// presses that take it off its copy and back (R164).
+// A node holds its projects as a copy kept in step through the controller,
+// the one way it holds them: each project's state, and the
+// presses that take it off its copy and back.
 function nodeSyncRow(n){
   if (n.kind !== "agent") return "";
   const rows = Object.entries(n.reported?.sync || {});
@@ -452,7 +451,7 @@ function nodeSyncRow(n){
     : !v.ready ? `copying${v.copying ? ` (${v.copying} to go)` : ""}`
     : v.pending ? `${v.pending} change${v.pending === 1 ? "" : "s"} going up` : "in step"}`;
   const conf = n.config || {}, live = n.live ? "" : "disabled";
-  // Off its synced copy (R164): no projects and no sessions here, the
+  // Off its synced copy: no projects and no sessions here, the
   // copies removed or on their way out, and one press back.
   if ((conf.workspace || "sync") !== "sync"){
     const c = n.reported?.sync_clean || {};
@@ -477,7 +476,7 @@ function nodeSyncRow(n){
       <button type="button" data-nd="sync-resume" ${live}>Keep syncing</button></div>`;
   }
   // In step, each repository's state is on its row in Repositories, with
-  // Stop syncing under them (the operator, 26 Oct: said twice otherwise).
+  // Stop syncing under them (said twice otherwise).
   void rows; void one;
   return "";
 }
@@ -490,14 +489,14 @@ function nodeSyncSaid(n, name){
     : v.pending ? `${v.pending} change${v.pending === 1 ? "" : "s"} going up` : "in step";
 }
 
-// Hosting only (the operator, 10 Oct): a node that runs containers sent to
+// Hosting only: a node that runs containers sent to
 // it and nothing else, so nothing of it comes back to the controller. Said in
 // the Sessions section, since what it takes away is sessions and code.
-// The door in for SSH (R174): what the machine reports, or what the enroll
+// The door in for SSH: what the machine reports, or what the enroll
 // script set up while it has not reported yet; the switch is a system job,
 // and the line says the ssh command to use.
-// What a PC needs to come in through a cloudflared door (R179, the
-// operator's own way in to a hosting node, 11 Oct): an ~/.ssh/config block named
+// What a PC needs to come in through a cloudflared door (the
+// operator's own way in to a hosting node): an ~/.ssh/config block named
 // for the node, so every server keeps its own name and its own saved
 // password rather than all of them being localhost:22, and `ssh NAME`.
 // MobaXterm's own SSH sessions read no ssh config, so it is said how it
@@ -513,18 +512,18 @@ Host ${esc(alias)}
       <div class="sub">Then <code>ssh ${esc(alias)}</code>. In MobaXterm, whose own SSH sessions read no ssh config, make a Shell session that runs <code>ssh ${esc(alias)}</code>, or type it in its local terminal.</div>`;
 }
 
-// What the node has beyond the base (R91): each feature bb-sandbox installs
+// What the node has beyond the base: each feature bb-sandbox installs
 // and removes, with Install or Uninstall on its row, the same install the
 // enroll script's tick ran. A row that cannot be pressed says why under it,
 // muted; the firewall is a hosting-only node's alone.
-// ---- the model router (R144 step 1, router.py) ----
+// ---- the model router (router.py) ----
 // LiteLLM on this node with the provider keys, Ollama beside it where it is
 // on, and the projects allowed to use it, each with a key of its own. Read
 // per node from /api/router when the section first draws and after each
 // press; a key field says only that it is set, and a value typed replaces
 // it at Save. Deploy, Save and Remove are the nginx page's shape: a
 // written System container, built by a compose job on the node.
-// ---- USB (R116) ----
+// ---- USB ----
 // The machine's USB devices, each with what holds it (the host, a VM,
 // nothing), Give to a VM and Take back, and its USB controllers with what
 // hangs off each, given whole through the VM's Hardware dialog. Drawn only
@@ -601,8 +600,8 @@ function nodeUsbSection(n){
   const held = (hw.usb || []).filter(u => usbHolder(u, vmsHere)).length;
   return docSection("nodes", "usb", title, hw.usb?.length ? `${hw.usb.length} device${hw.usb.length === 1 ? "" : "s"}${held ? `, ${held} in a VM` : ""}` : "", body);
 }
-// The controller's own machine's name and time zone (R161 step 3, R56 step
-// 8): set through the node's root agent, a system job each; the zones the
+// The controller's own machine's name and time zone:
+// set through the node's root agent, a system job each; the zones the
 // browser knows, offered as a list to type into. Nowhere else: another
 // node's name is its own administrator's.
 const SPINDOWN_WORDS = [["0", "never"], ["5", "after 5 minutes"], ["10", "after 10 minutes"], ["15", "after 15 minutes"], ["20", "after 20 minutes"],
@@ -614,7 +613,7 @@ function nodeMachineSection(n){
   const why = !n.live ? ND_UNREACHED : "";
   let zones = [];
   try{ zones = Intl.supportedValuesOf("timeZone"); }catch(e){ zones = []; }
-  // One form (R301): its three fields on the grid, Apply at its foot.
+  // One form: its three fields on the grid, Apply at its foot.
   const off = admin && !why ? "" : " disabled";
   const body = `<div class="field"><div class="sub">What the machine is called on the network, and the time zone its clock, logs and schedules read.</div></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
@@ -627,7 +626,7 @@ function nodeMachineSection(n){
       foot: [admin && !why ? `<button type="button" class="primary" data-nd="machine-apply" disabled>Apply</button>` : ""]})}`;
   return docSection("nodes", "machine", ndTitle("machine"), [r.hostname || "", r.timezone || "", r.spindown ? `disks spin down after ${r.spindown} min` : ""].filter(Boolean).join(" · "), body);
 }
-// Reporting (R164 step 4): the controller's own machine's CPU, memory,
+// Reporting: the controller's own machine's CPU, memory,
 // network, disk I/O and temperatures over six hours, a day, a week or a
 // month, kept on the controller at falling resolution (history.py) and
 // drawn as the hour's charts are, one measure each, side by side; the
@@ -672,7 +671,7 @@ function wireReportSection(root, n){
   const fmtOf = id => (ND_REPORT.find(([k]) => id.startsWith(`rep:${k}:`)) || [, , v => `${Math.round(v)}%`])[2];
   wireCharts(sect, fmtOf);
 }
-// The controller's own machine's power (R164 step 3): its UPS as NUT
+// The controller's own machine's power: its UPS as NUT
 // reads it, drawn only where the UPS feature is installed: the status in
 // words, the charge as a meter, the minutes left and the load; and what
 // happens on a low battery, which is the feature's own.
@@ -743,7 +742,7 @@ function nodeFeaturesSection(n){
   const fe = n.reported?.features;
   const job = n.applying?.what === "feature" ? n.applying : null;
   const failed = n.last_apply?.what === "feature" && n.last_apply.state === "failed" ? n.last_apply : null;
-  // A job that succeeded and a census that does not show it yet (B162): the
+  // A job that succeeded and a census that does not show it yet: the
   // machine has changed and has not said so, so its row waits for the report
   // the agent sends after every feature job rather than offering the press
   // that was just made. Read off what the census says, not off the clock:
@@ -763,7 +762,7 @@ function nodeFeaturesSection(n){
     const mine = job?.feature === fid;
     // Its own job running, or done and the node not yet reporting it: its
     // word kept and the ring in its place (runAttr), saying which; done, it
-    // is no press at all until the node has said so (B162).
+    // is no press at all until the node has said so.
     const word = has ? "Uninstall" : "Install";
     const btn = ahead === fid ? `<button type="button"${runAttr(true, "Done, the node is reporting back")}>${word}</button>`
       : why || cant ? ""
@@ -775,7 +774,7 @@ function nodeFeaturesSection(n){
         <div class="sub">${about}</div>${cant ? `<div class="sub dim">${cant}</div>` : ""}${fail}${more}</div>${btn}</div>`;
   };
   const vm = fe?.vmhost || {};
-  // The installed edition's parts (R56 step 2), on the controller's own
+  // The installed edition's parts, on the controller's own
   // machine alone: storage for the Storage page's pools and array, shares
   // for the ones it makes; each says which of its tools answer.
   const sto = fe?.storage || {}, sh = fe?.shares || {};
@@ -796,7 +795,7 @@ function nodeFeaturesSection(n){
   const rows = [...ownRows, row("vmhost", "VM host", !!vm.installed,
       `Runs virtual machines here with KVM through libvirt${vm.libvirt ? ` (libvirt ${esc(vm.libvirt)})` : ""}, as the jobs account and never a session.`,
       fe && !vm.kvm && !vm.installed ? "No /dev/kvm here, so a VM would run in software. On a VM, its host passes virtualization through: CPU mode host-passthrough and nested KVM on." : "",
-      // Where its VMs may go (R91 step 8): the internet, the controller and
+      // Where its VMs may go: the internet, the controller and
       // their own project's network, and the LAN only when ticked, inside
       // the row it is about.
       (vm.installed ? `<label class="ndcap ndvmlan"><input type="checkbox" data-ndvmlan${n.config?.vm_lan ? " checked" : ""}${why ? " disabled" : ""}>
@@ -808,7 +807,7 @@ function nodeFeaturesSection(n){
   if (n.config?.host_only)
     rows.push(row("firewall", "Hosting firewall", !!fe?.firewall?.installed,
       "Takes in only 80 and 443, a port a container publishes included; port 22 as the SSH door leaves it.", ""));
-  // The IOMMU on the kernel's command line (R116 step 4): what passing a
+  // The IOMMU on the kernel's command line: what passing a
   // PCI device or a whole USB controller to a VM needs. Installed is the
   // line written; on is what the running kernel says, after a restart.
   const io = fe?.iommu || {};
@@ -818,7 +817,7 @@ function nodeFeaturesSection(n){
         io.installed ? (io.on ? " On now." : " Not on yet: restart the machine; if it stays off after that, turn VT-d or AMD-Vi on in its firmware.")
           : io.on || n.reported?.vm_host?.iommu ? " On already, set outside AerieOS." : ""}`,
       ""));
-  // The NVIDIA card to a VM (R207 step 3): bound to vfio-pci from boot, so
+  // The NVIDIA card to a VM: bound to vfio-pci from boot, so
   // the host's driver never takes it and a VM's start finds it free; this
   // machine and its containers do without it while it is marked so.
   const gv = fe?.gpuvm || {};
@@ -827,7 +826,7 @@ function nodeFeaturesSection(n){
       `Gives the card${n.reported?.gpu_card ? ` (${esc(n.reported.gpu_card)})` : ""} to vfio-pci from boot, so one VM takes it under Hardware… on the VMs page; this machine and its containers do without it meanwhile.${
         gv.installed ? (gv.bound ? " Held by vfio-pci now." : " Not yet: restart the machine.") : " This machine's now."}`,
       ""));
-  // The features installed elsewhere on the page (R91 step 1): each said as
+  // The features installed elsewhere on the page: each said as
   // the machine reports it, with the press that installs or removes it where
   // it already lives, since those take a license to accept (Google's, NVIDIA's)
   // or a secret (a door's token, a forge's) that is the person's to give.
@@ -852,7 +851,7 @@ function nodeFeaturesSection(n){
   const emu = (r.store_dirs?.android || []).includes("emulator");
   others.push(elsewhere("emulator", "Android emulator", emu, "The emulator and its system images, from the Library, where Google's SDK license is accepted.",
     `<button type="button" data-ndtc="${esc(n.id)}">Library</button>`));
-  // The model router (R144, R172): a card of the Library's on this node, configured there.
+  // The model router: a card of the Library's on this node, configured there.
   others.push(elsewhere("router", "Model router", false, "LiteLLM with your provider keys, Ollama beside it, deployed and configured from its card on the Library with this node picked.",
     `<button type="button" data-ndtc="${esc(n.id)}">Library</button>`));
   const runs = ((r.services || {}).runners || []).length;
@@ -865,7 +864,7 @@ function nodeFeaturesSection(n){
 }
 
 // How the node reaches the controller, chosen in Enroll node and kept on
-// its record (the operator, 13 Oct: what is the node's reads on its row;
+// its record (what is the node's reads on its row;
 // the controller's own tunnel stays in Settings). Read-only: changing it
 // is enrolling again.
 function nodeDoorRow(n){
@@ -878,7 +877,7 @@ function nodeDoorRow(n){
     : `ssh ${esc(n.config?.user || "bb")}@${esc(d.host || n.name)}`;
   // The machine's own way in, for a person with a shell on it, whatever
   // projects it hosts: one hostname, picked when it was enrolled, not a
-  // project's (the operator, 18 Oct, asked whether each project needed one).
+  // project's (asked whether each project needed one).
   return `<div class="field nddoor">
       <div class="sub">The SSH door lets you into this machine itself, as <code>${esc(n.config?.user || "bb")}</code>; ${
         d.kind === "cloudflared" ? "Cloudflare Access decides who reaches it" : "the tailnet's ACLs decide who reaches it"}. The spaces it hosts need none of their own.</div>
@@ -912,7 +911,7 @@ function ndInUse(n){
   return bits.join(" and ");
 }
 
-// Un-enroll (the operator, 11 Oct): the one way off. Where the machine can
+// Un-enroll: the one way off. Where the machine can
 // be cleaned (its agent dialing in, provisioned by AerieOS) the dialog
 // says what always goes (the agent, the session isolation, the accounts)
 // and offers three rings to tick: the stores on its disk, what was
@@ -920,7 +919,7 @@ function ndInUse(n){
 // doors and proxy, ticked for one. Anywhere else the node is removed here
 // only, and the dialog says AerieOS's pieces stay on the machine.
 // What un-enrolling takes off a machine and what it leaves, said the same
-// way in a node's Un-enroll and in Reset AerieOS (the operator, 12 Oct).
+// way in a node's Un-enroll and in Reset AerieOS.
 // `all`: everything goes (Reset un-enrolls with every part); otherwise the
 // parts the dialog's boxes choose are said as such.
 function unenrollWhat(all){
@@ -978,9 +977,9 @@ function openUnenroll(n){
   };
 }
 
-// The projects that have this node among theirs (the operator, 10 Oct): read
+// The projects that have this node among theirs: read
 // off the projects this account is shown, primary first in each. Which node
-// a project uses is its settings' to say (the operator, 26 Oct: not removed
+// a project uses is its settings' to say (not removed
 // from here), so each one the account is on carries Settings, opening its
 // settings at where it runs; one the account is not on says so.
 function nodeProjects(id){
@@ -989,8 +988,8 @@ function nodeProjects(id){
 }
 // One line a space, as a table (the tables rule): the space, whether this
 // node is its primary or one it also works on, each repository's copy here,
-// and Settings. A node is the space's setting, not a repository's (R294 step
-// 12), so the list is of spaces and Settings opens the space's own dialog at
+// and Settings. A node is the space's setting, not a repository's,
+// so the list is of spaces and Settings opens the space's own dialog at
 // its Nodes in one hop, where a node is taken off.
 const NODE_PROJ_COLS = [{label: "Space"}, {label: "This node is", w: "minmax(0,.8fr)"},
   {label: "Copies here", w: "minmax(0,1fr)"}, {act: true, w: "7rem"}];
@@ -1019,7 +1018,7 @@ function nodeProjectsSection(n){
       s.mine ? `<button type="button" data-ndproj="${esc(first)}" title="a space's nodes are set in its settings, under Nodes">Settings</button>`
         : `<span class="dim">not yours</span>${helpIcon("Add yourself to the space to change which nodes it uses.")}`])}</div>`;
   }).join("");
-  // Stop syncing, where the copies it stops are listed (R164).
+  // Stop syncing, where the copies it stops are listed.
   const conf = n.config || {};
   const stop = n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
     ? `<button type="button" data-nd="sync-stop" ${n.live ? "" : "disabled"}>Stop syncing</button>` : "";
@@ -1035,7 +1034,7 @@ function nodeSessionsSection(n){
   const list = n.reported?.sessions || [];
   const host = !!n.config?.host_only;
   const iso = n.reported?.isolation;
-  // What this node is, said as facts (the operator, 18 Oct: the section was
+  // What this node is, said as facts (the section was
   // a heap of lines from one install, a Save under every switch): who runs
   // the sessions, with what, how far each sees, how the node reaches the
   // controller, and its SSH door, the machine's own way in.
@@ -1045,8 +1044,8 @@ function nodeSessionsSection(n){
   const d = n.kind === "agent" ? (n.reported?.door || n.config?.door) : null;
   const door = !d?.kind ? "none" : `${d.kind}${d.host ? ` at ${d.host}` : ""}, ${!n.reported?.door ? "not reported yet" : !d.installed ? "not installed" : d.active ? "open" : "shut"}`;
   const ready = !host && se && typeof se === "object" && se.up;
-  // The coding agents here, each with its version (the operator, 23 Oct:
-  // their own section said less than this line, and said it apart), and
+  // The coding agents here, each with its version
+  // (their own section said less than this line, and said it apart), and
   // which of them this account is signed in to here, each installed and
   // updated from the Library and signed in to on the Installed page.
   const agents = ready ? nodeAgentsHere(n) : [];
@@ -1085,7 +1084,7 @@ function nodeSessionsSection(n){
     [status, cls] = !se.boot ? ["blocked", "bad"]
       : [`${list.length ? `${list.length} open` : "ready"}${shared ? ", not isolated" : ""}`, shared ? "warn" : "ok"];
   }
-  // It refused this controller's bundle (R267 step 6), said in its own
+  // It refused this controller's bundle, said in its own
   // words: its terminals and jobs run the aerie it had before.
   if (!host && n.bundle_held) notes.push([`Refused this controller's bundle: ${n.bundle_held}. Its terminals and jobs run the one it had.`, "warn"]);
   const body = `<div class="field">${facts}${notes.map(([x, c]) => `<div class="sub ${c}">${esc(x)}</div>`).join("")}</div>
@@ -1098,18 +1097,18 @@ function nodeSessionsSection(n){
   return docSection("nodes", "sessions", ndTitle("sessions"), status, body, {cls});
 }
 
-// The section's settings, one group with one Save and Revert at its foot
-// (the operator, 18 Oct): every switch and number here is a draft until
+// The section's settings, one group with one Save and Revert at its foot:
+// every switch and number here is a draft until
 // Save, which sends what changed and nothing else.
 function nodeSessSettings(n){
   const host = !!n.config?.host_only;
   const set = host ? {fields: [nodeHostRootRow(n), nodePortsLocalRow(n)]}
     : {head: "Set here", says: "Each a draft until Save below.", fields: [nodeRootAsksRow(n), nodePortsLocalRow(n), nodeTurnsRow(n)]};
   const t = n.turns || {};
-  // Sessions, said so: under the test workers' field it read as them (B394).
+  // Sessions, said so: under the test workers' field it read as them.
   const now = host ? "" : `${t.working || 0} session${(t.working || 0) === 1 ? "" : "s"} working now${t.limit ? ` of ${t.limit}` : ""}${t.waiting ? `, ${t.waiting} waiting for a turn` : ""}`;
   const dirty = nodeSessDirty(n);
-  // One form (R301): its switches and numbers on the form's grid, its Save
+  // One form: its switches and numbers on the form's grid, its Save
   // and Revert at the foot, ending where the fields end.
   return `<div class="ndsettings">${host ? "" : nodeSessFacts(n)}${formBox({groups: [set, nodeRoomGroup(n)],
     state: `<span class="state${t.waiting ? " warn" : ""}">${esc(now)}</span>`,
@@ -1129,7 +1128,7 @@ function nodeSessDirty(n){
     || ND_ROOM.some(([k]) => c[`room.${k}`] !== undefined && c[`room.${k}`].trim() !== nodeRoomHas(n, k));
 }
 
-// Room on this node (R294 step 7): the disk it keeps free, when its memory
+// Room on this node: the disk it keeps free, when its memory
 // warns and a container's default memory, each this node's own where set
 // and blank for the install's (Controller settings, Room), so a small board
 // and a big server are not held to one number. Saved with the section.
@@ -1146,7 +1145,7 @@ function nodeRoomGroup(n){
   })};
 }
 
-// Its system's own packages (R294 step 13), as its agent counts them once an
+// Its system's own packages, as its agent counts them once an
 // hour where it can (a Debian-family system, the agent as root): what waits,
 // the security updates among them, and a restart the last update asked for.
 // Updated by the machine's own package manager; said on every node's page,
@@ -1160,7 +1159,7 @@ function nodeHostUpdates(n){
 }
 
 // The coding agents installed on this node, each with its version as the
-// census says it (R95 step 15), in the table's order.
+// census says it, in the table's order.
 function nodeAgentsHere(n){
   const me = (state?.claude_code || {}).nodes?.[n.id] || {};
   const se = n.reported?.session || {};
@@ -1173,14 +1172,14 @@ function nodeAgentsHere(n){
 }
 
 // Whether each session here reaches only its own project's containers, the
-// controller and the internet (R79): the node's setting, and what its agent
+// controller and the internet: the node's setting, and what its agent
 // says about it underneath, a reason in red when it is on and not in force.
-// Root asks on a hosting-only node (the operator, 11 Oct): no session runs
+// Root asks on a hosting-only node: no session runs
 // here, but a session of a project that hosts its containers here may ask
 // for a root command by name (aerie root run --node NAME), and this switch
 // decides, as the Sessions section's does on a node that runs them. A
 // draft until its Save, like that one.
-// What a machine's own console said of root commands (R227 step 2): off
+// What a machine's own console said of root commands: off
 // there, every one is refused whatever this row's box says, so the row says
 // so under the box, in the color of a thing switched off, with where it is
 // switched back on and what the switch does not reach.
@@ -1206,7 +1205,7 @@ function nodeHostRootRow(n){
 }
 
 
-// Published ports bound to 127.0.0.1 by default (R190): on for a hosting-only
+// Published ports bound to 127.0.0.1 by default: on for a hosting-only
 // node unless switched off, since there a port on every address is open to
 // the world and not only to its nginx. The census says what docker binds to.
 function nodePortsLocalRow(n){
@@ -1291,14 +1290,14 @@ function nodeTurnsRow(n){
     c.draft.turnsText = have; c.draft.turnsFrom = have;
   }
   const inp = `ndTurns-${n.id}`;
-  // ...and how many workers a test run here may use (R81): the node's
+  // ...and how many workers a test run here may use: the node's
   // cores when 0, handed to every test job as BB_TEST_WORKERS.
   const tw = String(n.config?.test_workers || 0);
   if (c.draft.workersText === undefined || c.draft.workersFrom !== tw){
     c.draft.workersText = tw; c.draft.workersFrom = tw;
   }
   const winp = `ndWorkers-${n.id}`;
-  // What 0 means is in each label, where a phone reads it (B459).
+  // What 0 means is in each label, where a phone reads it.
   return formField(inp, "Sessions working at once (0: no limit)", `<input id="${esc(inp)}" data-k="turns" type="number" min="0" max="64" step="1" inputmode="numeric" value="${esc(c.draft.turnsText)}">`,
       {help: "a prompt past it waits for a turn instead of starting"})
     + formField(winp, `Test workers at most (0: every core${n.reported?.cpu ? `, ${n.reported.cpu} here` : ""})`, `<input id="${esc(winp)}" data-k="workers" type="number" min="0" max="256" step="1" inputmode="numeric" value="${esc(c.draft.workersText)}">`,
@@ -1315,7 +1314,7 @@ function nodeTurnsRow(n){
 function nodeAdvancedSection(n, stale, inflight){
   // An install or a change being applied on the machine holds Reboot and
   // Shut down: a restart in the middle of apt, or of a storage or network
-  // apply, leaves it half done (the operator, 30 Sep). A reboot or shut
+  // apply, leaves it half done. A reboot or shut
   // down of its own is the one system job that does not.
   const applying = (n.jobs || []).find(j => j.type === "system" && !["reboot", "poweroff"].includes(j.apply));
   const installing = inflight("toolchain") ? "a toolchain install or removal"
@@ -1328,7 +1327,7 @@ function nodeAdvancedSection(n, stale, inflight){
   if (c.draft.nameText === undefined || c.draft.nameFrom !== n.name){
     c.draft.nameText = n.name; c.draft.nameFrom = n.name;
   }
-  // Each action a row of its own (the operator, 18 Oct: the section was big
+  // Each action a row of its own (the section was big
   // gaps, a sentence across the width and its buttons on the next line): its
   // name and what it does at the left, its button at the right.
   const act = (title, say, btn, cls = "") => `<div class="ndact${cls ? " " + cls : ""}"><div class="grow"><div class="name">${esc(title)}</div>
@@ -1404,7 +1403,7 @@ function windowGap(n){
 
 function staleWhy(n){
   const mine = n.agent?.version || "?", ship = nodesAgent?.version;
-  // It took this controller's agent and went back to the one it had (R241):
+  // It took this controller's agent and went back to the one it had:
   // not sent again by itself, so the row says what happened and what asks.
   // One phrase, as every row is: why it went back is the bell's to say.
   const back = n.agent?.back;
@@ -1417,7 +1416,7 @@ function staleWhy(n){
   const [a, b] = [win(mine), win(ship)];
   if (windowGap(n) && a.length && b.length && (a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])))
     return `${n.name} runs agent ${mine}, newer than this controller works with`;
-  // It would refuse this build (B1108): what keeps it, where Update agent
+  // It would refuse this build: what keeps it, where Update agent
   // could only fail there.
   if (n.update_held)
     return `${n.name} runs agent ${mine} and refuses this controller's ${mine === ship ? "build of " : ""}${ship}: ${n.update_held}`;
@@ -1442,8 +1441,8 @@ function storeMoves(n){
     .map(([role, p]) => ({role, from: rep[role].path, to: p, empty: keep.has(role)}));
 }
 
-// The questions a changed data location asks before it is saved (R120, the
-// operator, 23 Oct), asked of what is really at each path on the node: Are
+// The questions a changed data location asks before it is saved,
+// asked of what is really at each path on the node: Are
 // you sure; a folder that already holds files gets one named for the node
 // inside it, and the setting changes to that; and whether the data in the
 // old place comes along. False when a question was answered no, or the
@@ -1456,7 +1455,7 @@ async function ndStoreAsk(n, c){
   const was = new Set((desired.mounts || []).map(m => norm(m.path)));
   const mounts = (d.mounts || []).map(m => norm(m.path)).filter(p => p && !was.has(p));
   // Mounts saved here that the node does not have as they are written: new,
-  // or pointed at another export (the operator, 23 Oct). A store inside one
+  // or pointed at another export. A store inside one
   // is placed only once Apply has mounted it, and what is on the share
   // cannot be seen from here before then.
   const repM = n?.reported?.mounts || [];
@@ -1468,7 +1467,7 @@ async function ndStoreAsk(n, c){
   // whose data on the node's own disk the share then covers.
   const covered = Object.entries(d.stores || {}).filter(([r, p]) => norm(p) && norm(p) === now(r) && coverOf(norm(p)))
     .map(([r, p]) => ({role: r, path: norm(p), mount: norm(coverOf(norm(p)).path)}));
-  // What the save found is asked once (R265, the operator, 19 Nov: each of
+  // What the save found is asked once (each of
   // these was a question of its own, one after another): alone, as its own
   // question; several, as one with each under its heading. What a yes
   // changes in the draft is set only after it.
@@ -1500,8 +1499,8 @@ async function ndStoreAsk(n, c){
             + `mounted. Apply mounts it first and only then puts the store there; if the mount does not come up, `
             + `the apply fails and ${role} stays in ${old || "its place"}.`);
       } else if (role === "toolchains" && st.store && want.endsWith(`/${n.id}`)){
-        // This node's own folder inside a toolchain store, typed itself
-        // (R212): the setting is the store around it, since the agent keeps
+        // This node's own folder inside a toolchain store, typed itself:
+        // the setting is the store around it, since the agent keeps
         // each node's toolchains in a folder named for it inside the store.
         already = true;
         to = want.slice(0, -(n.id.length + 1));
@@ -1510,7 +1509,7 @@ async function ndStoreAsk(n, c){
             + `across from ${old || "the old place"}.`);
         moved[role] = to;
       } else if (st.store || st.mine || st.own){
-        // Already a store (R212): AerieOS's marker in it, this node's own
+        // Already a store: AerieOS's marker in it, this node's own
         // toolchain folder inside it, or the folder nested for this node
         // before. Used as it is, nothing nested, nothing brought across.
         already = true;
@@ -1537,7 +1536,7 @@ async function ndStoreAsk(n, c){
   if (asks.length > 1 && !await askYes("", {title: `Save this storage on ${n.name}?`, verb: "Save", parts: asks})) return false;
   Object.assign(d.stores, moved);
   // Whether its data comes along is its own question with its own answers
-  // (the operator, 23 Oct: OK for yes and Cancel for no was messy): Yes,
+  // (OK for yes and Cancel for no was messy): Yes,
   // No, and Cancel to stop.
   for (const {role, old, to} of bring){
     const said = await ask({text: `Bring the ${role} data across from ${old} to ${to}?\n\n`
@@ -1570,7 +1569,7 @@ function nodeDrift(n){
     if (cls) storage.push(`${m.path || m.source || "a mount"}: ${mountHead(st, cls)}`);
   }
   // A stale mount is drift whether or not the desired list names it: it
-  // reads as mounted to every list and fails every read (roadmap R41).
+  // reads as mounted to every list and fails every read.
   for (const r of rep.mounts || []){
     if (r.stale && !(d.mounts || []).some(m => m.path === r.path))
       storage.push(`${r.path}: ${r.error || "mounted, but the handle is stale: re-export it on the host"}`);
@@ -1629,7 +1628,7 @@ function nodePathsTable(n, c){
     ${rows || fresh ? tblWrap(PATH_COLS, fresh + rows, "ndpaths") : `<div class="hint">none: every path a compose file names is the same on this node</div>`}</div>`;
 }
 
-// A node's mounts as records (the record-lists rule; the operator, 17 Nov: a
+// A node's mounts as records (the record-lists rule: a
 // record's Save writes it at once): a table of what is saved, each row
 // read-only with Edit at its right, Edit opening that row in place into its
 // form (Delete, Cancel, Save), Add a mount over the table opening the form
@@ -1650,7 +1649,7 @@ function nodeMountsTable(n, c){
     const [st, cls] = mountState(m, rep.mounts);
     // A reason with a fix in it (a stale handle, a mount that did not come
     // up) is longer than its cell shows, and the section's state line names
-    // the last apply's failure instead of it once one has failed (B660): the
+    // the last apply's failure instead of it once one has failed: the
     // cell keeps the state up to its first colon and the whole reason goes
     // under the row, where it can wrap.
     const head = mountHead(st, cls), cut = head !== st;
@@ -1871,7 +1870,7 @@ function nodeConfSections(n){
   </div></div>`;
 }
 
-// Storage's reading of a size (sgb): TB past ten of them (B834: 11425GB).
+// Storage's reading of a size (sgb): TB past ten of them (11425GB).
 const gb = mb => sgb(mb);
 
 // Everything the census measured, as meters: what the machine is doing now,
@@ -1879,8 +1878,8 @@ const gb = mb => sgb(mb);
 function nodeMeters(n){
   const rep = n.reported || {}, s = rep.sample || {};
   const out = [];
-  // What the charts below draw is not drawn again as a bar (the operator,
-  // 17 Oct): CPU and memory where the node has its hour charted, the card's
+  // What the charts below draw is not drawn again as a bar:
+  // CPU and memory where the node has its hour charted, the card's
   // two where its hour holds the card.
   const {cpu: charted, gpu: gpuCharted} = nodeCharted(n);
   if (n.live && typeof s.cpu_pct === "number" && !charted)
@@ -1928,11 +1927,10 @@ function nodeCharted(n){
   return {cpu: sp.length > 0, gpu: sp.some(x => typeof x[3] === "number"), vram: sp.some(x => typeof x[4] === "number")};
 }
 
-// Its last hour, CPU and memory, side by side at a desk (R218 step 9): the
+// Its last hour, CPU and memory, side by side at a desk: the
 // controller's ring of its samples, one each poll. Small multiples rather
 // than two lines on one chart, so neither needs a legend or a second hue.
-// The card's busyness and its own memory beside them where it has one (the
-// operator, 17 Oct).
+// The card's busyness and its own memory beside them where it has one.
 function nodeCharts(n){
   const c = nodeCharted(n);
   if (!c.cpu) return "";
@@ -1942,7 +1940,7 @@ function nodeCharts(n){
     c.vram ? hourChart(`vram:${n.id}`, "GPU RAM", n.spark.map(x => [x[0], x[4]])) : ""}</div>`;
 }
 
-// The page's parts its placeholder draws too (R218, the operator 18 Oct: a
+// The page's parts its placeholder draws too (a
 // template written beside the page fell behind it), so a change to either
 // is a change to both; given null, each draws the placeholder's.
 // A node's sections, in their order, by the titles they are drawn under.
@@ -1950,13 +1948,13 @@ const ND_SECTS = [["health", "Health"], ["report", "Reporting"], ["machine", "Na
                   ["features", "Features"], ["storage", "Storage"], ["network", "Network"], ["advanced", "Advanced"]];
 function ndTitle(k){ return (ND_SECTS.find(s => s[0] === k) || [k, k])[1]; }
 // Why New VM and Enroll node are dead, when this install switched
-// enrolling off (R81): under the bar, since a reason in a tooltip is nothing
+// enrolling off: under the bar, since a reason in a tooltip is nothing
 // on a phone.
 function ndOffLine(){
   const why = featureOff("enroll");
   return why ? `<div class="field">${deadWhy(why)}</div>` : "";
 }
-// After a move landed here (R175 step 3): the nodes the bundle named that
+// After a move landed here: the nodes the bundle named that
 // have not said hello since, each with the one line to run on it. A node
 // that heard the move knocks and follows by itself; one that was off the
 // whole time, and finds the old address silent, is told by hand, and keeps
@@ -1976,16 +1974,16 @@ function ndNotHereHtml(){
 // install with no public name has none to give): the address this page is
 // read at, which is where the node is to knock.
 const ndFollowLine = line => String(line || "").replace(/^(aerieos-agent follow)\s+([0-9a-f]{64})$/, (_m, verb, ch) => `${verb} ${location.origin} ${ch}`);
-// The bar: nothing of its own since R177, the node switcher, Create sandbox
+// The bar: nothing of its own the node switcher, Create sandbox
 // VM and Enroll node being the Machines group's header (page-shell.js
 // groupHeader); kept as the page's bar builder so its callers stand.
 function ndBar(live){
   return "";
 }
-// Its facts in the facts voice, its id among them (R218 step 26): the id is
+// Its facts in the facts voice, its id among them: the id is
 // the one in its enroll script's name.
 const ND_FACTS = ["Reached", "Has", "Seen", "Agent", "Updates", "Jobs run as", "Runs on", "Id"];
-// Whose agent updates a node takes (R227 step 1, the agent's release.py):
+// Whose agent updates a node takes (the agent's release.py):
 // only those AerieOS's release signed, once it has pinned the release key,
 // and those signed by a key a person added at its console (a controller
 // somebody built themselves, signed with their own key), said by how many;
@@ -2004,7 +2002,7 @@ function ndUpdatesFact(n){
   const added = `${also} ${also === 1 ? "key" : "keys"} added at its console`;
   if (!key){
     // Keys added there and no release key: signed builds only, all the same.
-    // A refusal of this build is the agent bar's to say, once (B1108).
+    // A refusal of this build is the agent bar's to say, once.
     if (also) return (n.reported.unsigned_ok ? `signed builds (${added}), and unsigned builds, allowed at its console` : `signed builds only (${added})`)
         + (n.reported.release_unpinned ? "; no release key, by its console's choice"
           : nodesAgent?.release_key ? "; no release key pinned (Enroll script pins it)" : "") + older;
@@ -2013,7 +2011,7 @@ function ndUpdatesFact(n){
     // Before AerieOS names a release key, no node can pin one: nothing to say.
     return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (its first signed update pins it, or the Enroll script)" : "";
   }
-  // The spare (R232): pinned with the key, or named by this build and not
+  // The spare: pinned with the key, or named by this build and not
   // pinned there yet. The node pins it by itself where this build carries
   // the release key's word for it (spare_said); else the Enroll script does.
   const spare = n.reported.release_spare || "";
@@ -2040,7 +2038,7 @@ function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");
 }
 // Test and Enroll script, the head's two buttons about the machine itself.
-// Enroll script is one press (R210): the node's script again, built from
+// Enroll script is one press: the node's script again, built from
 // what the row was enrolled with, downloaded the moment it arrives; the
 // Features section's Enroll again opens the dialog to change an answer.
 function ndAgentButtons(dead){
@@ -2049,8 +2047,8 @@ function ndAgentButtons(dead){
           <button type="button"${dead ? "" : ` data-nd="reenroll-now"`} title="this node's enroll script again, with the answers it was enrolled with, to run again on the same machine"${off}>Enroll script</button>`;
 }
 
-// One node's row: its name, facts and agent bar, then its sections (R218
-// step 26). Its own function so This machine (tab-machine.js, R90 step 8)
+// One node's row: its name, facts and agent bar, then its sections.
+// Its own function so This machine (tab-machine.js)
 // draws the controller's own machine with it.
 function ndRowHtml(n, lead = ""){
     const labels = Object.entries(n.labels || {})
@@ -2070,7 +2068,7 @@ function ndRowHtml(n, lead = ""){
     // button for the round trip; this is what keeps it gray afterwards,
     // through the repaint that replaces the element.
     const inflight = t => (n.jobs || []).some(j => j.type === t || j.apply === t);
-    // What a session is waiting on, as root, on THIS machine (roadmap R38):
+    // What a session is waiting on, as root, on THIS machine:
     // above everything else on the row, because somebody is blocked on it
     // and it is the one thing here that runs as root. From the phone's
     // answer, which carries every ask for this account; the server sends a
@@ -2092,14 +2090,14 @@ function ndRowHtml(n, lead = ""){
     const updating = stale && (inflight("self-update")
       || Date.now() - (nodesUpdating[n.id] || 0) < 180000);
     // ...and while it is queued the controller hands the node nothing new
-    // until what runs there has finished (B516), so the line says what it
+    // until what runs there has finished, so the line says what it
     // is waiting for rather than "Updating" for minutes.
     const held = (n.jobs || []).some(j => j.type === "self-update" && j.state === "queued")
       ? (n.jobs || []).filter(j => j.type !== "self-update" && j.state !== "queued").length : 0;
     // The agent a fact; an update for it a pill beside the node's state.
     const agentVer = n.kind === "agent" && n.agent?.version
       ? `${n.agent.version}${n.agent.digest ? " " + n.agent.digest.slice(7, 15) : ""}${
-        // When it was built (R131), so a person with a problem can say how old it is.
+        // When it was built, so a person with a problem can say how old it is.
         n.agent.built && !isNaN(Date.parse(n.agent.built)) ? ` · built ${fmtTime(Date.parse(n.agent.built), {day: "numeric", month: "short", year: "numeric"})}` : ""}` : "";
     const stalePill = n.kind === "agent" && n.agent?.version && stale
       ? ` <span class="pill warn ndstale" title="this controller ships agent ${
@@ -2175,14 +2173,14 @@ function ndRowHtml(n, lead = ""){
           n.config?.own || stalePill ? `<div class="name">${n.config?.own ? `<span class="tag ndown">this machine</span> ` : ""}${stalePill}</div>` : ""}
         ${
         // What it is doing now, on the status line every page's head opens
-        // with (R274; the operator, 24 Nov: a line on some pages, none on
+        // with (a line on some pages, none on
         // others, was all over the place), its facts under it.
         ndStatusLine(n)}
         ${
-        // Its facts in the facts voice, its id among them (R218 step 26):
+        // Its facts in the facts voice, its id among them:
         // the id is the one in its enroll script's name.
         ndFacts([where, census, seen, agentVer, ndUpdatesFact(n), n.kind === "agent" ? n.config?.user || "" : "",
-                 // A VM AerieOS made on another node (R91 step 14).
+                 // A VM AerieOS made on another node.
                  n.config?.vm_of ? `${nodeNameOf(n.config.vm_of, n.config.vm_of)}, as a VM` : "", n.id])}
         ${keepLine(n)}
         ${agentBar}${pendingBar}
@@ -2209,11 +2207,11 @@ function renderNodesInto(i){
   const d = docSurface(i, "nodes");
   if (!d) return;
   if (nodesList === null){
-    // Its template (R218 step 16): the bar, the sections' names and the jump
+    // Its template: the bar, the sections' names and the jump
     // bar over them are the page's own; the node and what it says are on
     // their way. A section somebody shut is drawn shut, as it will land.
-    // Drawn by the page's own builders given nothing (the operator, 18
-    // Oct: a template written beside the page fell behind it): the bar, the
+    // Drawn by the page's own builders given nothing
+    // (a template written beside the page fell behind it): the bar, the
     // head card with its facts' labels and its two buttons, the sections a
     // node usually has under their own titles, and the jump bar sectJump
     // puts over them, as the page does.
@@ -2251,7 +2249,7 @@ function renderNodesInto(i){
   const live = nodesList.filter(n => n.state !== "retired" && n.kind !== "local");
   if (!live.some(n => n.id === nodesPick)) nodesPick = live[0]?.id || "";
   const n = live.find(x => x.id === nodesPick);
-  // Picked as every node-scoped page picks one (nodePick, R218 step 26).
+  // Picked as every node-scoped page picks one (nodePick).
   d.setBar(ndBar(live));
   const rows = n ? ndRowHtml(n, state?.bare_metal && n.config?.own ? machineNodeSections(n) : "") : "";
   // Nothing enrolled. Said where the rows would be, rather than an empty
@@ -2264,7 +2262,7 @@ function renderNodesInto(i){
   // Enrolling is a dialog now (#ndmodal), not two panels appended here; see
   // the markup's comment. Which means a poll landing while it is open cannot
   // take the name being typed with it, because this list is not where it is.
-  // Patched into what is there (R244): a setting being typed, a fold turned
+  // Patched into what is there: a setting being typed, a fold turned
   // and what a press wrote into the row stay where they were.
   patch(d.list, ndOffLine() + ndNotHereHtml() + rows + none
     + (!nodesList.length ? `<div class="empty">The node list could not be read.</div>` : ""));
@@ -2282,12 +2280,12 @@ function renderNodesInto(i){
   }
 }
 
-// The CI runner tab (R121): a node picked in its bar, and that node's runners
+// The CI runner tab: a node picked in its bar, and that node's runners
 // below, drawn and wired exactly as the Nodes tab drew them (nodeRunnerSection
 // and wireNodeConf, one draft per node), so the two cannot disagree.
 let runnerNode = "";
 function openRunnerTab(nid){
-  // The CI runner tab is a grant (R137 step 3, the operator's R136 line):
+  // The CI runner tab is a grant:
   // the card's status stays for everybody; the tab does not open for an
   // account without it, and the server refuses its writes regardless.
   if (state?.can?.runner === false) return notify("the CI runner is an administrator's: its status is on the card", true);
@@ -2296,7 +2294,7 @@ function openRunnerTab(nid){
 }
 // Every node's runner, one row each, above the chosen node's section: which
 // is busy, idle or quiet across the install, a question the per-node section
-// cannot answer (the sidebar's Runner card's, until R218 step 3). A runner
+// cannot answer. A runner
 // job in flight comes first, a failure carries its time, and a row picks
 // its node.
 // What the controller says of a runner on a public repository, or "".
@@ -2326,7 +2324,7 @@ function renderRunnerInto(i){
   const d = docSurface(i, "runner");
   if (!d) return;
   if (nodesList === null){
-    // Its template (R218 step 16): the bar and the state row's words are the
+    // Its template: the bar and the state row's words are the
     // page's own; the node and its runners are on their way.
     // In the node's panel, as it lands: its rows are bands there, not a card.
     d.setBar("");
@@ -2337,8 +2335,8 @@ function renderRunnerInto(i){
   const has = n => (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
   if (!ns.some(n => n.id === runnerNode)) runnerNode = (ns.find(has) || ns[0])?.id || "";
   const n = ns.find(x => x.id === runnerNode);
-  // The node is the Build group's header's (R178), and Add runner sits on
-  // the head's action row under its facts (the operator, 29 Oct: the bar
+  // The node is the Build group's header's, and Add runner sits on
+  // the head's action row under its facts (the bar
   // it stood in left a gap), so the bar carries nothing.
   d.setBar("");
   patch(d.list, n
@@ -2350,7 +2348,7 @@ function renderRunnerInto(i){
   if (show) show.onclick = () => { nodeDraft(n).addRunner = true; readMoved("nodes"); drawPanes(); };
   if (n) wireNodeConf(d.list.querySelector(".ndrow"), n.id);
   d.list.querySelectorAll(".ndrunro button").forEach(b => { b.disabled = true; });
-  // CI runners switched off on this install (R81): every control here dead,
+  // CI runners switched off on this install: every control here dead,
   // the sentence above them.
   if (featureOff("runner")){
     d.list.querySelectorAll("button, input, select").forEach(b => { b.disabled = true; });
@@ -2363,7 +2361,7 @@ function renderRunnerInto(i){
 // Add runner, the page's main action, on the head's action row; while the
 // add band is open it is the band's to finish or cancel.
 function runnerAddBtn(n, c){
-  // Not drawn where this account's roles do not give it (the operator, 21 Oct).
+  // Not drawn where this account's roles do not give it.
   if (!n || c.addRunner || n.runner_new === false || nodeMay(n) !== "write") return "";
   return `<button type="button" class="primary" data-nrunnershow ${n.applying || nodeStale(n) || featureOff("runner") ? "disabled" : ""}
     title="a runner for another git host, or this one's under another address">Add runner</button>`;
@@ -2371,11 +2369,11 @@ function runnerAddBtn(n, c){
 
 // An account that does not administer sees a node's settings and changes
 // none of them: every control on the tab is dead for it but the picker and
-// its own Claude sign-in (the operator, 30 Sep), with nothing saying why
-// (the operator, 21 Oct: a role somebody lacks is not advertised). Once,
+// its own Claude sign-in, with nothing saying why
+// (a role somebody lacks is not advertised). Once,
 // after the draw and its wiring, rather than in each section: a control a
 // later section adds is dead for that account without anybody remembering.
-// Node by node since R260: a role may write one node and read another, so
+// Node by node: a role may write one node and read another, so
 // a row is dead where the server says its account may only read it (the
 // row's `may`), and the page's own controls only when it may write none.
 const nodeMay = n => n?.may || (state?.can?.admin === false ? "read" : "write");
@@ -2394,7 +2392,7 @@ function nodesReadOnly(root){
 // The enroll and sandbox VM dialogs, drawn into #ndmodal (outside every
 // page's DOM, so a poll landing mid-type cannot take what was typed): the
 // Nodes page's two buttons open them, and so does first run's node step
-// (page-setup.js), so there is one way to enroll (R267). Built on each
+// (page-setup.js), so there is one way to enroll. Built on each
 // call, as they were on each wiring of the Nodes page.
 function ndDialogs(){
   // ---- enrolling, in a dialog -------------------------------------------
@@ -2407,23 +2405,23 @@ function ndDialogs(){
   // The box narrows for the question and widens for the answer: one field
   // does not want 760px, and a shell line that wraps lies about what runs.
   const boxWidth = wide => modal.querySelector(".box").classList.toggle("wide", wide);
-  // The questions, and one script as the answer (R161): the provisioner
+  // The questions, and one script as the answer: the provisioner
   // with the answers, the token and (behind WireGuard) the tunnel inside,
   // built on the press and kept nowhere but the file the browser saves.
   // "Just a token" is the old way: the commands to paste, a Mac's included.
-  // `again` is a node already here (R177): the form opens on its answers,
+  // `again` is a node already here: the form opens on its answers,
   // its name fixed, its secrets left out (the node keeps them), and the
   // script it makes carries that node's id and runs on its machine alone.
   const mintForm = (was = {}, again = null) => {
-    // A node that has a machine (B637): a pending one never ran its script,
+    // A node that has a machine: a pending one never ran its script,
     // so its new one is a first enrollment, worded and checked as one.
     const enrolled = !!again && again.state !== "pending";
-    // WireGuard reach and the Tailscale door have no walk on record (R48):
+    // WireGuard reach and the Tailscale door have no walk on record:
     // offered with Offer dev features on, marked so.
     const dev = !!state?.settings?.settings?.offer_unvetted?.value;
     document.getElementById("ndTitle").textContent = again ? `Enroll ${again.name} again` : "Enroll a node";
     boxWidth(false);
-    // One form (R301): the machine and what runs on it; its SSH door; what
+    // One form: the machine and what runs on it; its SSH door; what
     // is put on it once it enrolls; how it reaches the controller. Each row a
     // choice shows or hides keeps its id (ndEn...Row).
     drawHTML(body, `<div class="field">${formBox({groups: [
@@ -2487,10 +2485,10 @@ function ndDialogs(){
     if (again) $b("#ndEnName").disabled = true;
     const reach = $b("#ndEnReach");
     // Hosting only takes sessions with it: the box is to run containers.
-    // Through a public hostname it is so by construction (R170): the
+    // Through a public hostname it is so by construction: the
     // switch is ticked and held, and the address field asks for the name.
     // A system marked dev says so under the pulldown, with why it is not
-    // walked where it cannot be here (R97, R102).
+    // walked where it cannot be here.
     const sysWhy = (slide = true) => {
       const s = nodesSystems.find(x => x.id === $b("#ndEnSystem")?.value);
       const dev = s && !s.vetted;
@@ -2526,14 +2524,14 @@ function ndDialogs(){
       const ctl = $b("#ndEnCtl");
       if (reach.value === "public" && /^https?:\/\/(\d+\.|localhost|\[)/.test(ctl.value)) ctl.value = "https://";
       else if (reach.value !== "public" && ctl.value === "https://") ctl.value = location.origin;
-      // The hostname the controller's own tunnel publishes (R176), filled
+      // The hostname the controller's own tunnel publishes, filled
       // in where the settings have one and nothing has been typed yet.
       const own = state?.settings?.settings?.tunnel_host?.value;
       if (reach.value === "public" && own && ctl.value === "https://") ctl.value = `https://${own}`;
       showHost(slide);
     };
-    // Make the script wakes once a WireGuard way in has its config (the
-    // operator, 18 Oct): chosen or pasted.
+    // Make the script wakes once a WireGuard way in has its config:
+    // chosen or pasted.
     const goReady = () => { const g = $b("#ndEnGo");
       if (g && !g.dataset.busy) g.disabled = reach.value === "wireguard" && !$b("#ndEnWgText").value.trim() && !enrolled; };
     reach.onchange = () => { showWg(); goReady(); };
@@ -2558,7 +2556,7 @@ function ndDialogs(){
       user: $b("#ndEnUser").value.trim() || "bb",
       system: $b("#ndEnSystem")?.value || "ubuntu"});
     // What was typed comes back after a refusal: a redraw to its defaults
-    // lost the name and the account on every one (B331's shape).
+    // lost the name and the account on every one.
     const keep = () => ({"#ndEnName": $b("#ndEnName").value, "#ndEnUser": $b("#ndEnUser").value, "#ndEnSystem": $b("#ndEnSystem")?.value,
       "#ndEnSess": $b("#ndEnSess").checked, "#ndEnHost": $b("#ndEnHost").checked, "#ndEnFw": $b("#ndEnFw").checked, "#ndEnVm": $b("#ndEnVm").checked, "#ndEnNginx": ngx.checked,
       "#ndEnDoor": door.value, "#ndEnDoorHost": $b("#ndEnDoorHost").value, "#ndEnDoorClose": $b("#ndEnDoorClose").checked,
@@ -2678,7 +2676,7 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
                               mac_prefix: "52:54:00", artifact: "domain XML"}];
     const kind = kinds.find(k => k.id === vmDraft.hv) || kinds[0];
     const takes = k => (kind.wants || []).includes(k);
-    // One form (R301): where it runs and its name, its three sizes across,
+    // One form: where it runs and its name, its three sizes across,
     // then what identifies it; the dialog's foot generates it.
     drawHTML(body, `<div class="field vmform">
         <div class="hint">Pick where it runs; the machine is written the same everywhere.</div>
@@ -2751,7 +2749,7 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
       const r = await nodeAct({action: "vm-xml", hv: vmDraft.hv});
       // Only onto the VM form it was asked for: closed by then and another
       // form opened in the same box (Enroll), a late catalog painted over
-      // it and took what was typed (B424).
+      // it and took what was typed.
       if (r.catalog){ vmKinds = r.catalog;
         if (!modal.hidden && body.querySelector("#vmGo") && !body.querySelector(".vmmade")) vmForm(null); }
     }
@@ -2780,7 +2778,7 @@ function sessionsEndSaid(here, {lead = "This ends", after = "", whose = true, ta
 }
 // A reboot and a shutdown end every session on the node, so the question
 // names them. Everybody's, as the node reports them, not only this
-// account's (the operator, 26 Oct): each is ended cleanly before the machine
+// account's: each is ended cleanly before the machine
 // goes, so none is left open on the record.
 function ndPowerSaid(id){
   return sessionsEndSaid(nodeOf(id)?.reported?.sessions || sessionsOn(id),
@@ -2793,7 +2791,7 @@ function ndPowerSaid(id){
 const ND_ASK_AS = {lockdown: {verb: "Lock down", danger: true}};
 // What a node's verb (data-nd) asks before it is sent: the question's words
 // for that node and that button, or "" where this press costs nothing. A
-// verb that is not here asks nothing (R265: a press asks only where its yes
+// verb that is not here asks nothing (a press asks only where its yes
 // costs something): Disable keeps the node enrolled with its sessions
 // running and Enable on the same row puts it back, the SSH door opens again
 // from the row that shut it, and Drain, Lock and a feature's Install are
@@ -2819,7 +2817,7 @@ const ND_ASK = {
     + "This installs the NVIDIA driver and a headless X server on the card, which "
     + "takes minutes, and the driver takes the card only after a reboot: the row "
     + "says when to press Reboot.",
-  // Leaving the synced copy (R164) ends the sessions, as a reboot does;
+  // Leaving the synced copy ends the sessions, as a reboot does;
   // cleaning up removes the copies, which only the drain allows.
   "sync-stop": id => `Stop syncing ${nodeNameOf(id)}?\n\n`
     + sessionsEndSaid(sessionsOn(id), {whose: false, tail: "; transcripts are kept. "})
@@ -2861,8 +2859,8 @@ const ND_APPLY_WORD = {storage: "a storage apply", network: "a network apply", r
 const ND_FEATURE_WORD = {vmhost: "VM host", firewall: "the hosting firewall", iommu: "the IOMMU", gpuvm: "the NVIDIA card to a VM",
   storage: "Storage", shares: "Shares", ups: "the UPS"};
 // The system job at work on a node, in words, or "": one pressed meanwhile
-// is queued behind it, never refused, and the press says so (the operator,
-// 22 Nov). A quick root command neither waits nor is waited for.
+// is queued behind it, never refused, and the press says so.
+// A quick root command neither waits nor is waited for.
 function ndAhead(n){
   const j = (n?.jobs || []).find(x => x.type === "system" && (x.state === "assigned" || x.state === "running") && x.apply !== "root");
   if (!j) return "";
@@ -2876,7 +2874,7 @@ function ndQueuedSay(n, ahead, what){
 }
 
 function wireNodesTab(root){
-  // A node's own version check's cadence (R176), saved on its pick: the
+  // A node's own version check's cadence, saved on its pick: the
   // pick shows as made, and a refusal puts the saved one back and says why
   // (drawNow), where a redraw saying what it said before would leave it.
   root.querySelectorAll("[data-ndcheck]").forEach(s => s.onchange = async () => {
@@ -2887,7 +2885,7 @@ function wireNodesTab(root){
     if (!j.error) notify(`its versions are checked ${now === "off" ? "only when asked" : now}`);
     await loadNodes();
   });
-  // The own machine's hold-next checkbox beside Reboot (R161 step 11).
+  // The own machine's hold-next checkbox beside Reboot.
   wireHoldNext(root);
   wireSignin(root);
   wireCharts(root);
@@ -2901,15 +2899,15 @@ function wireNodesTab(root){
   });
   root.querySelectorAll("[data-rdeny]").forEach(b => b.onclick = () =>
     phFetch({action: "deny", id: Number(b.dataset.rdeny)}));
-  // New VM and Enroll node are the group's header's (R177, wired
+  // New VM and Enroll node are the group's header's (wired
   // by page-shell.js wireGroupHeader); the dialogs stay the page's.
   const {modal, body, shut, mintForm, mintScript, vmForm} = ndDialogs();
   wireSections(root);
   root.querySelectorAll(".ndrow").forEach(box => {
     const id = box.dataset.node;
-    // The driver is a card in the Library (R102): this opens the Library on the node.
+    // The driver is a card in the Library: this opens the Library on the node.
     box.querySelectorAll("[data-ndtc]").forEach(b => b.onclick = () => openLibraryOn(b.dataset.ndtc));
-    // The agent's journal in the dock (R133 step 12).
+    // The agent's journal in the dock.
     box.querySelectorAll("[data-ndlog]").forEach(b => b.onclick = () =>
       openLogTab(`log:node:${b.dataset.ndlog}:agent`, `Log: ${b.dataset.ndlogname}'s agent`));
     box.querySelectorAll("[data-nd]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -2940,7 +2938,7 @@ function wireNodesTab(root){
         const j = await nodeAct({action: "update-agent", id});
         if (j.current){ delete nodesUpdating[id]; notify(`already on ${j.version}`); }
         // A failed update frees the button at once, never retried: the
-        // person reads why on the toast and presses again (B862). A good one
+        // person reads why on the toast and presses again. A good one
         // keeps it busy until the agent's hello brings the new digest.
         else if (j.ok) notifyJob(j.job, `agent update on ${nodeNameOf(id, "the node")}`,
           r => { if (r.state !== "succeeded"){ delete nodesUpdating[id]; readMoved("nodes"); drawPanes(); } });
@@ -2948,7 +2946,7 @@ function wireNodesTab(root){
         return;
       }
       if (act === "reenroll-now"){
-        // The row's own script (R210): built on the controller from what
+        // The row's own script: built on the controller from what
         // the node was enrolled with, saved the moment it arrives.
         const r = await nodeAct({action: "enroll", script: true, node: id, as_row: true, controller: location.origin});
         if (r.error) return;
@@ -2962,7 +2960,7 @@ function wireNodesTab(root){
         const was = nodeNameOf(id, "");
         if (!name || name === was) return notify("type the new name first", true);
         const j = await nodeAct({action: "update", id, fields: {name}});
-        // A refusal is nodeAct's to say, once (B1028).
+        // A refusal is nodeAct's to say, once.
         if (j.error) return;
         const c = nodesConf[id]; if (c && c.draft) c.draft.nameText = undefined;
         notify(`${was} is now ${name}; a runner already installed there keeps the label ${was} until it is reinstalled`);
@@ -2978,7 +2976,7 @@ function wireNodesTab(root){
         return;
       }
       if (act === "sess-save"){
-        // The Sessions section's one Save (the operator, 18 Oct): what
+        // The Sessions section's one Save: what
         // changed of its switches and numbers, each by its own action, said
         // in one line.
         const n0 = nodeOf(id) || {}, conf = n0.config || {};
@@ -3065,7 +3063,7 @@ function wireNodesTab(root){
         return;
       }
       // Every other verb is its name, sent with the node: the door's press
-      // says which way (R174) and a feature's which one. nodeAct says a
+      // says which way and a feature's which one. nodeAct says a
       // refusal and reads the nodes again.
       const j = await nodeAct({action: act, id, ...(act === "door" ? {on: b.dataset.on === "1"} : {}),
                                ...(act === "feature" ? {feature: b.dataset.feature, op: b.dataset.op} : {})});
@@ -3085,12 +3083,12 @@ function wireNodesTab(root){
     wireNodePaths(box, id);
     // ...and the name under Advanced: without it a heartbeat's repaint
     // between typing a new name and pressing Rename put the old one back,
-    // and Rename said to type one (B176: nodes.mjs's rename wait timed out
+    // and Rename said to type one (nodes.mjs's rename wait timed out
     // on exactly that, now and then).
     const ni = box.querySelector('.ndnameform [data-k="name"]');
     if (ni){
       ni.oninput = () => { const c = nodeDraft(nodeOf(id)); c.draft.nameText = ni.value;
-                           // Rename wakes on a new name (the operator, 18 Oct).
+                           // Rename wakes on a new name.
                            const rn = box.querySelector('[data-nd="rename"]'), v = ni.value.trim();
                            if (rn) rn.disabled = !v || v === nodeNameOf(id, ""); };
     }
@@ -3098,8 +3096,8 @@ function wireNodesTab(root){
     // section: a number is typed across a heartbeat as easily as a path.
     // The update-before-a-session switch is Controller settings' alone:
     // one setting for every node, behind an Apply there. It used to be a
-    // checkbox on this section too, written on the click (B257).
-    // Each session kept to its own project's network (R79): a draft until
+    // checkbox on this section too, written on the click.
+    // Each session kept to its own project's network: a draft until
     // the section's Save, like the limit beside it.
     // The Sessions section's drafts: each change wakes its one Save and
     // Revert, which sleep again when every field is back where it was.
@@ -3112,7 +3110,7 @@ function wireNodesTab(root){
     wireUsbSection(box, nodeOf(id) || {});
     wireMachineSection(box, nodeOf(id) || {});
     wireReportSection(box, nodeOf(id) || {});
-    // The GPU section's two switches (R102): drafts until its Apply.
+    // The GPU section's two switches: drafts until its Apply.
     const ge = box.querySelector('[data-k="gpuemu"]');
     if (ge) ge.onchange = () => { const c = nodeDraft(nodeOf(id)); c.draft.gpuEmu = ge.checked; };
     const gc = box.querySelector('[data-k="gpucomp"]');
@@ -3174,7 +3172,7 @@ function wireNodeConf(row, id){
   if (!fold) return;
   const c = nodesConf[id];
   const touch = () => { c.dirty = true; };
-  // The page is patched (R244), so a field keeps its caret through the
+  // The page is patched, so a field keeps its caret through the
   // heartbeat's redraw with nothing kept by hand.
   fold.querySelectorAll("[data-k]").forEach(el => {
     const on = () => {
@@ -3336,7 +3334,7 @@ function wireNodeConf(row, id){
       // Moving a store copies what is in it, which can be tens of gigabytes
       // and take a while, so it is asked about rather than started by a
       // text field losing focus. What it unmounts and what it moves are one
-      // question (R265: they were two in a row).
+      // question (they were two in a row).
       const moving = storeMoves(n);
       const copied = moving.filter(m => !m.empty), fresh = moving.filter(m => m.empty);
       if ((gone.length || moving.length) && !await askYes("", {title: `Apply storage to ${n?.name || "this node"}?`, verb: "Apply", parts: [
@@ -3345,15 +3343,15 @@ function wireNodeConf(row, id){
         {head: "Starting empty, what was there left where it is", lines: fresh.map(m => `${m.role} in ${m.to}, leaving ${m.from}`)}]})) return;
     }
     const r = await pressing(b, () => { busy(b, "Applying"); return nodeAct({action: "apply", id, what}); });
-    // A storage apply is followed to its end, which is kept on the record
-    // (R120 step 7): a store move can wait for the node to go quiet and then
+    // A storage apply is followed to its end, which is kept on the record:
+    // a store move can wait for the node to go quiet and then
     // run for hours, and its end is news to whoever pressed it.
     if (what === "storage" && r?.job) notifyJob(r.job, `Storage on ${n?.name || "the node"}`);
   });
 }
 
 // Why an idle session's token was not refreshed on this node, as its agent
-// said it on its last hello (B419): its complaints went only to the node's
+// said it on its last hello: its complaints went only to the node's
 // own journal, which nothing here reads. The newest of the last day, in the
 // warning color, with when a token was last kept beside it.
 function keepLine(n){

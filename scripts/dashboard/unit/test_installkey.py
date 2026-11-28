@@ -1,5 +1,5 @@
-"""The install key made by the install and changed from the page (R154,
-installkey.py): a change seals what is kept under the key again under the
+"""The install key made by the install and changed from the page
+(installkey.py): a change seals what is kept under the key again under the
 new one at once, opens with the one before meanwhile, keeps that one only
 while the nodes still need it, and a key set in the environment is never
 changed here; the fingerprint names a key and opens nothing."""
@@ -63,7 +63,7 @@ class InstallKey(unittest.TestCase):
         self.assertNotEqual((self.kd / "key").read_bytes(), OLD)
         self.assertEqual(body["resealed"], 2)
         # The one before is kept until the next start has sealed everything
-        # again with both (B550), then let go, nothing on the nodes needing it.
+        # again with both, then let go, nothing on the nodes needing it.
         self.assertEqual((self.kd / "key-previous").read_bytes(), OLD)
         self.assertEqual(installkey.status()["previous"], True)
         installkey.settle()
@@ -88,7 +88,7 @@ class InstallKey(unittest.TestCase):
         self.assertEqual(installkey.change()[1], 200)
 
     def test_what_a_pass_left_is_sealed_again_at_the_next_start(self):
-        # B550: a pass that failed for one thing at the change had its old
+        # A pass that failed for one thing at the change had its old
         # seal opened by nothing once the key before was dropped at once.
         calls = []
         def flaky(again=False):

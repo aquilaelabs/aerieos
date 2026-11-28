@@ -11,7 +11,7 @@ from .base import AGENT_IDS, GPU_DISPLAY_STATE, SYS_ROOT, TOOLKIT, _run
 
 def _gpu_card():
     """The NVIDIA card by its PCI id, before any driver is on it: what the
-    Nodes page offers Set up GPU display on (R20). A VM's virtual adapter is
+    Nodes page offers Set up GPU display on. A VM's virtual adapter is
     not one, and neither is a card of another make, which the verb would
     refuse."""
     for line in (_run(["lspci", "-nn"], timeout=10) if SYS_ROOT == "/sys" else "").splitlines():
@@ -39,12 +39,12 @@ _DISPLAY_CLASS = re.compile(r"\[03[0-9a-f]{2}\]")
 
 
 def _gpu_amd():
-    """An AMD card or APU by its PCI id (R207 step 4): a display-class
+    """An AMD card or APU by its PCI id: a display-class
     device of AMD's vendor id (0x1002), which the kernel's own amdgpu
     drives, so a container is given its render devices from its row. By
     the id, never by the name: 'ati' is in 'VGA compatible controller', so
     a VM's emulated adapter, an Intel one and an NVIDIA card all read as
-    AMD's while the name was what was matched (B767)."""
+    AMD's while the name was what was matched."""
     listed = _run(["lspci", "-nn"], timeout=10) if SYS_ROOT == "/sys" else ""
     for line in listed.splitlines():
         if _AMD_ID.search(line.lower()) and _DISPLAY_CLASS.search(line.lower()):
@@ -70,7 +70,7 @@ def _gpu_name():
     exited 0 is a name: nvidia-smi says why it failed on stdout, and with
     the driver installed but not yet loaded (nouveau holding the card until
     a reboot) that sentence was reported as the GPU and drawn on the node's
-    row as its name (B391)."""
+    row as its name."""
     if not shutil.which("nvidia-smi"):
         return ""
     try:
@@ -112,7 +112,7 @@ def _gpu_sample():
 
 
 # What is running on this machine by KIND, for a session judging whether it
-# is too busy to time anything on (R108). A session sees only its own
+# is too busy to time anything on. A session sees only its own
 # processes, so this is the one place the rest is visible; counted, never
 # named, so no other project's work is told to a session that is not on it.
 def _is_agent(ag, comm, args):
@@ -170,7 +170,7 @@ def _gpu_mem_kinds(proc_root="/proc", smi=None):
     nvidia-smi's process table, which lists a graphics user (an emulator
     drawing on the card) as well as a computing one. By kind, like
     _proc_kinds, never by name or project. An Android 37 phone filled the
-    card while it booted and a session could not tell what had (B532)."""
+    card while it booted and a session could not tell what had."""
     if smi is None:
         if not shutil.which("nvidia-smi"):
             return {}
@@ -194,7 +194,7 @@ def _gpu_mem_kinds(proc_root="/proc", smi=None):
     return out
 
 
-# The card read on a thread of its own and kept (B841): nvidia-smi takes a
+# The card read on a thread of its own and kept: nvidia-smi takes a
 # second or so to start, and the heartbeat asked it three times before every
 # work poll, so on a node with the driver installed a job queued after another
 # waited three seconds to be handed over, and every Containers read with it.
@@ -250,10 +250,10 @@ def _kernel_key(name):
 
 def _gpu_driver(sys_root=None, modinfo=None, modules_root="/lib/modules", running=None):
     """Where the NVIDIA driver stands on this machine, for the Toolchains
-    tab's driver row (R102): the version installed for this kernel (the
+    tab's driver row: the version installed for this kernel (the
     module modinfo finds), the version loaded now, and which driver has the
     card. {} with no NVIDIA card, unless the driver is installed for one
-    that has gone, which is said (nocard) so it can still be removed (B168).
+    that has gone, which is said (nocard) so it can still be removed.
     Read from the files, never from
     nvidia-smi, which only answers once the driver has the card, and the
     row has to tell "not installed" from "installed, waiting for a reboot"
@@ -383,14 +383,14 @@ def _gpu_driver_apt():
 
 def _gpu_container(card=None):
     """Where the NVIDIA container toolkit stands on this machine, for its
-    row on the Installed page (R102): the version installed, the version apt
+    row on the Installed page: the version installed, the version apt
     would move it to (known only while NVIDIA's package source is on the
     machine, which the row's install adds), and whether Docker lists the
     nvidia runtime, which is what a container reserving the card needs. {}
     with no Docker, or with no NVIDIA card and no toolkit: there is nothing
     to hand to a container, and the row is not drawn. A toolkit left for a
     card that has gone is said (nocard), since its refresh unit restarts
-    every second without one (B168)."""
+    every second without one."""
     if not shutil.which("docker"):
         return {}
     has_card = bool(card if card is not None else _gpu_card())

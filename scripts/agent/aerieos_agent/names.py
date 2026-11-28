@@ -1,4 +1,4 @@
-"""Where a node keeps what is AerieOS's, under its own name (R204).
+"""Where a node keeps what is AerieOS's, under its own name.
 
 A node kept its record in /etc/builderbot and its state in
 /var/lib/builderbot, and ran builderbot-agent, the name the product had

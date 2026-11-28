@@ -58,18 +58,18 @@ KEEP_PER_PROJECT = 5
 ARTIFACT_MAX = 1024 * 1024 * 1024        # a gigabyte: an APK is 30MB, an installer 300
 _lock = threading.Lock()
 _bundle = {}
-# The tool packs' catalog rows (toolpacks.catalog_json, R77), handed over by
+# The tool packs' catalog rows (toolpacks.catalog_json), handed over by
 # the server: the bundle carries them as config/toolpacks.json beside the
 # shipped catalog, which is how a node installs a pack by name.
 packs_json = None
 # The shipped catalog with a row's newer recipe from the vetted catalog in
-# its place (catalogrows.text, R234 step 4), "" when there is none: the
+# its place (catalogrows.text), "" when there is none: the
 # bundle carries it beside config/toolchains.json, as CATALOG_ROWS.
 toolchains_json = None
 # ...and the packs made on the controller, each a git bundle carried as
 # config/toolpacks/NAME.bundle (toolpacks.hosted_files): [(arcname, path)].
 packs_files = None
-# The controller's own git dir for reading a tree (git._own, B153), set by
+# The controller's own git dir for reading a tree (git._own), set by
 # the server: a deploy's tree is read through it, so a filter driver or a
 # hook the tree's config names is never this process's to run. None in a
 # module test, where the tree is read as it is.
@@ -132,7 +132,7 @@ def snapshot(project):
             try:
                 if p.is_symlink():
                     # A link that stays inside the tree travels as a link
-                    # (B281: the node built a different tree without them);
+                    # (the node built a different tree without them);
                     # one that points out of it is left behind, since the
                     # node's extraction refuses it and would refuse the lot.
                     target = os.readlink(p)
@@ -179,12 +179,12 @@ def snapshot(project):
 
 def snapshot_at(project, ref):
     """The tree as committed at `ref` (a branch, a tag or a commit), as one
-    tar kept as snapshot() keeps one: what a deploy ships (R281 step 4) is
+    tar kept as snapshot keeps one: what a deploy ships is
     what was committed, never a working tree's edits. Read through the
     controller's own git dir (own_git). git archive's own tar,
     whose bytes are the commit's alone (its time on every file, root its
     owner), so the same commit is the same digest and the node's cache
-    holds it. dist/ is left out as snapshot() leaves it.
+    holds it. dist/ is left out as snapshot leaves it.
     {digest, commit, tag, files, bytes, tar} or {error}, `tag` the ref
     where it is a tag of that commit."""
     root = WORKSPACE / project
@@ -334,7 +334,7 @@ def artifact_put(job, name, stream, length, extra=None):
             "source": job.get("source") or {}, "argv": spec.get("argv") or [],
             "requested_by": job.get("requested_by", ""), "at": int(time.time()),
             "sha256": h.hexdigest(), "size": got, "path": "dist/" + rel}
-    # What the job adds about it: a sign job, what signed it (R106).
+    # What the job adds about it: a sign job, what signed it.
     prov.update(extra or {})
     pdir = root / "dist" / ".provenance"
     try:
@@ -343,7 +343,7 @@ def artifact_put(job, name, stream, length, extra=None):
     except OSError:
         pass                                 # the artifact landed; the chain is best effort
     # A build landing is when the older ones are superseded, not when the
-    # tab is next opened (the operator, 6 Oct).
+    # tab is next opened.
     if "/" not in rel:
         try:
             artifacts.sweep_dev_builds(project, artifacts.dev_keep(project) if artifacts.dev_keep else artifacts.DEV_KEEP)
@@ -453,7 +453,7 @@ def bundle():
     shipped = REPO / "config" / "toolchains.json"
     newer = toolchains_json(shipped.read_text()) if toolchains_json and shipped.is_file() else ""
     # The release's signatures over the tools root installs from this bundle
-    # (R227 step 1) and over the list of every file it ships (R267 step 6),
+    # and over the list of every file it ships,
     # where the build made them: beside the agent's, in the file
     # tools/sign-agent.py writes, and each carried as a member of its own.
     bundle_sig = _bundle_sig()

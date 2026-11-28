@@ -1,7 +1,7 @@
 """A session's `aerie tool install NAME` installs the tool on the node that
 session runs on (toolchains.session_install, session_do; phone's ask):
 Allow queues the install there as the person who allowed it, where it used
-to keep a pack and install it nowhere (B1040). A name AerieOS ships is the
+to keep a pack and install it nowhere. A name AerieOS ships is the
 toolchain and never a pack; one the node holds whole is said at once; a
 folder with no tool in it still asks; auto asks nobody; deny keeps its
 words; an agreement is accepted for nobody; a pack that needs root stays an

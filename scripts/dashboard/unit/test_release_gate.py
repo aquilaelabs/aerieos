@@ -1,5 +1,5 @@
-"""Nothing is published that the checks have not passed (R206; the audit of
-13 Nov, the operator's choices of 14 Nov): a release's tag runs the place
+"""Nothing is published that the checks have not passed:
+a release's tag runs the place
 check, aerie lint with the unit tier, and every browser suite, and each job
 that pushes an image or makes or fills a release waits for all three. A tag
 ran none of them, CI's lint was its own copy of seven of aerie lint's
@@ -99,7 +99,7 @@ class Gate(unittest.TestCase):
         self.assertEqual([u["name"] for u in ups], ["release-bundle"])
         self.assertIn("notes.md", ups[0]["path"])
         # A week: a release's last job can wait on its approval past a day,
-        # and a re-run of it needs what was handed on (R290).
+        # and a re-run of it needs what was handed on.
         self.assertEqual(ups[0]["retention-days"], 7)
         downs = [s["with"] for s in last["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact@")]
         self.assertIn({"name": "aerieos-os", "path": "out"}, downs)
@@ -147,7 +147,7 @@ class Gate(unittest.TestCase):
             self.assertNotIn("secrets: inherit", text, f"{name}: a called workflow is handed the secrets it reads, by name")
         sig = load("build-image.yml")["jobs"]["signature"]
         self.assertEqual(sig["if"], TAG_ONLY)
-        # Asked as soon as the tag's place is checked (R190 step 6): what
+        # Asked as soon as the tag's place is checked: what
         # publishes waits for lint and the suites itself.
         self.assertEqual(needs(sig), {"place"})
         text = runs(sig)
@@ -296,7 +296,7 @@ class Gate(unittest.TestCase):
         self.assertEqual(meta["flavor"], "latest=false")
 
     def test_the_tags_people_follow_move_forward_only_on_the_default_branch_s_signers(self):
-        # R290: publishing an older release late never moves :dev back, and
+        # Publishing an older release late never moves :dev back, and
         # a tag cut from a branch that added a key does not vouch for itself.
         follow = load("publish-release.yml")["jobs"]["follow"]
         co = next(s for s in follow["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))["with"]
@@ -306,7 +306,7 @@ class Gate(unittest.TestCase):
         self.assertIn("left there", run)
 
     def test_no_job_on_a_self_hosted_runner_holds_key_material(self):
-        # R290 step 7: a machine of the operator's runs some jobs; none of
+        # A machine of the operator's runs some jobs; none of
         # them reads a secret, an environment's or the repository's, or may
         # mint an identity token, so a runner taken over gives nothing that
         # signs a release.
@@ -324,7 +324,6 @@ class Gate(unittest.TestCase):
                 self.assertNotEqual((job.get("permissions") or {}).get("id-token"), "write", f"{os.path.basename(path)} {name}")
 
     def test_a_release_s_image_is_signed_keyless_by_the_tag_s_identity_and_rehearsed(self):
-        # R290 step 3 (the operator, 26 Nov).
         jobs = load("build-image.yml")["jobs"]
         sign = jobs["sign-image"]
         self.assertEqual(set(sign["needs"]), {"build", "upgrade"})
@@ -339,7 +338,7 @@ class Gate(unittest.TestCase):
         self.assertIn("cosign verify-blob", next(s for s in rehearsal["steps"] if s.get("run"))["run"])
 
     def test_a_release_tag_s_image_is_built_with_no_cache(self):
-        # B1169: :main's cache is any merge's to write, and a release's image
+        # :main's cache is any merge's to write, and a release's image
         # is built from its own commit alone.
         build = load("build-image.yml")["jobs"]["build"]
         push = next(s for s in build["steps"] if "no-cache" in (s.get("with") or {}))["with"]
@@ -642,7 +641,7 @@ esac
             self.assertNotIn("release-attach.sh", runs(job), name)
 
     def test_the_rehearsal_runs_what_a_tag_runs_with_the_same_tools(self):
-        # R190 step 2 (the review of 22 Nov): the rehearsal built no
+        # The rehearsal built no
         # container image, so the image's start on each release's /config,
         # its root tier and the agent's signature ran first on a tag.
         tag, reh = load("build-image.yml")["jobs"], load("release-rehearsal.yml")["jobs"]

@@ -1,4 +1,4 @@
-"""The node agent's loops start fewer processes (R228 step 18): a firewall
+"""The node agent's loops start fewer processes: a firewall
 table in place is listed every TABLE_LOOK_S and not every two seconds, the
 accounts and their groups are read once a minute and afresh when the agent
 changes one, and its controller client makes one TLS context of each kind."""

@@ -112,7 +112,7 @@ def _catalog():
 
 
 def packs_at(path):
-    """The tool packs a person added (R77), the rows of the toolpacks.json
+    """The tool packs a person added, the rows of the toolpacks.json
     beside the catalog at `path`: the controller writes it into the bundle,
     so a node installs a pack by name exactly as it does a shipped toolchain.
     [] when none were added."""
@@ -717,7 +717,7 @@ def newest(tc, spec=None):
     return version, url
 
 
-# ---- what a download should be (R137) ---------------------------------------
+# ---- what a download should be ---------------------------------------
 # A row's source.checksum says where its publisher states what the file is:
 #   github-asset   GitHub's own digest of a release asset (the release API)
 #   file           a checksum file beside it (url: a template; {url}, {name}, {version})
@@ -877,7 +877,7 @@ def checksum(tc, url, version, spec=None):
             if len(parts) >= 2 and parts[-1].lstrip("*").removeprefix("./") == name:
                 return (*_algo(parts[0]), src)
         # A file of one bare digest is this file's; one line that names a
-        # file names another (B1052: it was taken as this file's digest
+        # file names another (it was taken as this file's digest
         # whatever name it carried, and a pin learned from it was wrong).
         if len(lines) == 1 and (len(lines[0]) == 1
                                 or (len(lines[0]) == 2 and lines[0][1].lstrip("*").removeprefix("./") in ("", "-"))):
@@ -1148,7 +1148,7 @@ def source_host(tc):
 
 def unreachable(host, timeout=6):
     """Why `host` cannot be reached from here on 443 (its name not found, or
-    no answer), or "" when it can (R82): asked before an install starts, so a
+    no answer), or "" when it can: asked before an install starts, so a
     machine with no internet is told in one sentence, not a traceback."""
     import socket
     try:
@@ -1163,12 +1163,12 @@ def unreachable(host, timeout=6):
 
 
 def receipt(d, commit, name=""):
-    """An install's receipt (R234): every file that landed in DIR with its
+    """An install's receipt: every file that landed in DIR with its
     sha256, one hash over the whole list, and the commit it was installed
     from (for an entry that is no repository, the sha256 its download was
     held to, or nothing). A pack's pin covers its own files, and what its
-    install steps fetch from somewhere else left no trail (the operator,
-    13 Nov): this is it. Written to DIR/.bb-receipt, whose first line is
+    install steps fetch from somewhere else left no trail:
+    this is it. Written to DIR/.bb-receipt, whose first line is
     the summary the node's census reads (format, commit, tree, files,
     bytes, when, the tree the same commit made here before where that was
     another, and whether its steps ran with the network cut, for an entry
@@ -1308,7 +1308,7 @@ def main(argv):
 
     if op == "keyring":
         # keyring KEYS [NAME [DIR]]: the keyring file gpgv reads for one
-        # publisher's keys (R137), the ones the entry NAME carries where it
+        # publisher's keys, the ones the entry NAME carries where it
         # carries them, made in DIR, the caller's own directory for this
         # one check.
         print(keyring(argv[1] if len(argv) > 1 else "", toolchain(argv[2]) if len(argv) > 2 and argv[2] else None,
