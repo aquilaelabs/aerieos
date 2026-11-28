@@ -288,16 +288,15 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .askdlg .askpart li+li{margin-top:4px}
 .modal .box.prose{display:flex;flex-direction:column}
 .modal .box.prose>*{flex:none}
-.modal .box.prose>.about{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+.modal .box.prose>.about{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .about>*{flex:none}
-.about>.abpage{flex:0 1 auto;min-height:0}
+.about>.abpage{flex:1 1 auto;min-height:0}
 .abpage{overflow:auto;padding-right:4px}
 /* A guide's heading is the text's, not the dialog's: .modal h3 (the title
    band's inset, rule and voice) reached into it and set every heading
    in from the paragraph under it. */
 .about .abpage :is(h2,h3,h4){margin:12px 0 4px;padding:0;border:0;font:var(--f-ui);font-weight:600;
   text-transform:none;letter-spacing:normal;position:static;background:none;--sheen:none}
-.modal .box.prose>.about,.about>.abpage{flex:1 1 auto}
 .abpage p,.abpage li{font:var(--f-ui);color:var(--ink);line-height:1.5}
 .abpage ul{margin:4px 0 8px 18px;padding:0}
 .abpage .dim{color:var(--dim)}
@@ -681,7 +680,6 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 .modal .field>label,.modal .prefrow>label{
   margin-bottom:calc(var(--label-gap) - var(--field-gap))}
 .field .field{padding:0}
-.prefrow{gap:var(--field-gap)}
 /* A row of fields straight in a dialog is a band like a .field, inset the
    same, rather than flush against the dialog's edge. */
 .modal .prefrow:not(.field .prefrow){padding:var(--row-y) var(--row-x)}
@@ -878,7 +876,6 @@ details.grp>summary>.roadmap{flex:1 1 auto;min-width:0;padding-block:0}
   color:var(--dim);font-size:11px;cursor:pointer}
 .roadmap .fold::before{content:"\25B8"}
 details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
-.roadmap .txt{cursor:pointer}
 
 /* The "N to M of T" footer under a long list, with Previous and Next. Quiet:
    it is a fact about the list plus the controls that turn its page, not a
@@ -2041,7 +2038,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 /* A lead cell wraps between words and breaks one only when it is longer
    than its column: anywhere cut 'nginx-bb-dev-sandbox' mid-word in a column
    that had room for it on the next line. */
-.tbl .td.lead{white-space:normal;overflow-wrap:break-word;font-weight:600}
+.tbl .td.lead{white-space:normal;overflow-wrap:break-word}
 .tbl .td{font:var(--f-data);color:var(--dim)}
 .tbl .td.lead{font:var(--f-ui);font-weight:600;color:var(--ink)}
 .tbl .td.act{overflow:visible;display:flex;justify-content:flex-end}
@@ -2499,7 +2496,7 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
   /* Half the bar at most: Firefox and Safari size a picker to its longest
      option, a disabled one's reason included, where Chrome sizes it to the
      one chosen. */
-  :is(.doctab,.nb) .field.docbarrow>label.pick{flex:0 1 auto;min-width:0;max-width:50%;display:inline-flex;align-items:center;margin-inline-end:auto}
+  :is(.doctab,.nb) .field.docbarrow>label.pick{flex:0 1 auto;min-width:6.5em;max-width:50%;display:inline-flex;align-items:center;margin-inline-end:auto}
   :is(.doctab,.nb) .field.docbarrow>label.pick>.pickw{display:none}
   /* ...and a placeholder's picker box loses the gap it kept after the word. */
   :is(.doctab,.nb) .field.docbarrow>label.pick>.skv{margin-left:0}
@@ -2508,7 +2505,6 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
   :is(.doctab,.nb) .field.docbarrow>.sp{display:none}
   :is(.doctab,.nb) .field.docbarrow>.actbar{flex:0 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end;margin-inline-start:auto}
   :is(.doctab,.nb) .field.docbarrow>input[type=search]{order:-1;flex:1 1 9rem;min-width:9rem;max-width:none;width:auto}
-  :is(.doctab,.nb) .field.docbarrow>label.pick{min-width:6.5em}
   /* While a job runs on Toolchains, Abort is the bar's one live button and
      the three it holds dead step aside rather than crowd it. */
   :is(.doctab,.nb) .field.docbarrow>.actbar>button.tcidle{display:none}
@@ -2790,8 +2786,7 @@ span.skel.sk-word{display:inline-block;vertical-align:middle;padding:0}
    the tab strip that sat on it, and with the strip gone the box read as
    open at the top while the dock's line closed its foot. */
 .panes{flex:1;min-height:0;display:grid;gap:6px;grid-template-columns:1fr;
-  background:var(--line);border:var(--hair) solid var(--line);
-  border-radius:var(--r-surface);overflow:hidden}
+  background:var(--line);border:var(--hair) solid var(--line);overflow:hidden}
 .pane.dock.active{outline:0}
 /* The line takes the room and scrolls inside itself; the controls after it
    stay at the right edge on every width (a phone's line once pushed the
