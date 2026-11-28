@@ -1146,9 +1146,6 @@ body.firstrun #panes{display:none}
    field the width of the row and the day's verbs in the bar's order. */
 .snaprecords>.snaprec.open{background:var(--sunk)}
 .snapform{padding:0 var(--row-x) var(--row-y)}
-/* A pair's line sits on the band's inset, not a row's inset on top of it,
-   its delete at the band's right edge where every other one is. */
-.nginxtab .field>.row.ngcert{padding-left:0;padding-right:0}
 /* The certificate and its key are pasted whole: a tall box each, one under
    the other like every field (the two sat beside the
    picker on desktop). */

@@ -680,6 +680,10 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 .modal .field>label,.modal .prefrow>label{
   margin-bottom:calc(var(--label-gap) - var(--field-gap))}
 .field .field{padding:0}
+/* A list row inside a field sits on the field's own inset, not on a row's
+   inset inside it, so its last control ends where the section's others do:
+   a row straight in the field, or in the field's list of them. */
+.field>.row,.field>.rowlist>.row{padding-left:0;padding-right:0}
 /* A row of fields straight in a dialog is a band like a .field, inset the
    same, rather than flush against the dialog's edge. */
 .modal .prefrow:not(.field .prefrow){padding:var(--row-y) var(--row-x)}
