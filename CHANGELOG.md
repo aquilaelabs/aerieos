@@ -20,6 +20,7 @@
 - A session reaches its space's Kubernetes environments with aerie k8s (what runs, a pod's log, deploy and roll back) through the controller, which keeps every credential, under a new Deploy to Kubernetes setting that is deny until you change it; an environment marked production always asks you first. Environments that deploy on a push or on a release now do, a stuck or short environment is a row on the bell until it recovers, and Home counts your clusters ready (a4702d1)
 - The Clusters page says each cluster's CPU and memory in use where it reports them, and the Doctor warns about a cluster that does not answer or whose certificate is about to end (808d205)
 - A space can run a Discord server: connect its bot in the space's settings, and the Discord view pulls the server into deploy/discord.yml, plans what applying it changes and applies it; agents do the same with aerie discord under the new Manage Discord setting (42ca615)
+- The bell and This machine's Image say when the system's own root has shown a block that no longer verifies, until an update has written the slot again (3032fb6)
 
 ### Changed
 
@@ -66,6 +67,7 @@
 - A space's settings name every section in the bar over them, People, Nodes, Discord and Running sessions included, which had no chip because they show once their reads land (85b5aa5)
 - Sessions' aerie verbs: capture shot photographs a file:// page; changelog add asked from a worktree the controller cannot see is refused instead of written into the space's own directory; a push or a signing from a node waits while the node's copy is still catching up, and a refused push says to run it again rather than naming a page only a person can open; map find lists a page's variable beside a function of the same name (415d244, 3ceccb5, 929fb3e, bacefa1, fe05ed5)
 - A push policy picked on Permissions and not yet applied is asked about before the notebook is left, as the git host's picks beside it are: it was dropped without a word (548df93)
+- A space's Running sessions row lines up with its section: its End ended 16px short of the section's other controls, and its name stood in from the label over it (1c39f1f)
 
 ### Security
 
@@ -86,6 +88,7 @@
 - A node's cache of source snapshots is root's own folder, and root follows no link an account left on the way to a job's source: a space named snapshots was handed that cache, where a job could aim root's next download at any file (010e254)
 - The deploy-key helper refuses a key store that is not root's alone, so a folder another account put in its place is never read or written as root (0be8bd9)
 - A move's pull is proved with the time it was asked, good for five minutes by the old controller's clock, so a proof read off the wire cannot be sent again later. Upgrading: the two controllers' clocks have to agree to within five minutes for a pull, and the page says so when they do not (753c561)
+- On AerieOS each slot's root is read through dm-verity against a hash the slot's own initrd carries: a root changed or damaged on the disk is refused at boot in words, or read as an error, and never used; an update holds the new root to that hash before it writes the other slot and again as the slot reads back (881bc5e)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
