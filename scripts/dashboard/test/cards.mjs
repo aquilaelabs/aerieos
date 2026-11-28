@@ -1503,6 +1503,44 @@ await section("Groups (the operator, 18 Oct)", async () => {
   await page.waitForSelector('.doc .projtab .pcard[data-row="gamma"]', { timeout: 5000 });
   ok(chips[0]?.startsWith('All') && chips.some(c => c.startsWith('No group')) && chips.includes('Clients 1'),
      `the groups are chips over the grid, each counted, and one narrows it to its group (${chips.join(' | ')})`);
+  // A mark set on a space is held over every read of the spaces until its
+  // save is answered. A read that draws the panes before the cards (another
+  // browser's strip taken on, a dead terminal's tab closed) drew them from
+  // what the server still had: the group gone for that one draw, and a chip
+  // pressed on it back on All for good.
+  {
+    // A write as another browser of this account's would make it, past the
+    // page's own code.
+    const write = (path, body) => page.evaluate(([p, b]) => fetch(p, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.status), [path, body]);
+    let letGo;
+    const out = new Promise(r => { letGo = r; });
+    await page.route('**/api/project-group', async r => { await out; await r.continue().catch(() => {}); });
+    await group('gamma', 'Held');
+    await page.waitForSelector('.doc .projtab .pjgroup[data-group="Held"] .pcard[data-row="gamma"]', { timeout: 15000 });
+    await page.click('.doc .projtab #pjChips [data-pjchip="Held"]');
+    await page.waitForFunction(() => pjChip === 'Held' && !savePending && !pushing, null, { timeout: 10000 });
+    // Another browser's strip, its tabs the other way round, while the save
+    // is still out: the read that brings it draws the panes as it is taken.
+    const mine = await page.evaluate(() => layoutNow());
+    await write('/api/layout', { ...mine, tabs: [...mine.tabs].reverse() });
+    const kept = await page.evaluate(async was => { await refresh();
+      return { chip: pjChip, taken: JSON.stringify(tabs.map(t => t.id)) !== was, held: projHeld.size,
+               card: !!document.querySelector('.doc .projtab .pjgroup[data-group="Held"] .pcard[data-row="gamma"]') }; },
+      JSON.stringify(mine.tabs.map(t => t.id)));
+    ok(kept.taken && kept.held === 1 && kept.chip === 'Held' && kept.card,
+       `a group whose save is still out stands through a read that takes on another browser's strip, and so does the chip pressed on it (${JSON.stringify(kept)})`);
+    letGo();
+    await page.waitForFunction(() => !projHeld.size, null, { timeout: 15000 });
+    await page.unroute('**/api/project-group');
+    // As it was: the strip, the chip on All, gamma in no group.
+    await write('/api/layout', mine);
+    await page.evaluate(() => refresh());
+    await page.click('.doc .projtab #pjChips [data-pjchip=""]');
+    await write('/api/project-group', { name: 'gamma', group: '' });
+    await page.evaluate(() => refresh());
+    await page.waitForFunction(() => !document.querySelector('.doc .projtab .pjgroup[data-group="Held"]'), null, { timeout: 15000 });
+  }
   await pjMenu('gamma');
   // The card keeps its size as the box opens on it, the box in the
   // repositories' place.

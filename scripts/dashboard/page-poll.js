@@ -230,6 +230,13 @@ async function refresh(){
     // Dropped, and a fresh one asked for.
     if (adoptSeq !== adoptedBefore){ refreshAgain = true; return; }
     state = got;
+    // The marks a press holds until its save is answered, laid on this
+    // answer before anything draws from it. The cards' own draw lays them
+    // too, but a layout taken on from another browser and a dead terminal's
+    // tab closed both draw the panes ahead of it, and drew the Spaces page
+    // from what the server still had: a group gone for that one draw, which
+    // put a chip pressed on it back to All.
+    projHeldLay();
     agentsAdopt(state.pack_agents);
     // A new run of the container under this page, noticed here or by the
     // revs poll, whichever answers first: its code is what that run serves,
