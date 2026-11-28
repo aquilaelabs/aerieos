@@ -68,6 +68,7 @@
 - Sessions' aerie verbs: capture shot photographs a file:// page; changelog add asked from a worktree the controller cannot see is refused instead of written into the space's own directory; a push or a signing from a node waits while the node's copy is still catching up, and a refused push says to run it again rather than naming a page only a person can open; map find lists a page's variable beside a function of the same name (415d244, 3ceccb5, 929fb3e, bacefa1, fe05ed5)
 - A push policy picked on Permissions and not yet applied is asked about before the notebook is left, as the git host's picks beside it are: it was dropped without a word (548df93)
 - A space's Running sessions row lines up with its section: its End ended 16px short of the section's other controls, and its name stood in from the label over it (1c39f1f)
+- With the Library and Installed side by side on two nodes, a press on one (Install, Remove, Check for updates, system packages) goes to its own page's node: it went to whichever page had read last (b224b83)
 
 ### Security
 
