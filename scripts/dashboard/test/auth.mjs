@@ -1895,10 +1895,10 @@ for table in ("GET_ROUTES", "POST_ROUTES"):
     out[table] = {"routes": routes,
                   "missing": [n for _, _, n in routes if not re.search(r"^    def " + n + r"\\(self", src, re.M)]}
 gates = ns["ROUTE_GATES"]
-named = {n for t in out.values() for _, _, n in t["routes"]}
+named = {n for t in out.values() for _, _, n in t["routes"]} | set(ns["STREAMED_DOORS"].values())
 out["GATES"] = {"none": sorted(named - set(gates)), "stale": sorted(set(gates) - named),
-                "odd": sorted(n for n, g in gates.items() if g != "handler" and not (isinstance(g, tuple) and g[0] in ("owner", "admin", "person") and g[1])),
-                "central": sum(1 for g in gates.values() if g != "handler")}
+                "odd": sorted(n for n, g in gates.items() if not (isinstance(g, tuple) and len(g) > 1 and g[0] in ("owner", "admin", "person", "handler") and g[1])),
+                "central": sum(1 for g in gates.values() if g[0] != "handler")}
 out["SESSION"] = sorted(ns["SESSION_ROUTES"])
 print(json.dumps(out))`], { encoding: 'utf8' }));
   // Every route names who may reach it, beside the routes (R227): one that

@@ -13,7 +13,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER = open(os.path.join(HERE, "..", "server.py"), encoding="utf-8").read()
 TABLES = ("GET_ROUTES", "POST_ROUTES", "ROUTE_GATES", "SESSION_ROUTES", "SESSION_ACTIONS", "SESSION_INSTEAD",
-          "STREAMED_POSTS", "MAX_BODY_FOR", "OWN_WRITE_ROUTES", "WORK_REFUSED", "QUIET_POSTS")
+          "STREAMED_DOORS", "MAX_BODY_FOR", "OWN_WRITE_ROUTES", "WORK_REFUSED", "QUIET_POSTS")
 
 
 def tables(source):
@@ -46,8 +46,9 @@ class Record(unittest.TestCase):
             self.assertRegex(SERVER, r"(?m)^    def " + re.escape(r.handler) + r"\(self", f"{r.path} names a method the handler has not")
         for r in MATCHED:
             g = r.gate
-            self.assertTrue(g == "handler" or (isinstance(g, tuple) and len(g) == 2 and g[0] in ("owner", "admin", "person") and g[1]),
-                            f"{r.method} {r.path} names no gate")
+            central = isinstance(g, tuple) and len(g) == 2 and g[0] in ("owner", "admin", "person") and g[1]
+            own = isinstance(g, tuple) and len(g) > 1 and g[0] == "handler" and all(isinstance(x, str) and x for x in g[1:])
+            self.assertTrue(central or own, f"{r.method} {r.path} names no gate")
 
     def test_a_handler_s_routes_say_one_thing(self):
         # The gate and a session's reach are asked by handler (route_gate),
@@ -68,7 +69,7 @@ class Record(unittest.TestCase):
         for r in MATCHED:
             self.assertTrue(r.session in (False, True) or (isinstance(r.session, tuple) and r.session), r)
             if r.session:
-                self.assertEqual(r.gate, "handler", f"{r.handler}: a person's or the owner's gate refuses every session")
+                self.assertEqual(r.gate[0], "handler", f"{r.handler}: a person's or the owner's gate refuses every session")
             if isinstance(r.session, tuple):
                 self.assertTrue(r.instead, f"{r.handler} names actions and not what the refusal of another says")
             if r.session is True:
@@ -82,7 +83,7 @@ class Record(unittest.TestCase):
             self.assertTrue(r.max_body is None or r.max_body > 64 * 1024, r)
             self.assertTrue(r.quiet in (False, True) or (isinstance(r.quiet, tuple) and r.quiet), r)
             if r.how == "door":
-                self.assertEqual((r.gate, r.session), (None, False), r)
+                self.assertEqual((r.gate[0], r.session), ("handler", False), r)
 
     def test_no_route_is_taken_by_an_earlier_prefix(self):
         for method in ("GET", "POST"):
@@ -104,10 +105,10 @@ class Record(unittest.TestCase):
     def test_the_tables_are_the_record_s(self):
         for method, name in (("GET", "GET_ROUTES"), ("POST", "POST_ROUTES")):
             self.assertEqual(NOW[name], tuple((r.how, r.path, r.handler) for r in MATCHED if r.method == method))
-        self.assertEqual(set(NOW["ROUTE_GATES"]), {r.handler for r in MATCHED})
+        self.assertEqual(set(NOW["ROUTE_GATES"]), {r.handler for r in ROUTES})
         self.assertEqual(NOW["SESSION_ROUTES"], {r.handler for r in MATCHED if r.session})
         self.assertEqual(set(NOW["SESSION_ACTIONS"]) | set(NOW["SESSION_INSTEAD"]), {r.handler for r in MATCHED if r.instead})
-        self.assertEqual(sorted(NOW["STREAMED_POSTS"]), sorted(r.path for r in ROUTES if r.how == "door"))
+        self.assertEqual(NOW["STREAMED_DOORS"], {r.path: r.handler for r in ROUTES if r.how == "door"})
 
 
 class Quiet(unittest.TestCase):

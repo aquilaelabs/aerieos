@@ -12,6 +12,8 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import routegates  # noqa: E402
 SRC = ROOT / "scripts" / "dashboard" / "server.py"
 OUT = ROOT / "docs" / "api.md"
 
@@ -45,55 +47,41 @@ def first_sentence(fn):
     return m.group(1) if m else doc[:220]
 
 
-def refusals(fn):
-    seen = []
-    for node in ast.walk(fn):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
-                and node.func.attr in ("_refused", "_readonly", "_not_project") and node.args \
-                and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-            seen.append(f"{node.func.attr[1:]}: {node.args[0].value}" if node.func.attr == "_refused"
-                        else node.func.attr[1:])
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
-                and node.func.attr in ("_readonly", "_not_project") and not node.args:
-            seen.append(node.func.attr[1:])
-        # The helpers that ask _refused for an area of their own (R283 step 3):
-        # a space's own write names its area first; the bin's acts are trash's.
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
-                and node.func.attr == "_space_write" and node.args \
-                and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-            seen.append(f"refused: {node.args[0].value}")
-        # ...and the ones asking it of one instance: a node, a cluster.
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
-                and node.func.attr in ("_refused_on_node", "_refused_instance") and node.args \
-                and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-            seen.append(f"refused: {node.args[0].value} (on the {'node' if node.func.attr == '_refused_on_node' else 'instance'})")
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "_trash_refused":
-            seen.append("refused: trash")
-    out = []
-    for s in seen:
-        if s not in out:
-            out.append(s)
-    return out
+CENTRAL = {"owner": "the owner's alone, held by the dispatcher", "admin": "an administrator's, held by the dispatcher",
+           "person": "a person's own sign-in, never a session's token, held by the dispatcher"}
+
+
+def asked(gate):
+    """A route's gate as the page says it: what the dispatcher holds, or the
+    names of what the handler asks (scripts/lib/routegates.py)."""
+    if not gate:
+        return ""
+    return ", ".join(f"`{n}`" for n in gate[1:]) if gate[0] == "handler" else CENTRAL.get(gate[0], gate[0])
 
 
 def render():
     tree = ast.parse(SRC.read_text(encoding="utf-8"))
     fns = handlers(tree)
+    gates = {(m, p): ast.literal_eval(g) if g is not None else None for m, _h, p, _f, g, _el in routegates.routes_of(tree)}
     lines = ["# The dashboard's API", "",
              "Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.",
              "Every request carries the account's credential (a session's token, or the person's cookie or",
-             "basic auth); who may call what is decided in the handler, and the last column names the",
-             "permission a handler refuses on (`refused: NAME`), or that it refuses a locked project",
-             "(`readonly`) or a name that is not a project the account sees (`not_project`). A `prefix`",
-             "route takes every path it prefixes, in the order listed; an `exact` one takes its path alone.",
-             "The companion app's own contract is `apps/android/api-surface.json`.", "",
-             "| Method | Path | Match | Handler | What it does | Refuses on |", "|---|---|---|---|---|---|"]
+             "basic auth). The last column is the route's gate in the route record: what the dispatcher holds",
+             "before the handler runs, or the names of everything the handler itself asks: a permission (of the",
+             "install, or of the space the request names), `space` for a space the account sees, `unlocked` for",
+             "one not locked against it, `node:` and `instance:` for a permission asked of one node or one",
+             "cluster, `dial:` for a session's ask under the space's Agents may, `own` for the account's own",
+             "things, and `seen` or `open` where the handler refuses nobody signed in (`seen`: the answer holds",
+             "what the asker may see). A name is everything the handler consults, so a permission read only to",
+             "draw a dead button is named too. A `prefix` route takes every path it prefixes, in the order",
+             "listed; an `exact` one takes its path alone. The companion app's own contract is",
+             "`apps/android/api-surface.json`.", "",
+             "| Method | Path | Match | Handler | What it does | Asks |", "|---|---|---|---|---|---|"]
     for method in ("GET", "POST"):
         for how, path, fn in routes(tree, method):
             f = fns.get(fn)
             words = first_sentence(f) if f else "(no handler by that name)"
-            gates = ", ".join(refusals(f)) if f else ""
-            lines.append(f"| {method} | `{path}` | {how} | `{fn}` | {words.replace('|', '\\\\|')} | {gates} |")
+            lines.append(f"| {method} | `{path}` | {how} | `{fn}` | {words.replace('|', '\\\\|')} | {asked(gates.get((method, path)))} |")
     return "\n".join(lines) + "\n"
 
 
@@ -102,7 +90,7 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         have = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
         if have == text:
-            print(f"  [ok]   docs/api.md is server.py's {text.count(chr(10)) - 12} routes, word for word")
+            print(f"  [ok]   docs/api.md is server.py's {text.count(chr(10)) - 17} routes, word for word")
             sys.exit(0)
         print("  [FAIL] docs/api.md differs from server.py's routes: tools/api-doc.py rewrites it")
         sys.exit(1)
@@ -110,4 +98,4 @@ if __name__ == "__main__":
         sys.stdout.write(text)
     else:
         OUT.write_text(text, encoding="utf-8")
-        print(f"docs/api.md: {text.count(chr(10)) - 12} routes")
+        print(f"docs/api.md: {text.count(chr(10)) - 17} routes")

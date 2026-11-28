@@ -156,6 +156,7 @@ scripts/
   lib/login-list.py              `aerie login --list`: every account this machine is signed in as, each agent's read from what its sign-in data says (who_of), and the sign-out that forgets keys
   lib/doctor-probes.py           egl, project node, commit identity, session-capable node, signed-in account
   lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement
+  lib/routegates.py              what each handler of the dashboard's API asks of its caller, read off its own checks: the names the route record carries, which a unit test holds to this and docs/api.md prints
   lib/releasepub.py              config/aerieos-release.pub read one way, for the Enroll script, the build's signer and aerie lint: the key and its spare, or none and why
   lib/bundleparts.py             what a release ships in the bundle a node fetches, and the list of those files a release signs (R267 step 6): the parts, their files without Python's bytecode, and one line a file with its sha256; read by the controller's bundle and tools/sign-agent.py
   startup.d/*.sh                 startup hooks

@@ -5941,10 +5941,18 @@ def _snapshot(who):
 #     ("admin", words)   an administrator's (the owner among them), never a
 #                        session's: six handlers each wrote it out (R283)
 #     ("person", words)  anybody's own sign-in, never a session's token
-#     "handler"          the handler holds its own, as it reads the request
-#                        (which space, which node, which action): the state
-#                        of most of them, and each one moved up here is one
-#                        fewer place to forget.
+#     ("handler", NAME, ...)
+#                        the handler holds its own, as it reads the request
+#                        (which space, which node, which action), and the
+#                        names say everything it asks: a permission, `space`
+#                        for a space the account sees, `node:` and
+#                        `instance:` for a permission asked of one node or
+#                        one cluster, `seen` and `open` where it refuses
+#                        nobody signed in. scripts/lib/routegates.py derives
+#                        them from the handler's own checks and
+#                        unit/test_route_gates.py holds this column to that,
+#                        so who may reach a route is read here, and a route
+#                        that asks nothing is seen here.
 #   The words are what the refusal says, as the handler said it.
 #
 # session: whether a session's token reaches the route, which it does where
@@ -6018,130 +6026,130 @@ Route = collections.namedtuple(
     "Route", "method how path handler gate session instead streamed max_body own_write needs_repo quiet",
     defaults=(None, False, "", False, None, False, False, False))
 ROUTES = (
-    Route("GET", "prefix", "/api/revs", "_get_revs", "handler"),
-    Route("GET", "exact", "/api/live", "_get_live", "handler"),
-    Route("GET", "exact", "/api/audit", "_get_audit", "handler"),
-    Route("GET", "prefix", "/api/trace", "_get_trace", "handler", session=True),
-    Route("GET", "prefix", "/api/status", "_get_status", "handler"),
-    Route("GET", "exact", "/api/reset", "_get_reset", "handler"),
+    Route("GET", "prefix", "/api/revs", "_get_revs", ("handler", "seen")),
+    Route("GET", "exact", "/api/live", "_get_live", ("handler", "seen")),
+    Route("GET", "exact", "/api/audit", "_get_audit", ("handler", "controller-read")),
+    Route("GET", "prefix", "/api/trace", "_get_trace", ("handler", "admin", "debug"), session=True),
+    Route("GET", "prefix", "/api/status", "_get_status", ("handler", "seen")),
+    Route("GET", "exact", "/api/reset", "_get_reset", ("handler", "controller-read")),
     Route("GET", "exact", "/api/move", "_get_move", ("admin", "moving the controller is an administrator's")),
     Route("GET", "exact", "/api/move-bundle", "_get_move_bundle", ("owner", "the move bundle is its owner's")),
     Route("GET", "exact", "/api/move-backup", "_get_move_backup", ("owner", "the controller's backup is its owner's")),
     Route("GET", "exact", "/api/backup", "_get_backup", ("admin", "the backup is an administrator's")),
     Route("GET", "exact", "/api/backup-file", "_get_backup_file", ("owner", "a backup's download is the owner's")),
-    Route("GET", "prefix", "/api/findings", "_get_findings", "handler",
+    Route("GET", "prefix", "/api/findings", "_get_findings", ("handler", "seen"),
           instead="a session reads its space's findings with aerie findings", needs_repo=True),
-    Route("GET", "prefix", "/api/profile", "_profile", "handler"),
-    Route("GET", "prefix", "/api/transcripts", "_get_transcripts", "handler", session=True),
+    Route("GET", "prefix", "/api/profile", "_profile", ("handler", "own", "admin", "node", "space")),
+    Route("GET", "prefix", "/api/transcripts", "_get_transcripts", ("handler", "own", "space"), session=True),
     Route("GET", "prefix", "/api/snapshots", "_get_snapshots", ("person", "a space's snapshots are the operator's"),
           needs_repo=True),
-    Route("GET", "prefix", "/api/transcript", "_get_transcript", "handler", session=True),
-    Route("GET", "prefix", "/api/git", "_get_git", "handler",
+    Route("GET", "prefix", "/api/transcript", "_get_transcript", ("handler", "own", "space"), session=True),
+    Route("GET", "prefix", "/api/git", "_get_git", ("handler", "space"),
           instead="a session reads its repository with aerie git and git itself", needs_repo=True),
-    Route("GET", "exact", "/api/forge-access", "_get_forge_access", "handler",
+    Route("GET", "exact", "/api/forge-access", "_get_forge_access", ("handler", "space"),
           instead="a session reads what it may do on the git host with aerie forge whoami", needs_repo=True),
-    Route("GET", "prefix", "/api/project-sessions", "_get_project_sessions", "handler"),
-    Route("GET", "prefix", "/api/changelog", "_get_changelog", "handler",
+    Route("GET", "prefix", "/api/project-sessions", "_get_project_sessions", ("handler", "settings", "space")),
+    Route("GET", "prefix", "/api/changelog", "_get_changelog", ("handler", "space"),
           instead="a session reads its space's changelog in the tree and adds to it with aerie changelog add",
           needs_repo=True),
-    Route("GET", "prefix", "/api/version", "_get_version", "handler",
+    Route("GET", "prefix", "/api/version", "_get_version", ("handler", "space"),
           instead="a session reads and moves its space's version with aerie version", needs_repo=True),
-    Route("GET", "prefix", "/api/tls", "_get_tls", "handler"),
-    Route("GET", "prefix", "/api/artifacts", "_get_artifacts", "handler", needs_repo=True),
-    Route("GET", "prefix", "/api/artifact", "_get_artifact", "handler", needs_repo=True),
-    Route("GET", "prefix", "/api/signing-backup", "_get_signing_backup", "handler"),
-    Route("GET", "prefix", "/api/node-busy", "_get_node_busy", "handler", session=True),
-    Route("GET", "prefix", "/api/meta", "_get_meta", "handler", session=True),
-    Route("GET", "prefix", "/api/welcome", "_get_welcome", "handler"),
+    Route("GET", "prefix", "/api/tls", "_get_tls", ("handler", "controller-read")),
+    Route("GET", "prefix", "/api/artifacts", "_get_artifacts", ("handler", "space"), needs_repo=True),
+    Route("GET", "prefix", "/api/artifact", "_get_artifact", ("handler", "space"), needs_repo=True),
+    Route("GET", "prefix", "/api/signing-backup", "_get_signing_backup", ("handler", "space", "signing")),
+    Route("GET", "prefix", "/api/node-busy", "_get_node_busy", ("handler", "space"), session=True),
+    Route("GET", "prefix", "/api/meta", "_get_meta", ("handler", "seen"), session=True),
+    Route("GET", "prefix", "/api/welcome", "_get_welcome", ("handler", "seen")),
     Route("GET", "prefix", "/api/source", "_get_source", ("person", "a session has the tree already")),
-    Route("GET", "prefix", "/logs/download", "_get_logs_download", "handler"),
-    Route("GET", "prefix", "/api/phone/wait", "_get_phone_wait", "handler"),
-    Route("GET", "prefix", "/api/phone", "_get_phone", "handler", session=True),
-    Route("GET", "prefix", "/api/toolchains", "_get_toolchains", "handler",
+    Route("GET", "prefix", "/logs/download", "_get_logs_download", ("handler", "controller-read")),
+    Route("GET", "prefix", "/api/phone/wait", "_get_phone_wait", ("handler", "admin")),
+    Route("GET", "prefix", "/api/phone", "_get_phone", ("handler", "admin", "node", "space"), session=True),
+    Route("GET", "prefix", "/api/toolchains", "_get_toolchains", ("handler", "node:read", "admin", "node", "space"),
           instead="a session reads its node's toolchains with aerie toolchains"),
-    Route("GET", "prefix", "/api/agents", "_get_agents", "handler"),
-    Route("GET", "prefix", "/api/emulator", "_get_emulator", "handler"),
-    Route("GET", "prefix", "/api/roles", "_get_roles", "handler"),
-    Route("GET", "prefix", "/api/users", "_get_users", "handler"),
-    Route("GET", "prefix", "/api/nginx", "_get_nginx", "handler"),
+    Route("GET", "prefix", "/api/agents", "_get_agents", ("handler", "node:read", "admin", "node", "space")),
+    Route("GET", "prefix", "/api/emulator", "_get_emulator", ("handler", "node:read", "admin", "node", "space")),
+    Route("GET", "prefix", "/api/roles", "_get_roles", ("handler", "admin", "space")),
+    Route("GET", "prefix", "/api/users", "_get_users", ("handler", "admin", "space")),
+    Route("GET", "prefix", "/api/nginx", "_get_nginx", ("handler", "admin", "node:configure", "node:configure-read", "node:nodes-read")),
     Route("GET", "exact", "/api/scanners", "_get_scanners", ("person", "a node's scanners are a person's")),
     Route("GET", "exact", "/api/router", "_get_router", ("person", "a node's router is a person's")),
-    Route("GET", "exact", "/api/router-key", "_get_router_key", "handler", session=True),
-    Route("GET", "prefix", "/api/storage", "_get_storage", "handler"),
-    Route("GET", "prefix", "/api/history", "_get_history", "handler"),
-    Route("GET", "exact", "/api/schedules", "_get_schedules", "handler",
+    Route("GET", "exact", "/api/router-key", "_get_router_key", ("handler", "space", "work"), session=True),
+    Route("GET", "prefix", "/api/storage", "_get_storage", ("handler", "admin")),
+    Route("GET", "prefix", "/api/history", "_get_history", ("handler", "node:nodes-read")),
+    Route("GET", "exact", "/api/schedules", "_get_schedules", ("handler", "schedules-read", "schedules"),
           instead="schedules are a person's: a session has no say in them"),
     Route("GET", "exact", "/api/extmounts", "_get_extmounts", ("admin", "the machine's other disks and shares are an administrator's")),
-    Route("GET", "exact", "/api/nasapps", "_get_nasapps", "handler"),
-    Route("GET", "prefix", "/api/catalog", "_get_catalog", "handler", session=True),
-    Route("GET", "prefix", "/api/library", "_get_library", "handler",
+    Route("GET", "exact", "/api/nasapps", "_get_nasapps", ("handler", "docker-write", "node:read", "admin", "node", "space")),
+    Route("GET", "prefix", "/api/catalog", "_get_catalog", ("handler", "toolchains-write"), session=True),
+    Route("GET", "prefix", "/api/library", "_get_library", ("handler", "node:read", "admin", "node", "space", "toolchains-write", "docker-write", "node:configure", "work", "node:toolchains-write", "curate"),
           instead="a session finds a tool pack with aerie tool search and asks for one with aerie tool install"),
-    Route("GET", "prefix", "/api/pack-icon", "_get_pack_icon", "handler"),
+    Route("GET", "prefix", "/api/pack-icon", "_get_pack_icon", ("handler", "seen")),
     Route("GET", "exact", "/api/storebackups", "_get_storebackups", ("admin", "the machine's backups are an administrator's")),
-    Route("GET", "exact", "/api/root-hooks", "_get_root_hooks", "handler"),
-    Route("GET", "exact", "/api/connections", "_get_connections", "handler"),
-    Route("GET", "exact", "/api/clusters", "_get_clusters", "handler"),
-    Route("GET", "exact", "/api/deploy", "_get_deploy", "handler"),
-    Route("GET", "exact", "/api/discord", "_get_discord", "handler"),
-    Route("GET", "exact", "/api/kubernetes", "_get_kubernetes", "handler"),
-    Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
-    Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
-    Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
-    Route("GET", "prefix", "/api/home", "_get_home", "handler"),
-    Route("GET", "prefix", "/api/apps", "_get_apps", "handler"),
-    Route("GET", "prefix", "/api/notices", "_get_notices", "handler"),
-    Route("GET", "prefix", "/api/help", "_get_help", "handler",
+    Route("GET", "exact", "/api/root-hooks", "_get_root_hooks", ("handler", "controller-read")),
+    Route("GET", "exact", "/api/connections", "_get_connections", ("handler", "controller-read")),
+    Route("GET", "exact", "/api/clusters", "_get_clusters", ("handler", "clusters-read", "instance:clusters-read", "instance:clusters", "node:configure")),
+    Route("GET", "exact", "/api/deploy", "_get_deploy", ("handler", "space", "deploy-read", "instance:clusters-read", "clusters-read", "settings", "write", "unlocked", "deploy")),
+    Route("GET", "exact", "/api/discord", "_get_discord", ("handler", "space", "settings", "unlocked")),
+    Route("GET", "exact", "/api/kubernetes", "_get_kubernetes", ("handler", "space", "deploy-read")),
+    Route("GET", "exact", "/api/old-compose", "_get_old_compose", ("handler", "admin")),
+    Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", ("handler", "admin", "node", "space", "instance:nodes-write", "instance:runner"), session=True),
+    Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", ("handler", "admin", "space", "debug", "node:jobs", "work"), session=True),
+    Route("GET", "prefix", "/api/home", "_get_home", ("handler", "admin", "space", "clusters-read", "instance:clusters-read")),
+    Route("GET", "prefix", "/api/apps", "_get_apps", ("handler", "open")),
+    Route("GET", "prefix", "/api/notices", "_get_notices", ("handler", "own")),
+    Route("GET", "prefix", "/api/help", "_get_help", ("handler", "open"),
           instead="a session reads AerieOS's docs with aerie help"),
-    Route("GET", "prefix", "/api/docker", "_get_docker", "handler", session=True),
-    Route("GET", "prefix", "/api/containers", "_get_containers", "handler"),
-    Route("GET", "exact", "/api/vms", "_get_vms", "handler", session=True),
-    Route("GET", "exact", "/api/node-files", "_get_node_files", "handler"),
-    Route("GET", "exact", "/api/node-files/read", "_get_node_files_read", "handler"),
-    Route("GET", "prefix", "/api/project-job", "_get_project_job", "handler"),
-    Route("GET", "prefix", "/api/trash", "_get_trash", "handler"),
-    Route("GET", "prefix", "/api/claude-now", "_get_claude_now", "handler"),
-    Route("GET", "prefix", "/api/roadmap", "_get_todo", "handler",
+    Route("GET", "prefix", "/api/docker", "_get_docker", ("handler", "space", "read", "node:read", "admin", "node", "containers-read"), session=True),
+    Route("GET", "prefix", "/api/containers", "_get_containers", ("handler", "containers-read")),
+    Route("GET", "exact", "/api/vms", "_get_vms", ("handler", "space", "admin"), session=True),
+    Route("GET", "exact", "/api/node-files", "_get_node_files", ("handler", "admin")),
+    Route("GET", "exact", "/api/node-files/read", "_get_node_files_read", ("handler", "admin")),
+    Route("GET", "prefix", "/api/project-job", "_get_project_job", ("handler", "create")),
+    Route("GET", "prefix", "/api/trash", "_get_trash", ("handler", "trash", "trash-any")),
+    Route("GET", "prefix", "/api/claude-now", "_get_claude_now", ("handler", "space")),
+    Route("GET", "prefix", "/api/roadmap", "_get_todo", ("handler", "space"),
           instead="a session reads its space's roadmap with aerie roadmap", needs_repo=True),
     # The GET of the rules is let through all the same (_work_refused): the
     # global ones hold there and a session reads them.
-    Route("GET", "prefix", "/api/rules", "_get_rules", "handler", instead="a session reads its rules with aerie rules",
+    Route("GET", "prefix", "/api/rules", "_get_rules", ("handler", "space", "admin"), instead="a session reads its rules with aerie rules",
           needs_repo=True),
-    Route("GET", "prefix", "/api/global-rules", "_get_global_rules", "handler"),
-    Route("GET", "prefix", "/api/preamble", "_get_preamble", "handler",
+    Route("GET", "prefix", "/api/global-rules", "_get_global_rules", ("handler", "open")),
+    Route("GET", "prefix", "/api/preamble", "_get_preamble", ("handler", "space"),
           instead="a session reads its briefing with aerie preamble"),
-    Route("GET", "prefix", "/api/brief", "_get_brief", "handler", session=True, needs_repo=True),
-    Route("GET", "prefix", "/api/design", "_get_design", "handler", session=True, needs_repo=True),
-    Route("GET", "prefix", "/api/wiki-export", "_get_wiki_export", "handler"),
-    Route("GET", "prefix", "/api/wiki", "_get_wiki", "handler", session=True, needs_repo=True),
-    Route("GET", "prefix", "/api/ci-runs", "_get_ci_runs", "handler", session=True),
-    Route("GET", "prefix", "/api/ci-watch", "_get_ci_watch", "handler"),
-    Route("GET", "prefix", "/api/codebase", "_get_codebase", "handler"),
-    Route("GET", "prefix", "/api/pending", "_get_pending", "handler",
+    Route("GET", "prefix", "/api/brief", "_get_brief", ("handler", "space"), session=True, needs_repo=True),
+    Route("GET", "prefix", "/api/design", "_get_design", ("handler", "space"), session=True, needs_repo=True),
+    Route("GET", "prefix", "/api/wiki-export", "_get_wiki_export", ("handler", "space")),
+    Route("GET", "prefix", "/api/wiki", "_get_wiki", ("handler", "space"), session=True, needs_repo=True),
+    Route("GET", "prefix", "/api/ci-runs", "_get_ci_runs", ("handler", "space"), session=True),
+    Route("GET", "prefix", "/api/ci-watch", "_get_ci_watch", ("handler", "space")),
+    Route("GET", "prefix", "/api/codebase", "_get_codebase", ("handler", "space")),
+    Route("GET", "prefix", "/api/pending", "_get_pending", ("handler", "space"),
           instead="a session reads what it has waiting with aerie roadmap pending"),
-    Route("GET", "prefix", "/api/memory", "_get_memory", "handler", session=True, needs_repo=True),
-    Route("GET", "prefix", "/api/tests", "_get_tests", "handler",
+    Route("GET", "prefix", "/api/memory", "_get_memory", ("handler", "space"), session=True, needs_repo=True),
+    Route("GET", "prefix", "/api/tests", "_get_tests", ("handler", "space"),
           instead="a session reads and runs its space's tests with aerie tests", needs_repo=True),
-    Route("GET", "prefix", "/api/bugs", "_get_bugs", "handler",
+    Route("GET", "prefix", "/api/bugs", "_get_bugs", ("handler", "space"),
           instead="a session reads its space's bugs with aerie bug", needs_repo=True),
-    Route("GET", "prefix", "/api/pubkeys", "_get_pubkeys", "handler"),
+    Route("GET", "prefix", "/api/pubkeys", "_get_pubkeys", ("handler", "create")),
     # The POSTs whose bodies are streamed, each with a door of its own in _post
     # ahead of the routes below, in the order it asks them.
-    Route("POST", "door", "/api/upload-archive", "_upload_archive", streamed=True),
-    Route("POST", "door", "/api/vms-iso-upload", "_vms_iso_upload", streamed=True),
-    Route("POST", "door", "/api/move-land", "_move_land", streamed=True),
-    Route("POST", "door", "/api/node-files/upload", "_node_files_upload", streamed=True),
-    Route("POST", "prefix", "/api/v1/nodes", "_nodes", "handler"),
-    Route("POST", "prefix", "/api/v1/jobs", "_jobs", "handler", session=("cancel",),
+    Route("POST", "door", "/api/upload-archive", "_upload_archive", ("handler", "create"), streamed=True),
+    Route("POST", "door", "/api/vms-iso-upload", "_vms_iso_upload", ("handler", "vms-write"), streamed=True),
+    Route("POST", "door", "/api/move-land", "_move_land", ("handler", "owner"), streamed=True),
+    Route("POST", "door", "/api/node-files/upload", "_node_files_upload", ("handler", "admin"), streamed=True),
+    Route("POST", "prefix", "/api/v1/nodes", "_nodes", ("handler", "instance:runner", "instance:nodes-write")),
+    Route("POST", "prefix", "/api/v1/jobs", "_jobs", ("handler", "jobs", "space", "node:jobs", "admin", "work"), session=("cancel",),
           instead="a session runs aerie run, build, test and emu where it is, on its space's node; a job would run "
                   "outside the session's view, so a session cannot queue one"),
-    Route("POST", "exact", "/api/v1/bb", "_bb_relay", "handler", session=True),
-    Route("POST", "exact", "/api/v1/claude-login", "_claude_login", "handler", session=True),
-    Route("POST", "exact", "/api/v1/hook", "_hook", "handler", session=True,
+    Route("POST", "exact", "/api/v1/bb", "_bb_relay", ("handler", "bb"), session=True),
+    Route("POST", "exact", "/api/v1/claude-login", "_claude_login", ("handler", "seen"), session=True),
+    Route("POST", "exact", "/api/v1/hook", "_hook", ("handler", "seen"), session=True,
           quiet=("note", "seen", "asking", "guards", "recall", "alive", "turn", "turn-done")),
-    Route("POST", "exact", "/api/v1/tty-grant", "_tty_grant", "handler", session=True),
-    Route("POST", "prefix", "/api/lock", "_lock", "handler"),
-    Route("POST", "prefix", "/api/archive", "_archive", "handler"),
-    Route("POST", "prefix", "/api/repos", "_repos", "handler"),
+    Route("POST", "exact", "/api/v1/tty-grant", "_tty_grant", ("handler", "admin", "write", "terminal", "vms-write", "claude", "terminal-any", "own"), session=True),
+    Route("POST", "prefix", "/api/lock", "_lock", ("handler", "space", "admin")),
+    Route("POST", "prefix", "/api/archive", "_archive", ("handler", "space")),
+    Route("POST", "prefix", "/api/repos", "_repos", ("handler", "admin", "create", "space", "unlocked", "node:node")),
     # NOT /api/pin, which is the command pin and has been since long before
     # this: startswith() means a route added above it silently takes every
     # path it prefixes, and both handlers were called _pin, so the later
@@ -6150,140 +6158,140 @@ ROUTES = (
           ("person", "a session pins no spaces: the pins are a person's own")),
     Route("POST", "prefix", "/api/project-group", "_project_group",
           ("person", "a session has no Spaces page: the groups are a person's own")),
-    Route("POST", "prefix", "/api/apps", "_apps", "handler"),
-    Route("POST", "prefix", "/api/pc", "_pc", "handler", session=True),
+    Route("POST", "prefix", "/api/apps", "_apps", ("handler", "controller")),
+    Route("POST", "prefix", "/api/pc", "_pc", ("handler", "seen"), session=True),
     Route("POST", "prefix", "/api/project-color", "_project_color",
           ("person", "a session has no Spaces page: a space's color is a person's own")),
-    Route("POST", "prefix", "/api/project-auth", "_project_auth", "handler"),
-    Route("POST", "exact", "/api/project-ftp", "_project_ftp", "handler"),
-    Route("POST", "prefix", "/api/container", "_container", "handler"),
+    Route("POST", "prefix", "/api/project-auth", "_project_auth", ("handler", "space", "git-auth")),
+    Route("POST", "exact", "/api/project-ftp", "_project_ftp", ("handler", "space", "ftp")),
+    Route("POST", "prefix", "/api/container", "_container", ("handler", "node:configure", "docker-write", "docker-any", "space")),
     # A GPU's .rom given on the VMs page (R100).
-    Route("POST", "exact", "/api/vms", "_vms", "handler", session=True, max_body=3 * 1024 * 1024),
-    Route("POST", "prefix", "/api/dockerctl", "_docker_ctl", "handler", session=True),
-    Route("POST", "prefix", "/api/rename", "_rename", "handler"),
+    Route("POST", "exact", "/api/vms", "_vms", ("handler", "admin", "node:nodes-write", "vms-write", "space"), session=True, max_body=3 * 1024 * 1024),
+    Route("POST", "prefix", "/api/dockerctl", "_docker_ctl", ("handler", "read", "docker-read", "docker-write", "node:read", "admin", "node", "space", "node:nodes-write", "instance:configure", "node:configure", "docker-any"), session=True),
+    Route("POST", "prefix", "/api/rename", "_rename", ("handler", "space", "rename", "git-auth")),
     # These two before the bare prefix, or startswith swallows them.
-    Route("POST", "prefix", "/api/trash-restore", "_trash_restore", "handler"),
-    Route("POST", "prefix", "/api/trash-purge", "_trash_purge", "handler"),
-    Route("POST", "prefix", "/api/trash", "_trash", "handler"),
-    Route("POST", "prefix", "/api/session", "_session", "handler"),
-    Route("POST", "prefix", "/api/send", "_send", "handler"),
-    Route("POST", "prefix", "/api/say", "_say", "handler"),
-    Route("POST", "prefix", "/api/chat", "_chat", "handler",
+    Route("POST", "prefix", "/api/trash-restore", "_trash_restore", ("handler", "trash", "trash-any", "space")),
+    Route("POST", "prefix", "/api/trash-purge", "_trash_purge", ("handler", "trash", "trash-any")),
+    Route("POST", "prefix", "/api/trash", "_trash", ("handler", "trash")),
+    Route("POST", "prefix", "/api/session", "_session", ("handler", "theirs", "own")),
+    Route("POST", "prefix", "/api/send", "_send", ("handler", "theirs", "own")),
+    Route("POST", "prefix", "/api/say", "_say", ("handler", "space", "claude")),
+    Route("POST", "prefix", "/api/chat", "_chat", ("handler", "own", "space"),
           instead="a session posts to its space's feed through its hooks, and a person's messages are theirs"),
-    Route("POST", "prefix", "/api/layout", "_layout", "handler"),
-    Route("POST", "exact", "/api/bell", "_bell", "handler"),
-    Route("POST", "exact", "/api/notices", "_notices", "handler"),
+    Route("POST", "prefix", "/api/layout", "_layout", ("handler", "own")),
+    Route("POST", "exact", "/api/bell", "_bell", ("handler", "own")),
+    Route("POST", "exact", "/api/notices", "_notices", ("handler", "own")),
     Route("POST", "exact", "/api/nginx", "_nginx", ("person", "a node's proxy is a person's")),
     Route("POST", "exact", "/api/scanners", "_scanners", ("person", "a node's scanners are a person's")),
     Route("POST", "exact", "/api/router", "_router", ("person", "a node's router is a person's")),
-    Route("POST", "exact", "/api/library", "_library", "handler"),
+    Route("POST", "exact", "/api/library", "_library", ("handler", "node:configure", "admin", "work")),
     Route("POST", "exact", "/api/images", "_images", ("person", "checking for image updates is a person's")),
-    Route("POST", "exact", "/api/storage", "_storage", "handler"),
-    Route("POST", "exact", "/api/schedules", "_schedules", "handler",
+    Route("POST", "exact", "/api/storage", "_storage", ("handler", "admin")),
+    Route("POST", "exact", "/api/schedules", "_schedules", ("handler", "schedules"),
           instead="schedules are a person's: a session has no say in them"),
     Route("POST", "exact", "/api/extmounts", "_extmounts", ("admin", "the machine's other disks and shares are an administrator's")),
-    Route("POST", "exact", "/api/nasapps", "_nasapps", "handler"),
+    Route("POST", "exact", "/api/nasapps", "_nasapps", ("handler", "docker-write", "curate")),
     Route("POST", "exact", "/api/storebackups", "_storebackups", ("admin", "the machine's backups are an administrator's")),
-    Route("POST", "exact", "/api/root-hooks", "_root_hooks", "handler"),
-    Route("POST", "exact", "/api/connections", "_connections", "handler"),
-    Route("POST", "exact", "/api/clusters", "_clusters", "handler"),
-    Route("POST", "exact", "/api/deploy", "_deploy", "handler"),
-    Route("POST", "exact", "/api/kubernetes", "_kubernetes", "handler"),
-    Route("POST", "exact", "/api/k8s", "_k8s", "handler", session=True),
-    Route("POST", "exact", "/api/discord", "_discord", "handler", session=True),
-    Route("POST", "prefix", "/api/pin", "_pin", "handler"),
-    Route("POST", "exact", "/api/reset", "_reset", "handler"),
+    Route("POST", "exact", "/api/root-hooks", "_root_hooks", ("handler", "controller")),
+    Route("POST", "exact", "/api/connections", "_connections", ("handler", "admin")),
+    Route("POST", "exact", "/api/clusters", "_clusters", ("handler", "instance:clusters", "node:configure")),
+    Route("POST", "exact", "/api/deploy", "_deploy", ("handler", "space", "unlocked", "deploy", "write", "settings", "instance:clusters-read")),
+    Route("POST", "exact", "/api/kubernetes", "_kubernetes", ("handler", "space", "unlocked", "deploy")),
+    Route("POST", "exact", "/api/k8s", "_k8s", ("handler", "deploy-read", "space", "unlocked", "deploy", "dial:kube"), session=True),
+    Route("POST", "exact", "/api/discord", "_discord", ("handler", "space", "unlocked", "settings", "write", "dial:discord"), session=True),
+    Route("POST", "prefix", "/api/pin", "_pin", ("handler", "command-pin")),
+    Route("POST", "exact", "/api/reset", "_reset", ("handler", "controller")),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
-    Route("POST", "exact", "/api/node-files", "_node_files", "handler"),
+    Route("POST", "exact", "/api/node-files", "_node_files", ("handler", "admin")),
     Route("POST", "exact", "/api/backup", "_backup", ("owner", "a backup now is the owner's")),
-    Route("POST", "prefix", "/api/create", "_create", "handler"),
-    Route("POST", "prefix", "/api/profile", "_profile", "handler"),
-    Route("POST", "prefix", "/api/git", "_git_act", "handler", instead="a session uses aerie git", needs_repo=True),
+    Route("POST", "prefix", "/api/create", "_create", ("handler", "create", "space", "admin", "unlocked", "node")),
+    Route("POST", "prefix", "/api/profile", "_profile", ("handler", "own", "admin", "node", "space")),
+    Route("POST", "prefix", "/api/git", "_git_act", ("handler", "space", "unlocked", "admin"), instead="a session uses aerie git", needs_repo=True),
     Route("POST", "exact", "/api/forge-access", "_forge_access_post",
           ("person", "an account's: a session reads it with aerie forge whoami"), needs_repo=True),
-    Route("POST", "exact", "/api/forge", "_forge", "handler", session=True),
-    Route("POST", "prefix", "/api/project-sessions", "_project_sessions", "handler"),
-    Route("POST", "prefix", "/api/unlink", "_unlink", "handler"),
-    Route("POST", "prefix", "/api/link", "_link", "handler"),
-    Route("POST", "prefix", "/api/project-job", "_project_job", "handler"),
-    Route("POST", "prefix", "/api/roadmap", "_roadmap", "handler",
+    Route("POST", "exact", "/api/forge", "_forge", ("handler", "work", "space", "unlocked"), session=True),
+    Route("POST", "prefix", "/api/project-sessions", "_project_sessions", ("handler", "settings", "space")),
+    Route("POST", "prefix", "/api/unlink", "_unlink", ("handler", "git-auth")),
+    Route("POST", "prefix", "/api/link", "_link", ("handler", "git-auth")),
+    Route("POST", "prefix", "/api/project-job", "_project_job", ("handler", "create")),
+    Route("POST", "prefix", "/api/roadmap", "_roadmap", ("handler", "space", "unlocked", "settings"),
           instead="a session reads and changes its space's roadmap with aerie roadmap", own_write=True,
           needs_repo=True),
-    Route("POST", "prefix", "/api/roles", "_roles", "handler"),
-    Route("POST", "prefix", "/api/users", "_users", "handler"),
-    Route("POST", "prefix", "/api/toolchains", "_toolchains", "handler"),
-    Route("POST", "exact", "/api/agents", "_agents", "handler"),
-    Route("POST", "exact", "/api/toolpacks", "_toolpacks", "handler", session=("install",),
+    Route("POST", "prefix", "/api/roles", "_roles", ("handler", "admin")),
+    Route("POST", "prefix", "/api/users", "_users", ("handler", "own", "admin", "space")),
+    Route("POST", "prefix", "/api/toolchains", "_toolchains", ("handler", "node:toolchains-write")),
+    Route("POST", "exact", "/api/agents", "_agents", ("handler", "node:toolchains-write")),
+    Route("POST", "exact", "/api/toolpacks", "_toolpacks", ("handler", "toolchains-write", "curate", "admin"), session=("install",),
           instead="a session asks for a tool on its node with aerie tool install NAME, nothing else"),
-    Route("POST", "prefix", "/api/emulator", "_emulator", "handler"),
-    Route("POST", "prefix", "/api/logs", "_logs", "handler"),
-    Route("POST", "prefix", "/api/idle", "_idle", "handler"),
+    Route("POST", "prefix", "/api/emulator", "_emulator", ("handler", "toolchains-write", "node:toolchains-write", "admin", "space")),
+    Route("POST", "prefix", "/api/logs", "_logs", ("handler", "controller")),
+    Route("POST", "prefix", "/api/idle", "_idle", ("handler", "controller")),
     Route("POST", "prefix", "/api/paths", "_paths", ("person", "the controller's storage is the operator's")),
     Route("POST", "prefix", "/api/snapshots", "_snapshots", ("person", "a space's snapshots are the operator's"),
           needs_repo=True),
-    Route("POST", "exact", "/api/transcripts", "_transcripts", "handler", session=("label", "note", "keep", "unkeep"),
+    Route("POST", "exact", "/api/transcripts", "_transcripts", ("handler", "own", "space"), session=("label", "note", "keep", "unkeep"),
           instead="a conversation is deleted or shared by its person, from the space's Sessions view, "
                   "not by a session"),
-    Route("POST", "prefix", "/api/settings", "_settings_post", "handler"),
-    Route("POST", "exact", "/api/checks", "_checks_post", "handler"),
-    Route("POST", "exact", "/api/catalog-mirror", "_catalog_mirror_post", "handler"),
-    Route("POST", "prefix", "/api/rules", "_rules", "handler",
+    Route("POST", "prefix", "/api/settings", "_settings_post", ("handler", "controller", "debug", "owner")),
+    Route("POST", "exact", "/api/checks", "_checks_post", ("handler", "controller")),
+    Route("POST", "exact", "/api/catalog-mirror", "_catalog_mirror_post", ("handler", "controller")),
+    Route("POST", "prefix", "/api/rules", "_rules", ("handler", "space", "unlocked", "rules"),
           instead="a session cannot change the rules it is being held to: they are the operator's, written on the "
                   "space's Overview in the notebook; aerie rules reads them and keeps a session's own notes",
           own_write=True, needs_repo=True),
-    Route("POST", "prefix", "/api/global-rules", "_global_rules", "handler"),
-    Route("POST", "prefix", "/api/pending", "_pending", "handler",
+    Route("POST", "prefix", "/api/global-rules", "_global_rules", ("handler", "controller")),
+    Route("POST", "prefix", "/api/pending", "_pending", ("handler", "space", "unlocked", "pending"),
           instead="what a session has waiting is the operator's to approve or deny, on the notebook; a session "
                   "cannot answer for itself"),
-    Route("POST", "prefix", "/api/memory", "_memory", "handler", session=True, own_write=True, needs_repo=True),
+    Route("POST", "prefix", "/api/memory", "_memory", ("handler", "space", "unlocked"), session=True, own_write=True, needs_repo=True),
     # A session is told the gate's own words here, never this hint.
     Route("POST", "prefix", "/api/prefs", "_prefs_post",
           ("person", "a space's settings are the operator's: say what should change in your reply"),
           instead="a space's settings are the operator's: a session reads them with aerie settings", own_write=True),
-    Route("POST", "prefix", "/api/brief", "_brief", "handler", session=True, needs_repo=True),
+    Route("POST", "prefix", "/api/brief", "_brief", ("handler", "space", "unlocked"), session=True, needs_repo=True),
     # The one body that is a document: a project's whole design, which its
     # own limits let run to megabytes (forty pages, sixty rules of twenty
     # thousand characters). At 64 kB a design of forty pages and thirteen
     # themes was refused as "body too large" with every part of it inside
     # its limit.
-    Route("POST", "prefix", "/api/design", "_design", "handler", session=True, max_body=4 * 1024 * 1024,
+    Route("POST", "prefix", "/api/design", "_design", ("handler", "space", "unlocked"), session=True, max_body=4 * 1024 * 1024,
           own_write=True, needs_repo=True),
-    Route("POST", "exact", "/api/wiki", "_wiki", "handler", session=True, max_body=1024 * 1024, needs_repo=True),
-    Route("POST", "exact", "/api/ci-watch", "_ci_watch", "handler"),
-    Route("POST", "prefix", "/api/devapp", "_devapp", "handler", session=True),
+    Route("POST", "exact", "/api/wiki", "_wiki", ("handler", "space", "unlocked"), session=True, max_body=1024 * 1024, needs_repo=True),
+    Route("POST", "exact", "/api/ci-watch", "_ci_watch", ("handler", "space")),
+    Route("POST", "prefix", "/api/devapp", "_devapp", ("handler", "space", "admin", "read", "docker-write", "node:configure", "docker-read", "work", "docker-any", "unlocked", "node"), session=True),
     Route("POST", "prefix", "/api/changelog", "_changelog",
           ("person", "the changelog's arrangement is the operator's: a session writes entries with `aerie "
                      "changelog add`, and corrects one with `edit`, `merge`, `split` or `rm`"), needs_repo=True),
-    Route("POST", "prefix", "/api/version", "_version", "handler", session=True, needs_repo=True),
-    Route("POST", "prefix", "/api/tls", "_tls", "handler"),
-    Route("POST", "exact", "/api/signing", "_signing", "handler",
+    Route("POST", "prefix", "/api/version", "_version", ("handler", "space", "version", "dial:release"), session=True, needs_repo=True),
+    Route("POST", "prefix", "/api/tls", "_tls", ("handler", "controller")),
+    Route("POST", "exact", "/api/signing", "_signing", ("handler", "dial:sign", "dial:keys", "space", "unlocked", "signing"),
           session=("sign", "keys", "generate", "map", "rotate", "release", "release-sign"),
           instead="a session signs with aerie sign, which never hands it the key; the keys are a person's to manage"),
-    Route("POST", "exact", "/api/keys", "_keys", "handler"),
+    Route("POST", "exact", "/api/keys", "_keys", ("handler", "controller")),
     Route("POST", "exact", "/api/members", "_members", ("person", "who joins a space is a person's decision")),
-    Route("POST", "exact", "/api/signing-backup", "_post_signing_backup", "handler"),
-    Route("POST", "prefix", "/api/artifacts", "_artifacts", "handler",
+    Route("POST", "exact", "/api/signing-backup", "_post_signing_backup", ("handler", "space", "signing")),
+    Route("POST", "prefix", "/api/artifacts", "_artifacts", ("handler", "space", "unlocked"),
           instead="a session lets a capture go with aerie capture prune NAME, and a pin is a person's",
           needs_repo=True),
-    Route("POST", "prefix", "/api/nodelog", "_nodelog", "handler", session=True),
-    Route("POST", "exact", "/api/diag", "_diag", "handler", session=True),
-    Route("POST", "exact", "/api/reports", "_reports", "handler", session=True),
+    Route("POST", "prefix", "/api/nodelog", "_nodelog", ("handler", "space", "debug"), session=True),
+    Route("POST", "exact", "/api/diag", "_diag", ("handler", "debug"), session=True),
+    Route("POST", "exact", "/api/reports", "_reports", ("handler", "space", "controller", "controller-read", "debug"), session=True),
     # A file saved from a person's editor (R159): files.MAX_READ as base64.
     Route("POST", "exact", "/api/v1/files", "_files",
           ("person", "a session has its space's tree already: this is a person's editor's"), max_body=28 * 1024 * 1024),
-    Route("POST", "prefix", "/api/phone", "_phone", "handler", session=("ask", "outcome", "use"),
+    Route("POST", "prefix", "/api/phone", "_phone", ("handler", "admin", "node", "space"), session=("ask", "outcome", "use"),
           instead="a session asks; a person answers", quiet=("outcome",)),
-    Route("POST", "prefix", "/api/findings", "_findings_log", "handler", needs_repo=True),
-    Route("POST", "prefix", "/api/tests", "_tests", "handler", session=True, needs_repo=True),
-    Route("POST", "prefix", "/api/presence", "_presence", "handler", quiet=True),
-    Route("POST", "prefix", "/api/bugs", "_bugs", "handler",
+    Route("POST", "prefix", "/api/findings", "_findings_log", ("handler", "space"), needs_repo=True),
+    Route("POST", "prefix", "/api/tests", "_tests", ("handler", "space", "unlocked"), session=True, needs_repo=True),
+    Route("POST", "prefix", "/api/presence", "_presence", ("handler", "space"), quiet=True),
+    Route("POST", "prefix", "/api/bugs", "_bugs", ("handler", "space", "unlocked"),
           instead="a session reads and files its space's bugs with aerie bug", own_write=True, needs_repo=True),
-    Route("POST", "prefix", "/api/custom", "_custom", "handler"),
-    Route("POST", "prefix", "/api/doctor", "_doctor", "handler"),
-    Route("POST", "prefix", "/api/signout", "_signout", "handler"),
+    Route("POST", "prefix", "/api/custom", "_custom", ("handler", "command-pin")),
+    Route("POST", "prefix", "/api/doctor", "_doctor", ("handler", "controller")),
+    Route("POST", "prefix", "/api/signout", "_signout", ("handler", "node:read")),
     Route("POST", "prefix", "/api/login-code", "_login_code",
           ("person", "a session does not sign an account in or out")),
-    Route("POST", "prefix", "/api/signin", "_signin", "handler"),
+    Route("POST", "prefix", "/api/signin", "_signin", ("handler", "node:read")),
 )
 
 # The tables the dispatcher reads, each one fact of the record. The routes
@@ -6292,7 +6300,7 @@ GET_ROUTES = tuple((r.how, r.path, r.handler) for r in ROUTES if r.method == "GE
 POST_ROUTES = tuple((r.how, r.path, r.handler) for r in ROUTES if r.method == "POST" and r.how != "door")
 # What each route asks of its caller, by handler. A route that names no gate
 # has no line here, and route_gate refuses it.
-ROUTE_GATES = {r.handler: r.gate for r in ROUTES if r.how != "door" and r.gate is not None}
+ROUTE_GATES = {r.handler: r.gate for r in ROUTES if r.gate is not None}
 # What a session's token reaches, by handler; the actions where only some
 # are a session's, with what the refusal of any other says; and what a
 # session does instead of a route that is not its own.
@@ -6305,7 +6313,7 @@ SESSION_NOT_THE_PAGE = ("the dashboard is a person's: a session's token opens no
                         "A session reads and changes its space through aerie")
 # The POSTs whose bodies are streamed, each with a door of its own ahead of
 # the matched routes.
-STREAMED_POSTS = tuple(r.path for r in ROUTES if r.streamed)
+STREAMED_DOORS = {r.path: r.handler for r in ROUTES if r.how == "door"}
 # The routes' own body caps, beside the agent's.
 MAX_BODY_FOR.update({r.path: r.max_body for r in ROUTES if r.max_body is not None})
 # The paths whose writes the sessions are told of.
@@ -6327,11 +6335,11 @@ def route_gate(name, me, action=None):
         return "this route names no permission (ROUTE_GATES), so it is not served"
     me = me or {}
     if me.get("session") and name not in SESSION_ROUTES:
-        instead = g[1] if isinstance(g, tuple) else SESSION_INSTEAD.get(name, "")
+        instead = g[1] if g[0] != "handler" else SESSION_INSTEAD.get(name, "")
         return SESSION_REFUSED + (". " + instead[0].upper() + instead[1:] if instead else "")
     if me.get("session") and action is not None and name in SESSION_ACTIONS and action not in SESSION_ACTIONS[name][0]:
         return SESSION_ACTIONS[name][1]
-    if g == "handler":
+    if g[0] == "handler":
         return ""
     kind, words = g
     if me.get("session"):
@@ -9861,25 +9869,22 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why}, 403)
         if self._two_factor_gate(self.path.split("?")[0]):
             return None
-        # The streamed bodies below are outside the route tables, and none
-        # is a session's (R227 step 4): refused here, before any is read.
-        if self.path.split("?")[0] in STREAMED_POSTS and (self._who() or {}).get("session"):
-            return self._json({"error": SESSION_REFUSED}, 403)
-        # The one body that is not JSON: an archive to start a project from,
-        # streamed to the spool by projects.spool_archive. Its own door
-        # before the JSON read, and its own cap: MAX_BODY is sized for a
-        # form, and an upload is not read into memory at all.
-        if self.path.split("?")[0] == "/api/upload-archive":
-            return self._upload_archive()
-        # ...and an installer's ISO for a VM host (R99), streamed the same way.
-        if self.path.split("?")[0] == "/api/vms-iso-upload":
-            return self._vms_iso_upload()
-        # ...and a move landed from Controller settings, its bundle streamed.
-        if self.path.split("?")[0] == "/api/move-land":
-            return self._move_land()
-        # ...and a file put on a machine from the file explorer (R224), streamed through.
-        if self.path.split("?")[0] == "/api/node-files/upload":
-            return self._node_files_upload()
+        # The bodies that are not JSON, each streamed by its handler and never
+        # read into memory: an archive to start a space from, an installer's
+        # ISO for a VM host, a move's bundle, a file put on a machine. A door
+        # ahead of the JSON read, held to the route record like every other
+        # route: none is a session's, a switched-off feature refuses it, and
+        # the audit has its row before the body is taken.
+        if (door := STREAMED_DOORS.get(self.path.split("?")[0])):
+            path = self.path.split("?")[0]
+            if (why := route_gate(door, self._who())):
+                return self._json({"error": why}, 403)
+            if self._feature_off("POST", path, {}):
+                return None
+            if not NODES_DOWN:
+                q = self._q()
+                db.audit(self._principal(), path, str(next((q[k][0] for k in ("project", "node", "name") if q.get(k)), ""))[:120], {})
+            return getattr(self, door)()
         req = self._read_json()
         if req is None:
             return None
@@ -12302,10 +12307,6 @@ class Handler(BaseHTTPRequestHandler):
         spool and fetched from there by the node's job."""
         q = self._q()
         project = (q.get("project") or [""])[0]
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "uploading an installer ISO is a person's, on the VMs page"}, 403)
-        if self._feature_off("POST", "/api/vms", {}):
-            return None
         if not registry.is_project(project):
             return self._json({"error": "which space's VMs is it for? name one"}, 400)
         if self._refused("vms-write", project):
