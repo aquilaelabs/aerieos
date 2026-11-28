@@ -796,6 +796,10 @@ function bootDocs(){
   document.addEventListener("click", e => {
     const d = e.target.closest?.("summary")?.parentElement;
     if (!d?.dataset?.sect) return;
+    // A page's own section at a desk stands open and has nothing to press
+    // (sectFixed): a press on its head is no choice, and recorded as one it
+    // had every later draw write the section shut for oneOpen to open again.
+    if (sectFixed(d)) return;
     d.dataset.pressed = "1";
     // Recorded at the press, not only at `toggle`: a section slides shut over
     // a third of a second, and a tab that repaints on a heartbeat (Nodes, on

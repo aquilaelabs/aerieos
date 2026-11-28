@@ -2833,13 +2833,15 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
 if (runs('c')) {
 // ---- a fold lasts for the page, and a reload starts it from the default ---
 // Open state is kept while the page lives and never stored (the design
-// language, Sections): closed by hand on a desktop, where the default is
-// open, it stays closed through the repaints and is open again after a
-// reload. Measured on the Nodes tab's Health section: a fixed section
-// rather than the first one found, because a tab that is still filling in
-// (the Docker manager redraws as its rows land) replaces the element
-// between the find and the close, and a close on a detached fold records
-// nothing, which read as the rule failing when only the sample had moved.
+// language, Sections). At a desk a page's own sections stand open and do not
+// fold at all, so a press on one's head changes
+// nothing, then or at the next repaint; measured on the Nodes tab's Health,
+// a fixed section rather than the first one found, since a tab still
+// filling in replaces the element between the find and the press. What does
+// fold at a desk is a dialog's section: one of the space's settings shut by
+// hand is shut when the dialog opens again, and open after a reload. (This
+// waited for the press to be recorded on Health, which a heartbeat's redraw
+// unrecorded again before the wait first looked: a flake of the gate's.)
 await section("a fold lasts for the page, and a reload starts it from the default", async () => {
   const kind = 'nodes', key = 'nodes:health';
   const sel = `.doc.on details.sect[data-sect="${key}"]`;
@@ -2859,15 +2861,36 @@ await section("a fold lasts for the page, and a reload starts it from the defaul
   await atWidth(page, 1280);
   await focus();
   ok(await page.$eval(sel, d => d.open), `[${kind}] a section opens by default on a desktop (${key})`);
-  // A press on the summary, not `open = false`: only a fold somebody pressed
-  // is recorded, so that markup arriving open is never mistaken for a choice.
   await page.click(sel + ' > summary');
-  await page.waitForFunction(k => sectOpen[k] === false, key, { timeout: 5000 });
-  ok(true, `[${kind}] a fold closed by hand stays closed for the page (${key})`);
+  // Through a repaint: the list read again and drawn, as a heartbeat does.
+  await page.evaluate(async () => { await loadNodes(); drawPanes(); });
+  await settled(page, { quiet: 300, cap: 5000 });
+  const stood = await page.evaluate(([s, k]) => ({ open: document.querySelector(s)?.open, kept: sectOpen[k] }), [sel, key]);
+  ok(stood.open === true && stood.kept === undefined,
+     `[${kind}] a page's own section does not fold on a desktop, and a press on its head is not kept as a choice (${JSON.stringify(stood)})`);
+  // Read with $eval, which the harness's own fold-opening leaves be.
+  const rn = 'details.rngroup[data-sect="rn:claude"]';
+  const gear = async () => {
+    await page.evaluate(() => renameProject('alpha'));
+    await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
+    await page.waitForFunction(s => !!document.querySelector(s)?.offsetHeight, rn, { timeout: 10000 });
+  };
+  const shutGear = async () => {
+    await page.evaluate(() => closeRename());
+    await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 5000 });
+  };
+  await gear();
+  ok(await page.$eval(rn, d => d.open), "[projsettings] a dialog's section opens by default (rn:claude)");
+  await page.$eval(rn + ' > summary', s => s.click());
+  await page.waitForFunction(s => !document.querySelector(s).open, rn, { timeout: 5000 }).catch(() => {});
+  await shutGear();
+  await gear();
+  ok(!await page.$eval(rn, d => d.open), '[projsettings] a fold closed by hand stays closed for the page (rn:claude)');
+  await shutGear();
   await page.reload(); await ready(page);
-  await focus();
-  ok(await page.$eval(sel, d => d.open),
-     `[${kind}] ...and a reload starts it from its default, open on a desktop`);
+  await gear();
+  ok(await page.$eval(rn, d => d.open), '[projsettings] ...and a reload starts it from its default, open');
+  await shutGear();
 });
 }
 
