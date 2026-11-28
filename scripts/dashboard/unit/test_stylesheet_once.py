@@ -6,7 +6,13 @@ reader something the page does not do (a flex written two ways nine lines
 apart, a cursor a later rule turned back). The stylesheets are read rule by
 rule and each such declaration fails by its file and line. A rule that sets
 a property for a group and a later one that sets it for one of the group is
-how a stylesheet is written, and is not one."""
+how a stylesheet is written, and is not one.
+
+The same holds across the files: each is a cascade layer (skin, components,
+surfaces, overrides), a later layer wins whatever the selectors' weight, so
+a declaration that a later layer sets again for every selector it names,
+with no condition of its own (no media, no supports), never reaches the
+page either."""
 import collections
 import os
 import re
@@ -83,6 +89,40 @@ def never_reached(text):
     return out
 
 
+LAYERS = ("skin", "components", "surfaces", "overrides")
+
+
+def _layer(ctx):
+    m = re.search(r"@layer ([a-z]+)", ctx)
+    return LAYERS.index(m.group(1)) if m and m.group(1) in LAYERS else len(LAYERS)
+
+
+def _condition(ctx):
+    return " | ".join(p for p in ctx.split(" | ") if not p.startswith("@layer"))
+
+
+def never_reached_across(sheets):
+    """[(file, line, selectors, property, the later file, its line)] for
+    {file: text}: a declaration a later layer sets again, unconditionally,
+    for every selector it names."""
+    rs = [(name, ctx, line, sels, decls) for name, text in sheets.items() for ctx, line, sels, decls in rules(text)]
+    later = collections.defaultdict(list)
+    for name, ctx, line, sels, decls in rs:
+        for s in sels:
+            for p, v in decls.items():
+                if "!important" not in v and not _condition(ctx):
+                    later[(s, p)].append((_layer(ctx), name, line))
+    out = []
+    for name, ctx, line, sels, decls in rs:
+        for p, v in decls.items():
+            if "!important" in v:
+                continue
+            hits = [next(((f, ln) for rank, f, ln in later[(s, p)] if rank > _layer(ctx)), None) for s in sels]
+            if all(hits):
+                out.append((name, line, ", ".join(sels), p, *hits[0]))
+    return out
+
+
 class Once(unittest.TestCase):
     def test_no_declaration_is_set_again_for_all_it_names(self):
         said = []
@@ -91,6 +131,26 @@ class Once(unittest.TestCase):
                 for line, sels, prop, again in never_reached(f.read()):
                     said.append(f"{name}:{line} {sels[:60]} sets {prop}, and line {again} sets it again for all of them")
         self.assertEqual(said, [])
+
+    def test_no_declaration_is_set_again_by_a_later_layer_for_all_it_names(self):
+        sheets = {}
+        for name in SHEETS:
+            with open(os.path.join(DASH, name), encoding="utf-8") as f:
+                sheets[name] = f.read()
+        said = [f"{name}:{line} {sels[:60]} sets {prop}, and {later}:{at} sets it again for all of them in a later layer"
+                for name, line, sels, prop, later, at in never_reached_across(sheets)]
+        self.assertEqual(said, [])
+
+    def test_a_later_layer_wins_whatever_the_weight_and_a_condition_keeps_both(self):
+        a = "@layer components{#x .a .b{color:red;gap:1px}}"
+        self.assertEqual(never_reached_across({"a.css": a, "b.css": "@layer surfaces{.b{top:0}}"}), [])
+        self.assertEqual(never_reached_across({"a.css": a, "b.css": "@layer surfaces{#x .a .b{color:blue}}"}), [("a.css", 1, "#x .a .b", "color", "b.css", 1)])
+        self.assertEqual(never_reached_across({"a.css": a, "b.css": "@layer surfaces{@media(max-width:600px){#x .a .b{color:blue}}}"}), [],
+                         "the later one holds only at a width: both reach the page")
+        self.assertEqual(never_reached_across({"a.css": a, "b.css": "@layer skin{#x .a .b{color:blue}}"}), [("b.css", 1, "#x .a .b", "color", "a.css", 1)],
+                         "by the layers' order, not the files': it is the skin's that never reaches")
+        self.assertEqual(never_reached_across({"a.css": "@layer components{.a{color:red !important}}", "b.css": "@layer surfaces{.a{color:blue}}"}), [],
+                         "an !important turns the layers' order round")
 
     def test_it_reads_a_group_and_one_of_the_group_as_written(self):
         css = ".a,.b{color:red}\n.b{color:blue}\n@media(max-width:600px){.a{color:green}}\n"
