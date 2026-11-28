@@ -4174,11 +4174,25 @@ await section("who may rebuild it", async () => {
   // turning the dial to auto does not open it.
   {
     const store2 = `${DIR}/state/devapps.json`;
+    // The server writes this file too, when a job ends: the build started
+    // above is waited out first, or its last write lands over the node
+    // planted here and the rebuild below is let through (WebKit, under a
+    // gate's load). Planted again if a write still landed over it.
+    await idle();
     const before = readFileSync(store2, 'utf8');
-    const d = JSON.parse(before);
-    d['ep.silon'] = { ...d['ep.silon'],
-                      main: { ...(d['ep.silon'] || {}).main, node: 'n_anothernode' } };
-    writeFileSync(store2, JSON.stringify(d));
+    const plant = () => {
+      const d = JSON.parse(readFileSync(store2, 'utf8'));
+      d['ep.silon'] = { ...d['ep.silon'],
+                        main: { ...(d['ep.silon'] || {}).main, node: 'n_anothernode' } };
+      writeFileSync(store2, JSON.stringify(d));
+    };
+    plant();
+    await until(async () => {
+      await new Promise(r => setTimeout(r, 300));
+      if (JSON.parse(readFileSync(store2, 'utf8'))['ep.silon']?.main?.node === 'n_anothernode') return true;
+      plant();
+      return false;
+    }, 5000, 100);
     await page.evaluate(async () => {
       await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ project: 'ep.silon', devbuild: 'auto' }) });
