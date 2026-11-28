@@ -38,8 +38,8 @@ class StorageRows(unittest.TestCase):
         rep = {"os_image": {"version": "0.9.1", "slot": "b", "sealed": True, "damaged": True}}
         got = self.rows([own(rep)])
         self.assertEqual([(r["kind"], r["what"], r["bad"], r["key"]) for r in got], [("disk", "root", True, "root:damaged:n1:b:0.9.1")])
-        self.assertEqual(got[0]["said"], "slot b has a block that no longer matches AerieOS 0.9.1 as built: its disk is failing or the slot was changed, "
-                                         "and an update writes it again")
+        self.assertEqual(got[0]["said"], "slot b no longer matches AerieOS 0.9.1 as built: an update writes it again")
+        self.assertLess(len(got[0]["said"]), 80, "the bell shows two lines of a row and no more")
         for quiet in ({"version": "0.9.1", "slot": "b", "sealed": True, "damaged": False}, {"version": "0.9.1", "slot": "b"}, {}):
             self.assertEqual(self.rows([own({"os_image": quiet})]), [])
         self.assertEqual(self.rows([own(rep, own=False)]), [], "another machine's root is not this bell's")

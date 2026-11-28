@@ -1475,9 +1475,6 @@ body.firstrun #panes{display:none}
    its own under them; under them only where the row is too narrow for both. */
 .addline{display:flex;flex-wrap:wrap;gap:var(--field-gap);align-items:center;justify-content:space-between}
 .addline>:first-child{flex:1 1 16rem;min-width:0;margin:0}
-/* ...its words level with its buttons, over the form rows' rule that sets a
-   bar's items on their foot. */
-:is(.doctab,.nb) .headline>.actbar.actbar{align-items:center}
 /* display:flex beats the hidden attribute; the log hides this row. */
 .roadmapadd[hidden]{display:none}
 .roadmapadd :is(input,textarea){flex:1 1 8rem;min-width:0}
@@ -1872,7 +1869,6 @@ body.firstrun #panes{display:none}
   .doctab>.doclist>.tcs:not(.tbl):has(> .tc),.doctab>.doclist>.skt>.tcs:has(> .sk-row){margin:var(--card-gap) var(--row-x) 0;border:var(--hair) solid var(--line);
     border-radius:var(--r-surface);background:var(--panel);overflow:hidden}
   .doctab>.doclist>.tcs:not(.tbl)>:last-child{border-bottom:0}
-  .fxtab.fxtab .fxproj{border-top:0;padding-top:calc(var(--row-y) + 6px)}
   /* nginx's and the CI runner's state line heads the page, a line of words
      with nothing to draw a line under. */
   :is(.nginxtab, .runnertab) .row.toolstate{border-bottom:0}
@@ -2286,6 +2282,12 @@ body.firstrun #panes{display:none}
   padding:var(--row-y) var(--row-x) 3px;
   border-top:var(--hair) solid var(--line);font-weight:600}
 .fxtab .fxproj:first-of-type{border-top:0}
+/* At a desk each group heads a card of its own (the cards are above, with
+   the other pages'): no rule over it, and the card's own inset above. After
+   the rule it changes, so it outranks it by its place alone. */
+@media(min-width:901px){
+  .fxtab .fxproj{border-top:0;padding-top:calc(var(--row-y) + 6px)}
+}
 /* Resource meters. A number in a sentence cannot be glanced at; a bar can,
    and pressure picks the color so a filling disk is what the eye finds. */
 .ndmeters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
@@ -2439,6 +2441,10 @@ body.firstrun #panes{display:none}
    grid cell (.ctlline: a mount, a network, a store) and an action bar all
    line up this way. uniform.mjs measures every line on every tab.  */
 :is(.doctab,.nb,.modal) :is(.ctlrow,.ctlline,.actbar):not(.col){align-items:flex-end}
+/* ...but for a headline's bar, whose words stand level with its buttons (a
+   button that adds beside the words saying what it adds, .addline): after
+   the rule above, so it outranks it by its place alone. */
+:is(.doctab,.nb) .headline>.actbar{align-items:center}
 @media(max-width:600px){
   /* ...except a FULL bar, four buttons SHOWING or more (a hidden one does
      not count, and More counts as one): those share the width, each from

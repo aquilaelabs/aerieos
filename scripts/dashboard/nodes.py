@@ -5103,8 +5103,8 @@ def storage_attention():
         if img.get("damaged"):
             out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "root", "bad": True,
                         "key": f"root:damaged:{n['id']}:{img.get('slot') or ''}:{img.get('version') or ''}",
-                        "said": f"slot {img.get('slot') or '?'} has a block that no longer matches AerieOS {img.get('version') or ''} as built: "
-                                "its disk is failing or the slot was changed, and an update writes it again"})
+                        # Short enough for the bell's two lines: the cause is the Image fact's to say.
+                        "said": f"slot {img.get('slot') or '?'} no longer matches AerieOS {img.get('version') or ''} as built: an update writes it again"})
         for d in rep.get("disks") or []:
             sm = d.get("smart") or {}
             who = f"{d.get('model') or 'a disk'} ({d.get('name')}, serial {d.get('serial') or 'none'})"

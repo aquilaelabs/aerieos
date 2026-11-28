@@ -46,7 +46,7 @@ function machineHead(n){
     // AerieOS: the image, the slot this boot came from
     // and the one that boots next when an update has been written.
     ...(r.os_image?.version ? [["Image", `AerieOS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}${
-      r.os_image.damaged ? "; a block of its root no longer verifies" : r.os_image.sealed ? "; its root verified as it is read" : ""}`]] : []),
+      r.os_image.damaged ? "; a block of its root no longer verifies (a failing disk, or the slot changed)" : r.os_image.sealed ? "; its root verified as it is read" : ""}`]] : []),
     ["Up", shortUptime(state?.uptime || 0)],
     ...(r.timezone ? [["Time zone", r.timezone]] : []),
     ["Sessions kept apart", wall],
