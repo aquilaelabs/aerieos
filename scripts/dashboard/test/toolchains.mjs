@@ -162,9 +162,13 @@ await section("One word and an ellipsis for the whole of a job", async () => {
   // One word and an ellipsis for the whole of a job: no percentage read out
   // of the output (every recipe meters differently, several mislead), no bar,
   // and no verb on the card while it is being written.
-  let d = await card('flutter', { running: true, doing: 'install' });
+  let d = await card('flutter', { running: true, doing: 'install', installed: false });
   ok(d.state === 'installing' && d.dots && !d.bar && !d.acts.length,
      `a card being installed says installing with an ellipsis, no bar and no verb (${d.state}; ${d.acts.join(', ')})`);
+  // The same job on one the node already has is an update, as its row on
+  // the Installed page says.
+  d = await card('flutter', { running: true, doing: 'install', installed: true });
+  ok(d.state === 'updating' && d.dots, `...one already installed says updating, as its Installed row does (${d.state})`);
   d = await card('flutter', { running: true, doing: 'remove', installed: true });
   ok(d.state === 'removing' && d.dots && !d.bar, `...and one being removed says removing (${d.state})`);
   d = await card('flutter', { installed: true, unknown: false, version: '3.0', update: false, latest: '' });

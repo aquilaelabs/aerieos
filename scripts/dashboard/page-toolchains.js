@@ -242,6 +242,18 @@ function packHeldState(r){
 function packVersionPill(r){
   return r.version && r.version !== "-" && r.version !== "present" ? `<span class="pill" title="installed">${esc(r.version)}</span>` : "";
 }
+// The pill that says a newer version is out, or "" where none is: the one a
+// Library card, an Installed row and a thing's own page wear.
+function packOutPill(r){
+  return r.update && r.latest ? ` <span class="pill warn" title="update available">${esc(r.latest)} is out</span>` : "";
+}
+// What a row's running job is doing, in one word, the same on every page
+// that draws the row: one already on the node is being updated, whichever
+// page pressed it.
+function packDoing(r){
+  return r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.doing === "deploy" ? "deploying"
+    : r.installed ? "updating" : "installing";
+}
 // What the node's last job said went wrong with a toolchain or a pack, as
 // the line under its name, or "": nothing while its own job runs.
 function packJobErr(r, job){

@@ -93,7 +93,7 @@ function renderThingInto(i){
   }
   const may = inst.may || {};
   // Its version and an update as the row wears them, then where it stands.
-  const pills = `${packVersionPill(r)}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""}`;
+  const pills = `${packVersionPill(r)}${packOutPill(r)}`;
   const head = pageHead({title: r.label, pills, line: [inst.name ? {text: `on ${inst.name}`} : null], actions: `<span class="irow" data-irow="${esc(thingKey)}" data-style="display:contents">${instState(r)}${instActs(r, may)}</span>`})
     // Its glyph or its own icon beside its name, as a Library entry's page
     // draws it (the two pressed pages one shape).

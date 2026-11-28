@@ -80,7 +80,7 @@ function instHere(r){
 // Where it stands, in a few words at the row's right.
 function instState(r){
   const w = packState;
-  if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.doing === "deploy" ? "deploying" : r.installed ? "updating" : "installing")}<span class="dots"></span>`);
+  if (r.running) return w(`${packDoing(r)}<span class="dots"></span>`);
   if (r.kind === "service") return r.installed ? w("deployed", "ok") : r.ready ? w(esc(r.ready), "warn") : w("configured, not deployed", "warn");
   if (r.machine) return packMachineState(r, "not installed");
   if (r.kind === "agent" && !r.installed) return w("not installed: the Library installs it", "warn");
@@ -276,7 +276,7 @@ function instRow(r, may){
   const err = packJobErr(r, inst?.job);
   const conf = instConfigurable(r) ? `<button type="button" data-instopen="${esc(key)}" data-instat="configure">Configure</button>` : "";
   return `<div class="row irow" data-irow="${esc(key)}"><div class="grow">
-      <div class="name">${esc(r.label)}${ver}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""} <button type="button" class="link imore" data-instopen="${esc(key)}">Open</button></div>
+      <div class="name">${esc(r.label)}${ver}${packOutPill(r)} <button type="button" class="link imore" data-instopen="${esc(key)}">Open</button></div>
       <div class="sub iabout">${esc(r.about)}</div>${err}
     </div><div class="acts">${instState(r)}<span class="actbar">${conf}${instActs(r, may)}</span></div></div>`;
 }

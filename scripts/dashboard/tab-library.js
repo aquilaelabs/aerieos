@@ -194,15 +194,14 @@ function libPills(r){
   const by = r.maker ? `<span class="lcby" title="who ${esc(r.label)} is by">${esc(r.maker)}</span>` : "";
   const tier = `${by}<span class="pill${r.tier === "vetted" || r.tier === "verified" ? " ok" : ""}">${esc(libTierWord(r.tier).toLowerCase())}</span>`;
   const pill = packVersionPill(r), ver = pill && ` ${pill}`;
-  const upd = r.update && r.latest ? ` <span class="pill warn" title="update available">${esc(r.latest)} is out</span>` : "";
   const dev = r.dev ? devMark() : "";
-  return `${tier}${ver}${upd}${dev}`;
+  return `${tier}${ver}${packOutPill(r)}${dev}`;
 }
 
 // Where the row stands on the node, in a few words at its right.
 function libState(r){
   const w = packState;
-  if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.kind === "agent" && r.installed ? "updating" : "installing")}<span class="dots"></span>`);
+  if (r.running) return w(`${packDoing(r)}<span class="dots"></span>`);
   // Pressed while another job ran: it goes when that one ends, and says
   // which job that is.
   if (r.queued) return w(esc(`queued behind ${tcBehind(lib?.job) || tcBehind(entryLib?.job) || tcBehind() || "the job running now"}`));
