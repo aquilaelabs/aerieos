@@ -140,7 +140,14 @@ await section("the page's history", async () => {
   await page.click('.noticestab [data-ntchip=""]');
   const first = await page.$eval('.noticestab .ntrow', r => r.dataset.nt);
   await page.click(`.noticestab [data-ntdel="${first}"]`);
-  await page.waitForFunction(id => !document.querySelector(`.noticestab [data-nt="${id}"]`), first, { timeout: 10000 });
+  await page.waitForFunction(id => !document.querySelector(`.noticestab [data-nt="${id}"]`), first, { timeout: 10000,
+    tell: id => ({ kept: (noticesData || []).some(n => String(n.id) === id), chip: noticesChip, reading: !!readBusy("notices"),
+                   rows: [...document.querySelectorAll(`[data-nt="${id}"]`)].map(r => ({ cls: r.className, h: r.offsetHeight,
+                     anims: r.getAnimations().map(a => `${a.id}:${a.playState}`) })),
+                   bound: !!document.querySelector(`[data-ntdel="${id}"]`)?.onclick, now: Math.round(performance.now()),
+                   asked: performance.getEntriesByType("resource").filter(e => e.name.endsWith("/api/notices")).slice(-4)
+                     .map(e => `${Math.round(e.startTime)}+${Math.round(e.duration)}:${e.responseStatus ?? "?"}`),
+                   toasts: [...document.querySelectorAll(".toast")].map(t => t.textContent.trim().slice(0, 70)) }) });
   ok(!(await api('/api/notices')).notices.some(n => n.id === first), 'a row\'s × deletes it, on the record too');
   const says = await page.$eval('#ntClear', b => b.textContent.trim());
   await page.click('#ntClear');

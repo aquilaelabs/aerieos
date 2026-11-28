@@ -297,6 +297,17 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
           && !Array.isArray(args[1]) && Object.keys(args[1]).every(k => k === "timeout" || k === "polling"))
         args = [args[0], null, { ...args[1], ...(typeof args[1].timeout === "number"
           ? { timeout: Math.max(args[1].timeout, 30000) } : {}) }];
+      // `tell` among a wait's options is its owner's own question for the
+      // page, asked only when the wait times out and printed beside the
+      // page's state: what a part that has flaked wants known the next time
+      // (which rows, which chip, what was still out), so one sighting
+      // explains it. It is handed the wait's own argument.
+      let tell = null;
+      const opts = args[args.length - 1];
+      if (args.length > 1 && opts && typeof opts === "object" && !Array.isArray(opts) && typeof opts.tell === "function"){
+        tell = opts.tell;
+        args = [...args.slice(0, -1), Object.fromEntries(Object.entries(opts).filter(([k]) => k !== "tell"))];
+      }
       const last = args[args.length - 1];
       if (last && typeof last === "object" && typeof last.timeout === "number")
         args[args.length - 1] = { ...last, timeout: patience(last.timeout) };
@@ -357,6 +368,10 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
         // ready() and passed four times running minutes later: that one is
         // the box, and the dump shows a page that never finished arriving.
         if (e && e.name === "TimeoutError") await page.timedOut("wait");
+        if (tell && e && e.name === "TimeoutError"){
+          try { console.log("[wait] what this wait asks of the page: " + JSON.stringify(await page.evaluate(tell, m === "waitForFunction" ? args[1] : null))); }
+          catch (e2) { console.log("[wait] its own question could not be asked: " + String(e2).split("\n")[0]); }
+        }
         throw e;
       }
     };

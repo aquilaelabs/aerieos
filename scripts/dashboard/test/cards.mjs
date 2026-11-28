@@ -1494,7 +1494,11 @@ await section("Groups (the operator, 18 Oct)", async () => {
     `${c.firstChild.textContent.trim()} ${c.querySelector('.pill')?.textContent.trim()}`));
   await page.click('.doc .projtab #pjChips [data-pjchip="Clients"]');
   await page.waitForFunction(() => !document.querySelector('.doc .projtab .pcard[data-row="gamma"]')
-    && document.querySelector('.doc .projtab .pcard[data-row="beta"]'), null, { timeout: 5000 });
+    && document.querySelector('.doc .projtab .pcard[data-row="beta"]'), null, { timeout: 5000,
+    tell: () => ({ chip: pjChip, chips: [...document.querySelectorAll(".doc .projtab #pjChips [data-pjchip]")].map(c => c.dataset.pjchip + (c.classList.contains("on") ? "*" : "")),
+                   beta: (state?.repos?.beta || (state?.projects || []).find(p => p.name === "beta") || {}).group || "",
+                   held: projHeld.size, ghosts: document.querySelectorAll(".fghost").length, polling: !!refreshBusy,
+                   toasts: [...document.querySelectorAll(".toast")].map(t => t.textContent.trim().slice(0, 70)) }) });
   await page.click('.doc .projtab #pjChips [data-pjchip=""]');
   await page.waitForSelector('.doc .projtab .pcard[data-row="gamma"]', { timeout: 5000 });
   ok(chips[0]?.startsWith('All') && chips.some(c => c.startsWith('No group')) && chips.includes('Clients 1'),
